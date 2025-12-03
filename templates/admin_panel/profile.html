@@ -195,6 +195,41 @@
                                   rows="3" placeholder="Describe your restaurant...">{{ user.restaurant_description|default:'' }}</textarea>
                     </div>
                     
+                    <!-- Auto-Print Settings -->
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3">
+                                <i class="bi bi-printer me-2"></i>Automatic Printing Settings
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="auto_print_kot" 
+                                               name="auto_print_kot" {% if user.auto_print_kot %}checked{% endif %}>
+                                        <label class="form-check-label" for="auto_print_kot">
+                                            <strong>Auto-Print KOT</strong>
+                                            <small class="d-block text-muted">Automatically print Kitchen Order Tickets when orders are placed</small>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="auto_print_bot" 
+                                               name="auto_print_bot" {% if user.auto_print_bot %}checked{% endif %}>
+                                        <label class="form-check-label" for="auto_print_bot">
+                                            <strong>Auto-Print BOT</strong>
+                                            <small class="d-block text-muted">Automatically print Bar Order Tickets when orders are placed</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info mb-0 mt-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <small>When enabled, KOT/BOT will automatically open in print dialog when customers place orders. Make sure pop-ups are allowed in your browser.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="d-flex gap-2 mb-3">
                         <button type="submit" class="btn btn-success">
                             <i class="fas fa-save me-1"></i>Update Restaurant Info

@@ -76,6 +76,85 @@
 <div class="tab-content" id="categoryTabContent">
     <!-- Main Categories Tab -->
     <div class="tab-pane fade show active" id="main-categories" role="tabpanel" aria-labelledby="main-categories-tab">
+        <!-- Search and Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" id="filterForm" class="mb-0">
+                    <div class="row g-3">
+                        <!-- Search Input -->
+                        <div class="col-md-5">
+                            <label for="categorySearch" class="form-label">
+                                <i class="fas fa-search"></i> Search Categories
+                            </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="categorySearch" name="search" 
+                                       value="{{ request.GET.search }}" placeholder="Search by category name...">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                            </div>
+                            <small class="text-muted">Press ESC to clear search</small>
+                        </div>
+
+                        <!-- Restaurant Filter -->
+                        <div class="col-md-3">
+                            <label for="restaurantFilter" class="form-label">
+                                <i class="fas fa-building"></i> Restaurant
+                            </label>
+                            <select class="form-select" id="restaurantFilter" name="restaurant">
+                                <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                                {% for restaurant in accessible_restaurants %}
+                                <option value="{{ restaurant.id }}" 
+                                    {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
+                                    {% elif not request.GET.restaurant and current_restaurant.id == restaurant.id %}selected
+                                    {% endif %}>
+                                    {{ restaurant.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="col-md-2">
+                            <label for="statusFilter" class="form-label">
+                                <i class="fas fa-toggle-on"></i> Status
+                            </label>
+                            <select class="form-select" id="statusFilter" name="status">
+                                <option value="">All Status</option>
+                                <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                            </select>
+                        </div>
+
+                        <!-- Items Per Page -->
+                        <div class="col-md-2">
+                            <label for="perPageSelect" class="form-label">
+                                <i class="fas fa-list"></i> Per Page
+                            </label>
+                            <select class="form-select" id="perPageSelect" name="per_page">
+                                <option value="5" {% if request.GET.per_page == '5' %}selected{% endif %}>5</option>
+                                <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
+                                <option value="20" {% if request.GET.per_page == '20' %}selected{% endif %}>20</option>
+                                <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                                <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Results Summary -->
+                    <div class="mt-3">
+                        <div class="text-muted">
+                            {% if page_obj %}
+                                Showing <strong>{{ page_obj.paginator.count }}</strong> categories total
+                            {% else %}
+                                Showing <strong>{{ main_categories|length }}</strong> categories total
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="d-flex gap-2">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMainCategoryModal">
@@ -84,10 +163,6 @@
                 <button class="btn btn-danger" id="bulkDeleteMainCategoriesBtn" style="display: none;">
                     <i class="fas fa-trash me-2"></i>Delete Selected (<span id="selectedMainCategoriesCount">0</span>)
                 </button>
-            </div>
-            <div class="input-group" style="width: 300px;">
-                <span class="input-group-text"><i class="fas fa-search"></i></span>
-                <input type="text" class="form-control" placeholder="Search main categories..." id="mainCategorySearchInput">
             </div>
         </div>
         
@@ -100,6 +175,7 @@
                         </th>
                         <th>Category</th>
                         <th>Description</th>
+                        <th>Restaurant/Branch</th>
                         <th>Status</th>
                         <th>Subcategories</th>
                         <th>Actions</th>
@@ -107,7 +183,7 @@
                 </thead>
                 <tbody id="mainCategoriesTableBody">
                     {% for category in main_categories %}
-                    <tr data-category-id="{{ category.id }}">
+                    <tr data-category-id="{{ category.id }}" data-restaurant-id="{% if category.restaurant %}{{ category.restaurant.id }}{% endif %}">
                         <td>
                             <input type="checkbox" class="form-check-input category-checkbox" value="{{ category.id }}">
                         </td>
@@ -128,6 +204,15 @@
                         </td>
                         <td>
                             <span class="text-muted">{{ category.description|truncatewords:8|default:"No description provided" }}</span>
+                        </td>
+                        <td>
+                            {% if category.restaurant %}
+                                {{ category.restaurant.name }}
+                            {% elif category.owner %}
+                                {{ category.owner.restaurant_name|default:"-" }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if category.is_active %}
@@ -173,7 +258,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">
+                        <td colspan="7" class="text-center text-muted py-4">
                             <i class="fas fa-folder fa-3x mb-3 d-block text-light"></i>
                             No main categories found
                         </td>
@@ -182,6 +267,61 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination Controls -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Categories pagination" class="mt-4">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="text-muted mb-2">
+                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} categories
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <ul class="pagination justify-content-end mb-0">
+                        <!-- First Page -->
+                        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                            <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" {% if not page_obj.has_previous %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        
+                        <!-- Previous Page -->
+                        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                            <a class="page-link" href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% else %}#{% endif %}" {% if not page_obj.has_previous %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+
+                        <!-- Page Numbers -->
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if num >= page_obj.number|add:'-3' and num <= page_obj.number|add:'3' %}
+                                <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        <!-- Next Page -->
+                        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% else %}#{% endif %}" {% if not page_obj.has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+
+                        <!-- Last Page -->
+                        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" {% if not page_obj.has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+        {% endif %}
     </div>
 
     <!-- Subcategories Tab -->
@@ -211,6 +351,7 @@
                         <th>Subcategory</th>
                         <th>Main Category</th>
                         <th>Description</th>
+                        <th>Restaurant/Branch</th>
                         <th>Status</th>
                         <th>Products</th>
                         <th>Actions</th>
@@ -249,6 +390,15 @@
                         </td>
                         <td>
                             <span class="text-muted">{{ subcategory.description|truncatewords:8|default:"No description provided" }}</span>
+                        </td>
+                        <td>
+                            {% if subcategory.main_category.restaurant %}
+                                {{ subcategory.main_category.restaurant.name }}
+                            {% elif subcategory.main_category.owner %}
+                                {{ subcategory.main_category.owner.restaurant_name|default:"-" }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if subcategory.is_active %}
@@ -294,7 +444,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
+                        <td colspan="8" class="text-center text-muted py-4">
                             <i class="fas fa-folder-open fa-3x mb-3 d-block text-light"></i>
                             No subcategories found
                         </td>
@@ -331,6 +481,29 @@
                         <label for="mainCategoryImage" class="form-label">Category Image</label>
                         <input type="file" class="form-control" id="mainCategoryImage" name="image" accept="image/*">
                         <div class="form-text">Upload an image for this category (JPG, PNG, GIF - Max: 5MB)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="mainCategoryRestaurant" class="form-label">Restaurant/Branch</label>
+                        <select class="form-select" id="mainCategoryRestaurant" name="restaurant_id" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
+                            {% if view_all_restaurants %}
+                                <option value="">Select Restaurant/Branch</option>
+                                {% for restaurant in accessible_restaurants %}
+                                <option value="{{ restaurant.id }}">
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                {% endfor %}
+                            {% elif current_restaurant %}
+                                <option value="{{ current_restaurant.id }}" selected>
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
+                            {% else %}
+                                <option value="">No Restaurant Available</option>
+                            {% endif %}
+                        </select>
+                        {% if current_restaurant and not view_all_restaurants %}
+                        <div class="form-text">Category will be assigned to: {{ current_restaurant.name }}</div>
+                        {% endif %}
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
@@ -379,6 +552,26 @@
                         <input type="file" class="form-control" id="editMainCategoryImage" name="image" accept="image/*">
                         <div class="form-text">Upload a new image to replace the current one (optional)</div>
                         <div id="currentImagePreview" style="margin-top: 10px;"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editMainCategoryRestaurant" class="form-label">Restaurant/Branch</label>
+                        <select class="form-select" id="editMainCategoryRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
+                            {% if view_all_restaurants %}
+                                <option value="">Select Restaurant/Branch</option>
+                                {% for restaurant in accessible_restaurants %}
+                                <option value="{{ restaurant.id }}">
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                {% endfor %}
+                            {% elif current_restaurant %}
+                                <option value="{{ current_restaurant.id }}" selected>
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
+                            {% else %}
+                                <option value="">No Restaurant Available</option>
+                            {% endif %}
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -596,6 +789,15 @@ function editMainCategory(categoryId) {
             description = descElement.textContent.trim();
         }
         document.getElementById('editMainCategoryDescription').value = description;
+        
+        // Set restaurant dropdown value if category has a restaurant
+        const restaurantId = row.getAttribute('data-restaurant-id');
+        if (restaurantId) {
+            const restaurantSelect = document.getElementById('editMainCategoryRestaurant');
+            if (restaurantSelect) {
+                restaurantSelect.value = restaurantId;
+            }
+        }
         
         // Show modal
         const modal = new bootstrap.Modal(document.getElementById('editMainCategoryModal'));
@@ -868,21 +1070,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Search functionality for main categories
-    const mainCategorySearchInput = document.getElementById('mainCategorySearchInput');
-    if (mainCategorySearchInput) {
-        mainCategorySearchInput.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const tableRows = document.querySelectorAll('#mainCategoriesTableBody tr');
-            
-            tableRows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+    // Filter form auto-submit for categories
+    const filterSelects = document.querySelectorAll('#restaurantFilter, #statusFilter, #perPageSelect');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+    });
+
+    // Search with debounce for categories
+    const categorySearchInput = document.getElementById('categorySearch');
+    let searchTimeout;
+    if (categorySearchInput) {
+        categorySearchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                document.getElementById('filterForm').submit();
+            }, 500);
+        });
+
+        // ESC to clear search
+        categorySearchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                document.getElementById('filterForm').submit();
+            }
         });
     }
 

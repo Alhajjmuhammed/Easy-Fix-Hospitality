@@ -15,6 +15,21 @@
     <div class="card-body">
         <form method="get" id="filter-form">
             <div class="row">
+                <!-- Restaurant Filter (for PRO/BRANCH users) -->
+                {% if accessible_restaurants.count > 1 %}
+                <div class="col-md-3">
+                    <label for="restaurant_filter">Restaurant:</label>
+                    <select class="form-control" id="restaurant_filter" name="restaurant_filter" onchange="this.form.submit()">
+                        <option value="view_all" {% if view_all %}selected{% endif %}>All Restaurants</option>
+                        {% for restaurant in accessible_restaurants %}
+                            <option value="{{ restaurant.id }}" {% if selected_restaurant.id == restaurant.id %}selected{% endif %}>
+                                {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
                 <div class="col-md-3">
                     <label for="start_date">Start Date:</label>
                     <input type="date" id="start_date" name="date_from" class="form-control" value="{{ start_date }}">
@@ -57,6 +72,72 @@
         </form>
     </div>
 </div>
+
+<!-- Branch/Location Performance (when viewing all restaurants) -->
+{% if branch_performance %}
+<div class="card mt-4">
+    <div class="card-header" style="background: linear-gradient(120deg, #1e3c72 0%, #2a5298 100%); color: white;">
+        <h5 class="mb-0"><i class="fas fa-chart-bar mr-2"></i>Waste Performance by Location</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead style="background-color: #f8f9fc;">
+                    <tr>
+                        <th>Restaurant/Branch</th>
+                        <th>Total Items Wasted</th>
+                        <th>% of Total Items</th>
+                        <th>Total Cost</th>
+                        <th>% of Total Cost</th>
+                        <th>Avg Cost per Item</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for perf in branch_performance %}
+                    <tr>
+                        <td>
+                            <strong>{{ perf.restaurant.name }}</strong>
+                            {% if perf.restaurant.is_main_restaurant %}
+                                <span class="badge badge-primary ml-2">Main</span>
+                            {% else %}
+                                <span class="badge badge-info ml-2">Branch</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ perf.total_items }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="mr-2">{{ perf.items_percentage }}%</span>
+                                <div class="progress" style="width: 100px; height: 20px;">
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         style="width: {{ perf.items_percentage }}%"
+                                         aria-valuenow="{{ perf.items_percentage }}" 
+                                         aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${{ perf.total_cost|floatformat:2 }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="mr-2">{{ perf.cost_percentage }}%</span>
+                                <div class="progress" style="width: 100px; height: 20px;">
+                                    <div class="progress-bar bg-danger" role="progressbar" 
+                                         style="width: {{ perf.cost_percentage }}%"
+                                         aria-valuenow="{{ perf.cost_percentage }}" 
+                                         aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${{ perf.avg_cost|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <div class="card mt-4">
     <div class="card-header">

@@ -1,0 +1,409 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}Main Owner Dashboard{% endblock %}
+
+{% block page_title %}Branch Monitoring Dashboard{% endblock %}
+{% block page_description %}Monitor all your restaurant branches and performance{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<!-- Restaurant Context Header -->
+{% if user.is_main_owner %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-lg overflow-hidden" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%); border-radius: 20px;">
+            <div class="card-body p-4 position-relative" style="backdrop-filter: blur(10px);">
+                <!-- Decorative Elements -->
+                <div class="position-absolute" style="top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 50%; filter: blur(40px);"></div>
+                <div class="position-absolute" style="bottom: -30px; left: -30px; width: 150px; height: 150px; background: rgba(255,255,255,0.08); border-radius: 50%; filter: blur(30px);"></div>
+                
+                <div class="d-flex justify-content-between align-items-center position-relative">
+                    <div class="d-flex align-items-center">
+                        <div class="me-4" style="width: 70px; height: 70px; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.15);">
+                            <i class="fas fa-crown" style="font-size: 32px; color: #ffd700;"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-white mb-2" style="font-weight: 700; font-size: 1.8rem; letter-spacing: -0.5px;">
+                                {% if current_restaurant %}
+                                    {{ current_restaurant.name }}
+                                {% else %}
+                                    All Restaurants
+                                {% endif %}
+                            </h4>
+                            <p class="text-white mb-0 d-flex align-items-center" style="opacity: 0.95; font-size: 0.95rem;">
+                                {% if current_restaurant %}
+                                    {% if current_restaurant.is_main_restaurant %}
+                                        <span class="badge me-2" style="background: rgba(255,215,0,0.2); color: #ffd700; border: 1px solid rgba(255,215,0,0.3); padding: 4px 12px; border-radius: 20px;">
+                                            <i class="fas fa-star me-1"></i>Main Restaurant
+                                        </span>
+                                    {% else %}
+                                        <span class="badge me-2" style="background: rgba(100,210,255,0.2); color: #64d2ff; border: 1px solid rgba(100,210,255,0.3); padding: 4px 12px; border-radius: 20px;">
+                                            <i class="fas fa-code-branch me-1"></i>Branch Location
+                                        </span>
+                                    {% endif %}
+                                    {% if current_restaurant.address %}
+                                        <i class="fas fa-map-marker-alt me-2 ms-2"></i>{{ current_restaurant.address }}
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 6px 16px; border-radius: 20px; font-size: 0.9rem;">
+                                        <i class="fas fa-globe me-2"></i>Consolidated view of all restaurant locations ({{ total_restaurants }} locations)
+                                    </span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-light px-4 py-2 d-flex align-items-center gap-2" style="border-radius: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: all 0.3s ease;">
+                            <i class="fas fa-cog"></i>
+                            <span>Manage Branches</span>
+                        </a>
+                        <a href="{% url 'admin_panel:restaurant_selection' %}" class="btn px-4 py-2 d-flex align-items-center gap-2" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: all 0.3s ease;">
+                            <i class="fas fa-exchange-alt"></i>
+                            <span>Switch Restaurant</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Summary Statistics -->
+<div class="row g-4 mb-5">
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card stats-card">
+            <div class="card-body position-relative">
+                <div class="stats-number">{{ total_restaurants }}</div>
+                <div class="stats-label">Total Locations</div>
+                <i class="fas fa-store stats-icon text-primary"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card stats-card">
+            <div class="card-body position-relative">
+                <div class="stats-number">{{ active_branches }}</div>
+                <div class="stats-label">Active Branches</div>
+                <i class="fas fa-chart-line stats-icon text-success"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card stats-card">
+            <div class="card-body position-relative">
+                <div class="stats-number">{{ total_orders }}</div>
+                <div class="stats-label">Total Orders</div>
+                <i class="fas fa-shopping-cart stats-icon text-info"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card stats-card">
+            <div class="card-body position-relative">
+                <div class="stats-number">${{ total_revenue|floatformat:2 }}</div>
+                <div class="stats-label">Today's Revenue</div>
+                <i class="fas fa-dollar-sign stats-icon text-warning"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Branch Overview -->
+<div class="row">
+    <div class="col-12">
+        <div class="card modern-table">
+            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-store me-2 text-primary"></i>
+                    Branch Performance Overview
+                </h5>
+                <div>
+                    <a href="{% url 'admin_panel:branch_reports' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-chart-bar"></i> Detailed Reports
+                    </a>
+                    <a href="{% url 'admin_panel:add_branch' %}" class="btn btn-success btn-sm">
+                        <i class="fas fa-plus"></i> Add Branch
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Branch</th>
+                                <th>Status</th>
+                                <th>Branch Owner</th>
+                                <th class="text-center">Orders Today</th>
+                                <th class="text-center">Revenue Today</th>
+                                <th class="text-center">Staff</th>
+                                <th class="text-center">Tables</th>
+                                <th class="text-center">Products</th>
+                                <th class="text-center">Pending Orders</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in branch_stats %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if stat.restaurant.is_main_restaurant %}
+                                            <i class="fas fa-star text-warning me-2"></i>
+                                        {% else %}
+                                            <i class="fas fa-code-branch text-success me-2"></i>
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ stat.restaurant.name }}</strong>
+                                            {% if stat.restaurant.is_main_restaurant %}
+                                                <span class="badge bg-primary ms-2">Main</span>
+                                            {% else %}
+                                                <span class="badge bg-success ms-2">Branch</span>
+                                            {% endif %}
+                                            {% if stat.restaurant.address %}
+                                                <br><small class="text-muted">{{ stat.restaurant.address|truncatechars:30 }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if stat.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ stat.restaurant.branch_owner.get_full_name|default:stat.restaurant.branch_owner.username }}</strong>
+                                        <br><small class="text-muted">{{ stat.restaurant.branch_owner.username }}</small>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-info">{{ stat.orders_count }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <strong>${{ stat.today_revenue|floatformat:2 }}</strong>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary">{{ stat.staff_count }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-dark">{{ stat.tables_count }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-warning">{{ stat.products_count }}</span>
+                                </td>
+                                <td class="text-center">
+                                    {% if stat.pending_orders > 0 %}
+                                        <span class="badge bg-danger">{{ stat.pending_orders }}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'admin_panel:branch_detail' stat.restaurant.id %}" 
+                                           class="btn btn-outline-primary" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if not stat.restaurant.is_main_restaurant %}
+                                        <a href="{% url 'admin_panel:edit_branch' stat.restaurant.id %}" 
+                                           class="btn btn-outline-warning" title="Edit Branch">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-outline-{% if stat.is_active %}secondary{% else %}success{% endif %}" 
+                                                title="{% if stat.is_active %}Deactivate{% else %}Activate{% endif %} Branch"
+                                                onclick="toggleRestaurantStatus('{{ stat.restaurant.id }}', '{{ stat.restaurant.name|escapejs }}', {{ stat.is_active|yesno:'true,false' }})">
+                                            <i class="fas fa-{% if stat.is_active %}pause{% else %}play{% endif %}"></i>
+                                        </button>
+                                        <button type="button" 
+                                                class="btn btn-outline-danger" 
+                                                title="Delete Branch"
+                                                onclick="confirmDeleteBranch('{{ stat.restaurant.id }}', '{{ stat.restaurant.name|escapejs }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="10" class="text-center text-muted py-4">
+                                    <i class="fas fa-store fa-3x mb-3"></i>
+                                    <br>No branches found. 
+                                    <a href="{% url 'admin_panel:add_branch' %}">Add your first branch</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Branch Confirmation Modal -->
+<div class="modal fade" id="deleteBranchModal" tabindex="-1" aria-labelledby="deleteBranchModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteBranchModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Delete Branch
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <i class="fas fa-store fa-3x text-danger mb-3"></i>
+                    <h5>Are you sure you want to delete this branch?</h5>
+                    <p class="text-muted" id="branchDeleteMessage">This action cannot be undone.</p>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> This will permanently delete:
+                        <ul class="list-unstyled mt-2">
+                            <li>• All branch data</li>
+                            <li>• Tables and products</li>
+                            <li>• Order history</li>
+                            <li>• Branch owner access</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-1"></i>Delete Branch
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let branchToDelete = null;
+
+function confirmDeleteBranch(branchId, branchName) {
+    branchToDelete = branchId;
+    document.getElementById('branchDeleteMessage').innerHTML = 
+        `Branch "<strong>${branchName}</strong>" and all its data will be permanently deleted.`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('deleteBranchModal'));
+    modal.show();
+}
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+    if (branchToDelete) {
+        // Show loading state
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+        this.disabled = true;
+        
+        // Use AJAX instead of form submission for better error handling
+        $.ajax({
+            url: `/admin-panel/branches/${branchToDelete}/delete/`,
+            type: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Close modal and show success message
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('deleteBranchModal'));
+                    modal.hide();
+                    showAlert('success', response.message);
+                    // Reload page after short delay
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showAlert('danger', 'Error: ' + response.error);
+                    // Reset button
+                    const btn = document.getElementById('confirmDeleteBtn');
+                    btn.innerHTML = '<i class="fas fa-trash me-1"></i>Delete Branch';
+                    btn.disabled = false;
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'An error occurred while deleting the branch.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                showAlert('danger', errorMsg);
+                // Reset button
+                const btn = document.getElementById('confirmDeleteBtn');
+                btn.innerHTML = '<i class="fas fa-trash me-1"></i>Delete Branch';
+                btn.disabled = false;
+            }
+        });
+    }
+});
+
+function toggleRestaurantStatus(restaurantId, restaurantName, isActive) {
+    const action = isActive ? 'deactivate' : 'activate';
+    const confirmation = confirm(`Are you sure you want to ${action} "${restaurantName}"?`);
+    
+    if (confirmation) {
+        $.ajax({
+            url: `/admin-panel/branches/${restaurantId}/toggle-status/`,
+            type: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    showAlert('success', response.message);
+                    // Reload page after short delay
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showAlert('danger', 'Error: ' + response.error);
+                }
+            },
+            error: function() {
+                showAlert('danger', 'An error occurred while updating restaurant status.');
+            }
+        });
+    }
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert" 
+             style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    $('body').append(alertHtml);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        $('.alert').fadeOut();
+    }, 5000);
+}
+
+// Auto-refresh dashboard every 30 seconds
+setInterval(function() {
+    // Only refresh if no modals are open
+    if (!document.querySelector('.modal.show')) {
+        window.location.reload();
+    }
+}, 30000);
+
+// Add tooltips
+$(document).ready(function() {
+    $('[data-bs-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}

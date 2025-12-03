@@ -4,12 +4,75 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Count, Q
 from django.utils import timezone
+from django.core.paginator import Paginator
 from accounts.models import User, Role, RestaurantSubscription, SubscriptionLog
 from restaurant.models import MainCategory, SubCategory, Product, TableInfo
+from restaurant.models_restaurant import Restaurant
 from orders.models import Order, OrderItem
 from django.contrib.auth.hashers import make_password
 from datetime import date, timedelta, datetime
 import json
+
+def get_all_restaurants_for_admin():
+    """
+    Helper function to get all restaurants for admin filtering.
+    Returns a list of dictionaries with id and name for both User and Restaurant models.
+    Updated to show accurate subscription plan information after data cleanup.
+    """
+    # Priority: Get restaurants from Restaurant model first (more accurate)
+    restaurants_from_model = Restaurant.objects.select_related('main_owner', 'main_owner__role').filter(
+        is_main_restaurant=True,  # Only main restaurants for filtering
+        main_owner__is_active=True  # Only active owners
+    ).values(
+        'main_owner__id', 'name', 'subscription_plan', 'main_owner__role__name'
+    )
+    
+    # Get restaurants from User model that don't have Restaurant model entries
+    restaurants_from_users = User.objects.filter(
+        role__name__in=['owner', 'main_owner', 'branch_owner'], 
+        restaurant_name__isnull=False,
+        is_active=True
+    ).exclude(restaurant_name='').exclude(
+        id__in=[r['main_owner__id'] for r in restaurants_from_model]
+    ).values(
+        'id', 'restaurant_name', 'role__name'
+    )
+    
+    # Build final restaurant list
+    restaurant_list = []
+    
+    # Add from Restaurant model (most accurate)
+    for resto in restaurants_from_model:
+        plan_display = ""
+        if resto['subscription_plan'] == 'PRO':
+            plan_display = " (PRO)"
+        elif resto['subscription_plan'] == 'SINGLE':
+            plan_display = " (Single)"
+            
+        restaurant_list.append({
+            'id': resto['main_owner__id'],
+            'name': resto['name'] + plan_display,
+            'role': resto['main_owner__role__name'],
+            'plan': resto['subscription_plan']
+        })
+    
+    # Add from User model (legacy entries without Restaurant model)
+    for resto in restaurants_from_users:
+        restaurant_list.append({
+            'id': resto['id'],
+            'name': resto['restaurant_name'],
+            'role': resto['role__name'],
+            'plan': 'LEGACY'
+        })
+    
+    # Sort by name
+    return sorted(restaurant_list, key=lambda x: x['name'])
+
+def get_restaurant_owner_by_id(restaurant_id):
+    """
+    Helper function to get restaurant owner by ID, supporting all owner types.
+    """
+    return get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
 
 @login_required
 def system_dashboard(request):
@@ -18,9 +81,10 @@ def system_dashboard(request):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # System statistics
-    total_restaurants = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='').count()
-    total_owners = User.objects.filter(role__name='owner').count()
+    # System statistics - Use Restaurant model for accurate counts
+    total_restaurants = Restaurant.objects.filter(is_main_restaurant=True).count()
+    total_branches = Restaurant.objects.filter(is_main_restaurant=False).count()
+    total_owners = User.objects.filter(role__name__in=['owner', 'main_owner', 'branch_owner']).count()
     total_users = User.objects.count()
     total_categories = MainCategory.objects.count()
     total_products = Product.objects.count()
@@ -29,13 +93,21 @@ def system_dashboard(request):
     
     # Recent activity
     recent_orders = Order.objects.select_related('table_info', 'ordered_by').order_by('-created_at')[:10]
-    recent_users = User.objects.order_by('-created_at')[:10]
+    recent_users = User.objects.select_related('role').order_by('-created_at')[:10]
     
-    # Restaurant breakdown
+    # Restaurant breakdown - Use Restaurant model with optimized queries
     restaurants = []
-    for owner in User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name=''):
+    restaurant_list = Restaurant.objects.filter(
+        is_main_restaurant=True
+    ).select_related('main_owner', 'main_owner__role').prefetch_related(
+        'main_owner__owned_users'
+    ).order_by('name')[:10]  # Limit to first 10 for dashboard performance
+    
+    for restaurant in restaurant_list:
+        owner = restaurant.main_owner
         restaurant_data = {
             'owner': owner,
+            'restaurant': restaurant,
             'categories': MainCategory.objects.filter(owner=owner).count(),
             'products': Product.objects.filter(main_category__owner=owner).count(),
             'tables': TableInfo.objects.filter(owner=owner).count(),
@@ -46,6 +118,7 @@ def system_dashboard(request):
     
     context = {
         'total_restaurants': total_restaurants,
+        'total_branches': total_branches,
         'total_owners': total_owners,
         'total_users': total_users,
         'total_categories': total_categories,
@@ -75,10 +148,10 @@ def statistics(request):
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
     
-    # Basic counts
+    # Basic counts - Updated for new role system
     stats = {
         'total_restaurants': User.objects.filter(
-            role__name='owner',
+            role__name__in=['owner', 'main_owner', 'branch_owner'],
             restaurant_name__isnull=False
         ).exclude(restaurant_name='').count(),
         'total_users': User.objects.count(),
@@ -108,9 +181,9 @@ def statistics(request):
     for role_obj in Role.objects.all():
         user_role_counts[role_obj.name] = User.objects.filter(role=role_obj).count()
     
-    # Top restaurants by order count
+    # Top restaurants by order count - Updated for new role system
     top_restaurants = User.objects.filter(
-        role__name='owner',
+        role__name__in=['owner', 'main_owner', 'branch_owner'],
         restaurant_name__isnull=False
     ).exclude(restaurant_name='').annotate(
         order_count=Count('tableinfo__order')
@@ -127,69 +200,156 @@ def statistics(request):
 
 @login_required
 def manage_all_restaurants(request):
-    """Manage all restaurants system-wide with subscription information"""
+    """Manage all restaurants system-wide with subscription plan information"""
     if not request.user.is_administrator():
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # Get all owners (restaurants are represented by owners)
-    restaurants = User.objects.filter(role__name='owner').select_related('subscription').order_by('restaurant_name', 'username')
+    # Get search and filter parameters
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '')
+    plan_filter = request.GET.get('plan', '')
+    subscription_status_filter = request.GET.get('subscription_status', '')
+    per_page = int(request.GET.get('per_page', 10))  # Default to 10, allow customization
+    page = request.GET.get('page', 1)
+    
+    # Start with all restaurants
+    restaurants = Restaurant.objects.select_related('main_owner', 'branch_owner').order_by('-is_main_restaurant', 'name')
+    
+    # Apply search filter
+    if search_query:
+        restaurants = restaurants.filter(
+            Q(name__icontains=search_query) |
+            Q(main_owner__username__icontains=search_query) |
+            Q(main_owner__first_name__icontains=search_query) |
+            Q(main_owner__last_name__icontains=search_query) |
+            Q(main_owner__email__icontains=search_query) |
+            Q(address__icontains=search_query)
+        )
+    
+    # Apply status filter
+    if status_filter:
+        if status_filter == 'active':
+            restaurants = restaurants.filter(is_active=True)
+        elif status_filter == 'inactive':
+            restaurants = restaurants.filter(is_active=False)
+    
+    # Apply subscription plan filter
+    if plan_filter:
+        restaurants = restaurants.filter(subscription_plan=plan_filter)
+    
+    # Apply subscription status filter
+    if subscription_status_filter:
+        # Filter by subscription status through main_owner relationship
+        if subscription_status_filter == 'active':
+            restaurants = restaurants.filter(main_owner__subscription__subscription_status='active')
+        elif subscription_status_filter == 'blocked':
+            restaurants = restaurants.filter(main_owner__subscription__subscription_status='blocked')
+        elif subscription_status_filter == 'expired':
+            restaurants = restaurants.filter(main_owner__subscription__subscription_status='expired')
+        elif subscription_status_filter == 'no_subscription':
+            restaurants = restaurants.filter(main_owner__subscription__isnull=True)
+    
+    # Get total count before pagination
     total_restaurants = restaurants.count()
     
-    # Calculate subscription statistics
+    # Calculate subscription plan statistics (before filtering)
+    all_restaurants = Restaurant.objects.select_related('main_owner', 'branch_owner')
     subscription_stats = {
-        'total': total_restaurants,
-        'active': 0,
-        'expired': 0,
-        'blocked': 0,
-        'trial': 0,
-        'grace_period': 0,
-        'expiring_soon': 0,  # Expiring in next 7 days
+        'total': all_restaurants.count(),
+        'single_plan': all_restaurants.filter(subscription_plan='SINGLE').count(),
+        'pro_plan': all_restaurants.filter(subscription_plan='PRO').count(),
+        'main_restaurants': all_restaurants.filter(is_main_restaurant=True).count(),
+        'branches': all_restaurants.filter(is_main_restaurant=False).count(),
+        'active': all_restaurants.filter(is_active=True).count(),
+        'inactive': all_restaurants.filter(is_active=False).count(),
     }
     
-    # Process each restaurant to add subscription info
+    
+    # Pagination with customizable per_page
+    from django.core.paginator import Paginator
+    # Ensure per_page is within reasonable limits
+    per_page = max(5, min(per_page, 50))  # Between 5 and 50
+    paginator = Paginator(restaurants, per_page)
+    try:
+        restaurants_page = paginator.page(page)
+    except:
+        restaurants_page = paginator.page(1)
+    
+    # Add computed fields for template
     restaurant_data = []
-    for restaurant in restaurants:
+    for restaurant in restaurants_page:
+        # Add subscription plan info
+        restaurant.subscription_display = restaurant.get_subscription_display()
+        restaurant.can_create_branches_display = restaurant.can_create_branches()
+        restaurant.branch_count = restaurant.branches.count() if restaurant.is_main_restaurant else 0
+        
+        # Add owner information from the User model for template compatibility
+        main_owner = restaurant.main_owner
+        restaurant.username = main_owner.username
+        restaurant.email = main_owner.email
+        restaurant.first_name = main_owner.first_name
+        restaurant.last_name = main_owner.last_name
+        
+        # Add subscription status and days remaining
         try:
-            subscription = restaurant.subscription
-            subscription.update_subscription_status()  # Update status
-            
-            # Add subscription info to restaurant object
-            restaurant.subscription_info = subscription.get_subscription_info()
-            
-            # Update statistics
-            if subscription.is_active:
-                subscription_stats['active'] += 1
-                if subscription.days_until_expiration <= 7 and subscription.days_until_expiration > 0:
-                    subscription_stats['expiring_soon'] += 1
-            elif subscription.is_blocked_by_admin:
-                subscription_stats['blocked'] += 1
-            elif subscription.subscription_status == 'expired':
-                subscription_stats['expired'] += 1
-            
-            if subscription.subscription_plan == 'trial':
-                subscription_stats['trial'] += 1
-            
-            if subscription.is_in_grace_period:
-                subscription_stats['grace_period'] += 1
-                
-        except RestaurantSubscription.DoesNotExist:
-            # Restaurant without subscription
-            restaurant.subscription_info = {
-                'status': 'No Subscription',
-                'is_active': False,
-                'plan': 'None',
-                'days_until_expiration': 0,
-                'is_blocked': False,
-                'is_in_grace_period': False
-            }
+            subscription = main_owner.subscription
+            restaurant.subscription_status = subscription.subscription_status
+            restaurant.days_remaining = subscription.days_until_expiration
+            restaurant.is_blocked = subscription.subscription_status == 'blocked' or subscription.is_blocked_by_admin
+            restaurant.is_in_grace = subscription.is_in_grace_period
+        except:
+            # No subscription record found
+            restaurant.subscription_status = 'unknown'
+            restaurant.days_remaining = 0
+            restaurant.is_blocked = False
+            restaurant.is_in_grace = False
+        
+        # Use Restaurant model data when available, fallback to User model
+        restaurant.phone_number = main_owner.phone_number
+        restaurant.address = restaurant.address  # Always use Restaurant model address
+        restaurant.date_joined = main_owner.date_joined
+        restaurant.restaurant_name = restaurant.name  # Always use Restaurant model
+        restaurant.restaurant_description = restaurant.description  # Always use Restaurant model
+        
+        # Debug: Add updated timestamp to check if data is fresh
+        restaurant.debug_updated = restaurant.updated_at
+        
+        # Add get_full_name method result directly as property for template access
+        restaurant.full_name_display = main_owner.get_full_name()
+        
+        # Add owner information for detailed views
+        restaurant.owner_info = {
+            'main_owner_name': main_owner.get_full_name() or main_owner.username,
+            'main_owner_email': main_owner.email,
+            'branch_owner_name': restaurant.branch_owner.get_full_name() or restaurant.branch_owner.username if restaurant.branch_owner else 'N/A',
+            'branch_owner_email': restaurant.branch_owner.email if restaurant.branch_owner else 'N/A',
+        }
         
         restaurant_data.append(restaurant)
     
+    # Get filter options for dropdowns
+    subscription_plans = [('SINGLE', 'Single Plan'), ('PRO', 'PRO Plan')]
+    subscription_statuses = [('active', 'Active'), ('blocked', 'Blocked'), ('expired', 'Expired'), ('no_subscription', 'No Subscription')]
+    status_options = [('active', 'Active'), ('inactive', 'Inactive')]
+    per_page_options = [5, 10, 15, 20, 25, 50]
+    
     context = {
-        'restaurants': restaurant_data,
+        'restaurants': restaurants_page,  # Pass the paginated queryset
         'total_restaurants': total_restaurants,
+        'filtered_count': total_restaurants,
         'subscription_stats': subscription_stats,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'plan_filter': plan_filter,
+        'subscription_status_filter': subscription_status_filter,
+        'per_page': per_page,
+        'subscription_plans': subscription_plans,
+        'subscription_statuses': subscription_statuses,
+        'status_options': status_options,
+        'per_page_options': per_page_options,
+        'paginator': paginator,
+        'page_obj': restaurants_page,
     }
     
     return render(request, 'system_admin/manage_restaurants.html', context)
@@ -201,33 +361,80 @@ def manage_all_users(request):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # Get all restaurants for filtering - EXACT COPY FROM TABLES
-    restaurants = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='').order_by('restaurant_name')
+    # Get all restaurants for filtering - Updated to include all owner types and PRO plans
+    restaurants = get_all_restaurants_for_admin()
     
-    # Filter by restaurant if requested - EXACT COPY FROM TABLES PATTERN
+    # Get search and filter parameters
+    search_query = request.GET.get('search', '').strip()
     restaurant_filter = request.GET.get('restaurant')
+    role_filter = request.GET.get('role')
+    status_filter = request.GET.get('status')
     
+    # Get pagination parameter
+    per_page = int(request.GET.get('per_page', 20))
+    if per_page not in [5, 10, 15, 20, 25, 30, 50]:
+        per_page = 20
+    
+    # Start with all users
+    users = User.objects.select_related('role', 'owner')
+    
+    # Apply search filter
+    if search_query:
+        users = users.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(restaurant_name__icontains=search_query) |
+            Q(phone_number__icontains=search_query) |
+            Q(role__name__icontains=search_query)
+        )
+    
+    # Apply restaurant filter
     if restaurant_filter:
-        users = User.objects.filter(Q(id=restaurant_filter) | Q(owner__id=restaurant_filter)).select_related('role', 'owner').order_by('role__name', 'username')
-        selected_restaurant = get_object_or_404(User, id=restaurant_filter, role__name='owner')
+        users = users.filter(Q(id=restaurant_filter) | Q(owner__id=restaurant_filter))
+        selected_restaurant = get_restaurant_owner_by_id(restaurant_filter)
     else:
-        users = User.objects.select_related('role', 'owner').order_by('role__name', 'username')
         selected_restaurant = None
     
-    # Apply role filter if requested
-    role_filter = request.GET.get('role')
+    # Apply role filter
     if role_filter:
         users = users.filter(role__name=role_filter)
+        
+    # Apply status filter
+    if status_filter == 'active':
+        users = users.filter(is_active=True)
+    elif status_filter == 'inactive':
+        users = users.filter(is_active=False)
+    
+    # Get total count before pagination
+    total_users = users.count()
+    
+    users = users.order_by('role__name', 'username')
+    
+    # Apply pagination
+    paginator = Paginator(users, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Count filtered results
+    filtered_count = users.count()
     
     # Get all roles for dropdown
     roles = Role.objects.all().order_by('name')
     
     context = {
-        'users': users,
+        'page_obj': page_obj,
+        'users': page_obj.object_list,
         'restaurants': restaurants,
         'roles': roles,
         'selected_restaurant': selected_restaurant,
+        'search_query': search_query,
         'role_filter': role_filter,
+        'status_filter': status_filter,
+        'per_page': per_page,
+        'total_users': total_users,
+        'filtered_count': filtered_count,
     }
     
     return render(request, 'system_admin/manage_users.html', context)
@@ -251,8 +458,11 @@ def view_all_orders(request):
     if restaurant_filter != 'all':
         orders = orders.filter(table_info__owner__id=restaurant_filter)
     
-    # Get filter options
-    restaurant_owners = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='')
+    # Get filter options - Updated for new role system
+    restaurant_owners = User.objects.filter(
+        role__name__in=['owner', 'main_owner', 'branch_owner'], 
+        restaurant_name__isnull=False
+    ).exclude(restaurant_name='')
     
     context = {
         'orders': orders,
@@ -276,9 +486,12 @@ def system_statistics(request):
     for role in Role.objects.all():
         user_stats[role.name] = User.objects.filter(role=role).count()
     
-    # Restaurant statistics
+    # Restaurant statistics - Updated for new role system
     restaurant_stats = []
-    for owner in User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name=''):
+    for owner in User.objects.filter(
+        role__name__in=['owner', 'main_owner', 'branch_owner'], 
+        restaurant_name__isnull=False
+    ).exclude(restaurant_name=''):
         stats = {
             'restaurant_name': owner.restaurant_name,
             'owner': owner,
@@ -341,6 +554,9 @@ def create_restaurant_owner(request):
             subscription_start_date = request.POST.get('subscription_start_date', '')
             subscription_end_date = request.POST.get('subscription_end_date', '')
             subscription_status = request.POST.get('subscription_status', 'active')
+            
+            # Subscription plan field
+            subscription_plan = 'PRO' if request.POST.get('subscription_plan') == 'PRO' else 'SINGLE'
             
             # Handle subscription dates based on quick_period or custom dates
             if quick_period and quick_period != 'custom':
@@ -414,8 +630,12 @@ def create_restaurant_owner(request):
                     messages.error(request, error)
                 return redirect('system_admin:manage_restaurants')
             
-            # Get owner role
-            owner_role = Role.objects.get(name='owner')
+            # Get main_owner role (updated for new system)
+            try:
+                main_owner_role = Role.objects.get(name='main_owner')
+            except Role.DoesNotExist:
+                # Fallback to 'owner' role if main_owner doesn't exist
+                main_owner_role = Role.objects.get(name='owner')
             
             # Create the restaurant description with additional info
             enhanced_description = restaurant_description
@@ -424,20 +644,33 @@ def create_restaurant_owner(request):
             if opening_hours:
                 enhanced_description += f"\nOpening Hours: {opening_hours}"
             
-            # Create the owner
+            # Create the main owner user
             new_owner = User.objects.create(
                 username=username,
                 email=email,
                 password=make_password(password),
                 first_name=first_name,
                 last_name=last_name,
-                role=owner_role,
+                role=main_owner_role,
                 restaurant_name=restaurant_name,
                 restaurant_description=enhanced_description.strip(),
                 phone_number=phone_number,
                 address=address,
                 is_active_staff=True,
                 owner=None
+            )
+            
+            # Create the Restaurant model object
+            new_restaurant = Restaurant.objects.create(
+                name=restaurant_name,
+                description=enhanced_description.strip(),
+                address=address,
+                subscription_plan=subscription_plan,  # Use the PRO/SINGLE choice from form
+                main_owner=new_owner,
+                branch_owner=new_owner,  # For main restaurant, main_owner is also branch_owner
+                is_main_restaurant=True,
+                parent_restaurant=None,
+                is_active=True
             )
             
             # Calculate subscription duration
@@ -464,14 +697,15 @@ def create_restaurant_owner(request):
             )
             
             success_msg = f'Restaurant "{restaurant_name}" and owner account "{username}" created successfully!'
-            success_msg += f' Subscription: {subscription_status} from {start_date_obj} to {end_date_obj} ({subscription_days} days).'
+            success_msg += f' Subscription Plan: {subscription_plan}'
+            success_msg += f' | Status: {subscription_status} from {start_date_obj} to {end_date_obj} ({subscription_days} days).'
             if cuisine_type:
                 success_msg += f' Cuisine type: {cuisine_type.title()}.'
             
             messages.success(request, success_msg)
             
             # Log the creation for system tracking
-            print(f"[SYSTEM ADMIN] New restaurant created: {restaurant_name} by {request.user.username}")
+            print(f"[SYSTEM ADMIN] New restaurant created: {restaurant_name} ({subscription_plan} plan) by {request.user.username}")
             print(f"[SYSTEM ADMIN] Subscription created: {subscription_status} from {start_date_obj} to {end_date_obj}")
             
             return redirect('system_admin:manage_restaurants')
@@ -491,7 +725,7 @@ def get_restaurant_details(request, restaurant_id):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     try:
-        restaurant = get_object_or_404(User, id=restaurant_id, role__name='owner')
+        restaurant = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
         
         # Parse restaurant description for additional info
         cuisine_type = ""
@@ -557,7 +791,7 @@ def edit_restaurant(request, restaurant_id):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    restaurant = get_object_or_404(User, id=restaurant_id, role__name='owner')
+    restaurant = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
     
     if request.method == 'POST':
         try:
@@ -581,6 +815,9 @@ def edit_restaurant(request, restaurant_id):
             subscription_start_date = request.POST.get('subscription_start_date', '')
             subscription_end_date = request.POST.get('subscription_end_date', '')
             subscription_status = request.POST.get('subscription_status', 'active')
+            
+            # Account status field
+            is_active = request.POST.get('is_active', 'true') == 'true'
             
             # Validation
             errors = []
@@ -656,12 +893,39 @@ def edit_restaurant(request, restaurant_id):
             restaurant.email = email
             restaurant.first_name = first_name
             restaurant.last_name = last_name
+            restaurant.is_active = is_active  # Update account active status
             
             # Update password only if provided
             if password:
                 restaurant.password = make_password(password)
             
             restaurant.save()
+            
+            # Also update the corresponding Restaurant model object if it exists
+            try:
+                restaurant_model = Restaurant.objects.get(main_owner=restaurant, is_main_restaurant=True)
+                
+                # Debug: Print before update
+                print(f"[DEBUG] Before update - Restaurant model address: {restaurant_model.address}")
+                print(f"[DEBUG] New address from form: {address}")
+                
+                restaurant_model.name = restaurant_name
+                restaurant_model.description = enhanced_description.strip()
+                restaurant_model.address = address
+                restaurant_model.is_active = is_active
+                restaurant_model.save(update_fields=['name', 'description', 'address', 'is_active', 'updated_at'])
+                
+                # Debug: Print after update
+                restaurant_model.refresh_from_db()
+                print(f"[DEBUG] After update - Restaurant model address: {restaurant_model.address}")
+                print(f"[SYSTEM ADMIN] Successfully updated Restaurant model for {restaurant_name}")
+                
+            except Restaurant.DoesNotExist:
+                print(f"[SYSTEM ADMIN] No Restaurant model found for user {restaurant.username}, only User model updated")
+            except Exception as e:
+                print(f"[SYSTEM ADMIN] Error updating Restaurant model: {str(e)}")
+                import traceback
+                traceback.print_exc()
             
             # Handle subscription update or creation only if dates are provided
             if subscription_start_date and subscription_end_date:
@@ -720,7 +984,8 @@ def edit_restaurant(request, restaurant_id):
             if password:
                 success_msg += ' Password has been changed.'
             
-            messages.success(request, success_msg)
+            # Don't use messages.success() here since we return JSON and show toast notification
+            # The page will reload and would show duplicate messages
             return JsonResponse({'success': True, 'message': success_msg})
             
         except Exception as e:
@@ -737,7 +1002,7 @@ def delete_restaurant(request, restaurant_id):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
     
     if request.method == 'POST':
         restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
@@ -808,7 +1073,7 @@ def block_restaurant(request, restaurant_id):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
     restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
     
     if request.method == 'POST':
@@ -852,7 +1117,7 @@ def unblock_restaurant(request, restaurant_id):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
     restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
     
     if request.method == 'POST':
@@ -897,7 +1162,7 @@ def extend_subscription(request, restaurant_id):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
     restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
     
     if request.method == 'POST':
@@ -971,22 +1236,63 @@ def manage_categories(request):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # Get all restaurants for filtering
-    restaurants = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='').order_by('restaurant_name')
+    # Get all restaurants for filtering - Updated to include all owner types and PRO plans
+    restaurants = get_all_restaurants_for_admin()
     
-    # Filter by restaurant if requested
+    # Get search and filter parameters
+    search_query = request.GET.get('search', '').strip()
     restaurant_filter = request.GET.get('restaurant')
     if restaurant_filter:
-        main_categories = MainCategory.objects.filter(owner__id=restaurant_filter).select_related('owner').prefetch_related('subcategories').order_by('name')
-        selected_restaurant = get_object_or_404(User, id=restaurant_filter, role__name='owner')
+        try:
+            restaurant_filter = int(restaurant_filter)
+        except (ValueError, TypeError):
+            restaurant_filter = None
+    
+    # Get pagination parameter
+    per_page = int(request.GET.get('per_page', 20))
+    if per_page not in [5, 10, 15, 20, 25, 30, 50]:
+        per_page = 20
+    
+    # Start with all main categories
+    main_categories = MainCategory.objects.select_related('owner').prefetch_related('subcategories')
+    
+    # Get total count before any filtering
+    total_categories = MainCategory.objects.count()
+    
+    # Apply search filter
+    if search_query:
+        main_categories = main_categories.filter(
+            Q(name__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(owner__restaurant_name__icontains=search_query)
+        )
+    
+    # Apply restaurant filter
+    if restaurant_filter:
+        main_categories = main_categories.filter(owner__id=restaurant_filter)
+        selected_restaurant = get_restaurant_owner_by_id(restaurant_filter)
     else:
-        main_categories = MainCategory.objects.select_related('owner').prefetch_related('subcategories').order_by('owner__restaurant_name', 'name')
         selected_restaurant = None
     
+    # Count filtered results before pagination
+    filtered_count = main_categories.count()
+    
+    main_categories = main_categories.order_by('owner__restaurant_name', 'name')
+    
+    # Apply pagination
+    paginator = Paginator(main_categories, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     context = {
-        'main_categories': main_categories,
+        'page_obj': page_obj,
+        'main_categories': page_obj.object_list,
         'restaurants': restaurants,
         'selected_restaurant': selected_restaurant,
+        'search_query': search_query,
+        'per_page': per_page,
+        'total_categories': total_categories,
+        'filtered_count': filtered_count,
     }
     return render(request, 'system_admin/manage_categories.html', context)
 
@@ -1006,8 +1312,8 @@ def create_category(request):
             if not restaurant_id or not name:
                 return JsonResponse({'success': False, 'message': 'Restaurant and name are required'})
             
-            # Get the restaurant owner
-            restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+            # Get the restaurant owner - Updated for new role system
+            restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
             
             # Check if category with this name already exists for this restaurant
             if MainCategory.objects.filter(owner=restaurant_owner, name=name).exists():
@@ -1254,38 +1560,80 @@ def manage_products(request):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # Get all restaurants for filtering
-    restaurants = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='').order_by('restaurant_name')
+    # Get all restaurants for filtering - Updated to include all owner types and PRO plans
+    restaurants = get_all_restaurants_for_admin()
     
-    # Filter by restaurant if requested
+    # Get search and filter parameters
+    search_query = request.GET.get('search', '').strip()
     restaurant_filter = request.GET.get('restaurant')
     category_filter = request.GET.get('category')
+    availability_filter = request.GET.get('availability')
+    
+    # Get pagination parameter
+    per_page = int(request.GET.get('per_page', 20))
+    if per_page not in [5, 10, 15, 20, 25, 30, 50]:
+        per_page = 20
     
     products = Product.objects.select_related('main_category', 'sub_category', 'main_category__owner')
     
+    # Apply search filter
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(main_category__name__icontains=search_query) |
+            Q(sub_category__name__icontains=search_query) |
+            Q(main_category__owner__restaurant_name__icontains=search_query)
+        )
+    
+    # Apply restaurant filter
     if restaurant_filter:
         products = products.filter(main_category__owner__id=restaurant_filter)
-        selected_restaurant = get_object_or_404(User, id=restaurant_filter, role__name='owner')
+        selected_restaurant = get_restaurant_owner_by_id(restaurant_filter)
         # Get categories for this restaurant
         categories = MainCategory.objects.filter(owner=selected_restaurant).order_by('name')
     else:
         selected_restaurant = None
         categories = MainCategory.objects.select_related('owner').order_by('owner__restaurant_name', 'name')
     
+    # Apply category filter
     if category_filter:
         products = products.filter(main_category__id=category_filter)
         selected_category = get_object_or_404(MainCategory, id=category_filter)
     else:
         selected_category = None
     
+    # Apply availability filter
+    if availability_filter == 'available':
+        products = products.filter(is_available=True)
+    elif availability_filter == 'unavailable':
+        products = products.filter(is_available=False)
+    
+    # Get total count before pagination
+    total_products = products.count()
+    
     products = products.order_by('main_category__owner__restaurant_name', 'main_category__name', 'name')
     
+    # Apply pagination
+    paginator = Paginator(products, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Count filtered results
+    filtered_count = products.count()
+    
     context = {
-        'products': products,
+        'page_obj': page_obj,
+        'products': page_obj.object_list,
         'restaurants': restaurants,
         'categories': categories,
         'selected_restaurant': selected_restaurant,
         'selected_category': selected_category,
+        'search_query': search_query,
+        'availability_filter': availability_filter,
+        'per_page': per_page,
+        'total_products': total_products,
+        'filtered_count': filtered_count,
     }
     return render(request, 'system_admin/manage_products.html', context)
 
@@ -1496,7 +1844,7 @@ def get_categories(request, restaurant_id):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
-        restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+        restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
         categories = MainCategory.objects.filter(owner=restaurant_owner).values('id', 'name')
         return JsonResponse({'success': True, 'categories': list(categories)})
     except Exception as e:
@@ -1512,22 +1860,80 @@ def manage_tables(request):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # Get all restaurants for filtering
-    restaurants = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='').order_by('restaurant_name')
+    # Get all restaurants for filtering - Updated to include all owner types and PRO plans
+    restaurants = get_all_restaurants_for_admin()
     
-    # Filter by restaurant if requested
+    # Get search and filter parameters
+    search_query = request.GET.get('search', '').strip()
     restaurant_filter = request.GET.get('restaurant')
     if restaurant_filter:
-        tables = TableInfo.objects.filter(owner__id=restaurant_filter).select_related('owner').order_by('tbl_no')
-        selected_restaurant = get_object_or_404(User, id=restaurant_filter, role__name='owner')
-    else:
-        tables = TableInfo.objects.select_related('owner').order_by('owner__restaurant_name', 'tbl_no')
-        selected_restaurant = None
+        try:
+            restaurant_filter = int(restaurant_filter)
+        except (ValueError, TypeError):
+            restaurant_filter = None
+    availability_filter = request.GET.get('availability')
+    per_page = int(request.GET.get('per_page', 10))  # Default to 10, allow customization
+    page = request.GET.get('page', 1)
     
+    # Get total count before any filtering
+    total_tables = TableInfo.objects.count()
+    
+    # Start with all tables
+    tables = TableInfo.objects.select_related('owner').order_by('owner__restaurant_name', 'tbl_no')
+    
+    # Apply search filter
+    if search_query:
+        tables = tables.filter(
+            Q(tbl_no__icontains=search_query) |
+            Q(owner__username__icontains=search_query) |
+            Q(owner__restaurant_name__icontains=search_query) |
+            Q(capacity__icontains=search_query)
+        )
+    
+    # Filter by restaurant if requested
+    if restaurant_filter:
+        tables = tables.filter(owner__id=restaurant_filter)
+        selected_restaurant = get_restaurant_owner_by_id(restaurant_filter)
+    else:
+        selected_restaurant = None
+        
+    # Filter by availability
+    if availability_filter:
+        if availability_filter == 'available':
+            tables = tables.filter(is_available=True)
+        elif availability_filter == 'occupied':
+            tables = tables.filter(is_available=False)
+    
+    # Count filtered results before pagination
+    filtered_count = tables.count()
+    
+    # Pagination with customizable per_page
+    from django.core.paginator import Paginator
+    # Ensure per_page is within reasonable limits
+    per_page = max(5, min(per_page, 50))  # Between 5 and 50
+    paginator = Paginator(tables, per_page)
+    try:
+        tables_page = paginator.page(page)
+    except:
+        tables_page = paginator.page(1)
+    
+    # Filter options
+    availability_options = [('available', 'Available'), ('occupied', 'Occupied')]
+    per_page_options = [5, 10, 15, 20, 25, 50]
+
     context = {
-        'tables': tables,
+        'tables': tables_page,
+        'total_tables': total_tables,
+        'filtered_count': filtered_count,
         'restaurants': restaurants,
         'selected_restaurant': selected_restaurant,
+        'search_query': search_query,
+        'availability_filter': availability_filter,
+        'availability_options': availability_options,
+        'per_page': per_page,
+        'per_page_options': per_page_options,
+        'paginator': paginator,
+        'page_obj': tables_page,
     }
     return render(request, 'system_admin/manage_tables.html', context)
 
@@ -1556,8 +1962,8 @@ def create_table(request):
             except (ValueError, TypeError):
                 return JsonResponse({'success': False, 'message': 'Invalid capacity format'})
             
-            # Get the restaurant owner
-            restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+            # Get the restaurant owner - Updated for new role system
+            restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
             
             # Check if table with this number already exists for this restaurant
             if TableInfo.objects.filter(owner=restaurant_owner, tbl_no=tbl_no).exists():
@@ -1704,43 +2110,87 @@ def manage_orders(request):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # Get all restaurants for filtering
-    restaurants = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='').order_by('restaurant_name')
+    # Get all restaurants for filtering - Updated to include all owner types and PRO plans
+    restaurants = get_all_restaurants_for_admin()
     
-    # Filter parameters
+    # Get search and filter parameters
+    search_query = request.GET.get('search', '').strip()
     restaurant_filter = request.GET.get('restaurant')
+    if restaurant_filter:
+        try:
+            restaurant_filter = int(restaurant_filter)
+        except (ValueError, TypeError):
+            restaurant_filter = None
     status_filter = request.GET.get('status')
     payment_status_filter = request.GET.get('payment_status')
+    per_page = int(request.GET.get('per_page', 10))  # Default to 10, allow customization
+    page = request.GET.get('page', 1)
+    
+    # Get total count before any filtering
+    total_orders = Order.objects.count()
     
     orders = Order.objects.select_related('table_info', 'table_info__owner', 'ordered_by', 'confirmed_by')
+    
+    # Apply search filter
+    if search_query:
+        orders = orders.filter(
+            Q(id__icontains=search_query) |
+            Q(table_info__tbl_no__icontains=search_query) |
+            Q(table_info__owner__username__icontains=search_query) |
+            Q(table_info__owner__restaurant_name__icontains=search_query) |
+            Q(ordered_by__username__icontains=search_query) |
+            Q(status__icontains=search_query) |
+            Q(payment_status__icontains=search_query)
+        )
     
     # Apply filters
     if restaurant_filter:
         orders = orders.filter(table_info__owner__id=restaurant_filter)
-        selected_restaurant = get_object_or_404(User, id=restaurant_filter, role__name='owner')
+        selected_restaurant = get_restaurant_owner_by_id(restaurant_filter)
     else:
         selected_restaurant = None
-    
+
     if status_filter:
         orders = orders.filter(status=status_filter)
-    
+
     if payment_status_filter:
         orders = orders.filter(payment_status=payment_status_filter)
-    
+
     orders = orders.order_by('-created_at')
     
+    # Count filtered results before pagination
+    filtered_count = orders.count()
+    
+    # Pagination with customizable per_page
+    from django.core.paginator import Paginator
+    # Ensure per_page is within reasonable limits
+    per_page = max(5, min(per_page, 50))  # Between 5 and 50
+    paginator = Paginator(orders, per_page)
+    try:
+        orders_page = paginator.page(page)
+    except:
+        orders_page = paginator.page(1)
+
     # Get status choices for filter
     status_choices = Order.STATUS_CHOICES
     payment_status_choices = Order.PAYMENT_STATUS_CHOICES
-    
+    per_page_options = [5, 10, 15, 20, 25, 50]
+
     context = {
-        'orders': orders,
+        'orders': orders_page,
+        'total_orders': total_orders,
+        'filtered_count': filtered_count,
         'restaurants': restaurants,
         'selected_restaurant': selected_restaurant,
         'status_choices': status_choices,
         'payment_status_choices': payment_status_choices,
         'selected_status': status_filter,
         'selected_payment_status': payment_status_filter,
+        'search_query': search_query,
+        'per_page': per_page,
+        'per_page_options': per_page_options,
+        'paginator': paginator,
+        'page_obj': orders_page,
     }
     return render(request, 'system_admin/manage_orders.html', context)
 
@@ -1895,8 +2345,11 @@ def manage_staff(request):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    # Get all restaurants for filtering
-    restaurants = User.objects.filter(role__name='owner', restaurant_name__isnull=False).exclude(restaurant_name='').order_by('restaurant_name')
+    # Get all restaurants for filtering - Updated for new role system
+    restaurants = User.objects.filter(
+        role__name__in=['owner', 'main_owner', 'branch_owner'], 
+        restaurant_name__isnull=False
+    ).exclude(restaurant_name='').order_by('restaurant_name')
     
     # Get all roles except administrator
     roles = Role.objects.exclude(name='administrator').order_by('name')
@@ -1910,7 +2363,7 @@ def manage_staff(request):
     
     # Apply filters
     if restaurant_filter:
-        selected_restaurant = get_object_or_404(User, id=restaurant_filter, role__name='owner')
+        selected_restaurant = get_object_or_404(User, id=restaurant_filter, role__name__in=['owner', 'main_owner', 'branch_owner'])
         # Get all staff for this restaurant (including the owner)
         staff = staff.filter(Q(id=restaurant_filter) | Q(owner_id=restaurant_filter))
     else:
@@ -1974,7 +2427,7 @@ def create_staff(request):
             else:
                 if not restaurant_id:
                     return JsonResponse({'success': False, 'message': 'Restaurant is required for staff members'})
-                restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+                restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
             
             # Create the user
             user = User.objects.create(
@@ -2202,7 +2655,7 @@ def create_user(request):
             
             # Set restaurant if provided
             if restaurant_id:
-                restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+                restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
                 user.owner = restaurant_owner
                 user.save()
             
@@ -2279,7 +2732,7 @@ def edit_user(request, user_id):
             
             # Set restaurant if provided
             if restaurant_id:
-                restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name='owner')
+                restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
                 user.owner = restaurant_owner
             else:
                 user.owner = None
@@ -2351,3 +2804,187 @@ def get_payment_status(request, order_id):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)})
+
+
+@login_required
+def toggle_restaurant_subscription_plan(request):
+    """Admin function to change restaurant subscription plan"""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    
+    if request.method == 'POST':
+        try:
+            restaurant_id = request.POST.get('restaurant_id')
+            new_plan = request.POST.get('new_plan')
+            
+            if not restaurant_id or new_plan not in ['SINGLE', 'PRO']:
+                return JsonResponse({'success': False, 'error': 'Invalid parameters.'})
+            
+            restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+            
+            # Check if downgrade is allowed
+            if new_plan == 'SINGLE' and restaurant.subscription_plan == 'PRO':
+                if restaurant.branches.exists():
+                    # Check if force delete is confirmed
+                    force_delete = request.POST.get('force_delete_branches', 'false').lower() == 'true'
+                    
+                    if not force_delete:
+                        # Return branch information for confirmation dialog
+                        branches_info = []
+                        for branch in restaurant.branches.all():
+                            branches_info.append({
+                                'id': branch.id,
+                                'name': branch.name,
+                                'is_active': branch.is_active,
+                                'created_date': branch.created_at.strftime('%Y-%m-%d') if hasattr(branch, 'created_at') else 'Unknown'
+                            })
+                        
+                        return JsonResponse({
+                            'success': False,
+                            'requires_confirmation': True,
+                            'branches_count': restaurant.branches.count(),
+                            'branches': branches_info,
+                            'message': f'Downgrading {restaurant.name} to SINGLE plan will permanently delete {restaurant.branches.count()} branch(es). This action cannot be undone.',
+                            'restaurant_name': restaurant.name
+                        })
+                    else:
+                        # Force delete confirmed - delete branches and downgrade
+                        branches_count = restaurant.branches.count()
+                        deleted_branches = []
+                        for branch in restaurant.branches.all():
+                            deleted_branches.append(branch.name)
+                        
+                        restaurant.branches.all().delete()
+                        
+                        # Continue with downgrade after branches are deleted
+                        old_plan = restaurant.get_subscription_display()
+                        restaurant.subscription_plan = new_plan
+                        restaurant.save(update_fields=['subscription_plan', 'updated_at'])
+                        
+                        return JsonResponse({
+                            'success': True,
+                            'message': f'Successfully downgraded {restaurant.name} to SINGLE plan. Deleted branches: {", ".join(deleted_branches)}.',
+                            'new_plan': restaurant.get_subscription_display(),
+                            'deleted_branches': deleted_branches
+                        })
+            
+            old_plan = restaurant.get_subscription_display()
+            restaurant.subscription_plan = new_plan
+            restaurant.save(update_fields=['subscription_plan', 'updated_at'])
+            
+            new_plan_display = restaurant.get_subscription_display()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully changed {restaurant.name} from {old_plan} to {new_plan_display}.',
+                'new_plan': new_plan_display
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Error changing subscription plan: {str(e)}'})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
+
+@login_required  
+def toggle_restaurant_status(request):
+    """Admin function to activate/deactivate restaurants"""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    
+    if request.method == 'POST':
+        try:
+            restaurant_id = request.POST.get('restaurant_id')
+            restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+            
+            # Toggle status
+            restaurant.is_active = not restaurant.is_active
+            restaurant.save(update_fields=['is_active', 'updated_at'])
+            
+            status_text = 'activated' if restaurant.is_active else 'deactivated'
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully {status_text} {restaurant.name}.',
+                'new_status': restaurant.is_active
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Error changing restaurant status: {str(e)}'})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
+
+@login_required
+def delete_restaurant_admin(request):
+    """Admin function to delete restaurants"""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    
+    if request.method == 'POST':
+        try:
+            restaurant_id = request.POST.get('restaurant_id')
+            restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+            
+            restaurant_name = restaurant.name
+            restaurant.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully deleted restaurant: {restaurant_name}.'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Error deleting restaurant: {str(e)}'})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
+
+@login_required
+def restaurant_details_admin(request, restaurant_id):
+    """Admin function to get detailed restaurant information"""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    
+    try:
+        restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+        
+        # Get restaurant statistics
+        branches_count = restaurant.branches.count()
+        active_branches = restaurant.branches.filter(is_active=True).count()
+        
+        data = {
+            'success': True,
+            'restaurant': {
+                'id': restaurant.id,
+                'name': restaurant.name,
+                'description': restaurant.description,
+                'subscription_plan': restaurant.get_subscription_display(),
+                'is_active': restaurant.is_active,
+                'owner': {
+                    'name': restaurant.main_owner.get_full_name() or restaurant.main_owner.username,
+                    'email': restaurant.main_owner.email
+                },
+                'branches_count': branches_count,
+                'active_branches': active_branches,
+                'created_at': restaurant.created_at.strftime('%Y-%m-%d %H:%M'),
+                'updated_at': restaurant.updated_at.strftime('%Y-%m-%d %H:%M')
+            }
+        }
+        
+        # Add branch information if it's a pro restaurant
+        if restaurant.subscription_plan == 'PRO' and branches_count > 0:
+            branches = restaurant.branches.all()
+            data['restaurant']['branches'] = [
+                {
+                    'id': branch.id,
+                    'name': branch.name,
+                    'is_active': branch.is_active,
+                    'created_at': branch.created_at.strftime('%Y-%m-%d')
+                } for branch in branches
+            ]
+        
+        return JsonResponse(data)
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error getting restaurant details: {str(e)}'})

@@ -88,6 +88,80 @@
     </a>
 </div>
 
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" id="promotionFilterForm" class="mb-0">
+            <div class="row g-3">
+                <!-- Search Input -->
+                <div class="col-md-4">
+                    <label for="promotionSearch" class="form-label">
+                        <i class="fas fa-search"></i> Search Promotions
+                    </label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="promotionSearch" name="search" 
+                               value="{{ request.GET.search }}" placeholder="Search by name, description...">
+                        <span class="input-group-text">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                    <small class="text-muted">Press ESC to clear search</small>
+                </div>
+
+                <!-- Restaurant Filter -->
+                <div class="col-md-3">
+                    <label for="restaurantFilter" class="form-label">
+                        <i class="fas fa-building"></i> Restaurant
+                    </label>
+                    <select class="form-select" id="restaurantFilter" name="restaurant">
+                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                        {% for restaurant in accessible_restaurants %}
+                        <option value="{{ restaurant.id }}" 
+                            {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
+                            {% elif not request.GET.restaurant and current_restaurant.id == restaurant.id %}selected
+                            {% endif %}>
+                            {{ restaurant.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Status Filter -->
+                <div class="col-md-3">
+                    <label for="statusFilter" class="form-label">
+                        <i class="fas fa-toggle-on"></i> Status
+                    </label>
+                    <select class="form-select" id="statusFilter" name="status">
+                        <option value="">All Status</option>
+                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+
+                <!-- Items Per Page -->
+                <div class="col-md-2">
+                    <label for="perPageSelect" class="form-label">
+                        <i class="fas fa-list"></i> Per Page
+                    </label>
+                    <select class="form-select" id="perPageSelect" name="per_page">
+                        <option value="5" {% if request.GET.per_page == '5' %}selected{% endif %}>5</option>
+                        <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
+                        <option value="20" {% if request.GET.per_page == '20' %}selected{% endif %}>20</option>
+                        <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+        
+        <!-- Results Summary -->
+        <div class="mt-3">
+            <small class="text-muted">
+                Showing {{ promotions|length }} promotion{{ promotions|length|pluralize }} total
+            </small>
+        </div>
+    </div>
+</div>
+
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -221,6 +295,23 @@
                         </div>
                     </div>
                     
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="fas fa-store"></i> 
+                            {% if promotion.owner %}
+                                {% with rest_info=promotion.owner.get_user_restaurant_info %}
+                                    {% if rest_info.restaurant %}
+                                        {{ rest_info.name }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                    
                     <hr>
                     
                     <div class="d-flex justify-content-between align-items-center">
@@ -235,6 +326,61 @@
             </div>
         {% endfor %}
     </div>
+
+    <!-- Pagination Controls -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav aria-label="Promotions pagination" class="mt-4">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <p class="text-muted mb-2">
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} promotions
+                </p>
+            </div>
+            <div class="col-md-6">
+                <ul class="pagination justify-content-end mb-0">
+                    <!-- First Page -->
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" {% if not page_obj.has_previous %}tabindex="-1" aria-disabled="true"{% endif %}>
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    
+                    <!-- Previous Page -->
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                        <a class="page-link" href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% else %}#{% endif %}" {% if not page_obj.has_previous %}tabindex="-1" aria-disabled="true"{% endif %}>
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+
+                    <!-- Page Numbers -->
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if num >= page_obj.number|add:'-3' and num <= page_obj.number|add:'3' %}
+                            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                                <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    {{ num }}
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <!-- Next Page -->
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% else %}#{% endif %}" {% if not page_obj.has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+
+                    <!-- Last Page -->
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" {% if not page_obj.has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
 {% else %}
     <div class="text-center py-5">
         <i class="fas fa-clock display-1 text-muted mb-3"></i>
@@ -249,6 +395,34 @@
 
 {% block extra_js %}
 <script>
+// Filter form auto-submit
+const promotionFilterSelects = document.querySelectorAll('#restaurantFilter, #statusFilter, #perPageSelect');
+promotionFilterSelects.forEach(select => {
+    select.addEventListener('change', function() {
+        document.getElementById('promotionFilterForm').submit();
+    });
+});
+
+// Search with debounce
+let promotionSearchTimeout;
+const promotionSearchInput = document.getElementById('promotionSearch');
+if (promotionSearchInput) {
+    promotionSearchInput.addEventListener('input', function() {
+        clearTimeout(promotionSearchTimeout);
+        promotionSearchTimeout = setTimeout(() => {
+            document.getElementById('promotionFilterForm').submit();
+        }, 500);
+    });
+    
+    // Clear search on ESC
+    promotionSearchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            document.getElementById('promotionFilterForm').submit();
+        }
+    });
+}
+
 function togglePromotion(promotionId) {
     fetch(`/restaurant/promotions/${promotionId}/toggle/`, {
         method: 'POST',

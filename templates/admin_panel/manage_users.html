@@ -76,14 +76,104 @@
 <div class="tab-content" id="userRoleTabContent">
     <!-- Users Tab -->
     <div class="tab-pane fade show active" id="users" role="tabpanel" aria-labelledby="users-tab">
+        <!-- Search and Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" id="filterForm" class="mb-0">
+                    <div class="row g-3">
+                        <!-- Search Input -->
+                        <div class="col-md-4">
+                            <label for="userSearch" class="form-label">
+                                <i class="fas fa-search"></i> Search Users
+                            </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="userSearch" name="search" 
+                                       value="{{ request.GET.search }}" placeholder="Search by username, name, email...">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                            </div>
+                            <small class="text-muted">Press ESC to clear search</small>
+                        </div>
+
+                        <!-- Restaurant Filter -->
+                        <div class="col-md-2">
+                            <label for="restaurantFilter" class="form-label">
+                                <i class="fas fa-building"></i> Restaurant
+                            </label>
+                            <select class="form-select" id="restaurantFilter" name="restaurant">
+                                <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                                {% for restaurant in accessible_restaurants %}
+                                <option value="{{ restaurant.id }}" 
+                                    {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
+                                    {% elif not request.GET.restaurant and current_restaurant.id == restaurant.id %}selected
+                                    {% endif %}>
+                                    {{ restaurant.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Role Filter -->
+                        <div class="col-md-2">
+                            <label for="roleFilter" class="form-label">
+                                <i class="fas fa-user-tag"></i> Role
+                            </label>
+                            <select class="form-select" id="roleFilter" name="role">
+                                <option value="">All Roles</option>
+                                {% for role in roles %}
+                                <option value="{{ role.name }}" {% if request.GET.role == role.name %}selected{% endif %}>
+                                    {{ role.get_name_display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div class="col-md-2">
+                            <label for="statusFilter" class="form-label">
+                                <i class="fas fa-toggle-on"></i> Status
+                            </label>
+                            <select class="form-select" id="statusFilter" name="status">
+                                <option value="">All Status</option>
+                                <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                            </select>
+                        </div>
+
+                        <!-- Items Per Page -->
+                        <div class="col-md-2">
+                            <label for="perPageSelect" class="form-label">
+                                <i class="fas fa-list"></i> Per Page
+                            </label>
+                            <select class="form-select" id="perPageSelect" name="per_page">
+                                <option value="5" {% if request.GET.per_page == '5' %}selected{% endif %}>5</option>
+                                <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
+                                <option value="20" {% if request.GET.per_page == '20' or not request.GET.per_page %}selected{% endif %}>20</option>
+                                <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                                <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Results Summary -->
+                    <div class="mt-3">
+                        <div class="text-muted">
+                            {% if page_obj %}
+                                Showing <strong>{{ page_obj.paginator.count }}</strong> users total
+                            {% else %}
+                                Showing <strong>{{ users|length }}</strong> users total
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div class="d-flex justify-content-between align-items-center mb-3">
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
                 <i class="fas fa-user-plus me-2"></i>Add User
             </button>
-            <div class="input-group" style="width: 300px;">
-                <span class="input-group-text"><i class="fas fa-search"></i></span>
-                <input type="text" class="form-control" placeholder="Search users..." id="userSearchInput">
-            </div>
         </div>
         
         <div class="table-responsive">
@@ -93,6 +183,7 @@
                         <th>User</th>
                         <th>Email</th>
                         <th>Role</th>
+                        <th>Restaurant/Branch</th>
                         <th>Status</th>
                         <th>Last Login</th>
                         <th>Actions</th>
@@ -131,6 +222,20 @@
                                     <i class="fas fa-user me-1"></i>Customer
                                 {% endif %}
                             </span>
+                        </td>
+                        <td>
+                            {% with restaurant_info=user.get_user_restaurant_info %}
+                                {% if restaurant_info %}
+                                    <div>
+                                        <span title="{{ restaurant_info.name }}">{{ restaurant_info.name }}</span>
+                                        {% if not restaurant_info.is_main %}
+                                            <span class="badge bg-info ms-1" style="font-size: 0.65rem;">Branch</span>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            {% endwith %}
                         </td>
                         <td>
                             {% if user.is_active %}
@@ -174,7 +279,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
+                        <td colspan="7" class="text-center text-muted py-4">
                             <i class="fas fa-users fa-3x mb-3 d-block text-light"></i>
                             No users found
                         </td>
@@ -183,6 +288,61 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination Controls -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Users pagination" class="mt-4">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="text-muted mb-2">
+                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} users
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <ul class="pagination justify-content-end mb-0">
+                        <!-- First Page -->
+                        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                            <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" {% if not page_obj.has_previous %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        
+                        <!-- Previous Page -->
+                        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                            <a class="page-link" href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% else %}#{% endif %}" {% if not page_obj.has_previous %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+
+                        <!-- Page Numbers -->
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if num >= page_obj.number|add:'-3' and num <= page_obj.number|add:'3' %}
+                                <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        <!-- Next Page -->
+                        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% else %}#{% endif %}" {% if not page_obj.has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+
+                        <!-- Last Page -->
+                        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" {% if not page_obj.has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+        {% endif %}
     </div>
 
     {% if not is_owner_access %}
@@ -363,6 +523,32 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="userRestaurant" class="form-label">Restaurant/Branch</label>
+                                <select class="form-select" id="userRestaurant" name="restaurant_id" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
+                                    {% if view_all_restaurants %}
+                                        <option value="">Select Restaurant/Branch</option>
+                                        {% for restaurant in accessible_restaurants %}
+                                        <option value="{{ restaurant.id }}" {% if restaurant.id == current_restaurant.id %}selected{% endif %}>
+                                            {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    {% elif current_restaurant %}
+                                        <option value="{{ current_restaurant.id }}" selected>
+                                            {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                        </option>
+                                        <!-- Hidden field to ensure value is sent even when select is disabled -->
+                                        <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
+                                    {% else %}
+                                        <option value="">No Restaurant Available</option>
+                                    {% endif %}
+                                </select>
+                                {% if current_restaurant and not view_all_restaurants %}
+                                <div class="form-text">User will be assigned to: {{ current_restaurant.name }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
@@ -454,11 +640,36 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
+                                <label for="editUserRestaurant" class="form-label">Restaurant/Branch</label>
+                                <select class="form-select" id="editUserRestaurant" name="restaurant_id" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
+                                    {% if view_all_restaurants %}
+                                        <option value="">Select Restaurant/Branch</option>
+                                        {% for restaurant in accessible_restaurants %}
+                                        <option value="{{ restaurant.id }}">
+                                            {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    {% elif current_restaurant %}
+                                        <option value="{{ current_restaurant.id }}" selected>
+                                            {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                        </option>
+                                        <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
+                                    {% else %}
+                                        <option value="">No Restaurant Available</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
                                 <label for="editPassword" class="form-label">New Password (optional)</label>
                                 <input type="password" class="form-control" id="editPassword" name="password">
                                 <small class="form-text text-muted">Leave blank to keep current password</small>
                             </div>
                         </div>
+                        <div class="col-md-6"></div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
@@ -938,21 +1149,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Search functionality
-    const searchInput = document.getElementById('userSearchInput');
+    // Filter form auto-submit
+    const filterSelects = document.querySelectorAll('#restaurantFilter, #roleFilter, #statusFilter, #perPageSelect');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+    });
+
+    // Search with debounce
+    const searchInput = document.getElementById('userSearch');
+    let searchTimeout;
     if (searchInput) {
         searchInput.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const tableRows = document.querySelectorAll('#usersTableBody tr');
-            
-            tableRows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                document.getElementById('filterForm').submit();
+            }, 500);
+        });
+
+        // ESC to clear search
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                document.getElementById('filterForm').submit();
+            }
         });
     }
 

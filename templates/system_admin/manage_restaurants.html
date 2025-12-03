@@ -4,51 +4,164 @@
 {% block page_title %}Manage Restaurants{% endblock %}
 {% block page_subtitle %}Restaurant Owners and Operations{% endblock %}
 
+{% block extra_css %}
+<style>
+.branch-deletion-modal .modal-content {
+    border: none;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+}
+
+.branch-deletion-modal .modal-header {
+    background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+    border: none;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.branch-deletion-modal .list-group-item {
+    border-left: 3px solid #e74c3c;
+    margin-bottom: 0.25rem;
+}
+
+.branch-deletion-modal .bg-light {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    border: 1px solid #dee2e6;
+}
+
+.modal-footer .btn-danger {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    border: none;
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+}
+
+.modal-footer .btn-danger:hover {
+    background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+}
+
+/* Improve contrast for Bootstrap badge colors */
+.badge.bg-info {
+    background-color: #0d6efd !important;
+    color: white !important;
+}
+
+.badge.bg-warning {
+    background-color: #f57c00 !important;
+    color: white !important;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- Display Django Messages -->
-{% if messages %}
-    <div class="container-fluid px-0 mb-3">
-        {% for message in messages %}
-            {% if message.tags == 'error' %}
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% elif message.tags == 'success' %}
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% elif message.tags == 'warning' %}
-                <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% else %}
-                <div class="alert alert-info alert-dismissible fade show" role="alert">
-                    <i class="fas fa-info-circle me-2"></i>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endif %}
-        {% endfor %}
+<!-- Messages are handled by base.html template - no need to duplicate here -->
+
+<!-- Search and Filter Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-search me-2"></i>Search & Filter Restaurants
+        </h6>
     </div>
-{% endif %}
+    <div class="card-body">
+        <form method="get" class="row g-3" id="filterForm">
+            <!-- Search Input with Real-time Search -->
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search <small class="text-muted">(auto-search)</small></label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           value="{{ search_query }}" placeholder="Restaurant name, owner, email..."
+                           autocomplete="off">
+                    <div id="searchSpinner" class="input-group-text d-none">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status Filter -->
+            <div class="col-md-2">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Status</option>
+                    {% for value, label in status_options %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Subscription Plan Filter -->
+            <div class="col-md-2">
+                <label for="plan" class="form-label">Plan</label>
+                <select class="form-select" id="plan" name="plan">
+                    <option value="">All Plans</option>
+                    {% for value, label in subscription_plans %}
+                        <option value="{{ value }}" {% if plan_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Subscription Status Filter -->
+            <div class="col-md-2">
+                <label for="subscription_status" class="form-label">Sub. Status</label>
+                <select class="form-select" id="subscription_status" name="subscription_status">
+                    <option value="">All Sub. Status</option>
+                    {% for value, label in subscription_statuses %}
+                        <option value="{{ value }}" {% if subscription_status_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Items Per Page -->
+            <div class="col-md-1">
+                <label for="per_page" class="form-label">Show</label>
+                <select class="form-select" id="per_page" name="per_page">
+                    {% for option in per_page_options %}
+                        <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="col-md-1 d-flex align-items-end">
+                <a href="{% url 'system_admin:manage_restaurants' %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i>Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Results Summary -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h5>Restaurants Management</h5>
+        <small class="text-muted">
+            {% if search_query or status_filter or plan_filter or subscription_status_filter %}
+                Showing {{ filtered_count }} of {{ subscription_stats.total }} restaurants
+                {% if search_query %} matching "{{ search_query }}"{% endif %}
+            {% else %}
+                Showing all {{ subscription_stats.total }} restaurants
+            {% endif %}
+        </small>
+    </div>
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createRestaurantModal">
+        <i class="fas fa-plus me-1"></i>Add New Restaurant
+    </button>
+</div>
 
 <div class="row mb-4">
     <div class="col-lg-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-store me-2"></i>
-                    All Restaurants ({{ total_restaurants }})
-                </h5>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRestaurantModal">
-                    <i class="fas fa-plus me-1"></i> Add New Restaurant
-                </button>
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-utensils me-2 text-primary"></i>
+                    All Restaurants 
+                    <span class="badge bg-primary">{{ filtered_count }}</span>
+                </h6>
+                <div class="text-muted small">
+                    Page {{ page_obj.number }} of {{ paginator.num_pages }} 
+                    ({{ paginator.count }} total)
+                </div>
             </div>
             <div class="card-body">
                 {% if restaurants %}
@@ -56,10 +169,11 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
+                                    <th width="50">SN</th>
                                     <th>Restaurant Info</th>
                                     <th>Owner Details</th>
                                     <th>Contact & Location</th>
-                                    <th>Business Info</th>
+                                    <th>Days Remaining</th>
                                     <th>Status</th>
                                     <th>Subscription</th>
                                     <th>Actions</th>
@@ -68,6 +182,10 @@
                             <tbody>
                                 {% for restaurant in restaurants %}
                                 <tr>
+                                    <!-- Serial Number Column -->
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</span>
+                                    </td>
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="restaurant-avatar me-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); width: 45px; height: 45px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
@@ -75,7 +193,10 @@
                                             </div>
                                             <div>
                                                 {% if restaurant.restaurant_name %}
-                                                    <strong class="text-primary">{{ restaurant.restaurant_name }}</strong>
+                                                    <strong class="{% if restaurant.is_blocked %}text-danger{% else %}text-primary{% endif %}">{{ restaurant.restaurant_name }}</strong>
+                                                    {% if restaurant.is_blocked %}
+                                                        <br><small class="text-danger"><i class="fas fa-ban me-1"></i>BLOCKED</small>
+                                                    {% endif %}
                                                     {% if restaurant.restaurant_description %}
                                                         {% with cuisine=restaurant.restaurant_description|cut:"Cuisine Type: "|cut:"Opening Hours:"|cut:"Seating Capacity:" %}
                                                             {% if "Cuisine Type:" in restaurant.restaurant_description %}
@@ -97,7 +218,7 @@
                                     </td>
                                     <td>
                                         <div>
-                                            <strong>{{ restaurant.get_full_name|default:restaurant.username }}</strong>
+                                            <strong>{{ restaurant.full_name_display|default:restaurant.username }}</strong>
                                             <br><small class="text-muted"><i class="fas fa-user me-1"></i>@{{ restaurant.username }}</small>
                                             <br><small class="text-info"><i class="fas fa-crown me-1"></i>Owner</small>
                                         </div>
@@ -115,15 +236,35 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <div class="small">
-                                            {% if restaurant.restaurant_description %}
-                                                {% for line in restaurant.restaurant_description.splitlines %}
-                                                    {% if "Opening Hours:" in line %}
-                                                        <div class="mb-1"><i class="fas fa-clock text-warning me-1"></i> {{ line|cut:"Opening Hours: " }}</div>
-                                                    {% endif %}
-                                                {% endfor %}
+                                        <div class="text-center">
+                                            {% if restaurant.days_remaining > 30 %}
+                                                <span class="badge bg-success fs-6">
+                                                    <i class="fas fa-calendar-check me-1"></i>{{ restaurant.days_remaining }} days
+                                                </span>
+                                            {% elif restaurant.days_remaining > 7 %}
+                                                <span class="badge bg-warning fs-6">
+                                                    <i class="fas fa-calendar-alt me-1"></i>{{ restaurant.days_remaining }} days
+                                                </span>
+                                            {% elif restaurant.days_remaining > 0 %}
+                                                <span class="badge bg-danger fs-6">
+                                                    <i class="fas fa-calendar-times me-1"></i>{{ restaurant.days_remaining }} days
+                                                </span>
+                                            {% elif restaurant.days_remaining == 0 %}
+                                                <span class="badge bg-dark fs-6">
+                                                    <i class="fas fa-calendar-minus me-1"></i>Expires Today
+                                                </span>
+                                            {% elif restaurant.is_in_grace %}
+                                                <span class="badge bg-warning fs-6">
+                                                    <i class="fas fa-hourglass me-1"></i>Grace Period
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger fs-6">
+                                                    <i class="fas fa-ban me-1"></i>Expired
+                                                </span>
                                             {% endif %}
-                                            <div><i class="fas fa-calendar me-1"></i> <small class="text-muted">Joined {{ restaurant.date_joined|date:"M d, Y" }}</small></div>
+                                            {% if restaurant.subscription_status %}
+                                                <br><small class="text-muted mt-1">Status: {{ restaurant.subscription_status|title }}</small>
+                                            {% endif %}
                                         </div>
                                     </td>
                                     <td>
@@ -134,90 +275,112 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if restaurant.subscription %}
-                                            {% if restaurant.subscription.subscription_status == 'active' %}
-                                                <span class="badge bg-success mb-1"><i class="fas fa-check-circle me-1"></i>Active</span>
-                                                <br><small class="text-muted">Until {{ restaurant.subscription.subscription_end_date|date:"M d, Y" }}</small>
-                                                {% if restaurant.subscription.days_until_expiration > 7 %}
-                                                    <br><small class="text-info"><i class="fas fa-calendar-alt me-1"></i>{{ restaurant.subscription.days_until_expiration }} days remaining</small>
-                                                {% elif restaurant.subscription.days_until_expiration > 0 %}
-                                                    <br><small class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>{{ restaurant.subscription.days_until_expiration }} days left</small>
-                                                {% elif restaurant.subscription.days_until_expiration == 0 %}
-                                                    <br><small class="text-danger"><i class="fas fa-clock me-1"></i>Expires today!</small>
-                                                    <br><small class="text-info"><i class="fas fa-shield-alt me-1"></i>Grace period starts</small>
-                                                {% elif restaurant.subscription.days_until_expiration < 0 %}
-                                                    {% if restaurant.subscription.is_in_grace_period %}
-                                                        <br><small class="text-warning"><i class="fas fa-hourglass-half me-1"></i>{{ restaurant.subscription.days_until_expiration|floatformat:0|cut:'-' }} days overdue (Grace period)</small>
-                                                        <br><small class="text-muted">Grace ends in {{ restaurant.subscription.days_in_grace_period }} days</small>
-                                                    {% else %}
-                                                        <br><small class="text-danger"><i class="fas fa-times me-1"></i>{{ restaurant.subscription.days_until_expiration|floatformat:0|cut:'-' }} days overdue</small>
-                                                    {% endif %}
-                                                {% endif %}
-                                            {% elif restaurant.subscription.subscription_status == 'expired' %}
-                                                <span class="badge bg-danger mb-1"><i class="fas fa-times-circle me-1"></i>Expired</span>
-                                                <br><small class="text-muted">Ended {{ restaurant.subscription.subscription_end_date|date:"M d, Y" }}</small>
-                                                {% if restaurant.subscription.days_until_expiration < 0 %}
-                                                    <br><small class="text-danger"><i class="fas fa-times me-1"></i>{{ restaurant.subscription.days_until_expiration|floatformat:0|cut:'-' }} days overdue</small>
-                                                {% endif %}
-                                            {% elif restaurant.subscription.subscription_status == 'blocked' %}
-                                                <span class="badge bg-warning mb-1"><i class="fas fa-ban me-1"></i>Blocked</span>
-                                                <br><small class="text-muted">Since {{ restaurant.subscription.updated_at|date:"M d, Y" }}</small>
-                                                {% if restaurant.subscription.subscription_end_date %}
-                                                    <br><small class="text-info"><i class="fas fa-info-circle me-1"></i>Originally until {{ restaurant.subscription.subscription_end_date|date:"M d, Y" }}</small>
-                                                {% endif %}
-                                            {% elif restaurant.subscription.subscription_status == 'grace_period' %}
-                                                <span class="badge bg-warning mb-1"><i class="fas fa-clock me-1"></i>Grace Period</span>
-                                                <br><small class="text-muted">{{ restaurant.subscription.grace_days_remaining }} days left</small>
-                                            {% endif %}
+                                        {% if restaurant.parent_restaurant %}
+                                            <!-- This is a branch - show branch information instead of subscription plan -->
+                                            <span class="badge bg-info mb-1">
+                                                <i class="fas fa-code-branch me-1"></i>Branch
+                                            </span>
+                                            <br><small class="text-muted">Branch of</small>
+                                            <br><strong class="text-primary">{{ restaurant.parent_restaurant.name }}</strong>
                                         {% else %}
-                                            <span class="badge bg-secondary"><i class="fas fa-question me-1"></i>No Subscription</span>
+                                            <!-- This is a main restaurant - show subscription plan -->
+                                            {% if restaurant.subscription_plan %}
+                                                {% if restaurant.subscription_plan == 'PRO' %}
+                                                    <span class="badge bg-primary mb-1">
+                                                        <i class="fas fa-crown me-1"></i>PRO Plan
+                                                    </span>
+                                                    <br><small class="text-muted">Multi-branch enabled</small>
+                                                    {% if restaurant.branch_count > 0 %}
+                                                        <br><small class="text-info">{{ restaurant.branch_count }} branch{{ restaurant.branch_count|pluralize }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge bg-secondary mb-1">
+                                                        <i class="fas fa-store me-1"></i>Single Plan
+                                                    </span>
+                                                    <br><small class="text-muted">Basic plan</small>
+                                                {% endif %}
+                                                
+                                                <!-- Subscription Plan Toggle Buttons -->
+                                                <div class="mt-2">
+                                                    {% if restaurant.subscription_plan == 'SINGLE' %}
+                                                        <button class="btn btn-xs btn-outline-primary upgrade-plan" 
+                                                                data-restaurant-id="{{ restaurant.id }}" 
+                                                                data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}"
+                                                                data-current-plan="SINGLE"
+                                                                title="Upgrade to PRO">
+                                                            <i class="fas fa-arrow-up me-1"></i>Upgrade
+                                                        </button>
+                                                    {% else %}
+                                                        <button class="btn btn-xs btn-outline-secondary downgrade-plan" 
+                                                                data-restaurant-id="{{ restaurant.id }}" 
+                                                                data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}"
+                                                                data-current-plan="PRO"
+                                                                title="Downgrade to Single">
+                                                            <i class="fas fa-arrow-down me-1"></i>Downgrade
+                                                        </button>
+                                                    {% endif %}
+                                                    
+                                                    <button class="btn btn-xs btn-outline-info toggle-status" 
+                                                            data-restaurant-id="{{ restaurant.id }}" 
+                                                            data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}"
+                                                            data-current-status="{{ restaurant.is_active|yesno:'true,false' }}"
+                                                            title="Toggle Status">
+                                                        <i class="fas fa-power-off me-1"></i>
+                                                        {% if restaurant.is_active %}Deactivate{% else %}Activate{% endif %}
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <span class="badge bg-warning"><i class="fas fa-question me-1"></i>No Plan Set</span>
+                                            {% endif %}
                                         {% endif %}
                                     </td>
                                     <td>
                                         <div class="btn-group-vertical d-grid gap-1" role="group">
                                             <button class="btn btn-sm btn-outline-primary view-restaurant" 
-                                                    data-restaurant-id="{{ restaurant.id }}" title="View Details">
+                                                    data-restaurant-id="{{ restaurant.main_owner.id }}" title="View Details">
                                                 <i class="fas fa-eye me-1"></i>View
                                             </button>
                                             <button class="btn btn-sm btn-outline-warning edit-restaurant" 
-                                                    data-restaurant-id="{{ restaurant.id }}" title="Edit Restaurant">
+                                                    data-restaurant-id="{{ restaurant.main_owner.id }}" title="Edit Restaurant">
                                                 <i class="fas fa-edit me-1"></i>Edit
                                             </button>
                                             
-                                            <!-- Subscription Management Buttons -->
-                                            {% if restaurant.subscription %}
-                                                {% if restaurant.subscription.subscription_status == 'blocked' %}
-                                                    <button class="btn btn-sm btn-outline-success unblock-restaurant" 
-                                                            data-restaurant-id="{{ restaurant.id }}" 
+                                            {% if not restaurant.parent_restaurant %}
+                                                <!-- Subscription Management Buttons - Only for Main Restaurants -->
+                                                {% if restaurant.subscription %}
+                                                    {% if restaurant.subscription.subscription_status == 'blocked' %}
+                                                        <button class="btn btn-sm btn-outline-success unblock-restaurant" 
+                                                                data-restaurant-id="{{ restaurant.main_owner.id }}" 
+                                                                data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" 
+                                                                title="Unblock Restaurant">
+                                                            <i class="fas fa-unlock me-1"></i>Unblock
+                                                        </button>
+                                                    {% else %}
+                                                        <button class="btn btn-sm btn-outline-warning block-restaurant" 
+                                                                data-restaurant-id="{{ restaurant.main_owner.id }}" 
+                                                                data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" 
+                                                                title="Block Restaurant">
+                                                            <i class="fas fa-ban me-1"></i>Block
+                                                        </button>
+                                                    {% endif %}
+                                                    <button class="btn btn-sm btn-outline-info extend-subscription" 
+                                                            data-restaurant-id="{{ restaurant.main_owner.id }}" 
                                                             data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" 
-                                                            title="Unblock Restaurant">
-                                                        <i class="fas fa-unlock me-1"></i>Unblock
+                                                            title="Extend Subscription">
+                                                        <i class="fas fa-calendar-plus me-1"></i>Extend
                                                     </button>
                                                 {% else %}
-                                                    <button class="btn btn-sm btn-outline-warning block-restaurant" 
-                                                            data-restaurant-id="{{ restaurant.id }}" 
+                                                    <button class="btn btn-sm btn-outline-info extend-subscription" 
+                                                            data-restaurant-id="{{ restaurant.main_owner.id }}" 
                                                             data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" 
-                                                            title="Block Restaurant">
-                                                        <i class="fas fa-ban me-1"></i>Block
+                                                            title="Create Subscription">
+                                                        <i class="fas fa-plus me-1"></i>Subscribe
                                                     </button>
                                                 {% endif %}
-                                                <button class="btn btn-sm btn-outline-info extend-subscription" 
-                                                        data-restaurant-id="{{ restaurant.id }}" 
-                                                        data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" 
-                                                        title="Extend Subscription">
-                                                    <i class="fas fa-calendar-plus me-1"></i>Extend
-                                                </button>
-                                            {% else %}
-                                                <button class="btn btn-sm btn-outline-info extend-subscription" 
-                                                        data-restaurant-id="{{ restaurant.id }}" 
-                                                        data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" 
-                                                        title="Create Subscription">
-                                                    <i class="fas fa-plus me-1"></i>Subscribe
-                                                </button>
                                             {% endif %}
                                             
                                             <button class="btn btn-sm btn-outline-danger delete-restaurant" 
-                                                    data-restaurant-id="{{ restaurant.id }}" 
+                                                    data-restaurant-id="{{ restaurant.main_owner.id }}" 
                                                     data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" title="Delete Restaurant">
                                                 <i class="fas fa-trash me-1"></i>Delete
                                             </button>
@@ -228,6 +391,64 @@
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Pagination -->
+                    {% if paginator.num_pages > 1 %}
+                    <div class="card-footer">
+                        <nav aria-label="Restaurant pagination">
+                            <ul class="pagination pagination-sm justify-content-center mb-0">
+                                <!-- Previous Page -->
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if plan_filter %}plan={{ plan_filter }}&{% endif %}{% if subscription_status_filter %}subscription_status={{ subscription_status_filter }}&{% endif %}per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">
+                                            <i class="fas fa-chevron-left"></i> Previous
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-chevron-left"></i> Previous</span>
+                                    </li>
+                                {% endif %}
+                                
+                                <!-- Page Numbers -->
+                                {% for page_num in paginator.page_range %}
+                                    {% if page_num == page_obj.number %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                    {% elif page_num > page_obj.number|add:"-3" and page_num < page_obj.number|add:"3" %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if plan_filter %}plan={{ plan_filter }}&{% endif %}{% if subscription_status_filter %}subscription_status={{ subscription_status_filter }}&{% endif %}per_page={{ per_page }}&page={{ page_num }}">{{ page_num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                <!-- Next Page -->
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if plan_filter %}plan={{ plan_filter }}&{% endif %}{% if subscription_status_filter %}subscription_status={{ subscription_status_filter }}&{% endif %}per_page={{ per_page }}&page={{ page_obj.next_page_number }}">
+                                            Next <i class="fas fa-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Next <i class="fas fa-chevron-right"></i></span>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        
+                        <!-- Enhanced Pagination Info -->
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <small class="text-muted">
+                                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} entries
+                            </small>
+                            <small class="text-muted">
+                                {{ per_page }} items per page
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
                 {% else %}
                     <div class="text-center py-5">
                         <i class="fas fa-store fa-3x text-muted mb-3"></i>
@@ -536,6 +757,36 @@
                                     <option value="blocked">Blocked - No access</option>
                                 </select>
                                 <div class="form-text">You can block access even if within date range</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subscription Plan Selection -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-crown text-warning me-1"></i>
+                                    Subscription Plan
+                                </label>
+                                <div class="card border-primary">
+                                    <div class="card-body p-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input form-check-input-lg" type="checkbox" 
+                                                   name="subscription_plan" id="subscription_plan" value="PRO">
+                                            <label class="form-check-label fw-semibold" for="subscription_plan">
+                                                <i class="fas fa-crown text-warning me-2"></i>
+                                                Set as PRO Plan (Multi-branch enabled)
+                                            </label>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <strong>Single Plan:</strong> Basic restaurant with no branches<br>
+                                                <strong>PRO Plan:</strong> Can create unlimited branches under this main restaurant
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -896,8 +1147,40 @@
                         <hr class="my-3">
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-8">
+                    <!-- First Row: Subscription Status and Account Status -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_subscription_status" class="form-label fw-semibold">
+                                    <i class="fas fa-toggle-on text-warning me-1"></i>
+                                    Subscription Status
+                                </label>
+                                <select class="form-select form-control-lg" name="subscription_status" id="edit_subscription_status">
+                                    <option value="active">Active - Full access</option>
+                                    <option value="blocked">Blocked - No access</option>
+                                    <option value="expired">Expired - Grace period</option>
+                                </select>
+                                <div class="form-text">Manual blocking overrides date-based access</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_is_active" class="form-label fw-semibold">
+                                    <i class="fas fa-power-off text-danger me-1"></i>
+                                    Account Status
+                                </label>
+                                <select class="form-select form-control-lg" name="is_active" id="edit_is_active">
+                                    <option value="true">Active - Can Login</option>
+                                    <option value="false">Inactive - Can't Login</option>
+                                </select>
+                                <div class="form-text">Enable/disable account login</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Second Row: Subscription Period (Full Width) -->
+                    <div class="row mb-3">
+                        <div class="col-12">
                             <div class="mb-3">
                                 <label for="edit_quick_period" class="form-label fw-semibold">
                                     <i class="fas fa-calendar-alt text-info me-1"></i>
@@ -913,20 +1196,6 @@
                                     <option value="365">365 Days (1 Year)</option>
                                 </select>
                                 <div class="form-text">Choose a preset period or keep custom dates</div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="edit_subscription_status" class="form-label fw-semibold">
-                                    <i class="fas fa-toggle-on text-warning me-1"></i>
-                                    Subscription Status
-                                </label>
-                                <select class="form-select form-control-lg" name="subscription_status" id="edit_subscription_status">
-                                    <option value="active">Active - Full access</option>
-                                    <option value="blocked">Blocked - No access</option>
-                                    <option value="expired">Expired - Grace period</option>
-                                </select>
-                                <div class="form-text">Manual blocking overrides date-based access</div>
                             </div>
                         </div>
                     </div>
@@ -1063,6 +1332,45 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Real-time search functionality
+    let searchTimeout;
+    const searchInput = document.getElementById('search');
+    const searchSpinner = document.getElementById('searchSpinner');
+    const filterForm = document.getElementById('filterForm');
+    
+    // Auto-submit on search input with debounce
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchSpinner.classList.remove('d-none');
+        
+        searchTimeout = setTimeout(() => {
+            searchSpinner.classList.add('d-none');
+            filterForm.submit();
+        }, 500); // 500ms delay for better UX
+    });
+    
+    // Auto-submit on filter changes
+    document.querySelectorAll('#filterForm select').forEach(select => {
+        select.addEventListener('change', function() {
+            // Reset to page 1 when filters change
+            const pageInput = document.createElement('input');
+            pageInput.type = 'hidden';
+            pageInput.name = 'page';
+            pageInput.value = '1';
+            filterForm.appendChild(pageInput);
+            
+            filterForm.submit();
+        });
+    });
+    
+    // Clear search on escape key
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            filterForm.submit();
+        }
+    });
+    
     // View restaurant details
     document.querySelectorAll('.view-restaurant').forEach(button => {
         button.addEventListener('click', function() {
@@ -1112,6 +1420,36 @@ document.addEventListener('DOMContentLoaded', function() {
             const restaurantId = this.getAttribute('data-restaurant-id');
             const restaurantName = this.getAttribute('data-restaurant-name');
             showExtendSubscriptionModal(restaurantName, restaurantId);
+        });
+    });
+
+    // Upgrade subscription plan
+    document.querySelectorAll('.upgrade-plan').forEach(button => {
+        button.addEventListener('click', function() {
+            const restaurantId = this.getAttribute('data-restaurant-id');
+            const restaurantName = this.getAttribute('data-restaurant-name');
+            const currentPlan = this.getAttribute('data-current-plan');
+            toggleSubscriptionPlan(restaurantId, restaurantName, currentPlan, 'PRO');
+        });
+    });
+
+    // Downgrade subscription plan
+    document.querySelectorAll('.downgrade-plan').forEach(button => {
+        button.addEventListener('click', function() {
+            const restaurantId = this.getAttribute('data-restaurant-id');
+            const restaurantName = this.getAttribute('data-restaurant-name');
+            const currentPlan = this.getAttribute('data-current-plan');
+            toggleSubscriptionPlan(restaurantId, restaurantName, currentPlan, 'SINGLE');
+        });
+    });
+
+    // Toggle restaurant status
+    document.querySelectorAll('.toggle-status').forEach(button => {
+        button.addEventListener('click', function() {
+            const restaurantId = this.getAttribute('data-restaurant-id');
+            const restaurantName = this.getAttribute('data-restaurant-name');
+            const currentStatus = this.getAttribute('data-current-status') === 'true';
+            toggleRestaurantStatus(restaurantId, restaurantName, currentStatus);
         });
     });
 
@@ -1528,6 +1866,9 @@ function editRestaurant(restaurantId) {
                 document.getElementById('edit_subscription_status').value = 'active';
             }
             
+            // Account Status
+            document.getElementById('edit_is_active').value = data.is_active ? 'true' : 'false';
+            
             // Set up quick period handler for edit form
             setupEditFormSubscriptionHandlers();
             
@@ -1687,16 +2028,46 @@ function showExtendSubscriptionModal(restaurantName, restaurantId) {
     // Sync select dropdown with hidden input
     const extensionDays = document.getElementById('extensionDays');
     const hiddenDays = document.getElementById('hiddenDays');
+    const extendForm = document.getElementById('extendForm');
     
-    extensionDays.addEventListener('change', function() {
-        hiddenDays.value = this.value;
-    });
+    // Remove any existing event listener to prevent duplicates
+    extensionDays.removeEventListener('change', updateHiddenDays);
+    extensionDays.addEventListener('change', updateHiddenDays);
+    
+    // Prevent double submission
+    extendForm.removeEventListener('submit', preventDoubleSubmit);
+    extendForm.addEventListener('submit', preventDoubleSubmit);
     
     // Set initial value
     hiddenDays.value = extensionDays.value;
     
     const modal = new bootstrap.Modal(document.getElementById('extendSubscriptionModal'));
     modal.show();
+}
+
+// Separate function to handle the change event
+function updateHiddenDays() {
+    const hiddenDays = document.getElementById('hiddenDays');
+    hiddenDays.value = this.value;
+}
+
+// Prevent double form submission
+function preventDoubleSubmit(e) {
+    const submitBtn = this.querySelector('button[type="submit"]');
+    if (submitBtn.disabled) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Disable submit button to prevent double clicks
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Extending...';
+    
+    // Re-enable after 3 seconds as fallback
+    setTimeout(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-calendar-plus me-1"></i>Extend Subscription';
+    }, 3000);
 }
 
 function setupEditFormSubscriptionHandlers() {
@@ -1811,6 +2182,178 @@ function createToastContainer() {
     container.style.zIndex = '9999';
     document.body.appendChild(container);
     return container;
+}
+
+function toggleSubscriptionPlan(restaurantId, restaurantName, currentPlan, newPlan) {
+    const action = newPlan === 'PRO' ? 'upgrade' : 'downgrade';
+    const planName = newPlan === 'PRO' ? 'PRO' : 'Single';
+    
+    // For upgrades, use simple confirmation
+    if (newPlan === 'PRO') {
+        if (!confirm(`Are you sure you want to ${action} "${restaurantName}" to ${planName} plan?`)) {
+            return;
+        }
+        executeSubscriptionChange(restaurantId, newPlan, false);
+    } else {
+        // For downgrades, check if branches exist first
+        executeSubscriptionChange(restaurantId, newPlan, false);
+    }
+}
+
+function executeSubscriptionChange(restaurantId, newPlan, forceDelete = false) {
+    const formData = new FormData();
+    formData.append('restaurant_id', restaurantId);
+    formData.append('new_plan', newPlan);
+    formData.append('force_delete_branches', forceDelete ? 'true' : 'false');
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('{% url "system_admin:toggle_subscription_plan" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            if (data.deleted_branches && data.deleted_branches.length > 0) {
+                showMessage(`Deleted branches: ${data.deleted_branches.join(', ')}`, 'info');
+            }
+            setTimeout(() => location.reload(), 2000); // Reload to show changes
+        } else if (data.requires_confirmation) {
+            // Show confirmation dialog for branch deletion
+            showBranchDeletionConfirmation(restaurantId, newPlan, data);
+        } else {
+            showMessage(data.error || 'Error changing subscription plan', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage(`Error: ${error.message}`, 'error');
+    });
+}
+
+function showBranchDeletionConfirmation(restaurantId, newPlan, data) {
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal fade branch-deletion-modal" id="branchDeletionModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Confirm Subscription Downgrade
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            <strong>Warning:</strong> ${data.message}
+                        </div>
+                        
+                        <p><strong>Restaurant:</strong> ${data.restaurant_name}</p>
+                        <p><strong>Current Plan:</strong> PRO (Multi-Branch)</p>
+                        <p><strong>New Plan:</strong> Single (Basic)</p>
+                        
+                        <div class="mt-3">
+                            <h6 class="text-danger">
+                                <i class="fas fa-trash me-1"></i>
+                                Branches to be deleted (${data.branches_count}):
+                            </h6>
+                            <div class="list-group">
+                                ${data.branches.map(branch => `
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>${branch.name}</strong>
+                                            <small class="text-muted d-block">Created: ${branch.created_date}</small>
+                                        </div>
+                                        <span class="badge ${branch.is_active ? 'bg-success' : 'bg-secondary'}">
+                                            ${branch.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-light rounded">
+                            <h6><i class="fas fa-info-circle text-info me-1"></i> What will happen:</h6>
+                            <ul class="mb-0">
+                                <li>All ${data.branches_count} branch(es) will be <strong class="text-danger">permanently deleted</strong></li>
+                                <li>All branch data, settings, and configurations will be lost</li>
+                                <li>Staff accounts associated with branches will be removed</li>
+                                <li>This action <strong class="text-danger">cannot be undone</strong></li>
+                                <li>The restaurant will be downgraded to Single plan</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteBranches">
+                            <i class="fas fa-trash me-1"></i>Delete Branches & Downgrade
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove any existing modal
+    const existingModal = document.getElementById('branchDeletionModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('branchDeletionModal'));
+    modal.show();
+    
+    // Handle confirmation
+    document.getElementById('confirmDeleteBranches').addEventListener('click', function() {
+        modal.hide();
+        // Execute with force delete
+        executeSubscriptionChange(restaurantId, newPlan, true);
+        
+        // Remove modal from DOM after hiding
+        setTimeout(() => {
+            const modalElement = document.getElementById('branchDeletionModal');
+            if (modalElement) {
+                modalElement.remove();
+            }
+        }, 300);
+    });
+}
+
+function toggleRestaurantStatus(restaurantId, restaurantName, currentStatus) {
+    const action = currentStatus ? 'deactivate' : 'activate';
+    
+    if (!confirm(`Are you sure you want to ${action} "${restaurantName}"?`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('restaurant_id', restaurantId);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('{% url "system_admin:toggle_restaurant_status" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            setTimeout(() => location.reload(), 1500); // Reload to show changes
+        } else {
+            showMessage(data.error || 'Error changing restaurant status', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage(`Error: ${error.message}`, 'error');
+    });
 }
 </script>
 {% endblock %}

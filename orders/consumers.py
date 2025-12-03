@@ -130,7 +130,7 @@ class OrderConsumer(AsyncWebsocketConsumer):
                         return True
             
             # Restaurant owner can view their own orders
-            if user.is_owner():
+            if user.is_owner() or user.is_main_owner() or user.is_branch_owner():
                 if hasattr(order, 'table_info') and order.table_info and hasattr(order.table_info, 'owner'):
                     if order.table_info.owner == user:
                         return True
@@ -194,7 +194,7 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
                 return
             
             # Only staff members can connect to restaurant updates
-            if not (user.is_owner() or user.is_kitchen_staff() or user.is_customer_care() or user.is_cashier()):
+            if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_kitchen_staff() or user.is_customer_care() or user.is_cashier()):
                 logger.warning(f"User {user.username} with role {user.role} attempted unauthorized restaurant WebSocket connection")
                 await self.close(code=4003)
                 return

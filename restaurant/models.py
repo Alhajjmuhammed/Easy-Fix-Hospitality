@@ -5,16 +5,54 @@ from decimal import Decimal
 
 User = get_user_model()
 
+# Import Restaurant model for hierarchical management
+from .models_restaurant import Restaurant
+
 class TableInfo(models.Model):
+    # Legacy owner field (will be deprecated)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tables', 
-                             limit_choices_to={'role__name': 'owner'}, null=True, blank=True)
+                             limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']}, 
+                             null=True, blank=True)
+    
+    # New restaurant field for hierarchical management
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tables',
+                                  null=True, blank=True, help_text="Restaurant/branch this table belongs to")
+    
     tbl_no = models.CharField(max_length=10)
     capacity = models.IntegerField(default=4)
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
+    class Meta:
+        # Ensure either owner or restaurant is set
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(owner__isnull=False) | models.Q(restaurant__isnull=False),
+                name='table_must_have_owner_or_restaurant'
+            ),
+        ]
+    
     def __str__(self):
-        return f"Table {self.tbl_no} ({self.owner.restaurant_name})"
+        if self.restaurant:
+            return f"Table {self.tbl_no} ({self.restaurant.name})"
+        elif self.owner:
+            return f"Table {self.tbl_no} ({self.owner.restaurant_name})"
+        else:
+            return f"Table {self.tbl_no}"
+    
+    def get_restaurant(self):
+        """Get the restaurant for this table"""
+        if self.restaurant:
+            return self.restaurant
+        elif self.owner and hasattr(self.owner, 'managed_restaurant') and self.owner.managed_restaurant.exists():
+            return self.owner.managed_restaurant.first()
+        return None
+    
+    def get_owner(self):
+        """Get the owner for this table (backward compatibility)"""
+        if self.restaurant:
+            return self.restaurant.branch_owner or self.restaurant.main_owner
+        return self.owner
     
     def get_active_orders(self):
         """Get active orders for this table"""
@@ -35,24 +73,84 @@ class TableInfo(models.Model):
     class Meta:
         verbose_name = "Table Information"
         verbose_name_plural = "Tables Information"
-        unique_together = ['owner', 'tbl_no']  # Each owner can have their own table numbering
+        constraints = [
+            # Ensure either owner or restaurant is set
+            models.CheckConstraint(
+                check=models.Q(owner__isnull=False) | models.Q(restaurant__isnull=False),
+                name='table_must_have_owner_or_restaurant'
+            ),
+            # Unique table numbers per owner (legacy)
+            models.UniqueConstraint(
+                fields=['owner', 'tbl_no'],
+                condition=models.Q(owner__isnull=False),
+                name='unique_table_per_owner'
+            ),
+            # Unique table numbers per restaurant (new system)
+            models.UniqueConstraint(
+                fields=['restaurant', 'tbl_no'],
+                condition=models.Q(restaurant__isnull=False),
+                name='unique_table_per_restaurant'
+            ),
+        ]
 
 class MainCategory(models.Model):
+    # Legacy owner field (will be deprecated)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='main_categories',
-                             limit_choices_to={'role__name': 'owner'}, null=True, blank=True)
+                             limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']}, 
+                             null=True, blank=True)
+    
+    # New restaurant field for hierarchical management
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='main_categories',
+                                  null=True, blank=True, help_text="Restaurant/branch this category belongs to")
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     image = models.ImageField(upload_to='categories/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    def __str__(self):
-        return f"{self.name} ({self.owner.restaurant_name})"
-    
     class Meta:
         verbose_name = "Main Category"
         verbose_name_plural = "Main Categories"
-        unique_together = ['owner', 'name']  # Each owner can have their own category names
+        # Updated unique constraint to work with both owner and restaurant
+        constraints = [
+            models.UniqueConstraint(
+                fields=['owner', 'name'],
+                condition=models.Q(owner__isnull=False),
+                name='unique_category_per_owner'
+            ),
+            models.UniqueConstraint(
+                fields=['restaurant', 'name'], 
+                condition=models.Q(restaurant__isnull=False),
+                name='unique_category_per_restaurant'
+            ),
+            models.CheckConstraint(
+                check=models.Q(owner__isnull=False) | models.Q(restaurant__isnull=False),
+                name='category_must_have_owner_or_restaurant'
+            ),
+        ]
+    
+    def __str__(self):
+        if self.restaurant:
+            return f"{self.name} ({self.restaurant.name})"
+        elif self.owner:
+            return f"{self.name} ({self.owner.restaurant_name})"
+        else:
+            return self.name
+    
+    def get_restaurant(self):
+        """Get the restaurant for this category"""
+        if self.restaurant:
+            return self.restaurant
+        elif self.owner and hasattr(self.owner, 'managed_restaurant') and self.owner.managed_restaurant.exists():
+            return self.owner.managed_restaurant.first()
+        return None
+    
+    def get_owner(self):
+        """Get the owner for this category (backward compatibility)"""
+        if self.restaurant:
+            return self.restaurant.branch_owner or self.restaurant.main_owner
+        return self.owner
 
 class SubCategory(models.Model):
     main_category = models.ForeignKey(MainCategory, on_delete=models.CASCADE, related_name='subcategories')
@@ -63,10 +161,21 @@ class SubCategory(models.Model):
     
     @property
     def owner(self):
-        return self.main_category.owner
+        """Get owner for backward compatibility"""
+        return self.main_category.get_owner()
+    
+    @property
+    def restaurant(self):
+        """Get restaurant for this subcategory"""
+        return self.main_category.get_restaurant()
     
     def __str__(self):
-        return f"{self.main_category.name} - {self.name} ({self.owner.restaurant_name})"
+        if self.main_category.restaurant:
+            return f"{self.main_category.name} - {self.name} ({self.main_category.restaurant.name})"
+        elif self.main_category.owner:
+            return f"{self.main_category.name} - {self.name} ({self.main_category.owner.restaurant_name})"
+        else:
+            return f"{self.main_category.name} - {self.name}"
     
     class Meta:
         verbose_name = "Sub Category"
@@ -88,10 +197,21 @@ class Product(models.Model):
     
     @property
     def owner(self):
-        return self.main_category.owner
+        """Get owner for backward compatibility"""
+        return self.main_category.get_owner()
+    
+    @property
+    def restaurant(self):
+        """Get restaurant for this product"""
+        return self.main_category.get_restaurant()
     
     def __str__(self):
-        return f"{self.name} ({self.owner.restaurant_name})"
+        if self.main_category.restaurant:
+            return f"{self.name} ({self.main_category.restaurant.name})"
+        elif self.main_category.owner:
+            return f"{self.name} ({self.main_category.owner.restaurant_name})"
+        else:
+            return self.name
     
     def is_in_stock(self):
         return self.available_in_stock > 0 and self.is_available
@@ -193,7 +313,7 @@ class HappyHourPromotion(models.Model):
     ]
     
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='happy_hour_promotions',
-                             limit_choices_to={'role__name': 'owner'})
+                             limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']})
     name = models.CharField(max_length=100, help_text="e.g., 'Happy Hour Special', 'Weekend Discount'")
     description = models.TextField(blank=True, help_text="Optional description of the promotion")
     

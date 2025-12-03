@@ -17,11 +17,11 @@ NC='\033[0m' # No Color
 # Configuration
 PROJECT_NAME="restaurant"
 PROJECT_DIR="/var/www/$PROJECT_NAME"
-GITHUB_REPO="https://github.com/Alhajjmuhammed/Easy-Fix-Restaurant.git"
+GITHUB_REPO="https://github.com/Alhajjmuhammed/Easy-Fix-Hospitality.git"
 DB_NAME="restaurant_db"
 DB_USER="restaurant_user"
 DB_PASSWORD="RestaurantSecure2024!"
-SERVER_IP="24.199.116.165"
+SERVER_IP="72.62.51.225"
 
 # Function to print colored output
 print_status() {
@@ -217,10 +217,10 @@ print_success "Permissions set!"
 
 # Step 12: Configure Nginx
 print_status "Step 12/12: Configuring Nginx web server..."
-cat > /etc/nginx/sites-available/$PROJECT_NAME << 'NGINXEOF'
+cat > /etc/nginx/sites-available/$PROJECT_NAME << NGINXEOF
 server {
     listen 80;
-    server_name 24.199.116.165;
+    server_name $SERVER_IP;
 
     client_max_body_size 10M;
 

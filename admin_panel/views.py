@@ -1,12 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from .restaurant_utils import get_restaurant_context, get_current_restaurant, filter_data_by_restaurant
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
+from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator
 from accounts.models import User, Role, get_owner_filter
 from restaurant.models import Product, MainCategory, SubCategory, TableInfo
+from restaurant.models_restaurant import Restaurant
 from orders.models import Order, OrderItem
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_http_methods
@@ -32,12 +35,12 @@ def get_production_qr_url(request, qr_code):
     """
     Helper function to generate the correct QR URL
     - Local development: http://127.0.0.1:8000/r/{qr_code}/
-    - Production: https://easyfixsoft.com/r/{qr_code}/
+    - Production: https://easyfixsoft.com/r/{qr_code}/ or http://72.62.51.225/r/{qr_code}/
     """
     host = request.get_host()
     
     # Force HTTPS for production domains
-    if 'easyfixsoft.com' in host or '24.199.116.165' in host:
+    if 'easyfixsoft.com' in host or '72.62.51.225' in host:
         return f'https://easyfixsoft.com/r/{qr_code}/'
     
     # Local development - use HTTP
@@ -51,63 +54,270 @@ def get_production_qr_url(request, qr_code):
 @login_required
 def admin_dashboard(request):
     """Main admin dashboard view - accessible by administrators and owners"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('restaurant:home')
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get current restaurant context
+        current_restaurant = None
+        view_all_restaurants = request.session.get('view_all_restaurants', False)
+        selected_restaurant_id = request.session.get('selected_restaurant_id')
         
-        if owner_filter:
-            # Owner-specific statistics
-            total_users = User.objects.filter(owner=owner_filter).count() + 1  # +1 for the owner themselves
-            total_orders = Order.objects.filter(table_info__owner=owner_filter).count()
-            total_products = Product.objects.filter(main_category__owner=owner_filter).count()
-            total_tables = TableInfo.objects.filter(owner=owner_filter).count()
-            
-            # Recent orders (last 7 days) for this owner
-            seven_days_ago = timezone.now() - timedelta(days=7)
+        if selected_restaurant_id and not view_all_restaurants:
+            # selected_restaurant_id stores User (owner) ID, not Restaurant ID
+            try:
+                selected_user = User.objects.get(id=selected_restaurant_id)
+                
+                # Get the Restaurant object for this user
+                if selected_user.is_branch_owner():
+                    current_restaurant = Restaurant.objects.filter(branch_owner=selected_user, is_main_restaurant=False).first()
+                else:
+                    current_restaurant = Restaurant.objects.filter(main_owner=selected_user, is_main_restaurant=True).first()
+                
+                # Verify user can access this restaurant
+                if current_restaurant and not current_restaurant.can_user_access(request.user):
+                    current_restaurant = None
+                    if 'selected_restaurant_id' in request.session:
+                        del request.session['selected_restaurant_id']
+            except User.DoesNotExist:
+                current_restaurant = None
+                if 'selected_restaurant_id' in request.session:
+                    del request.session['selected_restaurant_id']
+        
+        # If no current restaurant selected, auto-select for non-main owners
+        if not current_restaurant and not view_all_restaurants:
+            if request.user.is_branch_owner():
+                # Branch owners should see their restaurant by default
+                user_restaurants = Restaurant.objects.filter(branch_owner=request.user)
+                if user_restaurants.exists():
+                    current_restaurant = user_restaurants.first()
+                    request.session['selected_restaurant_id'] = current_restaurant.id
+            elif request.user.is_owner() and not request.user.is_main_owner():
+                # Legacy owners - try to find their restaurant via TableInfo
+                owner_filter = get_owner_filter(request.user)
+                if owner_filter:
+                    # Try to find restaurant associated with this owner
+                    user_restaurants = Restaurant.objects.filter(
+                        Q(main_owner=request.user) | Q(branch_owner=request.user)
+                    )
+                    if user_restaurants.exists():
+                        current_restaurant = user_restaurants.first()
+                        request.session['selected_restaurant_id'] = current_restaurant.id
+        
+        # Calculate statistics based on context
+        if request.user.is_administrator():
+            # Administrators see everything
+            if view_all_restaurants or not current_restaurant:
+                # All restaurants view
+                total_users = User.objects.count()
+                total_orders = Order.objects.count()
+                total_products = Product.objects.count()
+                total_tables = TableInfo.objects.count()
+                context_name = "All Restaurants (Admin)"
+            else:
+                # Specific restaurant for admin
+                # Count: owner + their staff
+                if current_restaurant.is_main_restaurant:
+                    staff_count = User.objects.filter(owner=current_restaurant.main_owner).count()
+                    total_users = 1 + staff_count  # main owner + staff
+                else:
+                    staff_count = User.objects.filter(owner=current_restaurant.branch_owner).count()
+                    total_users = 1 + staff_count  # branch owner + staff
+                total_orders = Order.objects.filter(
+                    Q(table_info__restaurant=current_restaurant) |
+                    Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner])
+                ).count()
+                total_products = Product.objects.filter(
+                    Q(main_category__restaurant=current_restaurant) |
+                    Q(main_category__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner])
+                ).count()
+                total_tables = TableInfo.objects.filter(
+                    Q(restaurant=current_restaurant) |
+                    Q(owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner])
+                ).count()
+                context_name = f"{current_restaurant.name} (Admin)"
+                
+        elif request.user.is_main_owner():
+            # Main owners - can see all or individual restaurants
+            if view_all_restaurants or not current_restaurant:
+                # All restaurants owned by this main owner
+                owned_restaurants = Restaurant.objects.filter(main_owner=request.user)
+                # Count: main owner (1) + main staff + branch owners + branch staff
+                main_staff = User.objects.filter(owner=request.user).count()
+                branch_count = owned_restaurants.filter(is_main_restaurant=False).count()
+                branch_staff = User.objects.filter(owner__in=[r.branch_owner for r in owned_restaurants if not r.is_main_restaurant]).count()
+                total_users = 1 + main_staff + branch_count + branch_staff
+                total_orders = Order.objects.filter(
+                    Q(table_info__restaurant__in=owned_restaurants) |
+                    Q(table_info__owner__in=[r.branch_owner for r in owned_restaurants])
+                ).count()
+                total_products = Product.objects.filter(
+                    Q(main_category__restaurant__in=owned_restaurants) |
+                    Q(main_category__owner__in=[r.branch_owner for r in owned_restaurants])
+                ).count()
+                total_tables = TableInfo.objects.filter(
+                    Q(restaurant__in=owned_restaurants) |
+                    Q(owner__in=[r.branch_owner for r in owned_restaurants])
+                ).count()
+                context_name = f"All Restaurants ({owned_restaurants.count()} locations)"
+            else:
+                # Specific restaurant
+                if current_restaurant.main_owner != request.user:
+                    raise PermissionDenied("You don't have access to this restaurant.")
+                
+                # Count branch owner + their staff
+                if current_restaurant.is_main_restaurant:
+                    # Main restaurant: count main owner + their staff
+                    total_users = 1 + User.objects.filter(owner=current_restaurant.main_owner).count()
+                else:
+                    # Branch: count branch owner + their staff
+                    total_users = 1 + User.objects.filter(owner=current_restaurant.branch_owner).count()
+                total_orders = Order.objects.filter(
+                    Q(table_info__restaurant=current_restaurant) |
+                    Q(table_info__owner=current_restaurant.branch_owner)
+                ).count()
+                total_products = Product.objects.filter(
+                    Q(main_category__restaurant=current_restaurant) |
+                    Q(main_category__owner=current_restaurant.branch_owner)
+                ).count()
+                total_tables = TableInfo.objects.filter(
+                    Q(restaurant=current_restaurant) |
+                    Q(owner=current_restaurant.branch_owner)
+                ).count()
+                context_name = current_restaurant.name
+                
+        else:
+            # Branch owners and legacy owners
+            if current_restaurant:
+                if not current_restaurant.can_user_access(request.user):
+                    raise PermissionDenied("You don't have access to this restaurant.")
+                
+                # Count: owner themselves (1) + their staff
+                staff_count = User.objects.filter(owner=request.user).count()
+                total_users = 1 + staff_count
+                total_orders = Order.objects.filter(
+                    Q(table_info__restaurant=current_restaurant) |
+                    Q(table_info__owner=request.user)
+                ).count()
+                total_products = Product.objects.filter(
+                    Q(main_category__restaurant=current_restaurant) |
+                    Q(main_category__owner=request.user)
+                ).count()
+                total_tables = TableInfo.objects.filter(
+                    Q(restaurant=current_restaurant) |
+                    Q(owner=request.user)
+                ).count()
+                context_name = current_restaurant.name
+            else:
+                # Fallback to legacy owner filter
+                owner_filter = get_owner_filter(request.user)
+                if owner_filter:
+                    total_users = User.objects.filter(owner=owner_filter).count() + 1
+                    total_orders = Order.objects.filter(table_info__owner=owner_filter).count()
+                    total_products = Product.objects.filter(main_category__owner=owner_filter).count()
+                    total_tables = TableInfo.objects.filter(owner=owner_filter).count()
+                    context_name = request.user.get_restaurant_name()
+                else:
+                    raise PermissionDenied("No restaurant access found.")
+        
+        # Calculate time-based statistics
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        today = timezone.now().date()
+        
+        if current_restaurant and not view_all_restaurants:
+            # Single restaurant stats
             recent_orders = Order.objects.filter(
-                table_info__owner=owner_filter,
+                Q(table_info__restaurant=current_restaurant) |
+                Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner]),
                 created_at__gte=seven_days_ago
             ).count()
             
-            # Today's revenue for this owner
-            today = timezone.now().date()
             today_orders = Order.objects.filter(
-                table_info__owner=owner_filter,
+                Q(table_info__restaurant=current_restaurant) |
+                Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner]),
                 created_at__date=today
             )
             today_revenue = today_orders.aggregate(total=Sum('total_amount'))['total'] or 0
             
-            # Pending orders for this owner
             pending_orders = Order.objects.filter(
-                table_info__owner=owner_filter,
+                Q(table_info__restaurant=current_restaurant) |
+                Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner]),
+                status='pending'
+            ).count()
+        elif request.user.is_main_owner() and view_all_restaurants:
+            # All restaurants for main owner
+            owned_restaurants = Restaurant.objects.filter(main_owner=request.user)
+            recent_orders = Order.objects.filter(
+                Q(table_info__restaurant__in=owned_restaurants) |
+                Q(table_info__owner__in=[r.branch_owner for r in owned_restaurants]),
+                created_at__gte=seven_days_ago
+            ).count()
+            
+            today_orders = Order.objects.filter(
+                Q(table_info__restaurant__in=owned_restaurants) |
+                Q(table_info__owner__in=[r.branch_owner for r in owned_restaurants]),
+                created_at__date=today
+            )
+            today_revenue = today_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+            
+            pending_orders = Order.objects.filter(
+                Q(table_info__restaurant__in=owned_restaurants) |
+                Q(table_info__owner__in=[r.branch_owner for r in owned_restaurants]),
                 status='pending'
             ).count()
         else:
-            # Administrator sees all statistics
-            total_users = User.objects.count()
-            total_orders = Order.objects.count()
-            total_products = Product.objects.count()
-            total_tables = TableInfo.objects.count()
+            # Fallback - use owner filter or all
+            if not request.user.is_administrator():
+                owner_filter = get_owner_filter(request.user)
+                recent_orders = Order.objects.filter(
+                    table_info__owner=owner_filter,
+                    created_at__gte=seven_days_ago
+                ).count()
+                
+                today_orders = Order.objects.filter(
+                    table_info__owner=owner_filter,
+                    created_at__date=today
+                )
+                today_revenue = today_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                
+                pending_orders = Order.objects.filter(
+                    table_info__owner=owner_filter,
+                    status='pending'
+                ).count()
+            else:
+                # Administrator - all data
+                recent_orders = Order.objects.filter(created_at__gte=seven_days_ago).count()
+                today_orders = Order.objects.filter(created_at__date=today)
+                today_revenue = today_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                pending_orders = Order.objects.filter(status='pending').count()
             
-            # Recent orders (last 7 days)
-            seven_days_ago = timezone.now() - timedelta(days=7)
-            recent_orders = Order.objects.filter(created_at__gte=seven_days_ago).count()
-            
-            # Today's revenue
-            today = timezone.now().date()
-            today_orders = Order.objects.filter(created_at__date=today)
-            today_revenue = today_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-            
-            # Pending orders
-            pending_orders = Order.objects.filter(status='pending').count()
-            
-    except PermissionDenied:
-        messages.error(request, 'You are not associated with any restaurant.')
+    except PermissionDenied as e:
+        messages.error(request, str(e))
+        return redirect('restaurant:home')
+    except Exception as e:
+        messages.error(request, f'Error loading dashboard: {str(e)}')
         return redirect('restaurant:home')
 
+    # Get restaurant context using utility
+    session_restaurant_id = request.session.get('selected_restaurant_id')
+    restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+    current_restaurant = restaurant_context['current_restaurant']
+    view_all_restaurants = restaurant_context['view_all_restaurants']
+    
+    # Restaurant name for display
+    context_name = restaurant_context['restaurant_name']
+
+    # Get current restaurant's QR code
+    current_qr_code = None
+    if current_restaurant and current_restaurant.qr_code:
+        current_qr_code = current_restaurant.qr_code
+    elif request.user.restaurant_qr_code:
+        # Fallback to user's QR code for legacy support
+        current_qr_code = request.user.restaurant_qr_code
+    
+    # Combine dashboard data with restaurant context
     context = {
         'total_users': total_users,
         'total_orders': total_orders,
@@ -116,7 +326,8 @@ def admin_dashboard(request):
         'recent_orders': recent_orders,
         'today_revenue': today_revenue,
         'pending_orders': pending_orders,
-        'restaurant_name': request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants",
+        'current_qr_code': current_qr_code,  # Current restaurant's QR code
+        **restaurant_context,  # Include all restaurant context variables
     }
 
     return render(request, 'admin_panel/dashboard.html', context)
@@ -125,33 +336,134 @@ def admin_dashboard(request):
 @login_required
 def manage_users(request):
     """User management view"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
+        view_all_restaurants = restaurant_context['view_all_restaurants']
         
-        if owner_filter:
-            # Owners see only their own staff and customers (full access to all roles except administrator)
-            users = User.objects.filter(
-                owner=owner_filter
-            ).order_by('-date_joined')
+        if current_restaurant and not view_all_restaurants:
+            # Filter users related to specific selected restaurant
+            if current_restaurant.is_main_restaurant:
+                # Main restaurant: show main owner, branch owner, and staff under main owner
+                users = User.objects.filter(
+                    Q(owned_restaurants=current_restaurant) |  # Main owners
+                    Q(managed_restaurant=current_restaurant) |  # Branch owners of this main restaurant
+                    Q(owner=current_restaurant.main_owner)  # Staff under main owner
+                ).distinct().order_by('-date_joined')
+            else:
+                # Branch restaurant: only show branch owner and staff under branch owner
+                users = User.objects.filter(
+                    Q(managed_restaurant=current_restaurant) |  # Branch owner of this branch
+                    Q(owner=current_restaurant.branch_owner)  # Staff under branch owner
+                ).distinct().order_by('-date_joined')
             roles = Role.objects.exclude(name='administrator')
-        else:
-            # Administrators see all users and roles
+        elif request.user.is_administrator():
+            # Administrators see all users
             users = User.objects.all().order_by('-date_joined')
             roles = Role.objects.all()
+        else:
+            # Get users from all accessible restaurants
+            accessible_restaurants = restaurant_context['accessible_restaurants']
+            
+            if accessible_restaurants.exists():
+                user_query = Q()
+                for restaurant in accessible_restaurants:
+                    user_query |= (
+                        Q(owned_restaurants=restaurant) |  # Main owners
+                        Q(managed_restaurant=restaurant) |  # Branch owners
+                        Q(owner=restaurant.main_owner) |  # Staff under main owner
+                        Q(owner=restaurant.branch_owner)  # Staff under branch owner
+                    )
+                
+                users = User.objects.filter(user_query).distinct().order_by('-date_joined')
+                roles = Role.objects.exclude(name='administrator')
+            else:
+                users = User.objects.all().order_by('-date_joined')
+                roles = Role.objects.all()
             
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
+    # Apply filters
+    search_query = request.GET.get('search', '').strip()
+    role_filter = request.GET.get('role', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    restaurant_filter = request.GET.get('restaurant', '').strip()
+
+    if search_query:
+        users = users.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+
+    if role_filter:
+        # Filter by role using the role relationship
+        if role_filter == 'administrator':
+            users = users.filter(role__name='administrator')
+        elif role_filter == 'owner':
+            # Include all owner types: main_owner, branch_owner, and legacy owner
+            users = users.filter(role__name__in=['owner', 'main_owner', 'branch_owner'])
+        elif role_filter == 'main_owner':
+            users = users.filter(role__name='main_owner')
+        elif role_filter == 'branch_owner':
+            users = users.filter(role__name='branch_owner')
+        elif role_filter == 'kitchen':
+            users = users.filter(role__name='kitchen')
+        elif role_filter == 'bar':
+            users = users.filter(role__name='bar')
+        elif role_filter == 'customer_care':
+            users = users.filter(role__name='customer_care')
+        elif role_filter == 'cashier':
+            users = users.filter(role__name='cashier')
+        elif role_filter == 'customer':
+            users = users.filter(role__name='customer')
+
+    if status_filter:
+        if status_filter == 'active':
+            users = users.filter(is_active=True)
+        elif status_filter == 'inactive':
+            users = users.filter(is_active=False)
+
+    if restaurant_filter:
+        from restaurant.models_restaurant import Restaurant
+        try:
+            filter_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            if filter_restaurant.is_main_restaurant:
+                users = users.filter(
+                    Q(owned_restaurants=filter_restaurant) |
+                    Q(managed_restaurant=filter_restaurant) |
+                    Q(owner=filter_restaurant.main_owner)
+                ).distinct()
+            else:
+                users = users.filter(
+                    Q(managed_restaurant=filter_restaurant) |
+                    Q(owner=filter_restaurant.branch_owner)
+                ).distinct()
+        except Restaurant.DoesNotExist:
+            pass
+
+    # Pagination
+    per_page = int(request.GET.get('per_page', 20))
+    paginator = Paginator(users, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'users': users,
+        'users': page_obj.object_list,
+        'page_obj': page_obj,
         'roles': roles,
-        'is_owner_access': request.user.is_owner() and not request.user.is_administrator(),
-        'restaurant_name': request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants",
+        'is_owner_access': (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()) and not request.user.is_administrator(),
+        **restaurant_context,  # Include restaurant context
     }
 
     return render(request, 'admin_panel/manage_users.html', context)
@@ -160,28 +472,104 @@ def manage_users(request):
 @login_required
 def manage_products(request):
     """Product management view - accessible by administrators and owners"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('restaurant:home')
 
+    # Initialize variables
+    main_categories = MainCategory.objects.none()
+    all_products = Product.objects.none()
+    base_categories = MainCategory.objects.none()
+
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
+        view_all_restaurants = restaurant_context['view_all_restaurants']
         
-        if owner_filter:
-            # Owner sees only their own products and categories
-            main_categories = MainCategory.objects.filter(
-                is_active=True, 
-                owner=owner_filter
-            ).order_by('name')
-            
-            all_products = Product.objects.filter(
-                main_category__owner=owner_filter
-            ).select_related('main_category', 'sub_category').order_by('name')
-        else:
+        # Get filter parameters first
+        search_query = request.GET.get('search', '').strip()
+        category_filter = request.GET.get('category', '').strip()
+        restaurant_filter = request.GET.get('restaurant', '').strip()
+        per_page = int(request.GET.get('per_page', 10))
+
+        # Determine which restaurant to filter by
+        target_restaurant = None
+        if restaurant_filter:
+            try:
+                from restaurant.models_restaurant import Restaurant
+                target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            except Restaurant.DoesNotExist:
+                target_restaurant = None
+        elif current_restaurant and not view_all_restaurants:
+            target_restaurant = current_restaurant
+
+        if target_restaurant:
+            # Filter by specific restaurant (either from filter or session)
+            if target_restaurant.is_main_restaurant:
+                # Main restaurant: show categories/products assigned to it OR owned by main owner with no restaurant
+                base_categories = MainCategory.objects.filter(
+                    is_active=True
+                ).filter(
+                    Q(restaurant=target_restaurant) | 
+                    Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
+                ).order_by('name')
+            else:
+                # Branch restaurant: only show categories/products specifically assigned to this branch
+                # OR created by the branch owner (not main owner)
+                branch_query = Q(restaurant=target_restaurant)
+                if target_restaurant.branch_owner:
+                    branch_query |= Q(owner=target_restaurant.branch_owner, restaurant__isnull=True)
+                    
+                base_categories = MainCategory.objects.filter(
+                    is_active=True
+                ).filter(branch_query).order_by('name')
+        elif request.user.is_administrator():
             # Administrator sees all products and categories
-            main_categories = MainCategory.objects.filter(is_active=True).order_by('name')
+            base_categories = MainCategory.objects.filter(is_active=True).order_by('name')
+        else:
+            # Get user's accessible restaurants (view all mode)
+            accessible_restaurants = restaurant_context['accessible_restaurants']
             
-            all_products = Product.objects.select_related('main_category', 'sub_category').all().order_by('name')
+            if accessible_restaurants.exists():
+                # Build query for accessible restaurants and legacy owner field
+                restaurant_query = Q()
+                owner_query = Q()
+                
+                for restaurant in accessible_restaurants:
+                    restaurant_query |= Q(restaurant=restaurant)
+                    if restaurant.main_owner:
+                        owner_query |= Q(owner=restaurant.main_owner, restaurant__isnull=True)
+                    if restaurant.branch_owner:
+                        owner_query |= Q(owner=restaurant.branch_owner, restaurant__isnull=True)
+                
+                base_categories = MainCategory.objects.filter(
+                    is_active=True
+                ).filter(restaurant_query | owner_query).order_by('name')
+            else:
+                base_categories = MainCategory.objects.none()
+        
+        # Start with base categories
+        main_categories = base_categories
+
+        # Apply category filter
+        if category_filter:
+            try:
+                filter_category = MainCategory.objects.get(id=category_filter)
+                main_categories = main_categories.filter(id=filter_category.id)
+            except MainCategory.DoesNotExist:
+                pass
+
+        # Get all products for the filtered categories
+        all_products = Product.objects.filter(
+            main_category__in=main_categories
+        ).select_related('main_category', 'sub_category').order_by('name')
+
+        # Apply search filter
+        if search_query:
+            all_products = all_products.filter(name__icontains=search_query)
         
         # Add pagination for each category
         paginated_categories = []
@@ -192,8 +580,8 @@ def manage_products(request):
             page_param = f'page_{category.id}'
             page_number = request.GET.get(page_param, 1)
             
-            # Paginate products (10 per page)
-            paginator = Paginator(category_products, 10)
+            # Paginate products
+            paginator = Paginator(category_products, per_page)
             page_obj = paginator.get_page(page_number)
             
             # Only include categories that have products
@@ -211,8 +599,8 @@ def manage_products(request):
 
     context = {
         'main_categories': paginated_categories,
-        'all_main_categories': main_categories,  # Add this for the form dropdown
-        'restaurant_name': request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants",
+        'all_main_categories': base_categories,  # Use base_categories for the dropdown (all accessible categories)
+        **restaurant_context,  # Include restaurant context
     }
 
     return render(request, 'admin_panel/manage_products.html', context)
@@ -221,19 +609,96 @@ def manage_products(request):
 @login_required
 def manage_orders(request):
     """Order management view with status-based tabs - accessible by administrators and owners"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('restaurant:home')
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
+        view_all_restaurants = restaurant_context['view_all_restaurants']
         
-        if owner_filter:
-            # Owner sees only orders placed at their restaurant's tables
-            base_orders = Order.objects.filter(table_info__owner=owner_filter)
-        else:
+        # Get filter parameters
+        search_query = request.GET.get('search', '').strip()
+        restaurant_filter = request.GET.get('restaurant', '').strip()
+        payment_status_filter = request.GET.get('payment_status', '').strip()
+        date_from = request.GET.get('date_from', '').strip()
+        date_to = request.GET.get('date_to', '').strip()
+        
+        # Determine which restaurant to filter by
+        target_restaurant = None
+        if restaurant_filter:
+            try:
+                from restaurant.models_restaurant import Restaurant
+                target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            except Restaurant.DoesNotExist:
+                target_restaurant = None
+        elif current_restaurant and not view_all_restaurants:
+            target_restaurant = current_restaurant
+        
+        if target_restaurant:
+            # Filter orders by specific selected restaurant
+            if target_restaurant.is_main_restaurant:
+                # Main restaurant: show orders from tables assigned to it OR owned by main owner with no restaurant
+                base_orders = Order.objects.filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True)
+                )
+            else:
+                # Branch restaurant: only show orders from tables specifically assigned to this branch
+                # OR created by the branch owner (not main owner)
+                base_orders = Order.objects.filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+        elif request.user.is_administrator():
             # Administrator sees all orders
             base_orders = Order.objects.all()
+        else:
+            # Get orders from all accessible restaurants
+            accessible_restaurants = restaurant_context['accessible_restaurants']
+            
+            if accessible_restaurants.exists():
+                order_query = Q()
+                for restaurant in accessible_restaurants:
+                    order_query |= (
+                        Q(table_info__restaurant=restaurant) |
+                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
+                        Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True)
+                    )
+                base_orders = Order.objects.filter(order_query)
+            else:
+                base_orders = Order.objects.none()
+        
+        # Apply search filter
+        if search_query:
+            base_orders = base_orders.filter(
+                Q(order_number__icontains=search_query) |
+                Q(table_info__tbl_no__icontains=search_query) |
+                Q(ordered_by__username__icontains=search_query) |
+                Q(ordered_by__first_name__icontains=search_query) |
+                Q(ordered_by__last_name__icontains=search_query)
+            )
+        
+        # Apply payment status filter
+        if payment_status_filter:
+            base_orders = base_orders.filter(payment_status=payment_status_filter)
+        
+        # Apply date range filter
+        if date_from:
+            from datetime import datetime
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+            base_orders = base_orders.filter(created_at__gte=date_from_obj)
+        
+        if date_to:
+            from datetime import datetime, timedelta
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+            # Add one day to include the entire end date
+            date_to_obj = date_to_obj + timedelta(days=1)
+            base_orders = base_orders.filter(created_at__lt=date_to_obj)
             
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
@@ -271,6 +736,7 @@ def manage_orders(request):
         'cancelled_count': cancelled_count,
         'total_count': total_count,
         'restaurant_name': request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants",
+        **restaurant_context,  # Include restaurant context for filters
     }
 
     return render(request, 'admin_panel/manage_orders.html', context)
@@ -279,19 +745,81 @@ def manage_orders(request):
 @login_required
 def manage_tables(request):
     """Table management view"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
+        view_all_restaurants = restaurant_context['view_all_restaurants']
         
-        if owner_filter:
-            # Owner sees only their own tables
-            tables = TableInfo.objects.filter(owner=owner_filter)
-        else:
+        # Get filter parameters
+        search_query = request.GET.get('search', '').strip()
+        restaurant_filter = request.GET.get('restaurant', '').strip()
+        status_filter = request.GET.get('status', '').strip()
+        
+        # Determine which restaurant to filter by
+        target_restaurant = None
+        if restaurant_filter:
+            try:
+                from restaurant.models_restaurant import Restaurant
+                target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            except Restaurant.DoesNotExist:
+                target_restaurant = None
+        elif current_restaurant and not view_all_restaurants:
+            target_restaurant = current_restaurant
+        
+        if target_restaurant:
+            # Filter tables by specific selected restaurant
+            if target_restaurant.is_main_restaurant:
+                # Main restaurant: show tables assigned to it OR owned by main owner with no restaurant
+                tables = TableInfo.objects.filter(
+                    Q(restaurant=target_restaurant) |
+                    Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
+                )
+            else:
+                # Branch restaurant: only show tables specifically assigned to this branch
+                # OR created by the branch owner (not main owner)
+                branch_query = Q(restaurant=target_restaurant)
+                if target_restaurant.branch_owner:
+                    branch_query |= Q(owner=target_restaurant.branch_owner, restaurant__isnull=True)
+                tables = TableInfo.objects.filter(branch_query)
+        elif request.user.is_administrator():
             # Administrator sees all tables
             tables = TableInfo.objects.all()
+        else:
+            # Get tables from all accessible restaurants
+            accessible_restaurants = restaurant_context['accessible_restaurants']
+            
+            if accessible_restaurants.exists():
+                table_query = Q()
+                for restaurant in accessible_restaurants:
+                    table_query |= (
+                        Q(restaurant=restaurant) |
+                        Q(owner=restaurant.main_owner, restaurant__isnull=True) |
+                        Q(owner=restaurant.branch_owner, restaurant__isnull=True)
+                    )
+                tables = TableInfo.objects.filter(table_query)
+            else:
+                tables = TableInfo.objects.none()
+        
+        # Apply search filter
+        if search_query:
+            tables = tables.filter(
+                Q(tbl_no__icontains=search_query) |
+                Q(no_of_seats__icontains=search_query)
+            )
+        
+        # Apply status filter
+        if status_filter:
+            if status_filter == 'available':
+                tables = tables.filter(is_available=True)
+            elif status_filter == 'occupied':
+                tables = tables.filter(is_available=False)
             
         # Custom sorting to handle T01, T02, T10, T011 properly
         tables = sorted(tables, key=lambda x: (len(x.tbl_no), x.tbl_no))
@@ -300,9 +828,17 @@ def manage_tables(request):
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
+    # Pagination
+    per_page = int(request.GET.get('per_page', 5))
+    paginator = Paginator(tables, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'tables': tables,
-        'restaurant_name': request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants",
+        'tables': page_obj.object_list,
+        'page_obj': page_obj,
+        'restaurant_name': current_restaurant.name if current_restaurant else (request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants"),
+        **restaurant_context,  # Include restaurant context
     }
 
     return render(request, 'admin_panel/manage_tables.html', context)
@@ -311,32 +847,123 @@ def manage_tables(request):
 @login_required
 def manage_categories(request):
     """Category management view"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
 
+    # Initialize variables
+    main_categories = MainCategory.objects.none()
+    subcategories = SubCategory.objects.none()
+
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
+        view_all_restaurants = restaurant_context['view_all_restaurants']
         
-        if owner_filter:
-            # Owner sees only their own categories
-            main_categories = MainCategory.objects.filter(owner=owner_filter).order_by('name')
+        if current_restaurant and not view_all_restaurants:
+            # Filter categories by specific selected restaurant
+            if current_restaurant.is_main_restaurant:
+                # Main restaurant: show categories assigned to it OR owned by main owner with no restaurant
+                main_categories = MainCategory.objects.filter(
+                    Q(restaurant=current_restaurant) | 
+                    Q(owner=current_restaurant.main_owner, restaurant__isnull=True)
+                ).order_by('name')
+            else:
+                # Branch restaurant: only show categories specifically assigned to this branch
+                # OR categories created by the branch owner (not main owner)
+                branch_query = Q(restaurant=current_restaurant)
+                if current_restaurant.branch_owner:
+                    branch_query |= Q(owner=current_restaurant.branch_owner, restaurant__isnull=True)
+                    
+                main_categories = MainCategory.objects.filter(branch_query).order_by('name')
+            
             subcategories = SubCategory.objects.filter(
-                main_category__owner=owner_filter
+                Q(main_category__in=main_categories)
             ).order_by('main_category__name', 'name')
-        else:
+        elif request.user.is_administrator():
             # Administrator sees all categories
             main_categories = MainCategory.objects.all().order_by('name')
             subcategories = SubCategory.objects.all().order_by('main_category__name', 'name')
+        else:
+            # Get user's accessible restaurants
+            accessible_restaurants = restaurant_context['accessible_restaurants']
+            
+            if accessible_restaurants.exists():
+                # Build query for accessible restaurants and legacy owner field
+                restaurant_query = Q()
+                owner_query = Q()
+                
+                for restaurant in accessible_restaurants:
+                    restaurant_query |= Q(restaurant=restaurant)
+                    if restaurant.main_owner:
+                        owner_query |= Q(owner=restaurant.main_owner, restaurant__isnull=True)
+                    if restaurant.branch_owner:
+                        owner_query |= Q(owner=restaurant.branch_owner, restaurant__isnull=True)
+                
+                main_categories = MainCategory.objects.filter(
+                    restaurant_query | owner_query
+                ).order_by('name')
+                
+                subcategories = SubCategory.objects.filter(
+                    Q(main_category__in=main_categories)
+                ).order_by('main_category__name', 'name')
+            else:
+                main_categories = MainCategory.objects.none()
+                subcategories = SubCategory.objects.none()
             
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
+    # Apply filters
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    restaurant_filter = request.GET.get('restaurant', '').strip()
+
+    if search_query:
+        main_categories = main_categories.filter(name__icontains=search_query)
+
+    if status_filter:
+        if status_filter == 'active':
+            main_categories = main_categories.filter(is_active=True)
+        elif status_filter == 'inactive':
+            main_categories = main_categories.filter(is_active=False)
+
+    if restaurant_filter:
+        from restaurant.models_restaurant import Restaurant
+        try:
+            filter_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            # Filter categories by restaurant OR by owner (for legacy categories without restaurant)
+            if filter_restaurant.is_main_restaurant:
+                # Main restaurant: include categories assigned to it OR owned by main_owner with no restaurant
+                main_categories = main_categories.filter(
+                    Q(restaurant=filter_restaurant) |
+                    Q(owner=filter_restaurant.main_owner, restaurant__isnull=True)
+                )
+            else:
+                # Branch: include categories assigned to this branch OR owned by branch_owner with no restaurant
+                branch_query = Q(restaurant=filter_restaurant)
+                if filter_restaurant.branch_owner:
+                    branch_query |= Q(owner=filter_restaurant.branch_owner, restaurant__isnull=True)
+                main_categories = main_categories.filter(branch_query)
+        except Restaurant.DoesNotExist:
+            pass
+
+    # Pagination for main categories
+    per_page = int(request.GET.get('per_page', 20))
+    paginator = Paginator(main_categories, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'main_categories': main_categories,
+        'main_categories': page_obj.object_list,
+        'page_obj': page_obj,
         'subcategories': subcategories,
-        'restaurant_name': request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants",
+        'restaurant_name': current_restaurant.name if current_restaurant else (request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants"),
+        **restaurant_context,  # Include restaurant context
     }
 
     return render(request, 'admin_panel/manage_categories.html', context)
@@ -346,33 +973,71 @@ def manage_categories(request):
 @require_POST
 def add_main_category(request):
     """Add a new main category"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context to determine where to save the category
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
         
         name = request.POST.get('name')
         description = request.POST.get('description', '')
         image = request.FILES.get('image')  # Handle image upload
+        restaurant_id = request.POST.get('restaurant_id', '').strip()
 
         if not name:
             return JsonResponse({'success': False, 'message': 'Category name is required'})
-
-        # Check for duplicate names within the same owner's categories
-        if owner_filter:
-            if MainCategory.objects.filter(name__iexact=name, owner=owner_filter).exists():
-                return JsonResponse({'success': False, 'message': 'Category with this name already exists in your restaurant'})
+        
+        # Get target restaurant from form if provided
+        from restaurant.models_restaurant import Restaurant
+        target_restaurant = None
+        
+        if restaurant_id:
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Verify user has permission to assign to this restaurant
+                accessible_restaurants = restaurant_context['accessible_restaurants']
+                if not accessible_restaurants.filter(id=target_restaurant.id).exists():
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to add categories to this restaurant'})
+            except Restaurant.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Selected restaurant not found'})
         else:
-            if MainCategory.objects.filter(name__iexact=name).exists():
-                return JsonResponse({'success': False, 'message': 'Category with this name already exists'})
+            # Use current restaurant context if no restaurant specified
+            target_restaurant = current_restaurant
+            
+        if not target_restaurant:
+            return JsonResponse({'success': False, 'message': 'No restaurant context available. Please select a restaurant.'})
 
+        # Check for duplicate names within the target restaurant's categories
+        if target_restaurant.is_main_restaurant:
+            # For main restaurant, check categories for this restaurant or main owner
+            existing_query = Q(name__iexact=name) & (
+                Q(restaurant=target_restaurant) | 
+                Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
+            )
+        else:
+            # For branch, check categories for this specific branch
+            existing_query = Q(name__iexact=name) & (
+                Q(restaurant=target_restaurant) | 
+                Q(owner=target_restaurant.branch_owner, restaurant__isnull=True)
+            )
+            
+        if MainCategory.objects.filter(existing_query).exists():
+            return JsonResponse({'success': False, 'message': f'Category with this name already exists in {target_restaurant.name}'})
+        
+        # Create category assigned to target restaurant
         category = MainCategory.objects.create(
             name=name,
             description=description,
-            image=image,  # Add image to creation
-            owner=owner_filter if owner_filter else None
+            image=image,
+            restaurant=target_restaurant,  # Use restaurant field for new system
+            owner=target_restaurant.branch_owner or target_restaurant.main_owner  # Backward compatibility
         )
+        
+        success_message = f'Main category "{name}" added successfully to {target_restaurant.name}'
 
         return JsonResponse({
             'success': True,
@@ -394,32 +1059,70 @@ def add_main_category(request):
 @require_POST
 def edit_main_category(request, category_id):
     """Edit an existing main category"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
+        from restaurant.models import Restaurant
         
-        # Get the category and check owner permission
-        if owner_filter:
-            category = get_object_or_404(MainCategory, id=category_id, owner=owner_filter)
-        else:
-            category = get_object_or_404(MainCategory, id=category_id)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get the category and verify access
+        try:
+            category = MainCategory.objects.get(id=category_id)
+            
+            # Verify user has access to this category's restaurant
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if category.restaurant and category.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to edit this category'})
+                
+        except MainCategory.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Category not found'})
             
         name = request.POST.get('name')
         description = request.POST.get('description', '')
         image = request.FILES.get('image')  # Handle image upload
+        restaurant_id = request.POST.get('restaurant')  # Get restaurant_id from form
 
         if not name:
             return JsonResponse({'success': False, 'message': 'Category name is required'})
 
-        # Check for duplicate names within the same owner's categories
-        if owner_filter:
-            if MainCategory.objects.filter(name__iexact=name, owner=owner_filter).exclude(id=category_id).exists():
-                return JsonResponse({'success': False, 'message': 'Category with this name already exists in your restaurant'})
+        # Determine if restaurant is being changed
+        current_category_restaurant_id = category.restaurant.id if category.restaurant else None
+        
+        if restaurant_id and str(current_category_restaurant_id) != str(restaurant_id):
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                
+                # Validate user has permission for this restaurant
+                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+                if target_restaurant not in accessible_restaurants:
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to assign categories to this restaurant'})
+                
+                # Determine owner based on restaurant type
+                if target_restaurant.is_main_restaurant:
+                    new_owner = target_restaurant.main_owner
+                else:
+                    new_owner = target_restaurant.branch_owner or target_restaurant.main_owner
+                
+                # Check for duplicates in target restaurant
+                if MainCategory.objects.filter(name__iexact=name, owner=new_owner).exclude(id=category_id).exists():
+                    return JsonResponse({'success': False, 'message': f'Category with this name already exists in {target_restaurant.name}'})
+                    
+                category.owner = new_owner
+                category.restaurant = target_restaurant
+                    
+            except Restaurant.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Selected restaurant does not exist'})
         else:
-            if MainCategory.objects.filter(name__iexact=name).exclude(id=category_id).exists():
-                return JsonResponse({'success': False, 'message': 'Category with this name already exists'})
+            # Same restaurant or no change, check duplicates with current owner
+            if MainCategory.objects.filter(name__iexact=name, owner=category.owner).exclude(id=category_id).exists():
+                return JsonResponse({'success': False, 'message': 'Category with this name already exists in this restaurant'})
 
         category.name = name
         category.description = description
@@ -447,17 +1150,30 @@ def edit_main_category(request, category_id):
 @require_POST
 def delete_main_category(request, category_id):
     """Delete a main category"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
         
-        # Get category with owner filtering
-        if owner_filter:
-            category = get_object_or_404(MainCategory, id=category_id, owner=owner_filter)
-        else:
-            category = get_object_or_404(MainCategory, id=category_id)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get the category and verify access
+        try:
+            category = MainCategory.objects.get(id=category_id)
+            
+            # Verify user has access to this category's restaurant
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if category.restaurant and category.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to delete this category'})
+                
+        except MainCategory.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Category not found'})
+        
         category_name = category.name
         subcategory_count = category.subcategories.count()
         
@@ -482,17 +1198,30 @@ def delete_main_category(request, category_id):
 @require_POST
 def toggle_main_category(request, category_id):
     """Toggle main category active status"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
         
-        # Get category with owner filtering
-        if owner_filter:
-            category = get_object_or_404(MainCategory, id=category_id, owner=owner_filter)
-        else:
-            category = get_object_or_404(MainCategory, id=category_id)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get the category and verify access
+        try:
+            category = MainCategory.objects.get(id=category_id)
+            
+            # Verify user has access to this category's restaurant
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if category.restaurant and category.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to toggle this category'})
+                
+        except MainCategory.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Category not found'})
+        
         category.is_active = not category.is_active
         category.save()
 
@@ -512,30 +1241,61 @@ def toggle_main_category(request, category_id):
 @require_POST
 def add_subcategory(request):
     """Add a new subcategory"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context instead of owner filter
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
         
-        main_category_id = request.POST.get('main_category')
-        name = request.POST.get('name')
-        description = request.POST.get('description', '')
+        main_category_id = request.POST.get('main_category', '').strip()
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
 
+        # Validate required fields and ensure main_category_id is numeric
         if not main_category_id or not name:
             return JsonResponse({'success': False, 'message': 'Main category and subcategory name are required'})
+        
+        try:
+            main_category_id = int(main_category_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'message': 'Invalid main category selected'})
 
-        # Get main category with owner filtering
-        if owner_filter:
-            try:
-                main_category = MainCategory.objects.get(id=main_category_id, owner=owner_filter)
-            except MainCategory.DoesNotExist:
-                return JsonResponse({'success': False, 'message': 'Main category not found or access denied'})
-        else:
+        # Get main category with restaurant context filtering
+        if current_restaurant:
+            if current_restaurant.is_main_restaurant:
+                # Main restaurant: show categories assigned to it OR owned by main owner with no restaurant
+                try:
+                    main_category = MainCategory.objects.get(
+                        Q(id=main_category_id) & (
+                            Q(restaurant=current_restaurant) | 
+                            Q(owner=current_restaurant.main_owner, restaurant__isnull=True)
+                        )
+                    )
+                except MainCategory.DoesNotExist:
+                    return JsonResponse({'success': False, 'message': 'Main category not found or access denied'})
+            else:
+                # Branch restaurant: only show categories specifically assigned to this branch
+                branch_query = Q(restaurant=current_restaurant)
+                if current_restaurant.branch_owner:
+                    branch_query |= Q(owner=current_restaurant.branch_owner, restaurant__isnull=True)
+                
+                try:
+                    main_category = MainCategory.objects.get(
+                        Q(id=main_category_id) & branch_query
+                    )
+                except MainCategory.DoesNotExist:
+                    return JsonResponse({'success': False, 'message': 'Main category not found or access denied'})
+        elif request.user.is_administrator():
             try:
                 main_category = MainCategory.objects.get(id=main_category_id)
             except MainCategory.DoesNotExist:
                 return JsonResponse({'success': False, 'message': 'Main category not found'})
+        else:
+            return JsonResponse({'success': False, 'message': 'No restaurant context found'})
 
         if SubCategory.objects.filter(main_category=main_category, name__iexact=name).exists():
             return JsonResponse({'success': False, 'message': 'Subcategory with this name already exists in the selected main category'})
@@ -566,7 +1326,8 @@ def add_subcategory(request):
 @require_POST
 def edit_subcategory(request, subcategory_id):
     """Edit an existing subcategory"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
@@ -619,17 +1380,30 @@ def edit_subcategory(request, subcategory_id):
 @require_POST
 def delete_subcategory(request, subcategory_id):
     """Delete a subcategory"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
         
-        # Get subcategory with owner filtering
-        if owner_filter:
-            subcategory = get_object_or_404(SubCategory, id=subcategory_id, main_category__owner=owner_filter)
-        else:
-            subcategory = get_object_or_404(SubCategory, id=subcategory_id)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get the subcategory and verify access
+        try:
+            subcategory = SubCategory.objects.get(id=subcategory_id)
+            
+            # Verify user has access to this subcategory's restaurant (via main category)
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if subcategory.main_category.restaurant and subcategory.main_category.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to delete this subcategory'})
+                
+        except SubCategory.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Subcategory not found'})
+        
         subcategory_name = subcategory.name
         product_count = subcategory.products.count()
         
@@ -654,17 +1428,30 @@ def delete_subcategory(request, subcategory_id):
 @require_POST
 def toggle_subcategory(request, subcategory_id):
     """Toggle subcategory active status"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
         
-        # Get subcategory with owner filtering
-        if owner_filter:
-            subcategory = get_object_or_404(SubCategory, id=subcategory_id, main_category__owner=owner_filter)
-        else:
-            subcategory = get_object_or_404(SubCategory, id=subcategory_id)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get the subcategory and verify access
+        try:
+            subcategory = SubCategory.objects.get(id=subcategory_id)
+            
+            # Verify user has access to this subcategory's restaurant (via main category)
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if subcategory.main_category.restaurant and subcategory.main_category.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to toggle this subcategory'})
+                
+        except SubCategory.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Subcategory not found'})
+        
         subcategory.is_active = not subcategory.is_active
         subcategory.save()
 
@@ -684,16 +1471,59 @@ def toggle_subcategory(request, subcategory_id):
 @login_required
 def get_subcategories(request, main_category_id):
     """Get subcategories for a main category"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context for proper filtering
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
+        view_all_restaurants = restaurant_context['view_all_restaurants']
         
-        if owner_filter:
-            main_category = get_object_or_404(MainCategory, id=main_category_id, owner=owner_filter)
-        else:
+        if current_restaurant and not view_all_restaurants:
+            # Filter by specific selected restaurant
+            if current_restaurant.is_main_restaurant:
+                # Main restaurant: show categories assigned to it OR owned by main owner with no restaurant
+                main_category = get_object_or_404(MainCategory, 
+                    Q(id=main_category_id) & (
+                        Q(restaurant=current_restaurant) | 
+                        Q(owner=current_restaurant.main_owner, restaurant__isnull=True)
+                    )
+                )
+            else:
+                # Branch restaurant: only show categories specifically assigned to this branch
+                # OR created by the branch owner (not main owner)
+                branch_query = Q(restaurant=current_restaurant)
+                if current_restaurant.branch_owner:
+                    branch_query |= Q(owner=current_restaurant.branch_owner, restaurant__isnull=True)
+                
+                main_category = get_object_or_404(MainCategory,
+                    Q(id=main_category_id) & branch_query
+                )
+        elif request.user.is_administrator():
             main_category = get_object_or_404(MainCategory, id=main_category_id)
+        else:
+            # Get user's accessible restaurants
+            accessible_restaurants = restaurant_context['accessible_restaurants']
+            
+            if accessible_restaurants.exists():
+                restaurant_query = Q()
+                owner_query = Q()
+                
+                for restaurant in accessible_restaurants:
+                    restaurant_query |= Q(restaurant=restaurant)
+                    if restaurant.main_owner:
+                        owner_query |= Q(owner=restaurant.main_owner, restaurant__isnull=True)
+                    if restaurant.branch_owner:
+                        owner_query |= Q(owner=restaurant.branch_owner, restaurant__isnull=True)
+                
+                main_category = get_object_or_404(MainCategory,
+                    Q(id=main_category_id) & (restaurant_query | owner_query)
+                )
+            else:
+                return JsonResponse({'success': False, 'message': 'No accessible restaurants'})
             
         subcategories = main_category.subcategories.filter(is_active=True).values('id', 'name')
         
@@ -709,7 +1539,8 @@ def get_subcategories(request, main_category_id):
 @require_POST
 def bulk_delete_main_categories(request):
     """Bulk delete main categories"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
@@ -775,7 +1606,8 @@ def bulk_delete_main_categories(request):
 @require_POST
 def bulk_delete_subcategories(request):
     """Bulk delete subcategories"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
 
     try:
@@ -832,20 +1664,39 @@ def bulk_delete_subcategories(request):
 @require_http_methods(["POST"])
 def add_product(request):
     """Add new product"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context for proper filtering
+        from restaurant.models_restaurant import Restaurant
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get restaurant from form or use current restaurant
+        restaurant_id = request.POST.get('restaurant')
+        if restaurant_id:
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Verify user has access to this restaurant
+                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+                if target_restaurant not in accessible_restaurants:
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to add products to this restaurant'})
+                current_restaurant = target_restaurant
+            except Restaurant.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Selected restaurant does not exist'})
+        else:
+            current_restaurant = restaurant_context['current_restaurant']
         
         # Get form data
-        name = request.POST.get('name')
-        description = request.POST.get('description')
-        main_category_id = request.POST.get('main_category')
-        sub_category_id = request.POST.get('sub_category')
-        price = request.POST.get('price')
-        stock = request.POST.get('available_in_stock')
-        prep_time = request.POST.get('preparation_time', 15)
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        main_category_id = request.POST.get('main_category', '').strip()
+        sub_category_id = request.POST.get('sub_category', '').strip()
+        price = request.POST.get('price', '').strip()
+        stock = request.POST.get('available_in_stock', '').strip()
+        prep_time = request.POST.get('preparation_time', '15').strip()
         is_available = request.POST.get('is_available') == 'on'
         image = request.FILES.get('image')
         
@@ -853,13 +1704,46 @@ def add_product(request):
         if not all([name, description, main_category_id, sub_category_id, price, stock]):
             return JsonResponse({'success': False, 'message': 'All required fields must be filled'})
         
-        # Get category objects with owner filtering
-        if owner_filter:
-            main_category = get_object_or_404(MainCategory, id=main_category_id, owner=owner_filter)
-            sub_category = get_object_or_404(SubCategory, id=sub_category_id, main_category__owner=owner_filter)
-        else:
+        # Validate numeric fields
+        try:
+            main_category_id = int(main_category_id)
+            sub_category_id = int(sub_category_id)
+            prep_time = int(prep_time)
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'message': 'Invalid category or preparation time selected'})
+        
+        # Get category objects with proper restaurant filtering
+        if current_restaurant:
+            if current_restaurant.is_main_restaurant:
+                # Main restaurant: show categories assigned to it OR owned by main owner with no restaurant
+                main_category = get_object_or_404(MainCategory, 
+                    Q(id=main_category_id) & (
+                        Q(restaurant=current_restaurant) | 
+                        Q(owner=current_restaurant.main_owner, restaurant__isnull=True)
+                    )
+                )
+            else:
+                # Branch restaurant: only show categories specifically assigned to this branch
+                # OR created by the branch owner (not main owner)
+                branch_query = Q(restaurant=current_restaurant)
+                if current_restaurant.branch_owner:
+                    branch_query |= Q(owner=current_restaurant.branch_owner, restaurant__isnull=True)
+                
+                main_category = get_object_or_404(MainCategory,
+                    Q(id=main_category_id) & branch_query
+                )
+                
+            sub_category = get_object_or_404(SubCategory, 
+                Q(id=sub_category_id) & Q(main_category=main_category)
+            )
+        elif request.user.is_administrator():
             main_category = get_object_or_404(MainCategory, id=main_category_id)
             sub_category = get_object_or_404(SubCategory, id=sub_category_id)
+        else:
+            return JsonResponse({'success': False, 'message': 'No restaurant context found'})
+        
+        # Get station field
+        station = request.POST.get('station', 'kitchen')
         
         # Create product
         product = Product.objects.create(
@@ -871,7 +1755,7 @@ def add_product(request):
             available_in_stock=int(stock),
             preparation_time=int(prep_time),
             is_available=is_available,
-            image=image
+            station=station
         )
         
         return JsonResponse({
@@ -887,15 +1771,18 @@ def add_product(request):
 @login_required
 def view_product(request, product_id):
     """Get product details for viewing"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
         owner_filter = get_owner_filter(request.user)
         
-        # Get product with owner filtering
+        # Get product with proper filtering for both restaurant and owner-based categories
         if owner_filter:
-            product = get_object_or_404(Product, id=product_id, main_category__owner=owner_filter)
+            # Build query for accessible categories (restaurant or owner)
+            category_query = Q(main_category__owner=owner_filter) | Q(main_category__restaurant__main_owner=owner_filter) | Q(main_category__restaurant__branch_owner=owner_filter)
+            product = get_object_or_404(Product.objects.filter(category_query), id=product_id)
         else:
             product = get_object_or_404(Product, id=product_id)
         
@@ -915,16 +1802,26 @@ def view_product(request, product_id):
 @login_required
 def edit_product(request, product_id):
     """Get product details for editing"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
         owner_filter = get_owner_filter(request.user)
         
-        # Get product with owner filtering
+        # Get product with proper filtering for both restaurant and owner-based categories
         if owner_filter:
-            product = get_object_or_404(Product, id=product_id, main_category__owner=owner_filter)
-            main_categories = MainCategory.objects.filter(is_active=True, owner=owner_filter).order_by('name')
+            # Build query for accessible categories (restaurant or owner)
+            category_query = Q(main_category__owner=owner_filter) | Q(main_category__restaurant__main_owner=owner_filter) | Q(main_category__restaurant__branch_owner=owner_filter)
+            product = get_object_or_404(Product.objects.filter(category_query), id=product_id)
+            
+            # Get accessible main categories
+            main_categories = MainCategory.objects.filter(
+                Q(owner=owner_filter) | 
+                Q(restaurant__main_owner=owner_filter) | 
+                Q(restaurant__branch_owner=owner_filter),
+                is_active=True
+            ).order_by('name')
         else:
             product = get_object_or_404(Product, id=product_id)
             main_categories = MainCategory.objects.filter(is_active=True).order_by('name')
@@ -949,7 +1846,8 @@ def edit_product(request, product_id):
 @require_http_methods(["POST"])
 def update_product(request, product_id):
     """Update product"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'message': 'Access denied'})
         else:
@@ -957,14 +1855,35 @@ def update_product(request, product_id):
             return redirect('admin_panel:manage_products')
     
     try:
-        product = get_object_or_404(Product, id=product_id)
+        # Get owner filter for permission check
+        owner_filter = get_owner_filter(request.user)
+        
+        # Get product with proper filtering for both restaurant and owner-based categories
+        if owner_filter:
+            # Build query for accessible categories (restaurant or owner)
+            category_query = Q(main_category__owner=owner_filter) | Q(main_category__restaurant__main_owner=owner_filter) | Q(main_category__restaurant__branch_owner=owner_filter)
+            product = get_object_or_404(Product.objects.filter(category_query), id=product_id)
+        else:
+            product = get_object_or_404(Product, id=product_id)
         
         # Update fields
         product.name = request.POST.get('name', product.name)
         product.description = request.POST.get('description', product.description)
         
         if request.POST.get('main_category'):
-            product.main_category = get_object_or_404(MainCategory, id=request.POST.get('main_category'))
+            # Validate category belongs to owner
+            if owner_filter:
+                main_category = get_object_or_404(
+                    MainCategory.objects.filter(
+                        Q(owner=owner_filter) | 
+                        Q(restaurant__main_owner=owner_filter) | 
+                        Q(restaurant__branch_owner=owner_filter)
+                    ),
+                    id=request.POST.get('main_category')
+                )
+                product.main_category = main_category
+            else:
+                product.main_category = get_object_or_404(MainCategory, id=request.POST.get('main_category'))
         
         if request.POST.get('sub_category'):
             product.sub_category = get_object_or_404(SubCategory, id=request.POST.get('sub_category'))
@@ -1009,11 +1928,22 @@ def update_product(request, product_id):
 @require_http_methods(["POST"])
 def toggle_product_availability(request, product_id):
     """Toggle product availability"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
-        product = get_object_or_404(Product, id=product_id)
+        # Get owner filter for permission check
+        owner_filter = get_owner_filter(request.user)
+        
+        # Get product with proper filtering for both restaurant and owner-based categories
+        if owner_filter:
+            # Build query for accessible categories (restaurant or owner)
+            category_query = Q(main_category__owner=owner_filter) | Q(main_category__restaurant__main_owner=owner_filter) | Q(main_category__restaurant__branch_owner=owner_filter)
+            product = get_object_or_404(Product.objects.filter(category_query), id=product_id)
+        else:
+            product = get_object_or_404(Product, id=product_id)
+        
         data = json.loads(request.body)
         
         product.is_available = data.get('is_available', not product.is_available)
@@ -1035,11 +1965,22 @@ def toggle_product_availability(request, product_id):
 @require_http_methods(["POST"])
 def delete_product(request, product_id):
     """Delete product"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
-        product = get_object_or_404(Product, id=product_id)
+        # Get owner filter for permission check
+        owner_filter = get_owner_filter(request.user)
+        
+        # Get product with proper filtering for both restaurant and owner-based categories
+        if owner_filter:
+            # Build query for accessible categories (restaurant or owner)
+            category_query = Q(main_category__owner=owner_filter) | Q(main_category__restaurant__main_owner=owner_filter) | Q(main_category__restaurant__branch_owner=owner_filter)
+            product = get_object_or_404(Product.objects.filter(category_query), id=product_id)
+        else:
+            product = get_object_or_404(Product, id=product_id)
+        
         product_name = product.name
         product.delete()
         
@@ -1060,7 +2001,8 @@ def delete_product(request, product_id):
 @require_POST
 def add_user(request):
     """Add a new user"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
@@ -1074,6 +2016,7 @@ def add_user(request):
         is_active = request.POST.get('is_active') == 'on'
         phone_number = request.POST.get('phone_number', '').strip()
         address = request.POST.get('address', '').strip()
+        restaurant_id = request.POST.get('restaurant_id', '').strip()
         
         # Validation
         if not all([first_name, last_name, username, email, password, role_name]):
@@ -1098,6 +2041,28 @@ def add_user(request):
         except Role.DoesNotExist:
             return JsonResponse({'success': False, 'message': 'Invalid role selected'})
         
+        # Get restaurant context for proper user assignment
+        from restaurant.models_restaurant import Restaurant
+        target_restaurant = None
+        
+        if restaurant_id:
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Verify user has permission to assign to this restaurant
+                accessible_restaurants = Restaurant.get_accessible_restaurants(request.user)
+                if not accessible_restaurants.filter(id=target_restaurant.id).exists():
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to assign users to this restaurant'})
+            except Restaurant.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Selected restaurant not found'})
+        else:
+            # Get current restaurant context if no restaurant specified
+            session_restaurant_id = request.session.get('selected_restaurant_id')
+            restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+            target_restaurant = restaurant_context['current_restaurant']
+            
+            if not target_restaurant:
+                return JsonResponse({'success': False, 'message': 'No restaurant context available. Please select a restaurant.'})
+        
         # Create user
         user = User.objects.create_user(
             username=username,
@@ -1111,11 +2076,27 @@ def add_user(request):
             address=address
         )
         
-        # Assign owner for non-administrator users
-        if request.user.is_owner() and not request.user.is_administrator():
-            # Owners assign their staff to themselves
-            user.owner = request.user
-            user.save()
+        # Assign proper owner based on restaurant and role
+        if role_name in ['main_owner', 'branch_owner']:
+            # Owner roles don't need an owner assigned
+            if role_name == 'main_owner' and target_restaurant:
+                # Update restaurant main_owner if creating main owner
+                target_restaurant.main_owner = user
+                target_restaurant.save()
+            elif role_name == 'branch_owner' and target_restaurant and not target_restaurant.is_main_restaurant:
+                # Update restaurant branch_owner if creating branch owner
+                target_restaurant.branch_owner = user
+                target_restaurant.save()
+        else:
+            # Staff roles need to be assigned to the appropriate owner
+            if target_restaurant:
+                if target_restaurant.is_main_restaurant:
+                    # Assign to main owner for main restaurant
+                    user.owner = target_restaurant.main_owner
+                else:
+                    # Assign to branch owner for branches
+                    user.owner = target_restaurant.branch_owner or target_restaurant.main_owner
+                user.save()
         
         return JsonResponse({
             'success': True,
@@ -1139,7 +2120,8 @@ def add_user(request):
 @require_http_methods(["GET"])
 def get_user_data(request, user_id):
     """Get user data for editing"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
@@ -1176,7 +2158,8 @@ def get_user_data(request, user_id):
 @require_POST
 def update_user(request, user_id):
     """Update an existing user"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
@@ -1198,6 +2181,7 @@ def update_user(request, user_id):
         is_active = request.POST.get('is_active') == 'on'
         phone_number = request.POST.get('phone_number', '').strip()
         address = request.POST.get('address', '').strip()
+        restaurant_id = request.POST.get('restaurant_id', '').strip()
         
         # Validation
         if not all([first_name, last_name, username, email, role_name]):
@@ -1221,6 +2205,25 @@ def update_user(request, user_id):
             # Owners can assign any role except administrator
             if role_name == 'administrator':
                 return JsonResponse({'success': False, 'message': 'Owners cannot assign administrator role'})
+        
+        # Handle restaurant assignment if provided
+        from restaurant.models_restaurant import Restaurant
+        if restaurant_id:
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Verify user has permission to assign to this restaurant
+                accessible_restaurants = Restaurant.get_accessible_restaurants(request.user)
+                if not accessible_restaurants.filter(id=target_restaurant.id).exists():
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to assign users to this restaurant'})
+                
+                # Update owner relationship for staff roles
+                if role_name not in ['main_owner', 'branch_owner']:
+                    if target_restaurant.is_main_restaurant:
+                        user.owner = target_restaurant.main_owner
+                    else:
+                        user.owner = target_restaurant.branch_owner or target_restaurant.main_owner
+            except Restaurant.DoesNotExist:
+                pass  # Keep existing assignment if restaurant not found
         
         # Update user
         user.first_name = first_name
@@ -1259,7 +2262,8 @@ def update_user(request, user_id):
 @require_POST
 def toggle_user_status(request, user_id):
     """Toggle user active/inactive status"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
@@ -1298,7 +2302,8 @@ def toggle_user_status(request, user_id):
 @require_POST
 def delete_user(request, user_id):
     """Delete a user"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
@@ -1477,7 +2482,8 @@ def delete_role(request, role_id):
 @login_required
 def edit_user(request, user_id):
     """Edit user view (GET request)"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('admin_panel:manage_users')
     
@@ -1526,18 +2532,43 @@ def edit_role(request, role_id):
 @require_http_methods(["POST"])
 def add_table(request):
     """Add new table"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
-        owner_filter = get_owner_filter(request.user)
+        # Get restaurant context to determine where to save the table
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
         
         table_number = request.POST.get('tbl_no', '').strip()
         capacity = request.POST.get('capacity')
         is_available = request.POST.get('is_available') == 'on'
+        restaurant_id = request.POST.get('restaurant_id', '').strip()
         
         if not table_number:
             return JsonResponse({'success': False, 'message': 'Table number is required'})
+        
+        # Get target restaurant from form if provided
+        from restaurant.models_restaurant import Restaurant
+        target_restaurant = None
+        
+        if restaurant_id:
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Verify user has permission to assign to this restaurant
+                accessible_restaurants = restaurant_context['accessible_restaurants']
+                if not accessible_restaurants.filter(id=target_restaurant.id).exists():
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to add tables to this restaurant'})
+            except Restaurant.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Selected restaurant not found'})
+        else:
+            # Use current restaurant context if no restaurant specified
+            target_restaurant = current_restaurant
+            
+        if not target_restaurant:
+            return JsonResponse({'success': False, 'message': 'No restaurant context available. Please select a restaurant.'})
         
         # Basic validation for table number (alphanumeric, max 10 chars)
         if len(table_number) > 10:
@@ -1549,25 +2580,24 @@ def add_table(request):
         if not capacity or int(capacity) < 1:
             return JsonResponse({'success': False, 'message': 'Valid capacity is required'})
         
-        # Check if table number already exists for this owner
-        if owner_filter:
-            if TableInfo.objects.filter(tbl_no=table_number, owner=owner_filter).exists():
-                return JsonResponse({'success': False, 'message': 'Table number already exists in your restaurant'})
-        else:
-            if TableInfo.objects.filter(tbl_no=table_number).exists():
-                return JsonResponse({'success': False, 'message': 'Table number already exists'})
+        # Check if table number already exists in target restaurant context
+        if TableInfo.objects.filter(tbl_no=table_number, restaurant=target_restaurant).exists():
+            return JsonResponse({'success': False, 'message': f'Table number already exists in {target_restaurant.name}'})
         
-        # Create new table
+        # Create new table assigned to target restaurant
         table = TableInfo.objects.create(
             tbl_no=table_number,
             capacity=int(capacity),
             is_available=is_available,
-            owner=owner_filter if owner_filter else None
+            restaurant=target_restaurant,  # Use restaurant field for new system
+            owner=target_restaurant.branch_owner or target_restaurant.main_owner  # Backward compatibility
         )
+        
+        success_message = f'Table {table_number} added successfully to {target_restaurant.name}'
         
         return JsonResponse({
             'success': True,
-            'message': f'Table {table_number} added successfully'
+            'message': success_message
         })
         
     except Exception as e:
@@ -1577,7 +2607,8 @@ def add_table(request):
 @login_required
 def get_table(request):
     """Get table data for editing"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     table_id = request.GET.get('table_id')
@@ -1589,7 +2620,8 @@ def get_table(request):
                 'id': table.id,
                 'tbl_no': table.tbl_no,
                 'capacity': table.capacity,
-                'is_available': table.is_available
+                'is_available': table.is_available,
+                'restaurant_id': table.restaurant.id if table.restaurant else None
             }
         })
     except Exception as e:
@@ -1600,16 +2632,26 @@ def get_table(request):
 @require_http_methods(["POST"])
 def update_table(request):
     """Update table"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
+        from restaurant.models import Restaurant
+        
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
         owner_filter = get_owner_filter(request.user)
         
         table_id = request.POST.get('table_id')
         table_number = request.POST.get('tbl_no', '').strip()
         capacity = request.POST.get('capacity')
         is_available = request.POST.get('is_available') == 'on'
+        restaurant_id = request.POST.get('restaurant')  # Get restaurant_id from form
         
         if not table_number:
             return JsonResponse({'success': False, 'message': 'Table number is required'})
@@ -1624,19 +2666,54 @@ def update_table(request):
         if not capacity or int(capacity) < 1:
             return JsonResponse({'success': False, 'message': 'Valid capacity is required'})
         
-        # Get table with owner filtering
-        if owner_filter:
-            table = get_object_or_404(TableInfo, id=table_id, owner=owner_filter)
-        else:
-            table = get_object_or_404(TableInfo, id=table_id)
+        # Get table and verify access
+        try:
+            table = TableInfo.objects.get(id=table_id)
+            
+            # Verify user has access to this table's restaurant
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if table.restaurant and table.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to edit this table'})
+                
+        except TableInfo.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Table not found'})
         
-        # Check if table number already exists within owner's restaurant (excluding current table)
-        if owner_filter:
-            if TableInfo.objects.filter(tbl_no=table_number, owner=owner_filter).exclude(id=table_id).exists():
-                return JsonResponse({'success': False, 'message': 'Table number already exists in your restaurant'})
+        # Determine if restaurant is being changed
+        current_table_restaurant_id = table.restaurant.id if table.restaurant else None
+        
+        if restaurant_id and str(current_table_restaurant_id) != str(restaurant_id):
+            # Restaurant is being changed
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                
+                # Validate user has permission for this restaurant
+                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+                if target_restaurant not in accessible_restaurants:
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to assign tables to this restaurant'})
+                
+                # Determine owner based on restaurant type
+                if target_restaurant.is_main_restaurant:
+                    new_owner = target_restaurant.main_owner
+                else:
+                    new_owner = target_restaurant.branch_owner or target_restaurant.main_owner
+                
+                # Check for duplicates in target restaurant
+                if TableInfo.objects.filter(tbl_no=table_number, owner=new_owner).exclude(id=table_id).exists():
+                    return JsonResponse({'success': False, 'message': f'Table {table_number} already exists in {target_restaurant.name}'})
+                    
+                table.owner = new_owner
+                table.restaurant = target_restaurant
+                    
+            except Restaurant.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Selected restaurant does not exist'})
         else:
-            if TableInfo.objects.filter(tbl_no=table_number).exclude(id=table_id).exists():
-                return JsonResponse({'success': False, 'message': 'Table number already exists'})
+            # Same restaurant or no change, just check duplicates with current owner
+            if owner_filter:
+                if TableInfo.objects.filter(tbl_no=table_number, owner=owner_filter).exclude(id=table_id).exists():
+                    return JsonResponse({'success': False, 'message': 'Table number already exists in your restaurant'})
+            else:
+                if TableInfo.objects.filter(tbl_no=table_number).exclude(id=table_id).exists():
+                    return JsonResponse({'success': False, 'message': 'Table number already exists'})
         
         # Update table
         table.tbl_no = table_number
@@ -1657,14 +2734,32 @@ def update_table(request):
 @require_http_methods(["POST"])
 def toggle_table_status(request):
     """Toggle table availability status"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
+        
         table_id = request.POST.get('table_id')
         action = request.POST.get('action')  # 'occupy' or 'free'
         
-        table = get_object_or_404(TableInfo, id=table_id)
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get the table and verify access
+        try:
+            table = TableInfo.objects.get(id=table_id)
+            
+            # Verify user has access to this table's restaurant
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if table.restaurant and table.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to modify this table'})
+                
+        except TableInfo.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Table not found'})
         
         if action == 'occupy':
             table.is_available = False
@@ -1690,12 +2785,31 @@ def toggle_table_status(request):
 @require_http_methods(["POST"])
 def delete_table(request):
     """Delete table"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
+        # Import restaurant context utilities
+        from admin_panel.restaurant_utils import get_restaurant_context
+        
         table_id = request.POST.get('table_id')
-        table = get_object_or_404(TableInfo, id=table_id)
+        
+        # Get restaurant context
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get the table and verify access
+        try:
+            table = TableInfo.objects.get(id=table_id)
+            
+            # Verify user has access to this table's restaurant
+            accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+            if table.restaurant and table.restaurant not in accessible_restaurants:
+                return JsonResponse({'success': False, 'message': 'You do not have permission to delete this table'})
+                
+        except TableInfo.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Table not found'})
         
         table_number = table.tbl_no
         table.delete()
@@ -1736,7 +2850,8 @@ def view_order(request, order_id):
 @require_http_methods(["POST"])
 def update_order_status(request):
     """Update order status"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
@@ -1774,7 +2889,8 @@ def update_order_status(request):
 @login_required
 def add_order(request):
     """Add new order"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator privileges required.")
         return redirect('restaurant:home')
     
@@ -1845,7 +2961,8 @@ def add_order(request):
 @login_required
 def edit_order(request, order_id):
     """Edit order"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator privileges required.")
         return redirect('restaurant:home')
     
@@ -2042,6 +3159,10 @@ def profile(request):
                 request.user.restaurant_description = restaurant_description
                 request.user.tax_rate = tax_rate_decimal
                 
+                # Handle auto-print settings (checkboxes)
+                request.user.auto_print_kot = request.POST.get('auto_print_kot') == 'on'
+                request.user.auto_print_bot = request.POST.get('auto_print_bot') == 'on'
+                
                 # Generate QR code if it doesn't exist
                 if not request.user.restaurant_qr_code:
                     request.user.generate_qr_code()
@@ -2062,24 +3183,59 @@ def profile(request):
 
 @login_required
 def manage_qr_code(request):
-    """QR Code management for restaurant owners"""
-    if not request.user.is_owner():
-        messages.error(request, "Access denied. Owner privileges required.")
+    """QR Code management for restaurant owners and branch owners"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, "Access denied. Owner or Branch Owner privileges required.")
         return redirect('restaurant:home')
     
-    # Ensure QR code exists
-    if not request.user.restaurant_qr_code:
-        request.user.generate_qr_code()
-        request.user.save()
+    # Get current restaurant context
+    current_restaurant = None
+    selected_restaurant_id = request.session.get('selected_restaurant_id')
+    
+    if selected_restaurant_id:
+        # selected_restaurant_id stores the User (owner) ID, not Restaurant ID
+        try:
+            selected_user = User.objects.get(id=selected_restaurant_id)
+            
+            # Get the Restaurant object for this user
+            if selected_user.is_branch_owner():
+                current_restaurant = Restaurant.objects.filter(branch_owner=selected_user, is_main_restaurant=False).first()
+            else:
+                current_restaurant = Restaurant.objects.filter(main_owner=selected_user, is_main_restaurant=True).first()
+            
+            # Verify access
+            if current_restaurant and not current_restaurant.can_user_access(request.user):
+                current_restaurant = None
+        except User.DoesNotExist:
+            current_restaurant = None
+    
+    # If no restaurant selected, get user's default restaurant
+    if not current_restaurant:
+        if request.user.is_branch_owner():
+            current_restaurant = Restaurant.objects.filter(branch_owner=request.user).first()
+        elif request.user.is_main_owner():
+            current_restaurant = Restaurant.objects.filter(main_owner=request.user, is_main_restaurant=True).first()
+        elif request.user.is_owner():
+            # Legacy support
+            user_restaurants = Restaurant.objects.filter(
+                models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
+            )
+            current_restaurant = user_restaurants.first()
+    
+    if not current_restaurant:
+        messages.error(request, "No restaurant found. Please contact administrator.")
+        return redirect('admin_panel:admin_dashboard')
     
     # Generate the full QR URL using helper function
-    qr_url = get_production_qr_url(request, request.user.restaurant_qr_code)
+    qr_url = get_production_qr_url(request, current_restaurant.qr_code)
     
     context = {
         'user': request.user,
-        'qr_code': request.user.restaurant_qr_code,
+        'qr_code': current_restaurant.qr_code,
         'qr_url': qr_url,
-        'restaurant_name': request.user.restaurant_name,
+        'restaurant_name': current_restaurant.name,
+        'current_restaurant': current_restaurant,
+        'is_branch': not current_restaurant.is_main_restaurant,
     }
     
     return render(request, 'admin_panel/manage_qr_code.html', context)
@@ -2087,32 +3243,76 @@ def manage_qr_code(request):
 @login_required
 @require_POST
 def regenerate_qr_code(request):
-    """Regenerate QR code for restaurant owner"""
-    if not request.user.is_owner():
-        messages.error(request, "Access denied. Owner privileges required.")
+    """Regenerate QR code for restaurant owner or branch owner"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, "Access denied. Owner or Branch Owner privileges required.")
         return redirect('restaurant:home')
+    
+    # Get current restaurant context
+    current_restaurant = None
+    selected_restaurant_id = request.session.get('selected_restaurant_id')
+    
+    if selected_restaurant_id:
+        try:
+            current_restaurant = Restaurant.objects.get(id=selected_restaurant_id)
+            if not current_restaurant.can_user_access(request.user):
+                current_restaurant = None
+        except Restaurant.DoesNotExist:
+            current_restaurant = None
+    
+    if not current_restaurant:
+        if request.user.is_branch_owner():
+            current_restaurant = Restaurant.objects.filter(branch_owner=request.user).first()
+        elif request.user.is_main_owner():
+            current_restaurant = Restaurant.objects.filter(main_owner=request.user, is_main_restaurant=True).first()
+    
+    if not current_restaurant:
+        messages.error(request, "No restaurant found for QR code regeneration.")
+        return redirect('admin_panel:admin_dashboard')
     
     # Generate new QR code
     import uuid
-    request.user.restaurant_qr_code = f"REST-{uuid.uuid4().hex[:12].upper()}"
-    request.user.save()
+    current_restaurant.qr_code = f"REST-{uuid.uuid4().hex[:12].upper()}"
+    current_restaurant.save()
     
-    messages.success(request, 'QR code has been regenerated successfully!')
+    messages.success(request, f'QR code has been regenerated successfully for {current_restaurant.name}!')
     return redirect('admin_panel:manage_qr_code')
 
 @login_required
 def generate_qr_image(request):
-    """Generate QR code image for restaurant owner"""
-    if not request.user.is_owner():
+    """Generate QR code image for restaurant owner or branch owner"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         return HttpResponse("Access denied", status=403)
     
+    # Get current restaurant context
+    current_restaurant = None
+    selected_restaurant_id = request.session.get('selected_restaurant_id')
+    
+    if selected_restaurant_id:
+        try:
+            current_restaurant = Restaurant.objects.get(id=selected_restaurant_id)
+            if not current_restaurant.can_user_access(request.user):
+                current_restaurant = None
+        except Restaurant.DoesNotExist:
+            current_restaurant = None
+    
+    if not current_restaurant:
+        if request.user.is_branch_owner():
+            current_restaurant = Restaurant.objects.filter(branch_owner=request.user).first()
+        elif request.user.is_main_owner():
+            current_restaurant = Restaurant.objects.filter(main_owner=request.user, is_main_restaurant=True).first()
+    
+    if not current_restaurant:
+        return HttpResponse("No restaurant found", status=404)
+    
     # Ensure QR code exists
-    if not request.user.restaurant_qr_code:
-        request.user.generate_qr_code()
-        request.user.save()
+    if not current_restaurant.qr_code:
+        import uuid
+        current_restaurant.qr_code = f"REST-{uuid.uuid4().hex[:12].upper()}"
+        current_restaurant.save()
     
     # Generate the full QR URL using helper function
-    qr_url = get_production_qr_url(request, request.user.restaurant_qr_code)
+    qr_url = get_production_qr_url(request, current_restaurant.qr_code)
     
     # Create QR code
     qr = qrcode.QRCode(
@@ -2165,7 +3365,8 @@ def debug_qr_code(request):
 @login_required
 def import_products_csv(request):
     """Import products from CSV file"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
     
@@ -2184,6 +3385,31 @@ def import_products_csv(request):
         return redirect('admin_panel:manage_products')
     
     try:
+        # Get restaurant context
+        from restaurant.models_restaurant import Restaurant
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get restaurant from form or use current restaurant
+        restaurant_id = request.POST.get('restaurant')
+        if restaurant_id:
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Verify user has access to this restaurant
+                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+                if target_restaurant not in accessible_restaurants:
+                    messages.error(request, 'You do not have permission to import products to this restaurant')
+                    return redirect('admin_panel:manage_products')
+                current_restaurant = target_restaurant
+            except Restaurant.DoesNotExist:
+                messages.error(request, 'Selected restaurant does not exist')
+                return redirect('admin_panel:manage_products')
+        else:
+            current_restaurant = restaurant_context.get('current_restaurant')
+            if not current_restaurant:
+                messages.error(request, 'Please select a restaurant for import')
+                return redirect('admin_panel:manage_products')
+        
         owner_filter = get_owner_filter(request.user)
         
         # Read CSV file
@@ -2229,20 +3455,24 @@ def import_products_csv(request):
                     error_count += 1
                     continue
                 
-                # Find or create main category
-                main_category_filter = {'name__iexact': main_category_name}
-                if owner_filter:
-                    main_category_filter['owner'] = owner_filter
+                # Find or create main category for the selected restaurant
+                main_category_filter = {'name__iexact': main_category_name, 'restaurant': current_restaurant}
                 
                 main_category = MainCategory.objects.filter(**main_category_filter).first()
                 if not main_category:
+                    # Determine owner based on restaurant type
+                    if current_restaurant.is_main_restaurant:
+                        category_owner = current_restaurant.main_owner
+                    else:
+                        category_owner = current_restaurant.branch_owner or current_restaurant.main_owner
+                    
                     main_category_data = {
                         'name': main_category_name,
                         'is_active': True,
-                        'description': row.get('main_category_description', '').strip()
+                        'description': row.get('main_category_description', '').strip(),
+                        'owner': category_owner,
+                        'restaurant': current_restaurant
                     }
-                    if owner_filter:
-                        main_category_data['owner'] = owner_filter
                     main_category = MainCategory.objects.create(**main_category_data)
                     messages.info(request, f"Created main category '{main_category_name}' for this import.")
                 
@@ -2333,7 +3563,8 @@ def import_products_csv(request):
 @login_required
 def import_products_excel(request):
     """Import products from Excel file"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
     
@@ -2356,6 +3587,31 @@ def import_products_excel(request):
         return redirect('admin_panel:manage_products')
     
     try:
+        # Get restaurant context
+        from restaurant.models_restaurant import Restaurant
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        
+        # Get restaurant from form or use current restaurant
+        restaurant_id = request.POST.get('restaurant')
+        if restaurant_id:
+            try:
+                target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Verify user has access to this restaurant
+                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
+                if target_restaurant not in accessible_restaurants:
+                    messages.error(request, 'You do not have permission to import products to this restaurant')
+                    return redirect('admin_panel:manage_products')
+                current_restaurant = target_restaurant
+            except Restaurant.DoesNotExist:
+                messages.error(request, 'Selected restaurant does not exist')
+                return redirect('admin_panel:manage_products')
+        else:
+            current_restaurant = restaurant_context.get('current_restaurant')
+            if not current_restaurant:
+                messages.error(request, 'Please select a restaurant for import')
+                return redirect('admin_panel:manage_products')
+        
         owner_filter = get_owner_filter(request.user)
         
         # Save file temporarily
@@ -2449,10 +3705,8 @@ def import_products_excel(request):
                         error_count += 1
                         continue
                     
-                    # Find main category
-                    main_category_filter = {'name__iexact': main_category_name}
-                    if owner_filter:
-                        main_category_filter['owner'] = owner_filter
+                    # Find main category for the selected restaurant
+                    main_category_filter = {'name__iexact': main_category_name, 'restaurant': current_restaurant}
                     
                     main_category = MainCategory.objects.filter(**main_category_filter).first()
                     if not main_category:
@@ -2677,7 +3931,8 @@ def download_template_excel(request):
 @require_POST
 def bulk_delete_products(request):
     """Bulk delete multiple products"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'error': 'Access denied. Administrator or Owner privileges required.'})
     
     try:
@@ -2756,15 +4011,27 @@ def bulk_delete_products(request):
 @login_required
 def export_products_csv(request):
     """Export all products to CSV"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
     
-    # Get user's products
-    if request.user.is_administrator():
-        products = Product.objects.all()
+    # Get restaurant context for proper filtering
+    session_restaurant_id = request.session.get('selected_restaurant_id')
+    restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+    current_restaurant = restaurant_context['current_restaurant']
+    view_all_restaurants = restaurant_context['view_all_restaurants']
+    accessible_restaurants = restaurant_context['accessible_restaurants']
+    
+    # Get products based on restaurant context
+    if view_all_restaurants:
+        # Export from all accessible restaurants
+        products = Product.objects.filter(main_category__restaurant__in=accessible_restaurants)
+    elif current_restaurant:
+        # Export from current restaurant only
+        products = Product.objects.filter(main_category__restaurant=current_restaurant)
     else:
-        products = Product.objects.filter(main_category__owner=request.user)
+        products = Product.objects.none()
     
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="products_export.csv"'
@@ -2795,7 +4062,8 @@ def export_products_csv(request):
 @login_required  
 def export_products_excel(request):
     """Export all products to Excel"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
     
@@ -2805,11 +4073,22 @@ def export_products_excel(request):
         messages.error(request, 'Excel export is not available. Please contact administrator.')
         return redirect('admin_panel:manage_products')
     
-    # Get user's products
-    if request.user.is_administrator():
-        products = Product.objects.all()
+    # Get restaurant context for proper filtering
+    session_restaurant_id = request.session.get('selected_restaurant_id')
+    restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+    current_restaurant = restaurant_context['current_restaurant']
+    view_all_restaurants = restaurant_context['view_all_restaurants']
+    accessible_restaurants = restaurant_context['accessible_restaurants']
+    
+    # Get products based on restaurant context
+    if view_all_restaurants:
+        # Export from all accessible restaurants
+        products = Product.objects.filter(main_category__restaurant__in=accessible_restaurants)
+    elif current_restaurant:
+        # Export from current restaurant only
+        products = Product.objects.filter(main_category__restaurant=current_restaurant)
     else:
-        products = Product.objects.filter(main_category__owner=request.user)
+        products = Product.objects.none()
     
     workbook = openpyxl.Workbook()
     worksheet = workbook.active
@@ -2852,7 +4131,8 @@ def export_products_excel(request):
 @login_required
 def export_products_pdf(request):
     """Export all products to PDF"""
-    if not (request.user.is_administrator() or request.user.is_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
     
@@ -2926,3 +4206,188 @@ def export_products_pdf(request):
     doc.build(elements)
     
     return response
+
+
+# ============================================================================
+# Printer Configuration Views
+# ============================================================================
+
+@login_required
+def printer_settings(request):
+    """Display printer configuration page"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, 'Only restaurant owners can access printer settings.')
+        return redirect('admin_panel:admin_dashboard')
+    
+    user = request.user
+    
+    # Get the current restaurant based on session or user type
+    from restaurant.models_restaurant import Restaurant
+    
+    current_restaurant = None
+    session_restaurant_id = request.session.get('selected_restaurant_id')
+    
+    if session_restaurant_id:
+        try:
+            current_restaurant = Restaurant.objects.get(id=session_restaurant_id)
+        except Restaurant.DoesNotExist:
+            pass
+    
+    # If no session restaurant, get the user's primary restaurant
+    if not current_restaurant:
+        if user.is_main_owner():
+            current_restaurant = Restaurant.objects.filter(main_owner=user, is_main_restaurant=True).first()
+        elif user.is_branch_owner():
+            current_restaurant = Restaurant.objects.filter(branch_owner=user, is_main_restaurant=False).first()
+        elif user.is_owner():
+            current_restaurant = Restaurant.objects.filter(main_owner=user).first()
+    
+    # Get printer settings - prefer Restaurant model, fallback to User model
+    if current_restaurant:
+        kitchen_printer = current_restaurant.kitchen_printer_name or ''
+        bar_printer = current_restaurant.bar_printer_name or ''
+        receipt_printer = current_restaurant.receipt_printer_name or ''
+        auto_print_kot = current_restaurant.auto_print_kot
+        auto_print_bot = current_restaurant.auto_print_bot
+        settings_source = 'restaurant'
+    else:
+        kitchen_printer = user.kitchen_printer_name or ''
+        bar_printer = user.bar_printer_name or ''
+        receipt_printer = user.receipt_printer_name or ''
+        auto_print_kot = user.auto_print_kot
+        auto_print_bot = user.auto_print_bot
+        settings_source = 'user'
+    
+    context = {
+        'owner': user,
+        'current_restaurant': current_restaurant,
+        'settings_source': settings_source,
+        'kitchen_printer': kitchen_printer,
+        'bar_printer': bar_printer,
+        'receipt_printer': receipt_printer,
+        'auto_print_kot': auto_print_kot,
+        'auto_print_bot': auto_print_bot,
+    }
+    
+    return render(request, 'admin_panel/printer_settings.html', context)
+
+
+@login_required
+@require_POST
+def save_printer_settings(request):
+    """Save printer configuration - saves to Restaurant model for proper per-restaurant settings"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+    
+    try:
+        user = request.user
+        from restaurant.models_restaurant import Restaurant
+        
+        # Get form data
+        kitchen_printer = request.POST.get('kitchen_printer', '').strip()
+        bar_printer = request.POST.get('bar_printer', '').strip()
+        receipt_printer = request.POST.get('receipt_printer', '').strip()
+        auto_print_kot = request.POST.get('auto_print_kot') == 'on'
+        auto_print_bot = request.POST.get('auto_print_bot') == 'on'
+        
+        # Get the current restaurant based on session or user type
+        current_restaurant = None
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        
+        if session_restaurant_id:
+            try:
+                current_restaurant = Restaurant.objects.get(id=session_restaurant_id)
+            except Restaurant.DoesNotExist:
+                pass
+        
+        # If no session restaurant, get the user's primary restaurant
+        if not current_restaurant:
+            if user.is_main_owner():
+                current_restaurant = Restaurant.objects.filter(main_owner=user, is_main_restaurant=True).first()
+            elif user.is_branch_owner():
+                current_restaurant = Restaurant.objects.filter(branch_owner=user, is_main_restaurant=False).first()
+            elif user.is_owner():
+                current_restaurant = Restaurant.objects.filter(main_owner=user).first()
+        
+        # Save to Restaurant model (preferred) or User model (fallback)
+        if current_restaurant:
+            current_restaurant.kitchen_printer_name = kitchen_printer if kitchen_printer else None
+            current_restaurant.bar_printer_name = bar_printer if bar_printer else None
+            current_restaurant.receipt_printer_name = receipt_printer if receipt_printer else None
+            current_restaurant.auto_print_kot = auto_print_kot
+            current_restaurant.auto_print_bot = auto_print_bot
+            current_restaurant.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Printer settings saved for {current_restaurant.name}!'
+            })
+        else:
+            # Fallback to User model
+            user.kitchen_printer_name = kitchen_printer if kitchen_printer else None
+            user.bar_printer_name = bar_printer if bar_printer else None
+            user.receipt_printer_name = receipt_printer if receipt_printer else None
+            user.auto_print_kot = auto_print_kot
+            user.auto_print_bot = auto_print_bot
+            user.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Printer settings saved successfully!'
+            })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@login_required
+def detect_printers(request):
+    """Detect available printers on the system"""
+    try:
+        import win32print  # type: ignore
+        
+        printers = []
+        default_printer = None
+        
+        try:
+            default_printer = win32print.GetDefaultPrinter()
+        except:
+            pass
+        
+        # Get all local printers
+        try:
+            for printer_info in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL):
+                printer_name = printer_info[2]
+                printers.append({
+                    'name': printer_name,
+                    'is_default': printer_name == default_printer
+                })
+        except Exception as enum_error:
+            # If EnumPrinters fails, return empty list with error
+            return JsonResponse({
+                'success': False,
+                'error': f'Could not enumerate printers: {str(enum_error)}',
+                'printers': []
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'printers': printers,
+            'count': len(printers)
+        })
+        
+    except ImportError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Printer detection only works on Windows systems with pywin32 installed. Since your server is on Linux (Digital Ocean), you should run the print client on a Windows PC where printers are connected.',
+            'printers': []
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error: {str(e)}',
+            'printers': []
+        })

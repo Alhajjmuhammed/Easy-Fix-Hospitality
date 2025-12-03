@@ -1,0 +1,10 @@
+{
+    "server_url": "http://localhost:8000",
+    "api_token": "YOUR_API_TOKEN_HERE",
+    "restaurant_id": null,
+    "poll_interval": 5,
+    "printer_name": null,
+    "auto_detect_printer": true,
+    "retry_failed_jobs": true,
+    "max_retries": 3
+}

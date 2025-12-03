@@ -138,6 +138,19 @@ class OwnerRegistrationForm(forms.ModelForm):
         }),
         help_text="Brief description of your restaurant (optional)"
     )
+    
+    subscription_plan = forms.ChoiceField(
+        choices=[
+            ('SINGLE', 'Single Restaurant - Basic plan for one location'),
+            ('PRO', 'Pro Plan - Advanced plan with unlimited branches'),
+        ],
+        initial='SINGLE',
+        required=True,
+        widget=forms.RadioSelect(attrs={
+            'class': 'form-check-input'
+        }),
+        help_text="Choose your subscription plan. You can upgrade later if needed."
+    )
 
     role = forms.ModelChoiceField(
         queryset=None,
@@ -149,7 +162,7 @@ class OwnerRegistrationForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['username', 'email', 'first_name', 'last_name', 'phone_number', 'address', 
-                 'restaurant_name', 'restaurant_description', 'role']
+                 'restaurant_name', 'restaurant_description', 'subscription_plan', 'role']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from .models import Role

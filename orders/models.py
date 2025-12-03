@@ -182,3 +182,7 @@ class BillRequest(models.Model):
     def owner(self):
         """Get the restaurant owner this bill request belongs to"""
         return self.table_info.owner
+
+
+# Import PrintJob model
+from .models_printjob import PrintJob

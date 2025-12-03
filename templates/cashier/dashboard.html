@@ -536,12 +536,8 @@ function submitPayment() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Show success message with receipt option
-            const result = confirm(data.message + '\n\nWould you like to generate a receipt?');
-            if (result && data.payment_id) {
-                // Open receipt in new tab
-                window.open(`/cashier/receipt/${data.payment_id}/`, '_blank');
-            }
+            // Show success message and reload (receipt auto-prints in background)
+            alert('Payment processed successfully!');
             location.reload();
         } else {
             alert('Error: ' + data.error);

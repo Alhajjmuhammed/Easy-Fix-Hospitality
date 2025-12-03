@@ -78,6 +78,83 @@
 {% endblock %}
 
 {% block content %}
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" id="productFilterForm" class="mb-0">
+            <div class="row g-3">
+                <!-- Search Input -->
+                <div class="col-md-4">
+                    <label for="productSearch" class="form-label">
+                        <i class="fas fa-search"></i> Search Products
+                    </label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="productSearch" name="search" 
+                               value="{{ request.GET.search }}" placeholder="Search by product name...">
+                        <span class="input-group-text">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                    <small class="text-muted">Press ESC to clear search</small>
+                </div>
+
+                <!-- Restaurant Filter -->
+                <div class="col-md-3">
+                    <label for="restaurantFilter" class="form-label">
+                        <i class="fas fa-building"></i> Restaurant
+                    </label>
+                    <select class="form-select" id="restaurantFilter" name="restaurant">
+                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                        {% for restaurant in accessible_restaurants %}
+                        <option value="{{ restaurant.id }}" 
+                            {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
+                            {% elif not request.GET.restaurant and current_restaurant.id == restaurant.id %}selected
+                            {% endif %}>
+                            {{ restaurant.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="col-md-3">
+                    <label for="categoryFilter" class="form-label">
+                        <i class="fas fa-folder"></i> Category
+                    </label>
+                    <select class="form-select" id="categoryFilter" name="category">
+                        <option value="">All Categories</option>
+                        {% for category in all_main_categories %}
+                        <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:'s' %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Items Per Page -->
+                <div class="col-md-2">
+                    <label for="perPageSelect" class="form-label">
+                        <i class="fas fa-list"></i> Per Page
+                    </label>
+                    <select class="form-select" id="perPageSelect" name="per_page">
+                        <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
+                        <option value="20" {% if request.GET.per_page == '20' %}selected{% endif %}>20</option>
+                        <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                        <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Results Summary -->
+            <div class="mt-3">
+                <div class="text-muted">
+                    Showing products by category
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Action Bar -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex gap-2">
@@ -141,12 +218,6 @@
             </ul>
         </div>
     </div>
-    <div class="input-group" style="width: 300px;">
-        <input type="text" class="form-control" placeholder="Search products..." id="searchInput">
-        <button class="btn btn-outline-secondary" type="button">
-            <i class="fas fa-search"></i>
-        </button>
-    </div>
 </div>
 
 <!-- Products by Category - Tab Style -->
@@ -187,6 +258,7 @@
                                     <th style="width: 60px; color: black;">Image</th>
                                     <th style="color: black;">Product Info</th>
                                     <th style="width: 120px; color: black;">Sub Category</th>
+                                    <th style="width: 120px; color: black;">Restaurant/Branch</th>
                                     <th style="width: 100px; color: black;">Station</th>
                                     <th style="width: 80px; color: black;">Price</th>
                                     <th style="width: 80px; color: black;">Stock</th>
@@ -196,7 +268,7 @@
                             </thead>
                             <tbody>
                                 {% for product in category_data.products %}
-                                <tr id="product-row-{{ product.id }}" data-product-id="{{ product.id }}">
+                                <tr id="product-row-{{ product.id }}" data-product-id="{{ product.id }}" data-restaurant-id="{% if product.main_category.restaurant %}{{ product.main_category.restaurant.id }}{% endif %}">
                                     <td>
                                         <input type="checkbox" class="form-check-input product-checkbox" 
                                                value="{{ product.id }}" data-product-name="{{ product.name }}">
@@ -222,6 +294,17 @@
                                     </td>
                                     <td>
                                         <small class="text-muted" style="font-size: 0.75rem;">{{ product.sub_category.name }}</small>
+                                    </td>
+                                    <td>
+                                        <small style="font-size: 0.75rem;">
+                                            {% if product.main_category.restaurant %}
+                                                {{ product.main_category.restaurant.name }}
+                                            {% elif product.main_category.owner %}
+                                                {{ product.main_category.owner.restaurant_name|default:"-" }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </small>
                                     </td>
                                     <td>
                                         {% if product.station == 'kitchen' %}
@@ -388,6 +471,26 @@
                                 <div class="card-body">
                                     <div class="row g-3">
                                         <div class="col-md-12">
+                                            <label for="productRestaurant" class="form-label">Restaurant/Branch *</label>
+                                            <select class="form-select" id="productRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
+                                                {% if view_all_restaurants %}
+                                                    <option value="">Select Restaurant/Branch</option>
+                                                    {% for restaurant in accessible_restaurants %}
+                                                    <option value="{{ restaurant.id }}">
+                                                        {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                                    </option>
+                                                    {% endfor %}
+                                                {% elif current_restaurant %}
+                                                    <option value="{{ current_restaurant.id }}" selected>
+                                                        {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                                    </option>
+                                                    <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
+                                                {% else %}
+                                                    <option value="">No Restaurant Available</option>
+                                                {% endif %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-12">
                                             <label for="productName" class="form-label">Product Name *</label>
                                             <input type="text" class="form-control" id="productName" name="name" required>
                                         </div>
@@ -398,9 +501,9 @@
                                         <div class="col-md-6">
                                             <label for="productMainCategory" class="form-label">Main Category *</label>
                                             <select class="form-select" id="productMainCategory" name="main_category" required>
-                                                <option value="">Select Main Category</option>
+                                                <option value="">Select Restaurant First</option>
                                                 {% for category in all_main_categories %}
-                                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                                <option value="{{ category.id }}" data-restaurant-id="{{ category.restaurant.id|default:'' }}">{{ category.name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -443,24 +546,21 @@
                             </div>
                         </div>
                         
-                        <!-- Image Upload -->
+                        <!-- Product Image Information -->
                         <div class="col-md-4">
                             <div class="card">
                                 <div class="card-header bg-light">
                                     <h6 class="mb-0 fw-bold">Product Image</h6>
                                 </div>
-                                <div class="card-body">
-                                    <div class="file-upload-area" id="fileUploadArea">
-                                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                        <h6>Drop image here or click to browse</h6>
-                                        <p class="text-muted small mb-0">Supports: JPG, PNG, GIF (Max: 5MB)</p>
-                                        <input type="file" class="d-none" id="productImage" name="image" accept="image/*">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-info-circle fa-3x text-info mb-3"></i>
+                                        <h6 class="fw-bold">Category Image Used</h6>
+                                        <p class="text-muted small mb-0">Products automatically use their category's image. To change the product image, upload an image when creating or editing the category.</p>
                                     </div>
-                                    <div id="imagePreview" class="mt-3 d-none">
-                                        <img id="previewImg" src="" alt="Preview" class="img-fluid rounded">
-                                        <button type="button" class="btn btn-sm btn-outline-danger mt-2 w-100" onclick="removeImage()">
-                                            <i class="fas fa-trash me-1"></i>Remove Image
-                                        </button>
+                                    <div class="alert alert-info small mb-0">
+                                        <i class="fas fa-lightbulb me-1"></i>
+                                        <strong>Tip:</strong> Go to Categories section to manage images for all products in that category.
                                     </div>
                                 </div>
                             </div>
@@ -772,173 +872,6 @@ function initializeCategoryHandler(mainCategorySelectId, subCategorySelectId) {
     }
 }
 
-// File upload handling
-function initializeFileUpload() {
-    const fileInput = document.getElementById('productImage');
-    const fileUploadArea = document.getElementById('fileUploadArea');
-    const imagePreview = document.getElementById('imagePreview');
-    const previewImg = document.getElementById('previewImg');
-    
-    if (fileInput && fileUploadArea) {
-        // Click to upload
-        fileUploadArea.addEventListener('click', () => {
-            fileInput.click();
-        });
-        
-        // Drag and drop
-        fileUploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fileUploadArea.classList.add('border-primary');
-        });
-        
-        fileUploadArea.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            fileUploadArea.classList.remove('border-primary');
-        });
-        
-        fileUploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fileUploadArea.classList.remove('border-primary');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                handleFilePreview(files[0]);
-            }
-        });
-        
-        // File input change
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFilePreview(e.target.files[0]);
-            }
-        });
-    }
-}
-
-// Edit form file upload handling
-function initializeEditFileUpload() {
-    setTimeout(() => {
-        const editFileInput = document.getElementById('editProductImage');
-        const editFileUploadArea = document.getElementById('editFileUploadArea');
-        const editImagePreview = document.getElementById('editImagePreview');
-        const editPreviewImg = document.getElementById('editPreviewImg');
-        
-        if (editFileInput && editFileUploadArea) {
-            // Remove any existing event listeners by cloning the elements
-            const newEditFileUploadArea = editFileUploadArea.cloneNode(true);
-            editFileUploadArea.parentNode.replaceChild(newEditFileUploadArea, editFileUploadArea);
-            
-            // Click to upload
-            newEditFileUploadArea.addEventListener('click', () => {
-                editFileInput.click();
-            });
-            
-            // Drag and drop
-            newEditFileUploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                newEditFileUploadArea.classList.add('border-primary');
-            });
-            
-            newEditFileUploadArea.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                newEditFileUploadArea.classList.remove('border-primary');
-            });
-            
-            newEditFileUploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                newEditFileUploadArea.classList.remove('border-primary');
-                
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    editFileInput.files = files;
-                    handleEditFilePreview(files[0]);
-                }
-            });
-            
-            // File input change
-            editFileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleEditFilePreview(e.target.files[0]);
-                }
-            });
-        } else {
-        }
-    }, 200);
-}
-
-function handleFilePreview(file) {
-    const fileUploadArea = document.getElementById('fileUploadArea');
-    const imagePreview = document.getElementById('imagePreview');
-    const previewImg = document.getElementById('previewImg');
-    
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-        showAlert('Please select a valid image file', 'danger');
-        return;
-    }
-    
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showAlert('Image size should not exceed 5MB', 'danger');
-        return;
-    }
-    
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        previewImg.src = e.target.result;
-        fileUploadArea.style.display = 'none';
-        imagePreview.classList.remove('d-none');
-    };
-    reader.readAsDataURL(file);
-}
-
-function handleEditFilePreview(file) {
-    const editFileUploadArea = document.getElementById('editFileUploadArea');
-    const editImagePreview = document.getElementById('editImagePreview');
-    const editPreviewImg = document.getElementById('editPreviewImg');
-    
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-        showAlert('Please select a valid image file', 'danger');
-        return;
-    }
-    
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showAlert('Image size should not exceed 5MB', 'danger');
-        return;
-    }
-    
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        editPreviewImg.src = e.target.result;
-        editFileUploadArea.style.display = 'none';
-        editImagePreview.classList.remove('d-none');
-    };
-    reader.readAsDataURL(file);
-}
-
-function removeImage() {
-    const fileInput = document.getElementById('productImage');
-    const fileUploadArea = document.getElementById('fileUploadArea');
-    const imagePreview = document.getElementById('imagePreview');
-    
-    if (fileInput) fileInput.value = '';
-}
-
-function removeEditImage() {
-    const editFileInput = document.getElementById('editProductImage');
-    const editFileUploadArea = document.getElementById('editFileUploadArea');
-    const editImagePreview = document.getElementById('editImagePreview');
-    
-    if (editFileInput) editFileInput.value = '';
-    if (editImagePreview) editImagePreview.classList.add('d-none');
-    if (editFileUploadArea) editFileUploadArea.style.display = 'block';
-}
-
 // Event delegation for button clicks
 document.addEventListener('click', function(e) {
     // View product buttons
@@ -975,6 +908,34 @@ document.addEventListener('click', function(e) {
         deleteProduct(productId, productName);
     }
 });
+
+// Filter form auto-submit for products
+const productFilterSelects = document.querySelectorAll('#restaurantFilter, #categoryFilter, #perPageSelect');
+productFilterSelects.forEach(select => {
+    select.addEventListener('change', function() {
+        document.getElementById('productFilterForm').submit();
+    });
+});
+
+// Search with debounce for products
+const productSearchInput = document.getElementById('productSearch');
+let productSearchTimeout;
+if (productSearchInput) {
+    productSearchInput.addEventListener('input', function(e) {
+        clearTimeout(productSearchTimeout);
+        productSearchTimeout = setTimeout(() => {
+            document.getElementById('productFilterForm').submit();
+        }, 500);
+    });
+
+    // ESC to clear search
+    productSearchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            document.getElementById('productFilterForm').submit();
+        }
+    });
+}
 
 // Add search initialization function
 function initializeSearch() {
@@ -1032,6 +993,28 @@ function updateCategoryTabCounters() {
             <form action="{% url 'admin_panel:import_products_csv' %}" method="post" enctype="multipart/form-data">
                 <div class="modal-body">
                     {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="importCsvRestaurant" class="form-label">Restaurant/Branch *</label>
+                        <select class="form-select" id="importCsvRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %} required>
+                            {% if view_all_restaurants %}
+                                <option value="">Select Restaurant/Branch</option>
+                                {% for restaurant in accessible_restaurants %}
+                                <option value="{{ restaurant.id }}">
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                {% endfor %}
+                            {% elif current_restaurant %}
+                                <option value="{{ current_restaurant.id }}" selected>
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
+                            {% else %}
+                                <option value="">No Restaurant Available</option>
+                            {% endif %}
+                        </select>
+                        <div class="form-text">Products will be imported to this restaurant</div>
+                    </div>
+                    
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>CSV Format Requirements:</strong>
@@ -1081,6 +1064,28 @@ function updateCategoryTabCounters() {
             <form action="{% url 'admin_panel:import_products_excel' %}" method="post" enctype="multipart/form-data">
                 <div class="modal-body">
                     {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="importRestaurant" class="form-label">Restaurant/Branch *</label>
+                        <select class="form-select" id="importRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %} required>
+                            {% if view_all_restaurants %}
+                                <option value="">Select Restaurant/Branch</option>
+                                {% for restaurant in accessible_restaurants %}
+                                <option value="{{ restaurant.id }}">
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                {% endfor %}
+                            {% elif current_restaurant %}
+                                <option value="{{ current_restaurant.id }}" selected>
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
+                            {% else %}
+                                <option value="">No Restaurant Available</option>
+                            {% endif %}
+                        </select>
+                        <div class="form-text">Products will be imported to this restaurant</div>
+                    </div>
+                    
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>Excel Format Requirements:</strong>
@@ -1157,6 +1162,45 @@ function updateCategoryTabCounters() {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let selectedProducts = [];
+    
+    // Handle restaurant selection for Add Product form
+    const productRestaurant = document.getElementById('productRestaurant');
+    const productMainCategory = document.getElementById('productMainCategory');
+    
+    if (productRestaurant && productMainCategory) {
+        productRestaurant.addEventListener('change', function() {
+            const selectedRestaurantId = this.value;
+            const options = productMainCategory.querySelectorAll('option');
+            
+            // Filter categories by restaurant
+            options.forEach(option => {
+                if (option.value === '') {
+                    option.style.display = '';
+                    option.textContent = selectedRestaurantId ? 'Select Main Category' : 'Select Restaurant First';
+                    return;
+                }
+                
+                const categoryRestaurantId = option.getAttribute('data-restaurant-id');
+                if (!selectedRestaurantId || categoryRestaurantId === selectedRestaurantId) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+            
+            // Reset selections
+            productMainCategory.value = '';
+            const productSubCategory = document.getElementById('productSubCategory');
+            if (productSubCategory) {
+                productSubCategory.innerHTML = '<option value="">Select Main Category First</option>';
+            }
+        });
+        
+        // Trigger change to initialize filtering
+        if (productRestaurant.value) {
+            productRestaurant.dispatchEvent(new Event('change'));
+        }
+    }
     
     // Initialize category handlers for add product form
     initializeCategoryHandler('productMainCategory', 'productSubCategory');

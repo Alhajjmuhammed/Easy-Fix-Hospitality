@@ -1,0 +1,641 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}{{ branch.name }} - Branch Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .branch-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 30px;
+        margin-bottom: 30px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .branch-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100px;
+        height: 100px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        transform: translate(30px, -30px);
+    }
+    
+    .branch-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 24px;
+        margin-bottom: 30px;
+    }
+    
+    .info-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 24px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .info-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    
+    .info-card h6 {
+        color: #495057;
+        font-weight: 600;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .info-item {
+        display: flex;
+        align-items-center;
+        margin-bottom: 12px;
+    }
+    
+    .info-item i {
+        width: 24px;
+        margin-right: 12px;
+        color: #6c757d;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .stat-icon {
+        font-size: 32px;
+        margin-bottom: 12px;
+    }
+    
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    
+    .stat-label {
+        font-size: 14px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 24px;
+        margin-bottom: 30px;
+        height: 400px;
+    }
+    
+    .recent-orders {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .recent-orders-header {
+        background: #f8f9fa;
+        padding: 20px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .orders-table {
+        font-size: 14px;
+    }
+    
+    .orders-table th {
+        background: #f8f9fa;
+        border-top: none;
+        font-weight: 600;
+        color: #495057;
+        padding: 16px 12px;
+    }
+    
+    .orders-table td {
+        padding: 14px 12px;
+        vertical-align: middle;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .orders-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .order-status {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-preparing {
+        background: #cce5ff;
+        color: #004085;
+        border: 1px solid #74b9ff;
+    }
+    
+    .status-ready {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #00b894;
+    }
+    
+    .status-delivered {
+        background: #e2e6ea;
+        color: #383d41;
+        border: 1px solid #636c72;
+    }
+    
+    .status-cancelled {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #e74c3c;
+    }
+    
+    .performance-indicator {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 12px;
+    }
+    
+    .performance-excellent {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .performance-good {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .performance-average {
+        background: #e2e6ea;
+        color: #383d41;
+    }
+    
+    .performance-poor {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .back-button {
+        position: absolute;
+        top: 24px;
+        left: 24px;
+        z-index: 1;
+    }
+    
+    @media (max-width: 768px) {
+        .branch-header {
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .branch-info-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .info-card {
+            padding: 16px;
+        }
+        
+        .stat-card {
+            padding: 16px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+        }
+        
+        .stat-icon {
+            font-size: 28px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Branch Header -->
+    <div class="branch-header">
+        <a href="{% url 'admin_panel:main_owner_dashboard' %}" class="btn btn-outline-light back-button">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+        
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h2 mb-2">
+                    <i class="fas fa-store"></i> {{ branch.name }}
+                </h1>
+                <p class="mb-0 opacity-75">{{ branch.address }}</p>
+                {% if branch.phone %}
+                    <p class="mb-0 opacity-75">
+                        <i class="fas fa-phone"></i> {{ branch.phone }}
+                    </p>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="mb-2">
+                    {% if branch.is_active %}
+                        <span class="badge bg-success px-3 py-2">
+                            <i class="fas fa-check"></i> Active Branch
+                        </span>
+                    {% else %}
+                        <span class="badge bg-danger px-3 py-2">
+                            <i class="fas fa-times"></i> Inactive Branch
+                        </span>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if branch.performance_score >= 80 %}
+                        <span class="performance-indicator performance-excellent">Excellent Performance</span>
+                    {% elif branch.performance_score >= 60 %}
+                        <span class="performance-indicator performance-good">Good Performance</span>
+                    {% elif branch.performance_score >= 40 %}
+                        <span class="performance-indicator performance-average">Average Performance</span>
+                    {% else %}
+                        <span class="performance-indicator performance-poor">Needs Attention</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branch Information Grid -->
+    <div class="branch-info-grid">
+        <!-- Contact & Location Info -->
+        <div class="info-card">
+            <h6>
+                <i class="fas fa-map-marker-alt text-primary"></i> Location & Contact
+            </h6>
+            <div class="info-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>{{ branch.address|default:"No address specified" }}</span>
+            </div>
+            {% if branch.phone %}
+            <div class="info-item">
+                <i class="fas fa-phone"></i>
+                <span>{{ branch.phone }}</span>
+            </div>
+            {% endif %}
+            {% if branch.email %}
+            <div class="info-item">
+                <i class="fas fa-envelope"></i>
+                <span>{{ branch.email }}</span>
+            </div>
+            {% endif %}
+            <div class="info-item">
+                <i class="fas fa-calendar"></i>
+                <span>Opened: {{ branch.created_at|date:"M j, Y" }}</span>
+            </div>
+        </div>
+
+        <!-- Management Info -->
+        <div class="info-card">
+            <h6>
+                <i class="fas fa-users text-success"></i> Management
+            </h6>
+            <div class="info-item">
+                <i class="fas fa-crown"></i>
+                <div>
+                    <strong>Main Owner:</strong><br>
+                    {{ branch.main_owner.get_full_name|default:branch.main_owner.username }}
+                    <br><small class="text-muted">{{ branch.main_owner.email }}</small>
+                </div>
+            </div>
+            {% if branch.branch_owner %}
+            <div class="info-item">
+                <i class="fas fa-user-tie"></i>
+                <div>
+                    <strong>Branch Manager:</strong><br>
+                    {{ branch.branch_owner.get_full_name|default:branch.branch_owner.username }}
+                    <br><small class="text-muted">{{ branch.branch_owner.email }}</small>
+                </div>
+            </div>
+            {% else %}
+            <div class="info-item">
+                <i class="fas fa-user-times"></i>
+                <span class="text-muted">No assigned branch manager</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Financial Info -->
+        <div class="info-card">
+            <h6>
+                <i class="fas fa-dollar-sign text-warning"></i> Financial Settings
+            </h6>
+            <div class="info-item">
+                <i class="fas fa-percentage"></i>
+                <span>Tax Rate: {{ branch.tax_rate_percentage|floatformat:1 }}%</span>
+            </div>
+            {% if branch.currency %}
+            <div class="info-item">
+                <i class="fas fa-coins"></i>
+                <span>Currency: {{ branch.currency }}</span>
+            </div>
+            {% endif %}
+            {% if branch.parent_restaurant %}
+            <div class="info-item">
+                <i class="fas fa-link"></i>
+                <div>
+                    <strong>Parent Restaurant:</strong><br>
+                    {{ branch.parent_restaurant.name }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Performance Statistics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon text-primary">
+                <i class="fas fa-shopping-cart"></i>
+            </div>
+            <div class="stat-value text-primary">{{ branch.total_orders|default:0 }}</div>
+            <div class="stat-label">Total Orders</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon text-success">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="stat-value text-success">${{ branch.total_revenue|floatformat:2|default:"0.00" }}</div>
+            <div class="stat-label">Total Revenue</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon text-info">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-value text-info">${{ branch.avg_order_value|floatformat:2|default:"0.00" }}</div>
+            <div class="stat-label">Avg Order Value</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon text-warning">
+                <i class="fas fa-utensils"></i>
+            </div>
+            <div class="stat-value text-warning">{{ branch.menu_items_count|default:0 }}</div>
+            <div class="stat-label">Menu Items</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon text-secondary">
+                <i class="fas fa-chair"></i>
+            </div>
+            <div class="stat-value text-secondary">{{ branch.tables_count|default:0 }}</div>
+            <div class="stat-label">Total Tables</div>
+        </div>
+    </div>
+
+    <!-- Revenue Chart -->
+    <div class="chart-container">
+        <h5 class="mb-3">
+            <i class="fas fa-chart-line text-primary"></i> Revenue Performance (Last 30 Days)
+        </h5>
+        <canvas id="revenueChart"></canvas>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="recent-orders">
+        <div class="recent-orders-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock text-primary"></i> Recent Orders
+                </h5>
+                <a href="{% url 'admin_panel:view_all_orders' %}?branch={{ branch.id }}" class="btn btn-outline-primary btn-sm">
+                    View All Orders <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover orders-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td>
+                            <strong>#{{ order.id|stringformat:"05d" }}</strong>
+                            {% if order.table_info %}
+                                <br><small class="text-muted">Table: {{ order.table_info.table_number }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.customer_name %}
+                                <div>
+                                    <strong>{{ order.customer_name }}</strong>
+                                    {% if order.customer_phone %}
+                                        <br><small class="text-muted">{{ order.customer_phone }}</small>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">Walk-in Customer</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="font-size: 12px;">
+                                {% for item in order.orderitem_set.all|slice:":2" %}
+                                    <div>{{ item.quantity }}x {{ item.product.name }}</div>
+                                {% endfor %}
+                                {% if order.orderitem_set.count > 2 %}
+                                    <small class="text-muted">+{{ order.orderitem_set.count|add:"-2" }} more...</small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <strong class="text-success">${{ order.total|floatformat:2 }}</strong>
+                            {% if order.payment_method %}
+                                <br><small class="text-muted">{{ order.payment_method|title }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="order-status status-{{ order.status|lower }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div>
+                                {{ order.created_at|date:"M j" }}
+                                <br><small class="text-muted">{{ order.created_at|time:"g:i A" }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-outline-primary btn-sm" onclick="viewOrderDetails({{ order.id }})" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="fas fa-shopping-cart fa-2x mb-2"></i>
+                                <div>No recent orders for this branch</div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-receipt"></i> Order Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="orderDetailsContent">
+                <!-- Order details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    // Initialize revenue chart
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [
+                {
+                    label: 'Daily Revenue',
+                    data: {{ chart_data|safe }},
+                    borderColor: 'rgb(102, 126, 234)',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: 'rgb(102, 126, 234)',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgb(102, 126, 234)',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+});
+
+function viewOrderDetails(orderId) {
+    // Load order details via AJAX
+    $.get(`/admin-panel/orders/${orderId}/details/`, function(data) {
+        $('#orderDetailsContent').html(data);
+        $('#orderDetailsModal').modal('show');
+    }).fail(function() {
+        alert('Error loading order details');
+    });
+}
+</script>
+{% endblock %}

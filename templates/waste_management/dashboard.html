@@ -94,7 +94,22 @@
             </h6>
         </div>
         <div class="card-body">
-            <form method="get" class="row g-3">
+            <form method="get" class="row g-3" id="filterForm">
+                <!-- Restaurant Filter (for PRO/BRANCH users) -->
+                {% if accessible_restaurants.count > 1 %}
+                <div class="col-lg-2 col-md-4 mb-3">
+                    <label for="restaurant_filter" class="form-label font-weight-bold">Restaurant</label>
+                    <select class="form-control" id="restaurant_filter" name="restaurant_filter" onchange="this.form.submit()">
+                        <option value="view_all" {% if view_all %}selected{% endif %}>All Restaurants</option>
+                        {% for restaurant in accessible_restaurants %}
+                            <option value="{{ restaurant.id }}" {% if selected_restaurant.id == restaurant.id %}selected{% endif %}>
+                                {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
                 <div class="col-lg-2 col-md-4 mb-3">
                     <label for="period" class="form-label font-weight-bold">Period</label>
                     <select class="form-control" id="period" name="period" onchange="this.form.submit()">
@@ -156,16 +171,85 @@
                     <button type="button" class="btn btn-primary me-3" data-bs-toggle="modal" data-bs-target="#recordWasteModal">
                         <i class="fas fa-plus mr-2"></i>Record Waste
                     </button>
-                    <a href="{% url 'waste_management:export_csv' %}?period={{ selected_period }}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}" class="btn btn-success me-3">
+                    <a href="{% url 'waste_management:export_csv' %}?period={{ selected_period }}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-success me-3">
                         <i class="fas fa-download mr-2"></i>Export CSV
                     </a>
-                    <a href="{% url 'waste_management:export_pdf' %}?period={{ selected_period }}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}" class="btn btn-danger">
+                    <a href="{% url 'waste_management:export_pdf' %}?period={{ selected_period }}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-danger">
                         <i class="fas fa-file-pdf mr-2"></i>Export PDF
                     </a>
                 </div>
             </form>
         </div>
     </div>
+    
+    <!-- Branch/Location Performance (when viewing all restaurants) -->
+    {% if branch_performance %}
+    <div class="card shadow mb-4">
+        <div class="card-header py-3" style="background: linear-gradient(120deg, #1e3c72 0%, #2a5298 100%); color: white;">
+            <h6 class="m-0 font-weight-bold">
+                <i class="fas fa-chart-bar mr-2"></i>Waste Performance by Location
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead style="background-color: #f8f9fc;">
+                        <tr>
+                            <th>Restaurant/Branch</th>
+                            <th>Total Items Wasted</th>
+                            <th>% of Total Items</th>
+                            <th>Total Cost</th>
+                            <th>% of Total Cost</th>
+                            <th>Avg Cost per Item</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for perf in branch_performance %}
+                        <tr>
+                            <td>
+                                <strong>{{ perf.restaurant.name }}</strong>
+                                {% if perf.restaurant.is_main_restaurant %}
+                                    <span class="badge badge-primary ml-2">Main</span>
+                                {% else %}
+                                    <span class="badge badge-info ml-2">Branch</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ perf.total_items }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="mr-2">{{ perf.items_percentage }}%</span>
+                                    <div class="progress" style="width: 100px; height: 20px;">
+                                        <div class="progress-bar bg-warning" role="progressbar" 
+                                             style="width: {{ perf.items_percentage }}%"
+                                             aria-valuenow="{{ perf.items_percentage }}" 
+                                             aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>${{ perf.total_cost|floatformat:2 }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="mr-2">{{ perf.cost_percentage }}%</span>
+                                    <div class="progress" style="width: 100px; height: 20px;">
+                                        <div class="progress-bar bg-danger" role="progressbar" 
+                                             style="width: {{ perf.cost_percentage }}%"
+                                             aria-valuenow="{{ perf.cost_percentage }}" 
+                                             aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>${{ perf.avg_cost|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- Waste Data Table -->
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center" style="border-top: 4px solid #007bff;">
@@ -173,11 +257,56 @@
                 <i class="fas fa-table mr-2"></i>Detailed Waste Data
             </h6>
             <div class="d-flex">
-                <span class="badge me-3" style="background-color: #343a40; color: white; font-weight: bold;">{{ total_items_wasted }} Items</span>
-                <span class="badge" style="background-color: #343a40; color: white; font-weight: bold;">${{ total_waste_cost|floatformat:0 }}</span>
+                <span class="badge me-3" style="background-color: #343a40; color: white; font-weight-bold;">{{ total_items_wasted }} Items</span>
+                <span class="badge" style="background-color: #343a40; color: white; font-weight-bold;">${{ total_waste_cost|floatformat:0 }}</span>
             </div>
         </div>
         <div class="card-body">
+            <!-- Search and Per Page Controls -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <form method="get" class="input-group">
+                        <input type="text" class="form-control" name="search" placeholder="Search product, notes, or recorded by..." value="{{ search_query|default:'' }}">
+                        <input type="hidden" name="period" value="{{ request.GET.period }}">
+                        <input type="hidden" name="category_id" value="{{ request.GET.category_id }}">
+                        <input type="hidden" name="subcategory_id" value="{{ request.GET.subcategory_id }}">
+                        <input type="hidden" name="waste_reason" value="{{ request.GET.waste_reason }}">
+                        <input type="hidden" name="from_date" value="{{ request.GET.from_date }}">
+                        <input type="hidden" name="to_date" value="{{ request.GET.to_date }}">
+                        {% if request.GET.restaurant_filter %}<input type="hidden" name="restaurant_filter" value="{{ request.GET.restaurant_filter }}">{% endif %}
+                        <input type="hidden" name="per_page" value="{{ per_page }}">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        {% if search_query %}
+                            <a href="?period={{ request.GET.period }}&category_id={{ request.GET.category_id }}&subcategory_id={{ request.GET.subcategory_id }}&waste_reason={{ request.GET.waste_reason }}&from_date={{ request.GET.from_date }}&to_date={{ request.GET.to_date }}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}&per_page={{ per_page }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Clear
+                            </a>
+                        {% endif %}
+                    </form>
+                </div>
+                <div class="col-md-6 text-end">
+                    <form method="get" class="d-inline-flex align-items-center">
+                        <label class="me-2 mb-0">Show:</label>
+                        <select name="per_page" class="form-control form-control-sm" style="width: auto;" onchange="this.form.submit()">
+                            <option value="5" {% if per_page == '5' %}selected{% endif %}>5</option>
+                            <option value="10" {% if per_page == '10' %}selected{% endif %}>10</option>
+                            <option value="20" {% if per_page == '20' or not per_page %}selected{% endif %}>20</option>
+                            <option value="50" {% if per_page == '50' %}selected{% endif %}>50</option>
+                        </select>
+                        <span class="ms-2">entries per page</span>
+                        <input type="hidden" name="period" value="{{ request.GET.period }}">
+                        <input type="hidden" name="category_id" value="{{ request.GET.category_id }}">
+                        <input type="hidden" name="subcategory_id" value="{{ request.GET.subcategory_id }}">
+                        <input type="hidden" name="waste_reason" value="{{ request.GET.waste_reason }}">
+                        <input type="hidden" name="from_date" value="{{ request.GET.from_date }}">
+                        <input type="hidden" name="to_date" value="{{ request.GET.to_date }}">
+                        {% if request.GET.restaurant_filter %}<input type="hidden" name="restaurant_filter" value="{{ request.GET.restaurant_filter }}">{% endif %}
+                        {% if search_query %}<input type="hidden" name="search" value="{{ search_query }}">{% endif %}
+                    </form>
+                </div>
+            </div>
+            
             <div class="table-responsive">
                 <table class="table table-bordered" width="100%" cellspacing="0">
                     <thead style="background-color: #f8f9fc;">
@@ -264,12 +393,12 @@
                     <ul class="pagination mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page=1{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}">
+                                <a class="page-link" href="?page=1{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}&per_page={{ per_page }}">
                                     <i class="fas fa-angle-double-left"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}&per_page={{ per_page }}">
                                     <i class="fas fa-angle-left"></i>
                                 </a>
                             </li>
@@ -282,19 +411,19 @@
                                 </li>
                             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}">{{ num }}</a>
+                                    <a class="page-link" href="?page={{ num }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}&per_page={{ per_page }}">{{ num }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
                         
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}&per_page={{ per_page }}">
                                     <i class="fas fa-angle-right"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_waste_reason != 'all' %}&waste_reason={{ selected_waste_reason }}{% endif %}{% if request.GET.restaurant_filter %}&restaurant_filter={{ request.GET.restaurant_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}&per_page={{ per_page }}">
                                     <i class="fas fa-angle-double-right"></i>
                                 </a>
                             </li>

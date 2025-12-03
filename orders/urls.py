@@ -1,9 +1,18 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+from .api_printjob import PrintJobViewSet
 
 app_name = 'orders'
 
+# API Router for print jobs
+router = DefaultRouter()
+router.register(r'print-jobs', PrintJobViewSet, basename='printjob')
+
 urlpatterns = [
+    # Print Job API
+    path('api/', include(router.urls)),
+    
     # Bar management
     path('bar/', views.bar_dashboard, name='bar_dashboard'),
     path('', views.order_list, name='order_list'),

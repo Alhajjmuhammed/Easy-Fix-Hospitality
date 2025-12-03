@@ -187,7 +187,22 @@
             </h6>
         </div>
         <div class="card-body">
-            <form method="get" class="row g-3">
+            <form method="get" class="row g-3" id="reportFilterForm">
+                <div class="col-lg-2 col-md-4">
+                    <label for="restaurant" class="form-label font-weight-bold">Restaurant</label>
+                    <select class="form-control" id="restaurant" name="restaurant" onchange="this.form.submit()">
+                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                        {% for restaurant in accessible_restaurants %}
+                        <option value="{{ restaurant.id }}" 
+                            {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
+                            {% elif not request.GET.restaurant and current_restaurant.id == restaurant.id %}selected
+                            {% endif %}>
+                            {{ restaurant.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
                 <div class="col-lg-2 col-md-4">
                     <label for="period" class="form-label font-weight-bold">Period</label>
                     <select class="form-control" id="period" name="period" onchange="toggleDateFields(); this.form.submit();">
@@ -260,10 +275,10 @@
                 </div>
                 
                 <div class="col-lg-12 col-md-12 d-flex align-items-end justify-content-end">
-                    <a href="{% url 'reports:export_csv' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}" class="btn btn-success me-3">
+                    <a href="{% url 'reports:export_csv' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}" class="btn btn-success me-3">
                         <i class="fas fa-download mr-2"></i>Export CSV
                     </a>
-                    <a href="{% url 'reports:export_pdf' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}" class="btn btn-danger">
+                    <a href="{% url 'reports:export_pdf' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}" class="btn btn-danger">
                         <i class="fas fa-file-pdf mr-2"></i>Export PDF
                     </a>
                 </div>

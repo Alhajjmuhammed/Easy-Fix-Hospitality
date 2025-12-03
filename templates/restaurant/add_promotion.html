@@ -120,6 +120,30 @@
                         {% endif %}
                         <div class="help-text">Enter discount from 1% to 99%</div>
                     </div>
+                    
+                    <div class="col-md-12 mb-3">
+                        <label for="restaurant_id" class="form-label">Restaurant/Branch</label>
+                        <select class="form-select" id="restaurant_id" name="restaurant_id" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
+                            {% if view_all_restaurants %}
+                                <option value="">Select Restaurant/Branch</option>
+                                {% for restaurant in accessible_restaurants %}
+                                <option value="{{ restaurant.id }}">
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                {% endfor %}
+                            {% elif current_restaurant %}
+                                <option value="{{ current_restaurant.id }}" selected>
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                </option>
+                                <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
+                            {% else %}
+                                <option value="">No Restaurant Available</option>
+                            {% endif %}
+                        </select>
+                        {% if current_restaurant and not view_all_restaurants %}
+                        <div class="help-text">Promotion will be assigned to: {{ current_restaurant.name }}</div>
+                        {% endif %}
+                    </div>
                 </div>
                 
                 <div class="mb-3">
@@ -318,6 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const startTimeInput = document.querySelector('#id_start_time');
     const endTimeInput = document.querySelector('#id_end_time');
     const dayCheckboxes = document.querySelectorAll('input[name="days_selection"]');
+    const restaurantSelect = document.querySelector('#restaurant');
     
     // Update preview
     function updatePreview() {
@@ -346,6 +371,97 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('timePreview').innerHTML = 
             `<strong>Time:</strong> ${startTime} - ${endTime}<br>
              <strong>Days:</strong> ${selectedDays.length ? selectedDays.join(', ') : 'None selected'}`;
+    }
+    
+    // Dynamic loading of products/categories when restaurant changes
+    if (restaurantSelect) {
+        restaurantSelect.addEventListener('change', function() {
+            const restaurantId = this.value;
+            
+            if (!restaurantId) {
+                return;
+            }
+            
+            // Show loading state
+            const productsContainer = document.querySelector('.checkbox-grid');
+            if (productsContainer) {
+                productsContainer.innerHTML = '<p class="text-muted small">Loading...</p>';
+            }
+            
+            // Fetch products for selected restaurant
+            fetch(`{% url 'restaurant:get_restaurant_products' %}?restaurant_id=${restaurantId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update Products
+                        updateCheckboxList('products', data.products, 'No products available');
+                        
+                        // Update Main Categories
+                        updateCheckboxList('main_categories', data.main_categories, 'No categories available');
+                        
+                        // Update Sub Categories
+                        updateCheckboxList('sub_categories', data.sub_categories, 'No subcategories available');
+                    } else {
+                        console.error('Error loading products:', data.message);
+                        alert('Error loading products: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to load products. Please try again.');
+                });
+        });
+    }
+    
+    // Helper function to update checkbox lists
+    function updateCheckboxList(fieldName, items, emptyMessage) {
+        // Find the checkbox grid by looking for the field name in the page
+        const allGrids = document.querySelectorAll('.checkbox-grid');
+        let parentGrid = null;
+        
+        // Map field names to their grid positions
+        const gridMap = {
+            'products': 0,
+            'main_categories': 1,
+            'sub_categories': 2
+        };
+        
+        const gridIndex = gridMap[fieldName];
+        if (gridIndex !== undefined && allGrids[gridIndex]) {
+            parentGrid = allGrids[gridIndex];
+        }
+        
+        if (!parentGrid) return;
+        
+        if (items.length === 0) {
+            parentGrid.innerHTML = `<p class="text-muted small">${emptyMessage}</p>`;
+            return;
+        }
+        
+        // Clear existing checkboxes
+        parentGrid.innerHTML = '';
+        
+        // Create new checkboxes
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'form-check';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input';
+            checkbox.name = fieldName;
+            checkbox.value = item.id;
+            checkbox.id = `id_${fieldName}_${item.id}`;
+            
+            const label = document.createElement('label');
+            label.className = 'form-check-label small';
+            label.htmlFor = checkbox.id;
+            label.textContent = item.name;
+            
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            parentGrid.appendChild(div);
+        });
     }
     
     // Add event listeners

@@ -104,6 +104,17 @@
     padding: 20px;
     background-color: white;
 }
+
+/* Improve contrast for Bootstrap badge colors */
+.badge.bg-info {
+    background-color: #0d6efd !important;
+    color: white !important;
+}
+
+.badge.bg-warning {
+    background-color: #f57c00 !important;
+    color: white !important;
+}
 </style>
 {% endblock %}
 
@@ -126,268 +137,255 @@
                 </div>
             </div>
 
-            <!-- Filters -->
+            <!-- Search and Filters -->
             <div class="card filters-card mb-4">
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label for="restaurantFilter" class="form-label">Filter by Restaurant:</label>
-                            <select class="form-select" id="restaurantFilter" onchange="filterByRestaurant()">
-                                <option value="">All Restaurants</option>
-                                {% for restaurant in restaurants %}
-                                <option value="{{ restaurant.id }}" {% if selected_restaurant and selected_restaurant.id == restaurant.id %}selected{% endif %}>
-                                    {{ restaurant.restaurant_name }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6 d-flex align-items-end">
-                            <div class="me-3">
-                                <div class="btn-group" role="group" aria-label="View toggle">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="cardView" onclick="switchView('card')">
-                                        <i class="fas fa-th-large"></i> Cards
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm active" id="tableView" onclick="switchView('table')">
-                                        <i class="fas fa-table"></i> Table
-                                    </button>
+                    <form method="get" class="mb-0">
+                        <div class="row g-3">
+                            <!-- Search Input -->
+                            <div class="col-md-6">
+                                <label for="categorySearch" class="form-label">
+                                    <i class="fas fa-search"></i> Search Categories
+                                </label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="categorySearch" name="search" 
+                                           value="{{ search_query }}" placeholder="Search by name, description, restaurant...">
+                                    <span class="input-group-text">
+                                        <div id="searchSpinner" class="spinner-border spinner-border-sm" role="status" style="display: none;">
+                                            <span class="visually-hidden">Searching...</span>
+                                        </div>
+                                        <i class="fas fa-search" id="searchIcon"></i>
+                                    </span>
                                 </div>
+                                <small class="text-muted">Press ESC to clear search</small>
                             </div>
-                            <div class="text-muted">
-                                Showing {{ main_categories.count }} main categories
-                                {% if selected_restaurant %}for {{ selected_restaurant.restaurant_name }}{% endif %}
+
+                            <!-- Restaurant Filter -->
+                            <div class="col-md-4">
+                                <label for="restaurantFilter" class="form-label">
+                                    <i class="fas fa-building"></i> Restaurant
+                                </label>
+                                <select class="form-select" id="restaurantFilter" name="restaurant">
+                                    <option value="">All Restaurants</option>
+                                    {% for restaurant in restaurants %}
+                                    <option value="{{ restaurant.id }}" {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected{% endif %}>
+                                        {{ restaurant.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Items Per Page -->
+                            <div class="col-md-2">
+                                <label for="perPageSelect" class="form-label">
+                                    <i class="fas fa-list"></i> Per Page
+                                </label>
+                                <select class="form-select" id="perPageSelect" name="per_page">
+                                    <option value="5" {% if per_page == 5 %}selected{% endif %}>5</option>
+                                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                                    <option value="15" {% if per_page == 15 %}selected{% endif %}>15</option>
+                                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                                    <option value="30" {% if per_page == 30 %}selected{% endif %}>30</option>
+                                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
+
+                        <!-- Results Summary -->
+                        <div class="mt-3">
+                            <div class="text-muted">
+                                {% if search_query or request.GET.restaurant %}
+                                    Showing <strong>{{ filtered_count }}</strong> of <strong>{{ total_categories }}</strong> categories
+                                    {% if search_query %}matching "<em>{{ search_query }}</em>"{% endif %}
+                                    {% if request.GET.restaurant %}for selected restaurant{% endif %}
+                                {% else %}
+                                    Showing <strong>{{ total_categories }}</strong> categories total
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden fields to preserve pagination -->
+                        {% for key, value in request.GET.items %}
+                            {% if key != 'page' and key != 'search' and key != 'restaurant' and key != 'per_page' %}
+                                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                            {% endif %}
+                        {% endfor %}
+                    </form>
                 </div>
             </div>
 
-            <!-- Tabs -->
-            <ul class="nav nav-tabs" id="categoryTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="main-categories-tab" data-bs-toggle="tab" data-bs-target="#main-categories" type="button" role="tab">
-                        <i class="fas fa-folder"></i> Main Categories ({{ main_categories.count }})
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="sub-categories-tab" data-bs-toggle="tab" data-bs-target="#sub-categories" type="button" role="tab">
-                        <i class="fas fa-folder-open"></i> Sub Categories
-                    </button>
-                </li>
-            </ul>
-
-            <div class="tab-content" id="categoryTabContent">
-                <!-- Main Categories Tab -->
-                <div class="tab-pane fade show active" id="main-categories" role="tabpanel">
-                    <!-- Card View for Main Categories -->
-                    <div class="row" id="mainCategoryCardView" style="display: none;">
-                        {% for category in main_categories %}
-                        <div class="col-md-6 col-lg-4">
-                            <div class="category-card">
-                                <div class="category-header">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div class="flex-grow-1">
-                                            <h5 class="mb-1">{{ category.name }}</h5>
-                                            <div class="mb-2">
-                                                <span class="restaurant-badge">{{ category.owner.restaurant_name }}</span>
+            <!-- Categories Table -->
+            {% if page_obj.object_list %}
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 60px;">
+                                        <i class="fas fa-hashtag"></i> SN
+                                    </th>
+                                    <th>Category Name</th>
+                                    <th>Restaurant</th>
+                                    <th>Description</th>
+                                    <th>Subcategories</th>
+                                    <th>Products</th>
+                                    <th style="width: 120px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category in page_obj.object_list %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ page_obj.start_index|add:forloop.counter0 }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if category.image %}
+                                            <img src="{{ category.image.url }}" alt="{{ category.name }}" 
+                                                 class="me-2" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px;">
+                                            {% else %}
+                                            <div class="d-flex align-items-center justify-content-center me-2" 
+                                                 style="width: 40px; height: 40px; border: 2px dashed #ccc; border-radius: 6px;">
+                                                <i class="fas fa-tags text-muted"></i>
                                             </div>
-                                        </div>
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <ul class="dropdown-menu">
-                                                <li><a class="dropdown-item" href="#" onclick="viewCategoryDetails({{ category.id }})">
-                                                    <i class="fas fa-eye"></i> View Details
-                                                </a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="editCategory({{ category.id }})">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory({{ category.id }}, '{{ category.name }}', '{{ category.owner.restaurant_name }}')">
-                                                    <i class="fas fa-trash"></i> Delete
-                                                </a></li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="category-body">
-                                    <p class="text-muted mb-2">{{ category.description|default:"No description" }}</p>
-                                    <div class="mt-3 pt-2 border-top">
-                                        <small class="text-muted">
-                                            <span class="badge bg-info stats-badge">{{ category.subcategories.count }} subcategories</span>
-                                            <span class="badge bg-success stats-badge">{{ category.products.count }} products</span>
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% empty %}
-                        <div class="col-12">
-                            <div class="text-center py-5">
-                                <i class="fas fa-tags fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">No main categories found</h5>
-                                <p class="text-muted">Create your first main category to get started.</p>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                    <!-- Table View for Main Categories -->
-                    <div id="mainCategoryTableView">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>SN</th>
-                                        <th>Name</th>
-                                        <th>Restaurant</th>
-                                        <th>Description</th>
-                                        <th>Subcategories</th>
-                                        <th>Products</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for category in main_categories %}
-                                    <tr>
-                                        <td>{{ forloop.counter }}</td>
-                                        <td>
+                                            {% endif %}
                                             <strong>{{ category.name }}</strong>
-                                        </td>
-                                        <td>{{ category.owner.restaurant_name }}</td>
-                                        <td>
-                                            <small class="text-muted">{{ category.description|default:"No description"|truncatechars:50 }}</small>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info">{{ category.subcategories.count }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-success">{{ category.products.count }}</span>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-info" onclick="viewCategoryDetails({{ category.id }})" title="View Details">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ category.owner.restaurant_name }}</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ category.description|default:"No description"|truncatechars:50 }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-folder"></i> {{ category.subcategories.count }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-utensils"></i> {{ category.products.count }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-outline-info" onclick="viewCategoryDetails({{ category.id }})" 
+                                                    title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-warning" onclick="editCategory({{ category.id }})" title="Edit">
+                                            <button class="btn btn-outline-warning" onclick="editCategory({{ category.id }})" 
+                                                    title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory({{ category.id }}, '{{ category.name }}', '{{ category.owner.restaurant_name }}')" title="Delete">
+                                            <button class="btn btn-outline-danger" 
+                                                    onclick="deleteCategory({{ category.id }}, '{{ category.name }}', '{{ category.owner.restaurant_name }}')" 
+                                                    title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="7" class="text-center py-4">
-                                            <i class="fas fa-tags fa-2x text-muted mb-2"></i>
-                                            <div class="text-muted">No main categories found</div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sub Categories Tab -->
-                <div class="tab-pane fade" id="sub-categories" role="tabpanel">
-                    <!-- Card View for Sub Categories -->
-                    <div class="row" id="subCategoryCardView" style="display: none;">
-                        {% for category in main_categories %}
-                            {% for subcategory in category.subcategories.all %}
-                            <div class="col-md-6 col-lg-4">
-                                <div class="subcategory-card">
-                                    <div class="subcategory-header">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <h6 class="mb-1">{{ subcategory.name }}</h6>
-                                                <div class="mb-2">
-                                                    <span class="restaurant-badge">{{ category.owner.restaurant_name }}</span>
-                                                    <span class="category-badge">{{ category.name }}</span>
-                                                </div>
-                                            </div>
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                                    <i class="fas fa-ellipsis-v"></i>
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item" href="#" onclick="editSubCategory({{ subcategory.id }})">
-                                                        <i class="fas fa-edit"></i> Edit
-                                                    </a></li>
-                                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteSubCategory({{ subcategory.id }}, '{{ subcategory.name }}')">
-                                                        <i class="fas fa-trash"></i> Delete
-                                                    </a></li>
-                                                </ul>
-                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="subcategory-body">
-                                        <p class="text-muted mb-2">{{ subcategory.description|default:"No description" }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        {% empty %}
-                        <div class="col-12">
-                            <div class="text-center py-5">
-                                <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">No sub categories found</h5>
-                                <p class="text-muted">Create main categories first, then add sub categories.</p>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                    <!-- Table View for Sub Categories -->
-                    <div id="subCategoryTableView">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>SN</th>
-                                        <th>Name</th>
-                                        <th>Main Category</th>
-                                        <th>Restaurant</th>
-                                        <th>Description</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for category in main_categories %}
-                                        {% for subcategory in category.subcategories.all %}
-                                        <tr>
-                                            <td>{{ forloop.counter }}</td>
-                                            <td><strong>{{ subcategory.name }}</strong></td>
-                                            <td>{{ category.name }}</td>
-                                            <td>{{ category.owner.restaurant_name }}</td>
-                                            <td>
-                                                <small class="text-muted">{{ subcategory.description|default:"No description"|truncatechars:50 }}</small>
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-sm btn-outline-warning" onclick="editSubCategory({{ subcategory.id }})" title="Edit">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger" onclick="deleteSubCategory({{ subcategory.id }}, '{{ subcategory.name }}')" title="Delete">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="6" class="text-center py-4">
-                                            <i class="fas fa-folder-open fa-2x text-muted mb-2"></i>
-                                            <div class="text-muted">No sub categories found</div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <div class="text-muted">
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} categories
+                </div>
+                <nav aria-label="Categories pagination">
+                    <ul class="pagination mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">No Categories Found</h4>
+                    <p class="text-muted">
+                        {% if search_query %}
+                            No categories found matching "<em>{{ search_query }}</em>".
+                        {% elif request.GET.restaurant %}
+                            No categories found for the selected restaurant.
+                        {% else %}
+                            No categories found in the system.
+                        {% endif %}
+                    </p>
+                    {% if search_query or request.GET.restaurant %}
+                    <a href="{% url 'system_admin:manage_categories' %}" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-undo"></i> Clear Filters
+                    </a>
+                    {% endif %}
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCategoryModal">
+                        <i class="fas fa-plus"></i> Create First Category
+                    </button>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -407,7 +405,7 @@
                         <select class="form-select" id="categoryRestaurant" required>
                             <option value="">Choose Restaurant</option>
                             {% for restaurant in restaurants %}
-                            <option value="{{ restaurant.id }}">{{ restaurant.restaurant_name }}</option>
+                            <option value="{{ restaurant.id }}">{{ restaurant.name }} {% if restaurant.role == 'main_owner' %}(PRO){% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -444,7 +442,7 @@
                         <select class="form-select" id="subCategoryRestaurant" onchange="loadMainCategories()" required>
                             <option value="">Choose Restaurant</option>
                             {% for restaurant in restaurants %}
-                            <option value="{{ restaurant.id }}">{{ restaurant.restaurant_name }}</option>
+                            <option value="{{ restaurant.id }}">{{ restaurant.name }} {% if restaurant.role == 'main_owner' %}(PRO){% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -556,27 +554,77 @@
 
 {% block extra_js %}
 <script>
-// View toggle functionality
-function switchView(viewType) {
-    const cardViews = document.querySelectorAll('#mainCategoryCardView, #subCategoryCardView');
-    const tableViews = document.querySelectorAll('#mainCategoryTableView, #subCategoryTableView');
-    const cardBtn = document.getElementById('cardView');
-    const tableBtn = document.getElementById('tableView');
+// Real-time search functionality
+let searchTimeout;
+const searchInput = document.getElementById('categorySearch');
+const searchSpinner = document.getElementById('searchSpinner');
+const searchIcon = document.getElementById('searchIcon');
 
-    if (viewType === 'card') {
-        cardViews.forEach(view => view.style.display = 'flex');
-        tableViews.forEach(view => view.style.display = 'none');
-        cardBtn.classList.add('active');
-        tableBtn.classList.remove('active');
-    } else {
-        cardViews.forEach(view => view.style.display = 'none');
-        tableViews.forEach(view => view.style.display = 'block');
-        tableBtn.classList.add('active');
-        cardBtn.classList.remove('active');
-    }
+if (searchInput && searchSpinner && searchIcon) {
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchSpinner.style.display = 'inline-block';
+        searchIcon.style.display = 'none';
+        
+        searchTimeout = setTimeout(() => {
+            try {
+                const currentUrl = new URL(window.location.href);
+                const searchValue = this.value.trim();
+                
+                if (searchValue) {
+                    currentUrl.searchParams.set('search', searchValue);
+                } else {
+                    currentUrl.searchParams.delete('search');
+                }
+                
+                // Reset to page 1 for new search
+                currentUrl.searchParams.delete('page');
+                
+                window.location.href = currentUrl.toString();
+            } catch (error) {
+                console.error('Search error:', error);
+                searchSpinner.style.display = 'none';
+                searchIcon.style.display = 'inline-block';
+            }
+        }, 500);
+    });
+
+    // ESC key to clear search
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            try {
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.delete('search');
+                currentUrl.searchParams.delete('page');
+                window.location.href = currentUrl.toString();
+            } catch (error) {
+                console.error('Clear search error:', error);
+            }
+        }
+    });
 }
 
-// Filter by restaurant
+// Auto-submit forms for filters and pagination
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-submit restaurant filter
+    const restaurantFilter = document.getElementById('restaurantFilter');
+    if (restaurantFilter) {
+        restaurantFilter.addEventListener('change', function() {
+            this.form.submit();
+        });
+    }
+    
+    // Auto-submit per_page selector
+    const perPageSelect = document.getElementById('perPageSelect');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function() {
+            this.form.submit();
+        });
+    }
+});
+
+// Filter by restaurant (legacy support)
 function filterByRestaurant() {
     const restaurantId = document.getElementById('restaurantFilter').value;
     const url = new URL(window.location);

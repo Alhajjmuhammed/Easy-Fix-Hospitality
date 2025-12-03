@@ -14,8 +14,9 @@ def get_restaurant_name(context):
     
     if user.is_customer():
         return user.get_restaurant_name(request)
-    elif user.is_owner():
-        return user.restaurant_name or "Restaurant System"
+    elif user.is_owner() or user.is_main_owner() or user.is_branch_owner():
+        # Use get_restaurant_name for all owners to handle branch→main logic
+        return user.get_restaurant_name(request)
     elif user.is_kitchen_staff() or user.is_bar_staff() or user.is_cashier() or user.is_customer_care():
         # For staff members, use the get_restaurant_name method
         return user.get_restaurant_name(request)

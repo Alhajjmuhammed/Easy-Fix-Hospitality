@@ -40,7 +40,10 @@ Thumbs.db
 logs/
 *.log
 
-# Production files
+# Local development files (NOT production_settings.py - needed for deployment)
 gunicorn.conf.py
-production_settings.py
 debug_settings.py
+
+# Database
+db.sqlite3
+db.sqlite3-journal

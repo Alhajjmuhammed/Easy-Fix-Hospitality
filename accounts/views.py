@@ -11,7 +11,20 @@ import json
 from .forms import UserRegistrationForm, UserLoginForm, OwnerRegistrationForm, CustomerRegistrationForm
 from .models import Role, User
 
+# Import security decorators
+try:
+    from restaurant_system.security_decorators import rate_limit_login, rate_limit_registration
+    RATE_LIMITING_ENABLED = True
+except ImportError:
+    # Fallback if django-ratelimit not installed
+    RATE_LIMITING_ENABLED = False
+    def rate_limit_login(func):
+        return func
+    def rate_limit_registration(func):
+        return func
+
 @ensure_csrf_cookie
+@rate_limit_login
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('restaurant:home')
@@ -41,7 +54,8 @@ def login_view(request):
                 else:
                     return redirect('restaurant:menu')
             else:
-                messages.error(request, 'Invalid username or password.')
+                # Add error to form instead of messages
+                form.add_error(None, 'Invalid username or password.')
     else:
         form = UserLoginForm()
     
@@ -62,6 +76,7 @@ def logout_view(request):
     messages.success(request, 'You have been logged out successfully. Your cart has been cleared.')
     return redirect('accounts:login')
 
+@rate_limit_registration
 def register_view(request):
     # Redirect already authenticated users
     if request.user.is_authenticated:
@@ -92,6 +107,7 @@ def register_view(request):
     return render(request, 'accounts/register.html', {'form': form})
 
 
+@rate_limit_registration
 def register_owner_view(request):
     """Separate registration for restaurant owners"""
     # Redirect already authenticated users
@@ -166,17 +182,56 @@ def qr_code_access(request, qr_code):
         # Clean the QR code - remove any trailing slashes or whitespace
         qr_code = qr_code.strip().rstrip('/')
         
-        # Find restaurant by QR code
-        restaurant = User.objects.get(
-            restaurant_qr_code=qr_code, 
-            role__name='owner', 
-            is_active=True
-        )
+        # First try to find restaurant by QR code in Restaurant model (new system)
+        from restaurant.models_restaurant import Restaurant
+        restaurant_obj = None
+        user_restaurant = None
+        
+        try:
+            restaurant_obj = Restaurant.objects.get(qr_code=qr_code)
+            # Get the associated user (main_owner or branch_owner)
+            # For branches, use branch_owner; for main restaurants, use main_owner
+            user_restaurant = restaurant_obj.main_owner if restaurant_obj.is_main_restaurant else restaurant_obj.branch_owner
+        except Restaurant.DoesNotExist:
+            # Fallback: try to find in User model (legacy system)
+            try:
+                user_restaurant = User.objects.get(
+                    restaurant_qr_code=qr_code, 
+                    role__name__in=['owner', 'main_owner', 'branch_owner'], 
+                    is_active=True
+                )
+                # Try to get the corresponding Restaurant object
+                # Check if branch owner first, then main owner
+                try:
+                    if user_restaurant.is_branch_owner():
+                        restaurant_obj = Restaurant.objects.get(branch_owner=user_restaurant, is_main_restaurant=False)
+                    else:
+                        restaurant_obj = Restaurant.objects.get(main_owner=user_restaurant, is_main_restaurant=True)
+                except Restaurant.DoesNotExist:
+                    # Legacy user without Restaurant object - create minimal context
+                    restaurant_obj = None
+            except User.DoesNotExist:
+                raise User.DoesNotExist("QR code not found in either system")
+        
+        # Ensure we have a valid user
+        if not user_restaurant or not user_restaurant.is_active:
+            raise User.DoesNotExist("Restaurant owner not found or inactive")
+        
+        # For compatibility, set restaurant variable to user_restaurant for legacy code
+        restaurant = user_restaurant
         
         # Check if restaurant subscription is active
+        # For branches (PRO plan), check the MAIN owner's subscription
         from accounts.models import RestaurantSubscription
+        
+        # Determine which owner's subscription to check
+        subscription_owner = restaurant
+        if restaurant_obj and not restaurant_obj.is_main_restaurant:
+            # This is a branch - check the main owner's subscription (PRO plan cascade)
+            subscription_owner = restaurant_obj.main_owner
+        
         try:
-            subscription = RestaurantSubscription.objects.get(restaurant_owner=restaurant)
+            subscription = RestaurantSubscription.objects.get(restaurant_owner=subscription_owner)
             if not subscription.is_active:
                 # Restaurant is blocked - show unavailable message
                 reason = "This restaurant is temporarily unavailable."
@@ -186,39 +241,63 @@ def qr_code_access(request, qr_code):
                     reason = "This restaurant is temporarily unavailable due to expired subscription."
                 
                 from django.utils import timezone
+                # Get display name for branches
+                display_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+                if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+                    display_name = restaurant_obj.parent_restaurant.name
+                
                 return render(request, 'accounts/restaurant_unavailable.html', {
                     'restaurant': restaurant,
+                    'restaurant_obj': restaurant_obj,  # Pass Restaurant object if available
                     'qr_code': qr_code,
                     'reason': reason,
                     'subscription_status': subscription.subscription_status,
-                    'current_time': timezone.now()
+                    'current_time': timezone.now(),
+                    'display_name': display_name
                 })
         except RestaurantSubscription.DoesNotExist:
             # No subscription - restaurant unavailable
             from django.utils import timezone
+            # Get display name for branches
+            display_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+            if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+                display_name = restaurant_obj.parent_restaurant.name
+            
             return render(request, 'accounts/restaurant_unavailable.html', {
                 'restaurant': restaurant,
+                'restaurant_obj': restaurant_obj,  # Pass Restaurant object if available
                 'qr_code': qr_code,
                 'reason': "This restaurant is temporarily unavailable.",
                 'subscription_status': 'no_subscription',
-                'current_time': timezone.now()
+                'current_time': timezone.now(),
+                'display_name': display_name
             })
         
-        # Store restaurant in session
-        request.session['selected_restaurant_id'] = restaurant.id
-        request.session['selected_restaurant_name'] = restaurant.restaurant_name
+        # Store restaurant in session - ALWAYS use User ID (owner)
+        # select_table expects User.objects.get(id=selected_restaurant_id)
+        # restaurant = user_restaurant (always a User object)
+        request.session['selected_restaurant_id'] = restaurant.id  # User ID
+        request.session['selected_restaurant_name'] = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
         request.session['access_method'] = 'qr_code'
         
         # If user is not logged in, show restaurant info and prompt for login/register
         if not request.user.is_authenticated:
+            # Get the display name - for branches, show main restaurant name
+            display_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+            if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+                display_name = restaurant_obj.parent_restaurant.name
+            
             return render(request, 'accounts/qr_restaurant_access.html', {
                 'restaurant': restaurant,
-                'qr_code': qr_code
+                'restaurant_obj': restaurant_obj,  # Pass Restaurant object if available
+                'qr_code': qr_code,
+                'display_name': display_name
             })
         
         # If user is already logged in as customer, switch restaurant context and continue
         if request.user.is_customer():
-            messages.success(request, f'Welcome to {restaurant.restaurant_name}!')
+            restaurant_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+            messages.success(request, f'Welcome to {restaurant_name}!')
             return redirect('orders:select_table')
         
         # If user is staff of this restaurant, redirect to appropriate dashboard
@@ -231,7 +310,8 @@ def qr_code_access(request, qr_code):
                 return redirect('admin_panel:admin_dashboard')
         
         # Default: redirect to menu
-        messages.success(request, f'Welcome to {restaurant.restaurant_name}!')
+        restaurant_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+        messages.success(request, f'Welcome to {restaurant_name}!')
         return redirect('restaurant:menu')
         
     except User.DoesNotExist:
@@ -244,17 +324,50 @@ def qr_code_access(request, qr_code):
 def customer_register_view(request, qr_code):
     """Customer registration specifically for QR code access"""
     try:
-        # Get the restaurant from QR code
-        restaurant = User.objects.get(
-            restaurant_qr_code=qr_code,
-            role__name='owner',
-            is_active=True
-        )
+        # Clean the QR code
+        qr_code = qr_code.strip().rstrip('/')
+        
+        # First try to find restaurant by QR code in Restaurant model (new system)
+        from restaurant.models_restaurant import Restaurant
+        restaurant_obj = None
+        user_restaurant = None
+        
+        try:
+            restaurant_obj = Restaurant.objects.get(qr_code=qr_code)
+            # Get the associated user (main_owner or branch_owner)
+            # For branches, use branch_owner; for main restaurants, use main_owner
+            user_restaurant = restaurant_obj.main_owner if restaurant_obj.is_main_restaurant else restaurant_obj.branch_owner
+        except Restaurant.DoesNotExist:
+            # Fallback: try to find in User model (legacy system)
+            user_restaurant = User.objects.get(
+                restaurant_qr_code=qr_code,
+                role__name__in=['owner', 'main_owner', 'branch_owner'],
+                is_active=True
+            )
+            # Try to get the corresponding Restaurant object
+            try:
+                if user_restaurant.is_branch_owner():
+                    restaurant_obj = Restaurant.objects.get(branch_owner=user_restaurant, is_main_restaurant=False)
+                else:
+                    restaurant_obj = Restaurant.objects.get(main_owner=user_restaurant, is_main_restaurant=True)
+            except Restaurant.DoesNotExist:
+                restaurant_obj = None
+        
+        # For compatibility, set restaurant variable to user_restaurant for legacy code
+        restaurant = user_restaurant
         
         # Check if restaurant subscription is active before allowing registration
+        # For branches (PRO plan), check the MAIN owner's subscription
         from accounts.models import RestaurantSubscription
+        
+        # Determine which owner's subscription to check
+        subscription_owner = restaurant
+        if restaurant_obj and not restaurant_obj.is_main_restaurant:
+            # This is a branch - check the main owner's subscription (PRO plan cascade)
+            subscription_owner = restaurant_obj.main_owner
+        
         try:
-            subscription = RestaurantSubscription.objects.get(restaurant_owner=restaurant)
+            subscription = RestaurantSubscription.objects.get(restaurant_owner=subscription_owner)
             if not subscription.is_active:
                 # Restaurant is blocked - show unavailable message instead of registration
                 reason = "This restaurant is temporarily unavailable for new registrations."
@@ -264,28 +377,35 @@ def customer_register_view(request, qr_code):
                     reason = "This restaurant is temporarily unavailable due to expired subscription."
                 
                 from django.utils import timezone
+                # Get display name for branches
+                display_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+                if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+                    display_name = restaurant_obj.parent_restaurant.name
+                
                 return render(request, 'accounts/restaurant_unavailable.html', {
                     'restaurant': restaurant,
                     'qr_code': qr_code,
                     'reason': reason,
                     'subscription_status': subscription.subscription_status,
-                    'current_time': timezone.now()
+                    'current_time': timezone.now(),
+                    'display_name': display_name
                 })
         except RestaurantSubscription.DoesNotExist:
             # No subscription - registration not available
             from django.utils import timezone
+            # Get display name for branches
+            display_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+            if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+                display_name = restaurant_obj.parent_restaurant.name
+            
             return render(request, 'accounts/restaurant_unavailable.html', {
                 'restaurant': restaurant,
                 'qr_code': qr_code,
                 'reason': "This restaurant is temporarily unavailable for new registrations.",
                 'subscription_status': 'no_subscription',
-                'current_time': timezone.now()
+                'current_time': timezone.now(),
+                'display_name': display_name
             })
-        
-        # Store restaurant info in session
-        request.session['selected_restaurant_id'] = restaurant.id
-        request.session['selected_restaurant_name'] = restaurant.restaurant_name
-        request.session['access_method'] = 'qr_code'
         
         if request.method == 'POST':
             form = CustomerRegistrationForm(request.POST)
@@ -304,21 +424,48 @@ def customer_register_view(request, qr_code):
                 
                 # Auto-login the user
                 user = authenticate(
+                    request=request,
                     username=form.cleaned_data['username'],
                     password=form.cleaned_data['password']
                 )
                 if user:
                     login(request, user)
-                    messages.success(request, f'Welcome to {restaurant.restaurant_name}! Account created successfully.')
+                    
+                    # Store restaurant info in session AFTER login (login() cycles session)
+                    # ALWAYS store the USER (owner) ID, NOT the Restaurant object ID
+                    # This is what select_table expects: User.objects.get(id=selected_restaurant_id)
+                    request.session['selected_restaurant_id'] = restaurant.id  # restaurant = user_restaurant (User model)
+                    request.session['selected_restaurant_name'] = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+                    request.session['access_method'] = 'qr_code'
+                    request.session.modified = True  # Force session save
+                    
+                    # Use display name for message (main restaurant name for branches)
+                    display_name_msg = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+                    if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+                        display_name_msg = restaurant_obj.parent_restaurant.name
+                    messages.success(request, f'Welcome to {display_name_msg}! Account created successfully.')
                     return redirect('orders:select_table')
                 
         else:
             form = CustomerRegistrationForm()
+            
+            # Store restaurant info in session for GET requests too
+            # This ensures session data is available even if user refreshes
+            # ALWAYS store the USER (owner) ID, NOT the Restaurant object ID
+            request.session['selected_restaurant_id'] = restaurant.id  # restaurant = user_restaurant (User model)
+            request.session['selected_restaurant_name'] = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+            request.session['access_method'] = 'qr_code'
+        
+        # Get the display name - for branches, show main restaurant name
+        display_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+        if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+            display_name = restaurant_obj.parent_restaurant.name
         
         context = {
             'form': form,
             'restaurant': restaurant,
-            'qr_code': qr_code
+            'qr_code': qr_code,
+            'display_name': display_name
         }
         return render(request, 'accounts/customer_register.html', context)
         

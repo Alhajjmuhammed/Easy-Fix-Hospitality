@@ -24,8 +24,22 @@ from io import BytesIO
 def dashboard(request):
     """Advanced sales reports dashboard with kitchen/bar filtering"""
     
-    # Get owner filter for multi-tenant support
-    owner = get_owner_filter(request.user)
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
+        from django.shortcuts import redirect
+        from django.contrib import messages
+        messages.error(request, "Access denied. Owner privileges required.")
+        return redirect('restaurant:home')
+    
+    # Import restaurant context utilities
+    from admin_panel.restaurant_utils import get_restaurant_context
+    from django.db.models import Q
+    
+    # Get restaurant context
+    session_restaurant_id = request.session.get('selected_restaurant_id')
+    restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+    current_restaurant = restaurant_context['current_restaurant']
+    view_all_restaurants = restaurant_context['view_all_restaurants']
     
     # Get filter parameters
     payment_status = request.GET.get('payment_status', 'all')
@@ -33,15 +47,63 @@ def dashboard(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Kitchen/Bar filtering
+    restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if no period is being used)
     from_date = request.GET.get('from_date')
     to_date = request.GET.get('to_date')
     
-    # Base queryset - filter by owner through table_info with performance optimization
-    orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-        .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
-        .filter(table_info__owner=owner)
+    # Determine which restaurant to filter by
+    target_restaurant = None
+    if restaurant_filter:
+        try:
+            from restaurant.models_restaurant import Restaurant
+            target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+        except Restaurant.DoesNotExist:
+            target_restaurant = None
+    elif current_restaurant and not view_all_restaurants:
+        target_restaurant = current_restaurant
+    
+    # Base queryset - filter by restaurant with performance optimization
+    if target_restaurant:
+        # Filter orders by specific selected restaurant
+        if target_restaurant.is_main_restaurant:
+            # Main restaurant: show orders from tables assigned to it OR owned by main owner with no restaurant
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True)
+                )
+        else:
+            # Branch restaurant: only show orders from tables specifically assigned to this branch
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+    elif request.user.is_administrator():
+        # Administrator sees all orders
+        orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category').all()
+    else:
+        # Get orders from all accessible restaurants
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        
+        if accessible_restaurants.exists():
+            order_query = Q()
+            for restaurant in accessible_restaurants:
+                order_query |= (
+                    Q(table_info__restaurant=restaurant) |
+                    Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
+                    Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(order_query)
+        else:
+            orders = Order.objects.none()
     
     # Apply period filter
     today = timezone.now().date()
@@ -123,9 +185,35 @@ def dashboard(request):
     paginator = Paginator(orders_list, 10)  # Show 10 orders per page
     page_obj = paginator.get_page(page_number)
     
-    # Get categories and subcategories for the current owner
-    categories = MainCategory.objects.filter(owner=owner)
-    subcategories = SubCategory.objects.filter(main_category__owner=owner)
+    # Get categories and subcategories for the current restaurant context
+    if target_restaurant:
+        if target_restaurant.is_main_restaurant:
+            categories = MainCategory.objects.filter(
+                Q(restaurant=target_restaurant) |
+                Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
+            )
+        else:
+            branch_query = Q(restaurant=target_restaurant)
+            if target_restaurant.branch_owner:
+                branch_query |= Q(owner=target_restaurant.branch_owner, restaurant__isnull=True)
+            categories = MainCategory.objects.filter(branch_query)
+    elif request.user.is_administrator():
+        categories = MainCategory.objects.all()
+    else:
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        if accessible_restaurants.exists():
+            cat_query = Q()
+            for restaurant in accessible_restaurants:
+                cat_query |= Q(restaurant=restaurant)
+                if restaurant.main_owner:
+                    cat_query |= Q(owner=restaurant.main_owner, restaurant__isnull=True)
+                if restaurant.branch_owner:
+                    cat_query |= Q(owner=restaurant.branch_owner, restaurant__isnull=True)
+            categories = MainCategory.objects.filter(cat_query)
+        else:
+            categories = MainCategory.objects.none()
+    
+    subcategories = SubCategory.objects.filter(main_category__in=categories)
     
     # Filter subcategories by selected category if applicable
     if category_id != 'all':
@@ -142,6 +230,7 @@ def dashboard(request):
         'page_obj': page_obj,
         'orders': page_obj,
         'payment_status': payment_status,
+        'period': period,
         'categories': categories,
         'subcategories': subcategories,
         'selected_category': category_id,
@@ -154,6 +243,7 @@ def dashboard(request):
         'from_date': from_date,  # Default date values for template
         'to_date': to_date,
         'today': today_str,  # Today's date for reference
+        **restaurant_context,  # Include restaurant context for filters
     }
     
     return render(request, 'reports/dashboard.html', context)
@@ -162,8 +252,15 @@ def dashboard(request):
 def export_csv(request):
     """Export filtered data to CSV with station filtering"""
     
-    # Get owner filter for multi-tenant support
-    owner = get_owner_filter(request.user)
+    # Import restaurant context utilities
+    from admin_panel.restaurant_utils import get_restaurant_context
+    from django.db.models import Q
+    
+    # Get restaurant context
+    session_restaurant_id = request.session.get('selected_restaurant_id')
+    restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+    current_restaurant = restaurant_context['current_restaurant']
+    view_all_restaurants = restaurant_context['view_all_restaurants']
     
     # Get same filters as dashboard
     payment_status = request.GET.get('payment_status', 'all')
@@ -171,15 +268,57 @@ def export_csv(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
+    restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if custom period)
     from_date = request.GET.get('from_date')
     to_date = request.GET.get('to_date')
     
-    # Base queryset - filter by owner through table_info with optimization
-    orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-        .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
-        .filter(table_info__owner=owner)
+    # Determine which restaurant to filter by
+    target_restaurant = None
+    if restaurant_filter:
+        try:
+            from restaurant.models_restaurant import Restaurant
+            target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+        except Restaurant.DoesNotExist:
+            target_restaurant = None
+    elif current_restaurant and not view_all_restaurants:
+        target_restaurant = current_restaurant
+    
+    # Base queryset - filter by restaurant with optimization
+    if target_restaurant:
+        if target_restaurant.is_main_restaurant:
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True)
+                )
+        else:
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+    elif request.user.is_administrator():
+        orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category').all()
+    else:
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        if accessible_restaurants.exists():
+            order_query = Q()
+            for restaurant in accessible_restaurants:
+                order_query |= (
+                    Q(table_info__restaurant=restaurant) |
+                    Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
+                    Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(order_query)
+        else:
+            orders = Order.objects.none()
     
     # Apply period filter
     today = timezone.now().date()
@@ -261,15 +400,17 @@ def export_csv(request):
     writer.writerow(['Period:', period_desc])
     writer.writerow(['Payment Status Filter:', payment_status.title()])
     writer.writerow(['Station Filter:', station_filter.title()])
+    if target_restaurant:
+        writer.writerow(['Restaurant:', target_restaurant.name])
     if category_id != 'all':
         try:
-            category_name = MainCategory.objects.get(id=category_id, owner=owner).name
+            category_name = MainCategory.objects.get(id=category_id).name
             writer.writerow(['Category Filter:', category_name])
         except:
             writer.writerow(['Category Filter:', f'Category ID {category_id}'])
     if subcategory_id != 'all':
         try:
-            subcategory_name = SubCategory.objects.get(id=subcategory_id, main_category__owner=owner).name
+            subcategory_name = SubCategory.objects.get(id=subcategory_id).name
             writer.writerow(['Sub Category Filter:', subcategory_name])
         except:
             writer.writerow(['Sub Category Filter:', f'Sub Category ID {subcategory_id}'])
@@ -282,11 +423,106 @@ def export_csv(request):
     writer.writerow(['Items Sold:', f'{total_items:,}'])
     writer.writerow(['Average Order Value:', f'${avg_order_value:,.2f}'])
     writer.writerow([])  # Empty row
+    
+    # Branch Performance Analysis (only when viewing all restaurants for PRO plan)
+    if not target_restaurant and not request.user.is_administrator():
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        
+        # Check if user has multiple locations (main + branch, or multiple branches)
+        has_multiple_locations = accessible_restaurants.count() > 1
+        
+        if has_multiple_locations:
+            writer.writerow([])  # Empty row
+            writer.writerow(['BRANCH/LOCATION PERFORMANCE ANALYSIS'])
+            writer.writerow(['Location', 'Orders', '% of Total Orders', 'Revenue', '% of Total Revenue', 'Avg Order Value'])
+            
+            for restaurant in accessible_restaurants.order_by('name'):
+                # Get orders for this specific location
+                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
+                if restaurant.is_main_restaurant:
+                    restaurant_orders = orders.filter(
+                        Q(table_info__restaurant=restaurant) |
+                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
+                    )
+                else:
+                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
+                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
+                
+                location_order_count = restaurant_orders.count()
+                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                location_avg = (location_revenue / location_order_count) if location_order_count > 0 else 0
+                
+                order_percentage = (location_order_count / total_orders * 100) if total_orders > 0 else 0
+                revenue_percentage = (location_revenue / total_revenue * 100) if total_revenue > 0 else 0
+                
+                location_label = f"{restaurant.name}"
+                if not restaurant.is_main_restaurant:
+                    location_label += " (Branch)"
+                
+                writer.writerow([
+                    location_label,
+                    f'{location_order_count:,}',
+                    f'{order_percentage:.1f}%',
+                    f'${location_revenue:,.2f}',
+                    f'{revenue_percentage:.1f}%',
+                    f'${location_avg:.2f}'
+                ])
+            
+            writer.writerow([])  # Empty row
+            
+            # Top Products by Location
+            writer.writerow(['TOP PRODUCTS BY LOCATION'])
+            writer.writerow(['Location', 'Product', 'Quantity Sold', 'Revenue', '% of Location Revenue'])
+            
+            for restaurant in accessible_restaurants.order_by('name'):
+                # Get orders for this location
+                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
+                if restaurant.is_main_restaurant:
+                    restaurant_orders = orders.filter(
+                        Q(table_info__restaurant=restaurant) |
+                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
+                    )
+                else:
+                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
+                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
+                
+                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                
+                if restaurant_orders.exists():
+                    # Get top 5 products for this location
+                    top_products = OrderItem.objects.filter(order__in=restaurant_orders)\
+                        .values('product__name')\
+                        .annotate(
+                            total_quantity=Sum('quantity'),
+                            total_revenue=Sum('unit_price')
+                        )\
+                        .order_by('-total_quantity')[:5]
+                    
+                    location_label = f"{restaurant.name}"
+                    if not restaurant.is_main_restaurant:
+                        location_label += " (Branch)"
+                    
+                    for idx, product in enumerate(top_products):
+                        product_percentage = (product['total_revenue'] / location_revenue * 100) if location_revenue > 0 else 0
+                        
+                        writer.writerow([
+                            location_label if idx == 0 else '',  # Only show location name on first row
+                            product['product__name'],
+                            f"{product['total_quantity']:,}",
+                            f"${product['total_revenue']:,.2f}",
+                            f"{product_percentage:.1f}%"
+                        ])
+                    
+                    if not top_products:
+                        writer.writerow([location_label, 'No products sold', '-', '-', '-'])
+            
+            writer.writerow([])  # Empty row
+    
     writer.writerow([])  # Empty row
     
     # Write detailed data header
     writer.writerow(['DETAILED SALES DATA'])
-    writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Cashier'])
+    writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Cashier'])
     
     for order in orders.order_by('-created_at'):
         items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in order.order_items.all()])
@@ -297,11 +533,17 @@ def export_csv(request):
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
         cashier_name = f"{order.confirmed_by.first_name} {order.confirmed_by.last_name}" if order.confirmed_by else f"{order.ordered_by.first_name} {order.ordered_by.last_name} (Self)" if order.ordered_by else 'System'
         
+        # Get restaurant/branch name for this order
+        order_restaurant = order.table_info.restaurant.name if order.table_info and order.table_info.restaurant else 'Legacy'
+        if order.table_info and order.table_info.restaurant and not order.table_info.restaurant.is_main_restaurant:
+            order_restaurant += ' (Branch)'
+        
         writer.writerow([
             f"ORD-{order.id:08d}",
             customer_name,
             order.created_at.strftime('%Y-%m-%d %H:%M'),
             table_number,
+            order_restaurant,
             items_list,
             categories_list,
             subcategories_list,
@@ -318,8 +560,15 @@ def export_csv(request):
 def export_pdf(request):
     """Export filtered data to PDF with station filtering"""
     
-    # Get owner filter for multi-tenant support
-    owner = get_owner_filter(request.user)
+    # Import restaurant context utilities
+    from admin_panel.restaurant_utils import get_restaurant_context
+    from django.db.models import Q
+    
+    # Get restaurant context
+    session_restaurant_id = request.session.get('selected_restaurant_id')
+    restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+    current_restaurant = restaurant_context['current_restaurant']
+    view_all_restaurants = restaurant_context['view_all_restaurants']
     
     # Get same filters as dashboard
     payment_status = request.GET.get('payment_status', 'all')
@@ -327,15 +576,57 @@ def export_pdf(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
+    restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if custom period)
     from_date = request.GET.get('from_date')
     to_date = request.GET.get('to_date')
     
-    # Base queryset - filter by owner through table_info with optimization
-    orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-        .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
-        .filter(table_info__owner=owner)
+    # Determine which restaurant to filter by
+    target_restaurant = None
+    if restaurant_filter:
+        try:
+            from restaurant.models_restaurant import Restaurant
+            target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+        except Restaurant.DoesNotExist:
+            target_restaurant = None
+    elif current_restaurant and not view_all_restaurants:
+        target_restaurant = current_restaurant
+    
+    # Base queryset - filter by restaurant with optimization
+    if target_restaurant:
+        if target_restaurant.is_main_restaurant:
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True)
+                )
+        else:
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(
+                    Q(table_info__restaurant=target_restaurant) |
+                    Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+    elif request.user.is_administrator():
+        orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category').all()
+    else:
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        if accessible_restaurants.exists():
+            order_query = Q()
+            for restaurant in accessible_restaurants:
+                order_query |= (
+                    Q(table_info__restaurant=restaurant) |
+                    Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
+                    Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .filter(order_query)
+        else:
+            orders = Order.objects.none()
     
     # Apply period filter
     today = timezone.now().date()
@@ -436,7 +727,8 @@ def export_pdf(request):
     )
     
     # Title
-    title = Paragraph(f"{owner.restaurant_name}<br/>SALES REPORT", title_style)
+    restaurant_name = target_restaurant.name if target_restaurant else "All Restaurants"
+    title = Paragraph(f"{restaurant_name}<br/>SALES REPORT", title_style)
     elements.append(title)
     elements.append(Spacer(1, 20))
     
@@ -448,16 +740,19 @@ def export_pdf(request):
         ['Station Filter:', station_filter.title()],
     ]
     
+    if target_restaurant:
+        report_info.append(['Restaurant:', target_restaurant.name])
+    
     if category_id != 'all':
         try:
-            category_name = MainCategory.objects.get(id=category_id, owner=owner).name
+            category_name = MainCategory.objects.get(id=category_id).name
             report_info.append(['Category Filter:', category_name])
         except:
             report_info.append(['Category Filter:', f'Category ID {category_id}'])
     
     if subcategory_id != 'all':
         try:
-            subcategory_name = SubCategory.objects.get(id=subcategory_id, main_category__owner=owner).name
+            subcategory_name = SubCategory.objects.get(id=subcategory_id).name
             report_info.append(['Sub Category Filter:', subcategory_name])
         except:
             report_info.append(['Sub Category Filter:', f'Sub Category ID {subcategory_id}'])
@@ -501,12 +796,142 @@ def export_pdf(request):
     elements.append(summary_table)
     elements.append(Spacer(1, 30))
     
+    # Branch Performance Analysis (only for PRO plans with multiple locations when viewing all)
+    if not target_restaurant and not request.user.is_administrator():
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        has_multiple_locations = accessible_restaurants.count() > 1
+        
+        if has_multiple_locations:
+            # Branch Performance Heading
+            branch_heading = Paragraph("BRANCH/LOCATION PERFORMANCE ANALYSIS", heading_style)
+            elements.append(branch_heading)
+            
+            # Branch performance data
+            branch_data = [['Location', 'Orders', '% of Total', 'Revenue', '% of Total', 'Avg Order']]
+            
+            for restaurant in accessible_restaurants.order_by('name'):
+                # Get orders for this location
+                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
+                if restaurant.is_main_restaurant:
+                    restaurant_orders = orders.filter(
+                        Q(table_info__restaurant=restaurant) |
+                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
+                    )
+                else:
+                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
+                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
+                
+                location_orders = restaurant_orders.count()
+                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                location_avg = (location_revenue / location_orders) if location_orders > 0 else 0
+                
+                order_percentage = (location_orders / total_orders * 100) if total_orders > 0 else 0
+                revenue_percentage = (location_revenue / total_revenue * 100) if total_revenue > 0 else 0
+                
+                location_label = restaurant.name
+                if not restaurant.is_main_restaurant:
+                    location_label += " (Branch)"
+                
+                branch_data.append([
+                    location_label,
+                    f'{location_orders:,}',
+                    f'{order_percentage:.1f}%',
+                    f'${location_revenue:,.2f}',
+                    f'{revenue_percentage:.1f}%',
+                    f'${location_avg:.2f}'
+                ])
+            
+            branch_table = Table(branch_data, colWidths=[1.5*inch, 0.8*inch, 0.8*inch, 1.2*inch, 0.8*inch, 1*inch])
+            branch_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightcyan),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(branch_table)
+            elements.append(Spacer(1, 20))
+            
+            # Top Products by Location
+            products_heading = Paragraph("TOP PRODUCTS BY LOCATION", heading_style)
+            elements.append(products_heading)
+            
+            # Create products data for all locations
+            products_data = [['Location', 'Product', 'Qty', 'Revenue', '% of Loc']]
+            
+            for restaurant in accessible_restaurants.order_by('name'):
+                # Get orders for this location
+                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
+                if restaurant.is_main_restaurant:
+                    restaurant_orders = orders.filter(
+                        Q(table_info__restaurant=restaurant) |
+                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
+                    )
+                else:
+                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
+                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
+                
+                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                
+                if restaurant_orders.exists():
+                    # Get top 5 products for this location
+                    top_products = OrderItem.objects.filter(order__in=restaurant_orders)\
+                        .values('product__name')\
+                        .annotate(
+                            total_quantity=Sum('quantity'),
+                            total_revenue=Sum('unit_price')
+                        )\
+                        .order_by('-total_quantity')[:5]
+                    
+                    location_label = restaurant.name
+                    if not restaurant.is_main_restaurant:
+                        location_label += " (Branch)"
+                    
+                    for idx, product in enumerate(top_products):
+                        product_percentage = (product['total_revenue'] / location_revenue * 100) if location_revenue > 0 else 0
+                        
+                        products_data.append([
+                            location_label if idx == 0 else '',  # Only show location name on first row
+                            product['product__name'][:20],  # Limit product name length
+                            f"{product['total_quantity']:,}",
+                            f"${product['total_revenue']:,.2f}",
+                            f"{product_percentage:.1f}%"
+                        ])
+                    
+                    if not top_products:
+                        products_data.append([location_label, 'No products sold', '-', '-', '-'])
+            
+            if len(products_data) > 1:  # If we have data beyond header
+                products_table = Table(products_data, colWidths=[1.5*inch, 2*inch, 0.7*inch, 1*inch, 0.9*inch])
+                products_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightgreen),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                ]))
+                
+                elements.append(products_table)
+                elements.append(Spacer(1, 30))
+    
     # Detailed Sales Data
     detailed_heading = Paragraph("DETAILED SALES DATA", heading_style)
     elements.append(detailed_heading)
     
     # Table headers
-    headers = ['Order #', 'Date', 'Customer', 'Items', 'Total', 'Payment', 'Status']
+    headers = ['Order #', 'Date', 'Customer', 'Location', 'Items', 'Total', 'Payment', 'Status']
     data = [headers]
     
     # Table data
@@ -517,18 +942,24 @@ def export_pdf(request):
         
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in'
         
+        # Get restaurant/branch name for this order
+        order_restaurant = order.table_info.restaurant.name if order.table_info and order.table_info.restaurant else 'Legacy'
+        if order.table_info and order.table_info.restaurant and not order.table_info.restaurant.is_main_restaurant:
+            order_restaurant += ' (Branch)'
+        
         data.append([
             f"ORD-{order.id:08d}",
             order.created_at.strftime('%m/%d/%Y'),
-            customer_name[:15],  # Limit length
-            items_list[:25],  # Limit length
+            customer_name[:12],  # Limit length
+            order_restaurant[:15],  # Limit length
+            items_list[:20],  # Limit length
             f"${order.total_amount:.2f}",
             order.payment_status.title(),
             order.status.title()
         ])
     
-    # Create table
-    table = Table(data, colWidths=[1*inch, 0.8*inch, 1*inch, 2*inch, 0.8*inch, 0.8*inch, 0.8*inch])
+    # Create table with adjusted column widths to accommodate Restaurant/Branch column
+    table = Table(data, colWidths=[0.8*inch, 0.7*inch, 0.8*inch, 0.9*inch, 1.5*inch, 0.7*inch, 0.7*inch, 0.7*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),

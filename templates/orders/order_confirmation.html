@@ -30,9 +30,16 @@
                     <a href="{% url 'orders:my_orders' %}" class="btn btn-primary">
                         <i class="bi bi-list-ul"></i> View My Orders
                     </a>
-                    <a href="{% url 'orders:print_kot' order.id %}" class="btn btn-success" target="_blank">
-                        <i class="bi bi-printer"></i> Print Kitchen Order Ticket (KOT)
-                    </a>
+                    {% if has_kitchen_items %}
+                        <a href="{% url 'orders:print_kot' order.id %}" class="btn btn-success" target="_blank">
+                            <i class="bi bi-printer"></i> Print Kitchen Order Ticket (KOT)
+                        </a>
+                    {% endif %}
+                    {% if has_bar_items %}
+                        <a href="{% url 'orders:print_bot' order.id %}" class="btn btn-info text-white" target="_blank">
+                            <i class="bi bi-printer"></i> Print Bar Order Ticket (BOT)
+                        </a>
+                    {% endif %}
                     <a href="{% url 'orders:select_table' %}" class="btn btn-outline-primary">
                         <i class="bi bi-plus-circle"></i> Place Another Order
                     </a>
@@ -49,23 +56,41 @@
     </div>
 </div>
 
-{% if should_print_kot %}
+{% if should_print_kot or should_print_bot %}
 <script>
-    // Auto-open KOT in new window when order is placed
+    // Auto-open KOT and/or BOT in new windows when order is placed
     window.addEventListener('load', function() {
-        // Open KOT in new window for printing
+        {% if should_print_kot %}
+        // Open KOT in new window for automatic printing
         const kotWindow = window.open(
             "{% url 'orders:print_kot' order.id %}", 
             'KOT_Window',
             'width=800,height=900,scrollbars=yes,resizable=yes'
         );
         
-        // Show notification
         if (kotWindow) {
             console.log('KOT window opened for Order #{{ order.order_number }}');
         } else {
-            alert('Please allow pop-ups to print Kitchen Order Ticket (KOT)');
+            alert('Please allow pop-ups to automatically print Kitchen Order Ticket (KOT)');
         }
+        {% endif %}
+        
+        {% if should_print_bot %}
+        // Open BOT in new window for automatic printing (slight delay to avoid popup blocker)
+        setTimeout(function() {
+            const botWindow = window.open(
+                "{% url 'orders:print_bot' order.id %}", 
+                'BOT_Window',
+                'width=800,height=900,scrollbars=yes,resizable=yes'
+            );
+            
+            if (botWindow) {
+                console.log('BOT window opened for Order #{{ order.order_number }}');
+            } else {
+                alert('Please allow pop-ups to automatically print Bar Order Ticket (BOT)');
+            }
+        }, 300);
+        {% endif %}
     });
 </script>
 {% endif %}

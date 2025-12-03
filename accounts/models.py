@@ -37,7 +37,9 @@ def check_owner_permission(user, obj):
 class Role(models.Model):
     ROLE_CHOICES = [
         ('administrator', 'Administrator'),
-        ('owner', 'Owner'),
+        ('main_owner', 'Main Owner'),  # Can manage multiple restaurants/branches
+        ('branch_owner', 'Branch Owner'),  # Manages specific branch under main owner
+        ('owner', 'Owner'),  # Legacy role - kept for backward compatibility
         ('customer_care', 'Customer Care'),
         ('kitchen', 'Kitchen'),
         ('bar', 'Bar'),
@@ -68,6 +70,20 @@ class User(AbstractUser):
     # Tax configuration for restaurant owners
     tax_rate = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal('0.0800'), 
                                  help_text="Tax rate as decimal (e.g., 0.0800 for 8%, 0.0500 for 5%)")
+    # Auto-print settings for restaurant operations
+    auto_print_kot = models.BooleanField(default=True, 
+                                        help_text="Automatically print Kitchen Order Tickets when order is placed")
+    auto_print_bot = models.BooleanField(default=True,
+                                        help_text="Automatically print Bar Order Tickets when order is placed")
+    
+    # Printer configuration for multiple printers (optional)
+    kitchen_printer_name = models.CharField(max_length=200, blank=True, null=True,
+                                          help_text="Specific printer name for Kitchen Order Tickets (leave blank for auto-detect)")
+    bar_printer_name = models.CharField(max_length=200, blank=True, null=True,
+                                       help_text="Specific printer name for Bar Order Tickets (leave blank for auto-detect)")
+    receipt_printer_name = models.CharField(max_length=200, blank=True, null=True,
+                                          help_text="Specific printer name for Payment Receipts (leave blank for auto-detect)")
+    
     phone_number = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
     is_active_staff = models.BooleanField(default=True)
@@ -82,8 +98,19 @@ class User(AbstractUser):
     def is_administrator(self):
         return self.role and self.role.name == 'administrator'
     
+    def is_main_owner(self):
+        return self.role and self.role.name == 'main_owner'
+    
+    def is_branch_owner(self):
+        return self.role and self.role.name == 'branch_owner'
+    
     def is_owner(self):
-        return self.role and self.role.name == 'owner'
+        """Legacy method - includes main_owner, branch_owner, and old 'owner' role"""
+        return self.role and self.role.name in ['owner', 'main_owner', 'branch_owner']
+    
+    def is_any_owner(self):
+        """Check if user has any type of ownership role"""
+        return self.is_main_owner() or self.is_branch_owner() or (self.role and self.role.name == 'owner')
     
     def is_customer_care(self):
         return self.role and self.role.name == 'customer_care'
@@ -102,9 +129,126 @@ class User(AbstractUser):
     
     def get_owner(self):
         """Get the owner this user belongs to"""
-        if self.is_owner():
+        if self.is_any_owner():
             return self
         return self.owner
+    
+    def get_accessible_restaurants(self):
+        """Get restaurants this user can access"""
+        from restaurant.models_restaurant import Restaurant
+        return Restaurant.get_accessible_restaurants(self)
+    
+    def get_current_restaurant(self, request=None):
+        """Get current restaurant from session or default"""
+        if request and hasattr(request, 'session'):
+            restaurant_id = request.session.get('selected_restaurant_id')
+            if restaurant_id:
+                try:
+                    from restaurant.models_restaurant import Restaurant
+                    restaurant = Restaurant.objects.get(id=restaurant_id)
+                    if restaurant.can_user_access(self):
+                        return restaurant
+                except Restaurant.DoesNotExist:
+                    pass
+        
+        # Fallback to first accessible restaurant
+        accessible = self.get_accessible_restaurants()
+        return accessible.first() if accessible.exists() else None
+    
+    def can_manage_branches(self):
+        """Check if user can create/manage branches"""
+        return self.is_main_owner()
+    
+    def has_pro_plan_access(self):
+        """Check if user has PRO plan access for branch features"""
+        if not self.is_main_owner():
+            return False
+        
+        from restaurant.models_restaurant import Restaurant
+        try:
+            # Get the main restaurant for this user
+            main_restaurant = Restaurant.objects.filter(
+                main_owner=self,
+                is_main_restaurant=True
+            ).first()
+            
+            if main_restaurant:
+                return main_restaurant.subscription_plan == 'PRO'
+            return False
+        except:
+            return False
+    
+    def can_access_branch_features(self):
+        """Check if user can access branch network features (requires PRO plan)"""
+        return self.is_main_owner() and self.has_pro_plan_access()
+    
+    def get_managed_restaurants(self):
+        """Get restaurants directly managed by this user"""
+        from restaurant.models_restaurant import Restaurant
+        if self.is_main_owner():
+            return Restaurant.objects.filter(main_owner=self)
+        elif self.is_branch_owner():
+            return Restaurant.objects.filter(branch_owner=self)
+        elif self.role and self.role.name == 'owner':
+            # Legacy support - create restaurant record if needed
+            return Restaurant.objects.filter(
+                models.Q(main_owner=self) | models.Q(branch_owner=self)
+            )
+        else:
+            return Restaurant.objects.none()
+    
+    def get_user_restaurant_info(self):
+        """Get the restaurant this user belongs to with type (Main/Branch)"""
+        try:
+            from restaurant.models_restaurant import Restaurant
+            
+            # Check if user is branch owner (check this FIRST to avoid wrong assignment)
+            branch_restaurant = Restaurant.objects.filter(branch_owner=self, is_main_restaurant=False).first()
+            if branch_restaurant:
+                return {
+                    'restaurant': branch_restaurant,
+                    'name': branch_restaurant.name,
+                    'type': 'Branch',
+                    'is_main': False,
+                    'parent_name': branch_restaurant.parent_restaurant.name if branch_restaurant.parent_restaurant else None
+                }
+            
+            # Check if user is main owner (only for main restaurants)
+            main_restaurant = Restaurant.objects.filter(main_owner=self, is_main_restaurant=True).first()
+            if main_restaurant:
+                return {
+                    'restaurant': main_restaurant,
+                    'name': main_restaurant.name,
+                    'type': 'Main',
+                    'is_main': True
+                }
+            
+            # Check if user is staff under an owner
+            if self.owner:
+                # Check if owner is a branch owner first
+                branch_restaurant = Restaurant.objects.filter(branch_owner=self.owner, is_main_restaurant=False).first()
+                if branch_restaurant:
+                    return {
+                        'restaurant': branch_restaurant,
+                        'name': branch_restaurant.name,
+                        'type': 'Branch',
+                        'is_main': False,
+                        'parent_name': branch_restaurant.parent_restaurant.name if branch_restaurant.parent_restaurant else None
+                    }
+                
+                # Staff under main owner
+                main_restaurant = Restaurant.objects.filter(main_owner=self.owner, is_main_restaurant=True).first()
+                if main_restaurant:
+                    return {
+                        'restaurant': main_restaurant,
+                        'name': main_restaurant.name,
+                        'type': 'Main',
+                        'is_main': True
+                    }
+            
+            return None
+        except Exception as e:
+            return None
     
     def get_restaurant_name(self, request=None):
         """Get the restaurant name for this user's owner or current session restaurant"""
@@ -124,7 +268,30 @@ class User(AbstractUser):
         
         # For staff/owners, use the traditional method
         owner = self.get_owner()
-        return owner.restaurant_name if owner else "Unknown Restaurant"
+        if not owner:
+            return "Unknown Restaurant"
+        
+        # For branch owners/staff, show the MAIN restaurant name instead of branch name
+        if owner.is_branch_owner() or (hasattr(self, 'is_branch_owner') and self.is_branch_owner()):
+            # Get the main restaurant for this branch owner
+            try:
+                from restaurant.models_restaurant import Restaurant
+                branch_restaurant = Restaurant.objects.filter(
+                    branch_owner=owner,
+                    is_main_restaurant=False
+                ).first()
+                
+                if branch_restaurant and branch_restaurant.parent_restaurant:
+                    # Return the main restaurant's name
+                    return branch_restaurant.parent_restaurant.name
+                elif branch_restaurant and branch_restaurant.main_owner:
+                    # Fallback: use main owner's restaurant name
+                    return branch_restaurant.main_owner.restaurant_name
+            except:
+                pass
+        
+        # Default: return owner's restaurant name
+        return owner.restaurant_name if owner.restaurant_name else "Unknown Restaurant"
     
     def get_tax_rate(self):
         """Get the tax rate for this user's restaurant owner"""
@@ -491,6 +658,7 @@ class SubscriptionLog(models.Model):
     
     ACTION_CHOICES = [
         ('created', 'Subscription Created'),
+        ('auto_created', 'Auto-Created for Existing Restaurant'),
         ('extended', 'Subscription Extended'),
         ('blocked', 'Restaurant Blocked'),
         ('unblocked', 'Restaurant Unblocked'),

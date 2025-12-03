@@ -6,6 +6,110 @@
 {% block page_description %}Overview of your restaurant system{% endblock %}
 
 {% block content %}
+<!-- Restaurant Context Header -->
+{% if can_switch_restaurants %}
+<style>
+    .restaurant-header {
+        background: linear-gradient(120deg, #1e3c72 0%, #2a5298 100%);
+        border-radius: 15px;
+        position: relative;
+        overflow: hidden;
+    }
+    .restaurant-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+    .restaurant-icon-box {
+        background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05));
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    .restaurant-badge {
+        background: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.1));
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn-glass {
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        transition: all 0.3s ease;
+    }
+    .btn-glass:hover {
+        background: rgba(255,255,255,0.25);
+        border-color: rgba(255,255,255,0.5);
+        transform: translateY(-2px);
+        color: white;
+    }
+</style>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-lg restaurant-header">
+            <div class="card-body p-4 position-relative" style="z-index: 1;">
+                <div class="row align-items-center">
+                    <div class="col-lg-8 col-md-7">
+                        <div class="d-flex align-items-start">
+                            <div class="restaurant-icon-box rounded-3 p-3 me-3" style="width: 70px; height: 70px;">
+                                {% if current_restaurant and current_restaurant.is_main_restaurant %}
+                                    <i class="fas fa-crown text-warning" style="font-size: 28px;"></i>
+                                {% else %}
+                                    <i class="fas fa-store text-white" style="font-size: 28px;"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <h2 class="text-white mb-2 fw-bold" style="font-size: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    {{ restaurant_name }}
+                                </h2>
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    {% if current_restaurant %}
+                                        <span class="restaurant-badge px-3 py-2 rounded-pill text-white fw-semibold" style="font-size: 0.85rem;">
+                                            {% if current_restaurant.is_main_restaurant %}
+                                                <i class="fas fa-star text-warning me-1"></i> Main Restaurant
+                                            {% else %}
+                                                <i class="fas fa-code-branch me-1"></i> Branch Location
+                                            {% endif %}
+                                        </span>
+                                        {% if current_restaurant.address %}
+                                            <span class="text-white" style="opacity: 0.9; font-size: 0.95rem;">
+                                                <i class="fas fa-map-marker-alt me-2"></i>{{ current_restaurant.address }}
+                                            </span>
+                                        {% endif %}
+                                    {% elif view_all_restaurants %}
+                                        <span class="restaurant-badge px-3 py-2 rounded-pill text-white fw-semibold">
+                                            <i class="fas fa-globe me-1"></i> All Locations
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-5 text-md-end mt-3 mt-md-0">
+                        <div class="d-flex flex-column flex-md-row gap-2 justify-content-md-end">
+                            {% if can_manage_branches %}
+                                <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-glass px-4 py-2 rounded-pill">
+                                    <i class="fas fa-cog me-2"></i>Manage Branches
+                                </a>
+                            {% endif %}
+                            <a href="{% url 'admin_panel:restaurant_selection' %}" class="btn btn-glass px-4 py-2 rounded-pill">
+                                <i class="fas fa-exchange-alt me-2"></i>Switch Restaurant
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Statistics Cards -->
 <div class="row g-4 mb-5">
     <div class="col-xl-3 col-lg-6 col-md-6">
@@ -83,33 +187,6 @@
             </div>
         </div>
     </div>
-
-    <div class="col-xl-4">
-        <div class="card modern-table">
-            <div class="card-header bg-white border-0 py-3">
-                <h5 class="mb-0 fw-bold">
-                    <i class="fas fa-tasks me-2 text-primary"></i>
-                    Quick Actions
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-outline-primary btn-modern">
-                        <i class="fas fa-plus me-2"></i>Add Product
-                    </a>
-                    <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-success btn-modern">
-                        <i class="fas fa-user-plus me-2"></i>Add User
-                    </a>
-                    <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-outline-info btn-modern">
-                        <i class="fas fa-eye me-2"></i>View Orders
-                    </a>
-                    <a href="{% url 'admin_panel:manage_tables' %}" class="btn btn-outline-warning btn-modern">
-                        <i class="fas fa-table me-2"></i>Manage Tables
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 {% if user.is_owner %}
@@ -130,9 +207,9 @@
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">QR Code URL</label>
+                            <label class="form-label fw-semibold">QR Code URL{% if current_restaurant and not current_restaurant.is_main_restaurant %} <span class="badge bg-info">Branch</span>{% endif %}</label>
                             <div class="input-group">
-                                <input type="text" class="form-control" id="qrUrl" value="https://{{ request.get_host }}/r/{{ user.restaurant_qr_code }}/" readonly>
+                                <input type="text" class="form-control" id="qrUrl" value="{{ request.scheme }}://{{ request.get_host }}/r/{{ current_qr_code|default:user.restaurant_qr_code }}/" readonly>
                                 <button class="btn btn-outline-primary" type="button" onclick="copyQRUrl()">
                                     <i class="bi bi-clipboard"></i> Copy
                                 </button>

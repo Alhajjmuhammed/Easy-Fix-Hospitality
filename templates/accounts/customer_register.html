@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Register - {{ restaurant.restaurant_name }}{% endblock %}
+{% block title %}Register - {{ display_name }}{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -11,7 +11,7 @@
                     <!-- Restaurant Header -->
                     <div class="text-center mb-4">
                         <i class="bi bi-shop display-4 text-primary"></i>
-                        <h3 class="card-title mt-2">Join {{ restaurant.restaurant_name }}</h3>
+                        <h3 class="card-title mt-2">{{ display_name }}</h3>
                         <p class="text-muted">Create your customer account to start ordering</p>
                     </div>
 
@@ -19,7 +19,7 @@
                     <div class="alert alert-info mb-4">
                         <i class="bi bi-qr-code"></i>
                         <strong>QR Access Detected!</strong><br>
-                        You're registering for {{ restaurant.restaurant_name }}
+                        You've accessed {{ display_name }} via QR code.
                     </div>
 
                     <form method="post">
@@ -141,7 +141,7 @@
                     <div class="text-center">
                         <small class="text-muted">
                             <i class="bi bi-shield-check"></i>
-                            Creating an account for {{ restaurant.restaurant_name }}
+                            Creating an account for {{ display_name }}
                         </small>
                     </div>
                 </div>

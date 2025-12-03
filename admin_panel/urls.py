@@ -1,10 +1,38 @@
 from django.urls import path
 from . import views
+from . import views_branches
+from . import views_main_owner
 
 app_name = 'admin_panel'
 
 urlpatterns = [
     path('', views.admin_dashboard, name='admin_dashboard'),
+    
+    # Main Owner Monitoring Views (Read-only)
+    path('main-owner-dashboard/', views_main_owner.main_owner_dashboard, name='main_owner_dashboard'),
+    path('branch-reports/', views_main_owner.branch_reports, name='branch_reports'),
+    path('view-all-orders/', views_main_owner.view_all_orders, name='view_all_orders'),
+    path('branch/<int:restaurant_id>/detail/', views_main_owner.branch_detail, name='branch_detail'),
+    
+    # Branch management URLs
+    path('branches/', views_branches.manage_branches, name='manage_branches'),
+    path('branches/add/', views_branches.add_branch, name='add_branch'),
+    path('branches/<int:restaurant_id>/edit/', views_branches.edit_branch, name='edit_branch'),
+    path('branches/<int:restaurant_id>/delete/', views_branches.delete_branch, name='delete_branch'),
+    path('branches/<int:restaurant_id>/toggle-status/', views_branches.toggle_restaurant_status, name='toggle_restaurant_status'),
+    path('restaurant-selection/', views_branches.restaurant_selection, name='restaurant_selection'),
+    path('switch-restaurant/', views_branches.switch_restaurant, name='switch_restaurant'),
+    path('set-view-all-restaurants/', views_branches.set_view_all_restaurants, name='set_view_all_restaurants'),
+    
+    # Subscription management
+    path('upgrade-to-pro/', views_branches.upgrade_to_pro, name='upgrade_to_pro'),
+    path('downgrade-to-single/', views_branches.downgrade_to_single, name='downgrade_to_single'),
+    path('setup-main-restaurant/', views_branches.setup_main_restaurant, name='setup_main_restaurant'),
+    
+    # Temporary placeholder for reports - redirect to existing reports
+    path('consolidated-reports/', views.admin_dashboard, {'template': 'reports'}, name='consolidated_reports'),
+    
+    # Existing URLs continue below...
     path('profile/', views.profile, name='profile'),
     path('users/', views.manage_users, name='manage_users'),
     path('products/', views.manage_products, name='manage_products'),
@@ -77,4 +105,9 @@ urlpatterns = [
     path('qr-code/regenerate/', views.regenerate_qr_code, name='regenerate_qr_code'),
     path('qr-code/image/', views.generate_qr_image, name='generate_qr_image'),
     path('qr-code/debug/', views.debug_qr_code, name='debug_qr_code'),
+    
+    # Printer Configuration
+    path('printer-settings/', views.printer_settings, name='printer_settings'),
+    path('printer-settings/save/', views.save_printer_settings, name='save_printer_settings'),
+    path('printer-settings/detect/', views.detect_printers, name='detect_printers'),
 ]

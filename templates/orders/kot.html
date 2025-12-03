@@ -238,7 +238,7 @@
         <!-- Header -->
         <div class="kot-header">
             <div class="kot-title">*** KITCHEN ORDER TICKET ***</div>
-            <div class="restaurant-name">{{ order.table_info.owner.restaurant_name|upper }}</div>
+            <div class="restaurant-name">{{ restaurant_name|upper }}</div>
         </div>
         
         <!-- Order Information -->
@@ -320,17 +320,25 @@
     </div>
 
     <script>
-        // Auto-print when page loads (optional - comment out if not needed)
-        // window.onload = function() {
-        //     window.print();
-        // };
+        // Auto-print when page loads (triggered from order confirmation)
+        window.onload = function() {
+            // Small delay to ensure page is fully rendered
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
         
-        // Close window after printing (optional)
+        // Auto-close window after printing
         window.onafterprint = function() {
-            // Uncomment to auto-close after printing
-            // setTimeout(function() {
-            //     window.close();
-            // }, 500);
+            // Auto-close after printing to clean up
+            setTimeout(function() {
+                window.close();
+            }, 1000);
+        };
+        
+        // Also handle print dialog cancel
+        window.onbeforeprint = function() {
+            console.log('Print dialog opened for KOT');
         };
     </script>
 </body>

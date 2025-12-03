@@ -233,7 +233,7 @@
         <!-- Header -->
         <div class="bot-header">
             <div class="bot-title">BAR ORDER TICKET</div>
-            <div class="restaurant-name">{{ order.table_info.owner.restaurant_name|upper }}</div>
+            <div class="restaurant-name">{{ restaurant_name|upper }}</div>
             <span class="station-badge">BAR STATION</span>
         </div>
 
@@ -309,12 +309,19 @@
     </div>
 
     <script>
-        // Auto-print on load (optional - can be disabled)
-        // window.addEventListener('load', function() {
-        //     setTimeout(function() {
-        //         window.print();
-        //     }, 500);
-        // });
+        // Auto-print on load when triggered from order confirmation
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+        
+        // Auto-close window after printing
+        window.onafterprint = function() {
+            setTimeout(function() {
+                window.close();
+            }, 1000);
+        };
 
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {

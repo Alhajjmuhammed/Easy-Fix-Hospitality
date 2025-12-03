@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Account Temporarily Locked{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-danger">
+                <div class="card-header bg-danger text-white text-center">
+                    <h3><i class="fas fa-lock"></i> Account Temporarily Locked</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-shield-alt text-danger" style="font-size: 72px;"></i>
+                    </div>
+                    
+                    <h4 class="mb-3">Security Protection Active</h4>
+                    
+                    <div class="alert alert-warning">
+                        <strong>Too many failed login attempts detected!</strong>
+                    </div>
+                    
+                    <p class="lead mb-4">
+                        Your account has been temporarily locked for security reasons.
+                    </p>
+                    
+                    <div class="mb-4">
+                        <h5>What happened?</h5>
+                        <p>
+                            We detected multiple failed login attempts from your IP address or account. 
+                            This is a security measure to protect your account from unauthorized access.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>What can you do?</h5>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-clock text-primary"></i> 
+                                Wait for the cooldown period (typically 1-2 hours)
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-key text-primary"></i> 
+                                Make sure you're using the correct password
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-headset text-primary"></i> 
+                                Contact support if you've forgotten your password or believe this is an error
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Security Tip:</strong> Never share your password with anyone. 
+                        Restaurant system staff will never ask for your password.
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{% url 'restaurant:home' %}" class="btn btn-primary">
+                            <i class="fas fa-home"></i> Return to Home
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer text-muted text-center">
+                    If you need immediate assistance, please contact your system administrator.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

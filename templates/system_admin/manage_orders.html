@@ -149,6 +149,17 @@
     font-size: 0.8em !important;
     padding: 0.4em 0.7em !important;
 }
+
+/* Improve contrast for Bootstrap badge colors */
+.badge.bg-info {
+    background-color: #0d6efd !important;
+    color: white !important;
+}
+
+.badge.bg-warning {
+    background-color: #f57c00 !important;
+    color: white !important;
+}
 </style>
 {% endblock %}
 
@@ -163,31 +174,108 @@
                 </div>
             </div>
 
-            <!-- Filters -->
-            <div class="card filters-card mb-4">
+            <!-- Modern Search and Filter Form -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-search me-2"></i>Search & Filter Orders
+                    </h6>
+                </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <label for="restaurantFilter" class="form-label">Filter by Restaurant:</label>
-                            <select class="form-select" id="restaurantFilter" onchange="applyFilters()">
+                    <form method="get" class="row g-3" id="filterForm">
+                        <!-- Search Input with Real-time Search -->
+                        <div class="col-md-4">
+                            <label for="search" class="form-label">Search <small class="text-muted">(auto-search)</small></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="search" name="search" 
+                                       value="{{ search_query }}" placeholder="Order ID, table, restaurant, customer..."
+                                       autocomplete="off">
+                                <div id="searchSpinner" class="input-group-text d-none">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Restaurant Filter -->
+                        <div class="col-md-2">
+                            <label for="restaurant" class="form-label">Restaurant</label>
+                            <select class="form-select" id="restaurant" name="restaurant">
                                 <option value="">All Restaurants</option>
                                 {% for restaurant in restaurants %}
-                                <option value="{{ restaurant.id }}" {% if selected_restaurant and selected_restaurant.id == restaurant.id %}selected{% endif %}>
-                                    {{ restaurant.restaurant_name }}
+                                <option value="{{ restaurant.id }}" {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected{% endif %}>
+                                    {{ restaurant.name }}
                                 </option>
                                 {% endfor %}
                             </select>
                         </div>
+                        
+                        <!-- Order Status Filter -->
                         <div class="col-md-2">
-                            <label for="statusFilter" class="form-label">Order Status:</label>
-                            <select class="form-select" id="statusFilter" onchange="applyFilters()">
+                            <label for="status" class="form-label">Order Status</label>
+                            <select class="form-select" id="status" name="status">
                                 <option value="">All Statuses</option>
                                 {% for status_code, status_name in status_choices %}
-                                <option value="{{ status_code }}" {% if selected_status == status_code %}selected{% endif %}>
+                                <option value="{{ status_code }}" {% if request.GET.status == status_code %}selected{% endif %}>
                                     {{ status_name }}
                                 </option>
                                 {% endfor %}
                             </select>
+                        </div>
+                        
+                        <!-- Payment Status Filter -->
+                        <div class="col-md-2">
+                            <label for="payment_status" class="form-label">Payment Status</label>
+                            <select class="form-select" id="payment_status" name="payment_status">
+                                <option value="">All Payment Status</option>
+                                {% for payment_code, payment_name in payment_status_choices %}
+                                <option value="{{ payment_code }}" {% if request.GET.payment_status == payment_code %}selected{% endif %}>
+                                    {{ payment_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Items Per Page -->
+                        <div class="col-md-1">
+                            <label for="per_page" class="form-label">Show</label>
+                            <select class="form-select" id="per_page" name="per_page">
+                                {% for option in per_page_options %}
+                                    <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Clear Button -->
+                        <div class="col-md-1 d-flex align-items-end">
+                            <a href="{% url 'system_admin:manage_orders' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>Clear
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Results Summary -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5>Orders Management</h5>
+                    <small class="text-muted">
+                        {% if search_query or restaurant_filter or status_filter or payment_status_filter %}
+                            Showing {{ filtered_count }} of {{ total_orders }} orders
+                            {% if search_query %} matching "{{ search_query }}"{% endif %}
+                        {% else %}
+                            Showing all {{ total_orders }} orders
+                        {% endif %}
+                    </small>
+                </div>
+                <div class="text-muted small">
+                    {% if page_obj %}
+                        Page {{ page_obj.number }} of {{ paginator.num_pages }} 
+                        ({{ paginator.count }} total)
+                    {% endif %}
+                </div>
+            </div>
                         </div>
                         <div class="col-md-2">
                             <label for="paymentStatusFilter" class="form-label">Payment Status:</label>
@@ -342,7 +430,9 @@
                         <tbody>
                             {% for order in orders %}
                             <tr class="order-table-row">
-                                <td>{{ forloop.counter }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</span>
+                                </td>
                                 <td>
                                     <strong class="text-primary">{{ order.order_number }}</strong>
                                     {% if order.special_instructions %}
@@ -412,6 +502,64 @@
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Pagination -->
+                {% if paginator.num_pages > 1 %}
+                <div class="card-footer">
+                    <nav aria-label="Orders pagination">
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            <!-- Previous Page -->
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if restaurant %}restaurant={{ restaurant }}&{% endif %}{% if status %}status={{ status }}&{% endif %}{% if payment_status %}payment_status={{ payment_status }}&{% endif %}per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">
+                                        <i class="fas fa-chevron-left"></i> Previous
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link"><i class="fas fa-chevron-left"></i> Previous</span>
+                                </li>
+                            {% endif %}
+                            
+                            <!-- Page Numbers -->
+                            {% for page_num in paginator.page_range %}
+                                {% if page_num == page_obj.number %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% elif page_num > page_obj.number|add:"-3" and page_num < page_obj.number|add:"3" %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if restaurant %}restaurant={{ restaurant }}&{% endif %}{% if status %}status={{ status }}&{% endif %}{% if payment_status %}payment_status={{ payment_status }}&{% endif %}per_page={{ per_page }}&page={{ page_num }}">{{ page_num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <!-- Next Page -->
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if restaurant %}restaurant={{ restaurant }}&{% endif %}{% if status %}status={{ status }}&{% endif %}{% if payment_status %}payment_status={{ payment_status }}&{% endif %}per_page={{ per_page }}&page={{ page_obj.next_page_number }}">
+                                        Next <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">Next <i class="fas fa-chevron-right"></i></span>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    
+                    <!-- Enhanced Pagination Info -->
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted">
+                            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} entries
+                        </small>
+                        <small class="text-muted">
+                            {{ per_page }} items per page
+                        </small>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -507,6 +655,59 @@
 
 {% block extra_js %}
 <script>
+// Real-time search and modern filter functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Real-time search functionality
+    let searchTimeout;
+    const searchInput = document.getElementById('search');
+    const searchSpinner = document.getElementById('searchSpinner');
+    const filterForm = document.getElementById('filterForm');
+    
+    // Auto-submit on search input with debounce
+    if (searchInput && searchSpinner && filterForm) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchSpinner.classList.remove('d-none');
+            
+            searchTimeout = setTimeout(() => {
+                try {
+                    searchSpinner.classList.add('d-none');
+                    filterForm.submit();
+                } catch (error) {
+                    console.error('Search submit error:', error);
+                    searchSpinner.classList.add('d-none');
+                }
+            }, 500); // 500ms delay for better UX
+        });
+        
+        // Clear search on escape key
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                try {
+                    filterForm.submit();
+                } catch (error) {
+                    console.error('Clear search error:', error);
+                }
+            }
+        });
+    }
+    
+    // Auto-submit on filter changes
+    document.querySelectorAll('#filterForm select').forEach(select => {
+        select.addEventListener('change', function() {
+            // Reset to page 1 when filters change
+            const pageInput = document.createElement('input');
+            pageInput.type = 'hidden';
+            pageInput.name = 'page';
+            pageInput.value = '1';
+            filterForm.appendChild(pageInput);
+            
+            filterForm.submit();
+        });
+    });
+});
+
 // View toggle functionality
 function switchView(viewType) {
     const cardView = document.getElementById('orderCardView');
@@ -525,42 +726,6 @@ function switchView(viewType) {
         tableBtn.classList.add('active');
         cardBtn.classList.remove('active');
     }
-}
-
-// Apply filters
-function applyFilters() {
-    const restaurantId = document.getElementById('restaurantFilter').value;
-    const status = document.getElementById('statusFilter').value;
-    const paymentStatus = document.getElementById('paymentStatusFilter').value;
-    const dateRange = document.getElementById('dateFilter').value;
-    
-    const url = new URL(window.location);
-    
-    if (restaurantId) {
-        url.searchParams.set('restaurant', restaurantId);
-    } else {
-        url.searchParams.delete('restaurant');
-    }
-    
-    if (status) {
-        url.searchParams.set('status', status);
-    } else {
-        url.searchParams.delete('status');
-    }
-    
-    if (paymentStatus) {
-        url.searchParams.set('payment_status', paymentStatus);
-    } else {
-        url.searchParams.delete('payment_status');
-    }
-    
-    if (dateRange) {
-        url.searchParams.set('date_range', dateRange);
-    } else {
-        url.searchParams.delete('date_range');
-    }
-    
-    window.location.href = url.toString();
 }
 
 // View order details

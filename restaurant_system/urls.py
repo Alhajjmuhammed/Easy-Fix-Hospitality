@@ -10,6 +10,14 @@ from django.shortcuts import render
 import os
 from accounts.views import qr_code_access
 
+# Import security views
+try:
+    from restaurant_system.security_decorators import rate_limited_view
+except ImportError:
+    # Fallback if django-ratelimit not installed
+    def rate_limited_view(request, exception=None):
+        return render(request, 'accounts/rate_limited.html', {'retry_after': 60}, status=429)
+
 @require_GET
 def service_worker(request):
     """Serve the service worker with proper headers"""
@@ -29,6 +37,8 @@ def service_worker(request):
 urlpatterns = [
     path('', RedirectView.as_view(url='/accounts/login/', permanent=False), name='root'),
     path('service-worker.js', service_worker, name='service_worker'),
+    # Security endpoints
+    path('rate-limited/', rate_limited_view, name='rate_limited'),
     # QR Code access - short URL for restaurant access
     path('r/<str:qr_code>/', qr_code_access, name='qr_code_access'),
     path('admin/', admin.site.urls),

@@ -142,6 +142,97 @@
         </div>
     </div>
 
+    <!-- Search and Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" id="orderFilterForm" class="mb-0">
+                <div class="row g-3">
+                    <!-- Search Input -->
+                    <div class="col-md-3">
+                        <label for="orderSearch" class="form-label">
+                            <i class="fas fa-search"></i> Search Orders
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="orderSearch" name="search" 
+                                   value="{{ request.GET.search }}" placeholder="Order#, Table, Customer...">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                        </div>
+                        <small class="text-muted">Press ESC to clear</small>
+                    </div>
+
+                    <!-- Restaurant Filter -->
+                    <div class="col-md-2">
+                        <label for="restaurantFilter" class="form-label">
+                            <i class="fas fa-building"></i> Restaurant
+                        </label>
+                        <select class="form-select" id="restaurantFilter" name="restaurant">
+                            <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                            {% for restaurant in accessible_restaurants %}
+                            <option value="{{ restaurant.id }}" 
+                                {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
+                                {% elif not request.GET.restaurant and current_restaurant.id == restaurant.id %}selected
+                                {% endif %}>
+                                {{ restaurant.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Payment Status Filter -->
+                    <div class="col-md-2">
+                        <label for="paymentStatusFilter" class="form-label">
+                            <i class="fas fa-credit-card"></i> Payment
+                        </label>
+                        <select class="form-select" id="paymentStatusFilter" name="payment_status">
+                            <option value="">All Payment</option>
+                            <option value="unpaid" {% if request.GET.payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                            <option value="paid" {% if request.GET.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                            <option value="partial" {% if request.GET.payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                        </select>
+                    </div>
+
+                    <!-- Date From -->
+                    <div class="col-md-2">
+                        <label for="dateFrom" class="form-label">
+                            <i class="fas fa-calendar-alt"></i> From Date
+                        </label>
+                        <input type="date" class="form-control" id="dateFrom" name="date_from" 
+                               value="{{ request.GET.date_from }}">
+                    </div>
+
+                    <!-- Date To -->
+                    <div class="col-md-2">
+                        <label for="dateTo" class="form-label">
+                            <i class="fas fa-calendar-check"></i> To Date
+                        </label>
+                        <input type="date" class="form-control" id="dateTo" name="date_to" 
+                               value="{{ request.GET.date_to }}">
+                    </div>
+
+                    <!-- Clear Filters Button -->
+                    <div class="col-md-1 d-flex align-items-end">
+                        <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Results Summary -->
+            <div class="mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i> 
+                    Showing {{ total_count }} order{{ total_count|pluralize }} total
+                    {% if request.GET.search or request.GET.restaurant or request.GET.payment_status or request.GET.date_from or request.GET.date_to %}
+                        (filtered)
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+
     <!-- Status Tabs -->
     <div class="row">
         <div class="col-12">
@@ -308,6 +399,34 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
+    // Filter form auto-submit
+    const orderFilterSelects = document.querySelectorAll('#restaurantFilter, #paymentStatusFilter, #dateFrom, #dateTo');
+    orderFilterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            document.getElementById('orderFilterForm').submit();
+        });
+    });
+    
+    // Search with debounce
+    let orderSearchTimeout;
+    const orderSearchInput = document.getElementById('orderSearch');
+    if (orderSearchInput) {
+        orderSearchInput.addEventListener('input', function() {
+            clearTimeout(orderSearchTimeout);
+            orderSearchTimeout = setTimeout(() => {
+                document.getElementById('orderFilterForm').submit();
+            }, 500);
+        });
+        
+        // Clear search on ESC
+        orderSearchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                document.getElementById('orderFilterForm').submit();
+            }
+        });
+    }
+
     // View Order Details
     $('.view-order-btn').on('click', function() {
         const orderId = $(this).data('order-id');

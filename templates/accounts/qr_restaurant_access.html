@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ restaurant.restaurant_name }} - Access{% endblock %}
+{% block title %}{{ display_name }} - Access{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -11,7 +11,7 @@
                     <!-- Restaurant Info -->
                     <div class="mb-4">
                         <i class="bi bi-shop display-1 text-primary mb-3"></i>
-                        <h2 class="card-title mb-2">{{ restaurant.restaurant_name }}</h2>
+                        <h2 class="card-title mb-2">{{ display_name }}</h2>
                         {% if restaurant.restaurant_description %}
                             <p class="text-muted mb-4">{{ restaurant.restaurant_description }}</p>
                         {% endif %}
@@ -21,7 +21,7 @@
                     <div class="alert alert-info mb-4">
                         <i class="bi bi-qr-code"></i>
                         <strong>QR Code Detected!</strong><br>
-                        You've accessed {{ restaurant.restaurant_name }} via QR code.
+                        You've accessed {{ display_name }} via QR code.
                     </div>
 
                     <!-- Action Buttons -->
@@ -68,7 +68,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Store QR access info in sessionStorage
     sessionStorage.setItem('qr_restaurant_access', '{{ qr_code }}');
-    sessionStorage.setItem('restaurant_name', '{{ restaurant.restaurant_name }}');
+    sessionStorage.setItem('restaurant_name', '{{ display_name }}');
 });
 </script>
 {% endblock %}

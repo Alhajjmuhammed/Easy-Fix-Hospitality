@@ -103,6 +103,29 @@
                     </div>
                 </div>
                 
+                <!-- Restaurant Selector (Only in All Restaurants Mode) -->
+                {% if view_all_restaurants %}
+                    <div class="mb-3">
+                        <label for="restaurant" class="form-label">Restaurant/Branch</label>
+                        <select name="restaurant" id="restaurant" class="form-select" required>
+                            <option value="">Select Restaurant...</option>
+                            {% for rest in accessible_restaurants %}
+                                <option value="{{ rest.id }}" {% if promotion_restaurant and rest.id == promotion_restaurant.id %}selected{% endif %}>
+                                    {{ rest.name }} {% if rest.is_main_restaurant %}(Main){% else %}(Branch){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Select which restaurant this promotion belongs to</small>
+                    </div>
+                {% else %}
+                    <div class="mb-3">
+                        <label class="form-label">Restaurant/Branch</label>
+                        <input type="text" class="form-control" value="{{ current_restaurant.name }} {% if current_restaurant.is_main_restaurant %}(Main){% else %}(Branch){% endif %}" disabled>
+                        <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
+                        <small class="text-muted">Promotion will be assigned to: {{ current_restaurant.name }}</small>
+                    </div>
+                {% endif %}
+                
                 <div class="mb-3">
                     <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
                     {{ form.description }}
@@ -270,4 +293,150 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const restaurantSelect = document.querySelector('#restaurant');
+    
+    // Store initial selections from the promotion
+    const initialSelections = {
+        products: {{ selected_products|safe }},
+        main_categories: {{ selected_main_categories|safe }},
+        sub_categories: {{ selected_sub_categories|safe }}
+    };
+    
+    // Track current selections (start with initial)
+    let currentSelections = {
+        products: [...initialSelections.products],
+        main_categories: [...initialSelections.main_categories],
+        sub_categories: [...initialSelections.sub_categories]
+    };
+    
+    // Dynamic loading of products/categories when restaurant changes
+    if (restaurantSelect) {
+        restaurantSelect.addEventListener('change', function() {
+            const restaurantId = this.value;
+            
+            if (!restaurantId) {
+                return;
+            }
+            
+            // Save current selections before loading
+            saveCurrentSelections();
+            
+            // Show loading state
+            const firstGrid = document.querySelector('.checkbox-grid');
+            if (firstGrid) {
+                document.querySelectorAll('.checkbox-grid').forEach(grid => {
+                    grid.innerHTML = '<p class="text-muted small">Loading...</p>';
+                });
+            }
+            
+            // Fetch products for selected restaurant
+            fetch(`{% url 'restaurant:get_restaurant_products' %}?restaurant_id=${restaurantId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update Products
+                        updateCheckboxList('products', data.products, 'No products available');
+                        
+                        // Update Main Categories
+                        updateCheckboxList('main_categories', data.main_categories, 'No categories available');
+                        
+                        // Update Sub Categories
+                        updateCheckboxList('sub_categories', data.sub_categories, 'No subcategories available');
+                    } else {
+                        console.error('Error loading products:', data.message);
+                        alert('Error loading products: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to load products. Please try again.');
+                });
+        });
+    }
+    
+    // Function to save current selections
+    function saveCurrentSelections() {
+        const allGrids = document.querySelectorAll('.checkbox-grid');
+        const gridMap = {
+            0: 'products',
+            1: 'main_categories',
+            2: 'sub_categories'
+        };
+        
+        allGrids.forEach((grid, index) => {
+            const fieldName = gridMap[index];
+            if (fieldName) {
+                currentSelections[fieldName] = [];
+                grid.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    currentSelections[fieldName].push(parseInt(cb.value));
+                });
+            }
+        });
+    }
+    
+    // Helper function to update checkbox lists
+    function updateCheckboxList(fieldName, items, emptyMessage) {
+        // Find the checkbox grid by looking for the field name in the page
+        const allGrids = document.querySelectorAll('.checkbox-grid');
+        let parentGrid = null;
+        
+        // Map field names to their grid positions
+        const gridMap = {
+            'products': 0,
+            'main_categories': 1,
+            'sub_categories': 2
+        };
+        
+        const gridIndex = gridMap[fieldName];
+        if (gridIndex !== undefined && allGrids[gridIndex]) {
+            parentGrid = allGrids[gridIndex];
+        }
+        
+        if (!parentGrid) return;
+        
+        if (items.length === 0) {
+            parentGrid.innerHTML = `<p class="text-muted small">${emptyMessage}</p>`;
+            return;
+        }
+        
+        // Use saved current selections for this field
+        const selectionsToRestore = currentSelections[fieldName] || [];
+        
+        // Clear existing checkboxes
+        parentGrid.innerHTML = '';
+        
+        // Create new checkboxes
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'form-check';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input';
+            checkbox.name = fieldName;
+            checkbox.value = item.id;
+            checkbox.id = `id_${fieldName}_${item.id}`;
+            
+            // Re-check if it was previously selected AND exists in new restaurant
+            if (selectionsToRestore.includes(item.id)) {
+                checkbox.checked = true;
+            }
+            
+            const label = document.createElement('label');
+            label.className = 'form-check-label small';
+            label.htmlFor = checkbox.id;
+            label.textContent = item.name;
+            
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            parentGrid.appendChild(div);
+        });
+    }
+});
+</script>
 {% endblock %}

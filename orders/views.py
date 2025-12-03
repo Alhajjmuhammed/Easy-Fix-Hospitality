@@ -16,6 +16,7 @@ from .models import Order, OrderItem, BillRequest
 from .forms import TableSelectionForm, OrderForm, OrderStatusForm, CancelOrderForm
 from restaurant.models import TableInfo, Product, MainCategory
 from accounts.models import User, get_owner_filter, check_owner_permission
+from .printing import auto_print_order  # Server-side printing
 
 # Initialize channel layer for WebSocket communication
 channel_layer = get_channel_layer()
@@ -24,19 +25,33 @@ def select_table(request):
     """Customer selects table from available tables in restaurant"""
     restaurant = None
     
-    # For customer care users, use their assigned restaurant
-    if request.user.is_authenticated and request.user.is_customer_care() and request.user.owner:
-        restaurant = request.user.owner
-        # Set session data for consistency with QR code flow
-        request.session['selected_restaurant_id'] = restaurant.id
-        request.session['selected_restaurant_name'] = restaurant.restaurant_name
+    # For staff users (customer_care, kitchen, bar, cashier), use their assigned restaurant
+    if request.user.is_authenticated and (
+        request.user.is_customer_care() or 
+        request.user.is_kitchen_staff() or 
+        request.user.is_bar_staff() or 
+        request.user.is_cashier()
+    ):
+        # Staff users get their restaurant from User.owner
+        restaurant = request.user.get_owner()
+        if restaurant:
+            # Set session data for consistency with QR code flow
+            request.session['selected_restaurant_id'] = restaurant.id
+            request.session['selected_restaurant_name'] = restaurant.restaurant_name
+        else:
+            messages.error(request, 'You are not assigned to any restaurant. Please contact your administrator.')
+            return redirect('accounts:login')
     else:
         # Check if restaurant is selected via QR code or session
         selected_restaurant_id = request.session.get('selected_restaurant_id')
         
         if selected_restaurant_id:
             try:
-                restaurant = User.objects.get(id=selected_restaurant_id, role__name='owner')
+                # Support all owner types: owner, main_owner, branch_owner
+                restaurant = User.objects.get(
+                    id=selected_restaurant_id,
+                    role__name__in=['owner', 'main_owner', 'branch_owner']
+                )
             except User.DoesNotExist:
                 messages.error(request, 'Selected restaurant not found.')
                 return redirect('accounts:login')
@@ -333,7 +348,11 @@ def view_cart(request):
     try:
         selected_restaurant_id = request.session.get('selected_restaurant_id')
         if selected_restaurant_id:
-            restaurant_owner = User.objects.get(id=selected_restaurant_id, role__name='owner')
+            # Support all owner types: owner, main_owner, branch_owner
+            restaurant_owner = User.objects.get(
+                id=selected_restaurant_id,
+                role__name__in=['owner', 'main_owner', 'branch_owner']
+            )
             tax_rate = float(restaurant_owner.tax_rate)  # Convert decimal to float
         else:
             # Use default tax rate from User model default
@@ -376,12 +395,15 @@ def place_order(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    # Get current restaurant - for customer care users, use their assigned restaurant
+                    # Get current restaurant - for staff users, use their assigned restaurant
                     current_restaurant = None
                     
-                    if request.user.is_customer_care() and request.user.owner:
-                        # Customer care users use their assigned restaurant
-                        current_restaurant = request.user.owner
+                    if request.user.is_customer_care() or request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_cashier():
+                        # Staff users use their assigned restaurant
+                        current_restaurant = request.user.get_owner()
+                        if not current_restaurant:
+                            messages.error(request, 'You are not assigned to any restaurant. Please contact your administrator.')
+                            return redirect('orders:select_table')
                     else:
                         # Regular customers use QR code session
                         selected_restaurant_id = request.session.get('selected_restaurant_id')
@@ -390,7 +412,11 @@ def place_order(request):
                             return redirect('orders:select_table')
                         
                         try:
-                            current_restaurant = User.objects.get(id=selected_restaurant_id, role__name='owner')
+                            # Support all owner types: owner, main_owner, branch_owner
+                            current_restaurant = User.objects.get(
+                                id=selected_restaurant_id,
+                                role__name__in=['owner', 'main_owner', 'branch_owner']
+                            )
                         except User.DoesNotExist:
                             messages.error(request, 'Selected restaurant not found.')
                             return redirect('orders:select_table')
@@ -483,12 +509,32 @@ def place_order(request):
                     del request.session['selected_table']
                     request.session.modified = True
                     
-                    # Store order ID in session for KOT auto-print
+                    # ✨ SERVER-SIDE AUTO-PRINT (NO BROWSER DIALOG!)
+                    try:
+                        print_result = auto_print_order(order)
+                        if print_result['kot_printed']:
+                            messages.success(request, '🖨️ KOT printed automatically!')
+                        if print_result['bot_printed']:
+                            messages.success(request, '🖨️ BOT printed automatically!')
+                        if print_result['errors']:
+                            for error in print_result['errors']:
+                                messages.warning(request, f'Print warning: {error}')
+                    except Exception as e:
+                        # Print error doesn't stop order processing
+                        messages.warning(request, f'Auto-print unavailable: {str(e)}')
+                        print(f"Auto-print error: {str(e)}")
+                    
+                    # Check if order has kitchen or bar items for browser fallback
+                    has_kitchen_items = any(item.product.station == 'kitchen' for item in order.order_items.all())
+                    has_bar_items = any(item.product.station == 'bar' for item in order.order_items.all())
+                    
+                    # Store order ID and browser print flags (fallback if server print fails)
                     request.session['new_order_id'] = order.id
-                    request.session['print_kot'] = True
+                    request.session['print_kot'] = has_kitchen_items and current_restaurant.auto_print_kot
+                    request.session['print_bot'] = has_bar_items and current_restaurant.auto_print_bot
                     
                     messages.success(request, f'Order {order.order_number} placed successfully!')
-                    return redirect('orders:order_confirmation', order_id=order.id)
+                    return redirect('restaurant:menu')  # Redirect to menu instead of order confirmation
                     
             except Exception as e:
                 messages.error(request, f'Error placing order: {str(e)}')
@@ -503,7 +549,11 @@ def place_order(request):
     try:
         selected_restaurant_id = request.session.get('selected_restaurant_id')
         if selected_restaurant_id:
-            restaurant_owner = User.objects.get(id=selected_restaurant_id, role__name='owner')
+            # Support all owner types: owner, main_owner, branch_owner
+            restaurant_owner = User.objects.get(
+                id=selected_restaurant_id,
+                role__name__in=['owner', 'main_owner', 'branch_owner']
+            )
             tax_rate = float(restaurant_owner.tax_rate)  # Convert decimal to float
         else:
             # Use default tax rate from User model default
@@ -534,13 +584,25 @@ def order_confirmation(request, order_id):
     """Order confirmation page"""
     order = get_object_or_404(Order, id=order_id, ordered_by=request.user)
     
-    # Check if we should auto-print KOT
-    should_print_kot = request.session.pop('print_kot', False)
+    # Check if we should auto-print KOT and/or BOT
+    should_auto_print_kot = request.session.pop('print_kot', False)
+    should_auto_print_bot = request.session.pop('print_bot', False)
     new_order_id = request.session.pop('new_order_id', None)
+    
+    # Verify the order has the appropriate items
+    has_kitchen_items = any(item.product.station == 'kitchen' for item in order.order_items.all())
+    has_bar_items = any(item.product.station == 'bar' for item in order.order_items.all())
+    
+    # Determine if auto-print should trigger (for popup windows)
+    auto_print_kot = should_auto_print_kot and new_order_id == order.id and has_kitchen_items
+    auto_print_bot = should_auto_print_bot and new_order_id == order.id and has_bar_items
     
     context = {
         'order': order,
-        'should_print_kot': should_print_kot and new_order_id == order.id,
+        'has_kitchen_items': has_kitchen_items,
+        'has_bar_items': has_bar_items,
+        'should_print_kot': auto_print_kot,  # For auto-print popup
+        'should_print_bot': auto_print_bot,  # For auto-print popup
     }
     
     return render(request, 'orders/order_confirmation.html', context)
@@ -554,7 +616,11 @@ def my_orders(request):
     
     if selected_restaurant_id:
         try:
-            restaurant = User.objects.get(id=selected_restaurant_id, role__name='owner')
+            # Support all owner types: owner, main_owner, branch_owner
+            restaurant = User.objects.get(
+                id=selected_restaurant_id,
+                role__name__in=['owner', 'main_owner', 'branch_owner']
+            )
         except User.DoesNotExist:
             restaurant = None
     
@@ -599,7 +665,7 @@ def my_orders(request):
 def order_detail(request, order_id):
     """View order details with tracking information"""
     # Allow Customer Care, Owner, and Kitchen Staff to view any order from their restaurant
-    if request.user.is_customer_care() or request.user.is_owner() or request.user.is_kitchen_staff():
+    if request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_kitchen_staff():
         owner = get_owner_filter(request.user)
         order = get_object_or_404(Order, id=order_id, table_info__owner=owner)
     else:
@@ -857,7 +923,7 @@ def update_order_status(request, order_id):
         }
         
         # Allow kitchen staff and bar staff to change status backwards for corrections
-        if request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_owner():
+        if request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner():
             valid_transitions.update({
                 'confirmed': ['pending', 'preparing', 'cancelled'],
                 'preparing': ['confirmed', 'ready', 'cancelled'], 
@@ -1214,7 +1280,8 @@ def customer_care_dashboard(request):
 @login_required
 def customer_care_payments(request):
     """Customer Care payment processing interface - separate from cashier dashboard"""
-    if not (request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_customer_care() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
     
@@ -1266,7 +1333,8 @@ def customer_care_payments(request):
 @login_required
 def customer_care_receipt(request, payment_id):
     """Generate receipt for Customer Care - separate from cashier"""
-    if not (request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_customer_care() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
     
@@ -1302,7 +1370,8 @@ def customer_care_receipt(request, payment_id):
 @login_required
 def customer_care_reprint_receipt(request, payment_id):
     """Reprint receipt for Customer Care"""
-    if not (request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_customer_care() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
     
@@ -1342,7 +1411,8 @@ def customer_care_reprint_receipt(request, payment_id):
 @login_required
 def customer_care_receipt_management(request):
     """Manage receipts for Customer Care - search and reprint by order number or date"""
-    if not (request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_customer_care() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
     
@@ -1425,6 +1495,22 @@ def view_receipt(request, order_id):
     discount_amount = order.get_total_discount()
     total_amount = order.total_amount
     
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        # For branch owners, show the main restaurant name
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
     context = {
         'order': order,
         'payments': payments,
@@ -1432,8 +1518,8 @@ def view_receipt(request, order_id):
         'tax_amount': tax_amount,
         'discount_amount': discount_amount,
         'total_amount': total_amount,
-        'restaurant_name': order.table_info.owner.restaurant_name,
-        'restaurant_owner': order.table_info.owner,
+        'restaurant_name': restaurant_name,
+        'restaurant_owner': owner,
     }
     
     return render(request, 'orders/receipt.html', context)
@@ -1474,10 +1560,26 @@ def print_kot(request, order_id):
         messages.error(request, 'Permission error. Please contact administrator.')
         return redirect('orders:kitchen_dashboard')
     
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
     # Context for KOT template
     context = {
         'order': order,
         'now': timezone.now(),
+        'restaurant_name': restaurant_name,
     }
     
     return render(request, 'orders/kot.html', context)
@@ -1500,6 +1602,21 @@ def reprint_kot(request, order_id):
         messages.error(request, 'Access denied. Staff privileges required.')
         return redirect('orders:my_orders')
     
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
     # Add reprint message
     messages.info(request, f'Reprinting KOT for Order #{order.order_number}')
     
@@ -1507,6 +1624,7 @@ def reprint_kot(request, order_id):
         'order': order,
         'now': timezone.now(),
         'is_reprint': True,
+        'restaurant_name': restaurant_name,
     }
     
     return render(request, 'orders/kot.html', context)
@@ -1547,10 +1665,26 @@ def print_bot(request, order_id):
         messages.error(request, 'Permission error. Please contact administrator.')
         return redirect('orders:bar_dashboard')
     
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
     # Context for BOT template
     context = {
         'order': order,
         'now': timezone.now(),
+        'restaurant_name': restaurant_name,
     }
     
     return render(request, 'orders/bot.html', context)
@@ -1573,6 +1707,21 @@ def reprint_bot(request, order_id):
         messages.error(request, 'Access denied. Staff privileges required.')
         return redirect('orders:my_orders')
     
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
     # Add reprint message
     messages.info(request, f'Reprinting BOT for Order #{order.order_number}')
     
@@ -1580,6 +1729,7 @@ def reprint_bot(request, order_id):
         'order': order,
         'now': timezone.now(),
         'is_reprint': True,
+        'restaurant_name': restaurant_name,
     }
     
     return render(request, 'orders/bot.html', context)
@@ -1587,42 +1737,6 @@ def reprint_bot(request, order_id):
 
 
 @login_required
-def request_bill(request, table_id):
-    "Customer requests bill for their table"
-    if not request.user.is_customer():
-        messages.error(request, 'Access denied. Customer privileges required.')
-        return redirect('orders:my_orders')
-    
-    try:
-        table = TableInfo.objects.get(id=table_id)
-        
-        # Check if customer belongs to this restaurant
-        if request.user.get_owner() != table.owner:
-            messages.error(request, 'You can only request bill for your restaurant tables.')
-            return redirect('orders:my_orders')
-        
-        # Check if there's already a pending bill request for this table
-        existing_request = BillRequest.objects.filter(
-            table_info=table,
-            status='pending'
-        ).first()
-        
-        if existing_request:
-            messages.warning(request, f'Bill request already submitted for Table {table.tbl_no}. Staff will bring your bill shortly.')
-        else:
-            # Create new bill request
-            bill_request = BillRequest.objects.create(
-                table_info=table,
-                requested_by=request.user,
-                status='pending'
-            )
-            messages.success(request, f'Bill requested for Table {table.tbl_no}! Staff will bring your bill shortly.')
-        
-    except TableInfo.DoesNotExist:
-        messages.error(request, 'Table not found.')
-    
-    return redirect('orders:my_orders')
-
 @login_required
 def request_bill(request, table_id):
     """Customer requests bill for their table"""
@@ -1642,7 +1756,11 @@ def request_bill(request, table_id):
         
         # Verify the table belongs to the restaurant from QR code session
         try:
-            current_restaurant = User.objects.get(id=selected_restaurant_id, role__name='owner')
+            # Support all owner types: owner, main_owner, branch_owner
+            current_restaurant = User.objects.get(
+                id=selected_restaurant_id,
+                role__name__in=['owner', 'main_owner', 'branch_owner']
+            )
         except User.DoesNotExist:
             messages.error(request, 'Invalid restaurant context. Please scan QR code again.')
             return redirect('orders:my_orders')
@@ -1679,7 +1797,8 @@ def request_bill(request, table_id):
 @login_required
 def mark_bill_request_completed(request, request_id):
     """Staff marks bill request as completed"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or request.user.is_cashier()):
+    if not (request.user.is_customer_care() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_cashier()):
         messages.error(request, 'Access denied. Staff privileges required.')
         return redirect('orders:my_orders')
     

@@ -1,0 +1,262 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Setup Main Restaurant{% endblock %}
+
+{% block extra_css %}
+<style>
+    .setup-container {
+        max-width: 800px;
+        margin: 40px auto;
+        background: #fff;
+        border-radius: 15px;
+        padding: 40px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .setup-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    
+    .setup-icon {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        color: white;
+        font-size: 2rem;
+    }
+    
+    .plan-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .plan-card {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .plan-card input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+    }
+    
+    .plan-card input[type="radio"]:checked + .plan-content {
+        border-color: #28a745;
+        background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+    }
+    
+    .plan-card:hover {
+        border-color: #667eea;
+        transform: translateY(-2px);
+    }
+    
+    .plan-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    
+    .single-plan {
+        color: #007bff;
+    }
+    
+    .pro-plan {
+        color: #28a745;
+    }
+    
+    .plan-features {
+        font-size: 0.9rem;
+        color: #6c757d;
+        line-height: 1.5;
+    }
+    
+    .plan-badge {
+        position: absolute;
+        top: -8px;
+        right: 10px;
+        background: #28a745;
+        color: white;
+        font-size: 0.7rem;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+    }
+    
+    .form-section {
+        margin-bottom: 25px;
+    }
+    
+    .form-section label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+        display: block;
+    }
+    
+    .btn-setup {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: 500;
+        width: 100%;
+        margin-top: 20px;
+    }
+    
+    .btn-setup:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+    
+    .back-link {
+        color: #6c757d;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .back-link:hover {
+        color: #495057;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <a href="{% url 'admin_panel:manage_branches' %}" class="back-link">
+        <i class="fas fa-arrow-left me-2"></i> Back to Branches
+    </a>
+    
+    <div class="setup-container">
+        <div class="setup-header">
+            <div class="setup-icon">
+                <i class="fas fa-store"></i>
+            </div>
+            <h1>Setup Your Main Restaurant</h1>
+            <p class="text-muted">Complete your restaurant setup to start managing your business</p>
+        </div>
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <!-- Restaurant Basic Information -->
+            <div class="form-section">
+                <label for="name">Restaurant Name *</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="name" 
+                       name="name" 
+                       placeholder="e.g., Taste of Italy"
+                       required>
+            </div>
+            
+            <div class="form-section">
+                <label for="address">Restaurant Address *</label>
+                <textarea class="form-control" 
+                          id="address" 
+                          name="address" 
+                          rows="3"
+                          placeholder="Full address of your restaurant"
+                          required></textarea>
+            </div>
+            
+            <div class="form-section">
+                <label for="description">Description</label>
+                <textarea class="form-control" 
+                          id="description" 
+                          name="description" 
+                          rows="3"
+                          placeholder="Brief description of your restaurant (optional)"></textarea>
+            </div>
+            
+            <div class="form-section">
+                <label for="tax_rate">Tax Rate (%)</label>
+                <input type="number" 
+                       class="form-control" 
+                       id="tax_rate" 
+                       name="tax_rate" 
+                       value="8.0"
+                       step="0.1"
+                       min="0"
+                       max="50">
+            </div>
+            
+            <!-- Subscription Plan Selection -->
+            <div class="form-section">
+                <label>Choose Your Subscription Plan</label>
+                <div class="plan-cards">
+                    <label class="plan-card" for="single">
+                        <input type="radio" id="single" name="subscription_plan" value="SINGLE" checked>
+                        <div class="plan-content">
+                            <div class="plan-name single-plan">
+                                <i class="fas fa-store me-2"></i>
+                                Single Restaurant
+                            </div>
+                            <div class="plan-features">
+                                ✓ One restaurant location<br>
+                                ✓ All basic features<br>
+                                ✓ Staff management<br>
+                                ✓ Orders & inventory<br>
+                                <span class="text-success">✓ Free forever</span>
+                            </div>
+                        </div>
+                    </label>
+                    
+                    <label class="plan-card" for="pro">
+                        <input type="radio" id="pro" name="subscription_plan" value="PRO">
+                        <div class="plan-content">
+                            <span class="plan-badge">RECOMMENDED</span>
+                            <div class="plan-name pro-plan">
+                                <i class="fas fa-building me-2"></i>
+                                Pro Plan
+                            </div>
+                            <div class="plan-features">
+                                ✓ Unlimited branches<br>
+                                ✓ Multi-location management<br>
+                                ✓ Advanced analytics<br>
+                                ✓ Consolidated reporting<br>
+                                <span class="text-success">✓ Scale your business</span>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    You can upgrade or downgrade your plan anytime from the branches management page.
+                </small>
+            </div>
+            
+            <button type="submit" class="btn btn-setup">
+                <i class="fas fa-rocket me-2"></i> Create Main Restaurant
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+// Add click handlers for plan cards
+document.querySelectorAll('.plan-card').forEach(card => {
+    card.addEventListener('click', function() {
+        const radio = this.querySelector('input[type="radio"]');
+        radio.checked = true;
+    });
+});
+</script>
+{% endblock %}

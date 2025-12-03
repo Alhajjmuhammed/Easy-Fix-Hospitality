@@ -13,6 +13,7 @@ from orders.models import Order, OrderItem
 from restaurant.models import TableInfo, Product
 from waste_management.models import FoodWasteLog
 from .models import Payment, OrderItemPayment, VoidTransaction
+from orders.printing import auto_print_receipt  # Auto-print receipt
 
 
 @login_required
@@ -74,7 +75,7 @@ def cashier_dashboard(request):
 @require_http_methods(["GET", "POST"])
 def process_payment(request, order_id):
     """Process payment for an order - full or partial"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
@@ -197,11 +198,27 @@ def process_payment(request, order_id):
         
         order.save()
         
+        # ✨ AUTO-PRINT RECEIPT (NO BROWSER DIALOG!)
+        receipt_printed = False
+        try:
+            print_result = auto_print_receipt(payment)
+            receipt_printed = print_result.get('receipt_printed', False)
+            if receipt_printed:
+                print(f"✓ Auto-printed receipt for Payment #{payment.id}")
+            else:
+                print(f"⚠ Receipt auto-print returned False for Payment #{payment.id}")
+        except Exception as e:
+            # Print error doesn't stop payment processing
+            print(f"⚠ Receipt auto-print failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
         return JsonResponse({
             'success': True,
             'message': f'Payment of ${amount} processed successfully',
             'payment_id': payment.id,
-            'new_balance': float(order.total_amount - total_paid)
+            'new_balance': float(order.total_amount - total_paid),
+            'receipt_printed': receipt_printed
         })
         
     except Exception as e:
@@ -212,7 +229,7 @@ def process_payment(request, order_id):
 @require_http_methods(["POST"])
 def void_payment(request, payment_id):
     """Void a payment transaction"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
@@ -276,7 +293,7 @@ def void_payment(request, payment_id):
 @require_http_methods(["POST"])
 def cancel_order(request, order_id):
     """Cancel an unpaid order"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
@@ -314,7 +331,7 @@ def cancel_order(request, order_id):
 @login_required
 def payment_history(request, order_id):
     """Get payment history for an order"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
@@ -353,7 +370,7 @@ def payment_history(request, order_id):
 @login_required
 def generate_receipt(request, payment_id):
     """Generate receipt for a specific payment"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Cashier, Customer Care, or Owner role required.")
         return redirect('accounts:profile')
     
@@ -385,7 +402,7 @@ def generate_receipt(request, payment_id):
 @login_required  
 def reprint_receipt(request, payment_id):
     """Reprint an existing receipt"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         messages.error(request, "Access denied. Cashier, Customer Care, or Owner role required.")
         return redirect('accounts:profile')
     

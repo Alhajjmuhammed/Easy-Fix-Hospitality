@@ -1,0 +1,1166 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}Add New Branch{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 20px;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 25px rgba(30, 60, 114, 0.3);
+        border: 0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .page-header h1 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.8rem;
+    }
+    
+    .page-header p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 1rem;
+    }
+    
+    .form-container {
+        background: white;
+        border-radius: 15px;
+        padding: 0;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+    
+    .form-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.5rem 2rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .form-header h3 {
+        margin: 0;
+        color: #495057;
+        font-weight: 600;
+        font-size: 1.3rem;
+    }
+    
+    .form-body {
+        padding: 1.5rem;
+    }
+    
+    .form-section {
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 10px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    
+    .section-title {
+        color: #495057;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .section-subtitle {
+        color: #495057;
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .form-row {
+        margin-bottom: 1rem;
+    }
+    
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .form-control {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.6rem 0.8rem;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        background: #fff;
+        box-shadow: none;
+    }
+    
+    .form-control-lg {
+        padding: 0.7rem 0.9rem;
+        font-size: 0.95rem;
+        border-width: 1px;
+    }
+    
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.1);
+        background: #fff;
+        transform: none;
+    }
+    
+    .input-group .form-control {
+        border-radius: 6px 0 0 6px;
+    }
+    
+    .input-group .btn {
+        border-radius: 0 6px 6px 0;
+        border: 1px solid #dee2e6;
+        border-left: none;
+    }
+    
+    .input-group-lg .form-control {
+        border-radius: 6px 0 0 6px;
+    }
+    
+    .input-group-lg .btn {
+        border-radius: 0 6px 6px 0;
+    }
+    
+    .help-text {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.3rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    
+    .required {
+        color: #f44336;
+        font-weight: bold;
+    }
+    
+    .settings-card {
+        background: white;
+        padding: 0.75rem;
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        height: 100%;
+    }
+    
+    .divider-section {
+        display: flex;
+        align-items: center;
+        margin: 1.5rem 0;
+        gap: 1rem;
+    }
+    
+    .divider-line {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #bbdefb, transparent);
+    }
+    
+    .divider-text {
+        color: #90a4ae;
+        font-weight: 600;
+        font-size: 0.9rem;
+        background: white;
+        padding: 0 1rem;
+        border: 1px solid #e3f2fd;
+        border-radius: 20px;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 6px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        transition: all 0.2s ease;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-outline-secondary {
+        border: 1px solid #6c757d;
+        border-radius: 6px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 500;
+        color: #6c757d;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-outline-secondary:hover {
+        background: #6c757d;
+        border-color: #6c757d;
+        transform: translateY(-1px);
+    }
+    
+    .alert-info {
+        border: none;
+        background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+        color: #1565c0;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
+    }
+    
+    .form-check-input:checked {
+        background-color: #2196f3;
+        border-color: #2196f3;
+    }
+    
+    .badge {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .credentials-section {
+        background: linear-gradient(135deg, #fff9e6 0%, #f8f1ff 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #ffc107;
+        margin-top: 0.75rem;
+    }
+    
+    @media (max-width: 768px) {
+        .form-body {
+            padding: 1.5rem;
+        }
+        
+        .form-section {
+            padding: 1rem;
+        }
+        
+        .page-header {
+            padding: 1.5rem;
+        }
+    }
+        border: 2px solid #e9ecef;
+        border-left: none;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 10px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #6c757d;
+        border-radius: 10px;
+        padding: 0.75rem 1.5rem;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+    
+    .credentials-section {
+        background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+        border: 2px solid #2196F3;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-top: 1rem;
+        position: relative;
+    }
+    
+    .credentials-section::before {
+        content: "🔐";
+        position: absolute;
+        top: -10px;
+        left: 20px;
+        background: white;
+        padding: 0 10px;
+        font-size: 1.2rem;
+    }
+    
+    .credentials-section h6 {
+        color: #1976D2;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        font-size: 1rem;
+    }
+    
+    .alert {
+        border-radius: 10px;
+        border: none;
+        padding: 1rem 1.5rem;
+    }
+    
+    .required {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    .help-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    
+    .main-restaurant-info {
+        background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+        border: 2px solid #ff9800;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        position: relative;
+    }
+    
+    .main-restaurant-info::before {
+        content: "⭐";
+        position: absolute;
+        top: -10px;
+        left: 20px;
+        background: white;
+        padding: 0 10px;
+        font-size: 1.2rem;
+    }
+    
+    .action-buttons {
+        background: #f8f9fa;
+        padding: 1.5rem 2rem;
+        border-top: 1px solid #dee2e6;
+        display: flex;
+        gap: 1rem;
+        justify-content: end;
+    }
+    
+    /* Compact spacing overrides */
+    .row {
+        margin-bottom: 0.5rem;
+    }
+    
+    .col-md-6, .col-12 {
+        margin-bottom: 1rem;
+    }
+    
+    .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+    
+    .form-check {
+        margin-bottom: 1rem;
+    }
+    
+    .form-text {
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+    
+    /* Main restaurant info spacing */
+    .main-restaurant-info .row {
+        margin-bottom: 0.5rem;
+    }
+    
+    .main-restaurant-info .col-md-6 {
+        margin-bottom: 0.5rem;
+    }
+    
+    .main-restaurant-info p {
+        margin-bottom: 0.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .form-body {
+            padding: 1.5rem;
+        }
+        
+        .page-header {
+            padding: 1.5rem;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+            padding: 1rem 1.5rem;
+        }
+        
+        .action-buttons .btn {
+            width: 100%;
+        }
+    }
+    
+    .form-body {
+        padding: 30px;
+    }
+    
+    .form-group label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+    
+    .form-control {
+        border: 1px solid #e1e5e9;
+        border-radius: 6px;
+        padding: 12px 16px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 12px 30px;
+        font-weight: 500;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .info-card {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .required {
+        color: #dc3545;
+    }
+    
+    .help-text {
+        font-size: 13px;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    
+    .icon-input {
+        position: relative;
+    }
+    
+    .icon-input i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    
+    .icon-input .form-control {
+        padding-left: 40px;
+    }
+    
+    /* Credentials Display Styles */
+    .credentials-card {
+        border: 2px solid #28a745;
+        background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+    }
+    
+    .credential-value {
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+    }
+    
+    .copy-btn {
+        transition: all 0.3s ease;
+    }
+    
+    .copy-btn:hover {
+        transform: scale(1.05);
+    }
+    
+    /* New Credentials Section Styles */
+    #new_credentials_section {
+        background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 15px;
+        border: 2px solid #2196F3;
+    }
+    
+    #new_credentials_section h6 {
+        color: #1976D2;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+    
+    #new_credentials_section .alert-info {
+        background: rgba(33, 150, 243, 0.1);
+        border-color: #2196F3;
+        color: #1565C0;
+    }
+    
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="page-header">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h1><i class="fas fa-plus me-2"></i>Add New Branch</h1>
+                        <p>Create a new branch location for your restaurant network</p>
+                    </div>
+                    <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-light">
+                        <i class="fas fa-arrow-left me-1"></i>Back
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Row -->
+    <div class="row">
+        <div class="col-12">
+            
+            <!-- Main Restaurant Info -->
+            {% if main_restaurant %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="main-restaurant-info">
+                        <h5 class="mb-3 text-primary">
+                            <i class="fas fa-building me-2"></i>Main Restaurant Details
+                        </h5>
+                        <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="mb-2">
+                            <strong>Restaurant Name:</strong><br>
+                            <span class="text-muted">{{ main_restaurant.name }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Owner:</strong><br>
+                            <span class="text-muted">{{ main_restaurant.main_owner.username }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        {% if main_restaurant.address %}
+                        <div class="mb-2">
+                            <strong>Address:</strong><br>
+                            <span class="text-muted">{{ main_restaurant.address }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="mb-2">
+                            <strong>Tax Rate:</strong><br>
+                            <span class="text-muted">{{ main_restaurant.tax_rate_percentage|floatformat:1 }}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Branch Owner Credentials Display (shown after successful creation) -->
+            {% if branch_created and branch_credentials %}
+            <div class="alert alert-success border-0 shadow-sm mb-4">
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle fa-2x text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h4 class="alert-heading mb-3">
+                            <i class="fas fa-store"></i> Branch "{{ branch_name }}" Created Successfully!
+                        </h4>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="card bg-light border-0 mb-3">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-user-shield"></i> Branch Owner Login Credentials
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold text-muted">Full Name:</label>
+                                                    <div class="h6">{{ branch_credentials.full_name }}</div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold text-muted">Username:</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control fw-bold" value="{{ branch_credentials.username }}" readonly>
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.username }}', this)">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold text-muted">Email:</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control fw-bold" value="{{ branch_credentials.email }}" readonly>
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.email }}', this)">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold text-muted">Password:</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control fw-bold text-primary" value="{{ branch_credentials.password }}" readonly>
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.password }}', this)">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold text-muted">Role:</label>
+                                                    <div class="h6">
+                                                        <span class="badge bg-info">{{ branch_credentials.role }}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold text-muted">Login URL:</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" value="http://{{ request.get_host }}/accounts/login/" readonly>
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('http://{{ request.get_host }}/accounts/login/', this)">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <hr class="my-3">
+                                        
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="text-muted">
+                                                <i class="fas fa-info-circle"></i>
+                                                <strong>Important:</strong> Save these credentials securely. The password cannot be recovered.
+                                            </div>
+                                            <div>
+                                                <button type="button" class="btn btn-success me-2" onclick="printCredentials()">
+                                                    <i class="fas fa-print"></i> Print
+                                                </button>
+                                                <button type="button" class="btn btn-primary" onclick="copyAllCredentials()">
+                                                    <i class="fas fa-clipboard"></i> Copy All
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-outline-primary">
+                                <i class="fas fa-list"></i> View All Branches
+                            </a>
+                            <a href="{% url 'admin_panel:add_branch' %}" class="btn btn-outline-secondary ms-2">
+                                <i class="fas fa-plus"></i> Add Another Branch
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Add Branch Form -->
+            {% if not branch_created %}
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="form-container">
+                        <div class="form-header">
+                            <h3><i class="fas fa-code-branch me-2"></i>Branch Information</h3>
+                        </div>
+                        
+                        <div class="form-body">
+                            <form method="post" id="addBranchForm">
+                                {% csrf_token %}
+                                
+                                <!-- Basic Information Section -->
+                                <div class="form-section">
+                                    <div class="section-title">
+                                        <i class="fas fa-info-circle"></i>
+                                        Basic Information
+                                    </div>
+                                    
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-lg-6">
+                                            <div class="form-row">
+                                                <label for="name" class="form-label">
+                                                    <i class="fas fa-store-alt me-2 text-primary"></i>Branch Name <span class="required">*</span>
+                                                </label>
+                                                <input type="text" class="form-control" id="name" name="name" 
+                                                       placeholder="e.g., Downtown Branch, Mall Location" required>
+                                                <div class="help-text">
+                                                    <i class="fas fa-info-circle me-1"></i>Enter a descriptive name for this branch location
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-lg-6">
+                                            <div class="form-row">
+                                                <label for="address" class="form-label">
+                                                    <i class="fas fa-map-marker-alt me-2 text-primary"></i>Address <span class="required">*</span>
+                                                </label>
+                                                <textarea class="form-control" id="address" name="address" rows="3"
+                                                          placeholder="Full address of the branch location" required></textarea>
+                                                <div class="help-text">
+                                                    <i class="fas fa-info-circle me-1"></i>Complete address including street, city, and postal code
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row g-3">
+                                        <div class="col-lg-12">
+                                            <div class="form-row">
+                                                <label for="description" class="form-label">
+                                                    <i class="fas fa-align-left me-2 text-primary"></i>Description
+                                                </label>
+                                                <textarea class="form-control" id="description" name="description" rows="2"
+                                                          placeholder="Brief description of this branch location..."></textarea>
+                                                <div class="help-text">
+                                                    <i class="fas fa-info-circle me-1"></i>Optional description for this branch
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                        </div>
+
+                        <!-- Branch Owner Management Section -->
+                        <div class="form-section">
+                            <div class="section-title">
+                                <i class="fas fa-user-tie"></i>
+                                Branch Owner Management
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="auto_create_credentials" name="auto_create_credentials">
+                                <label class="form-check-label" for="auto_create_credentials">
+                                    <strong style="color: #1976D2; font-size: 16px;">✓ Create new branch owner credentials (Username & Password)</strong>
+                                    <br><small class="text-muted">Check this to automatically create a new user account with username and password for the branch owner</small>
+                                </label>
+                            </div>
+                            
+                            <div id="new_credentials_section" class="credentials-section" style="display: none;">
+                                <h6 class="section-subtitle">
+                                    <i class="fas fa-user-plus me-2"></i>New Branch Owner Details
+                                </h6>
+                                
+                                <div class="row g-3">
+                                    <div class="col-lg-6">
+                                        <div class="form-row">
+                                            <label for="branch_owner_username" class="form-label">
+                                                <i class="fas fa-user me-2 text-primary"></i>Username <span class="required">*</span>
+                                            </label>
+                                            <input type="text" class="form-control" id="branch_owner_username" name="branch_owner_username" 
+                                                   placeholder="e.g., downtown_manager">
+                                            <div class="help-text">
+                                                <i class="fas fa-info-circle me-1"></i>This will be their login username
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-lg-6">
+                                        <div class="form-row">
+                                            <label for="branch_owner_email" class="form-label">
+                                                <i class="fas fa-envelope me-2 text-primary"></i>Email <span class="required">*</span>
+                                            </label>
+                                            <input type="email" class="form-control" id="branch_owner_email" name="branch_owner_email" 
+                                                   placeholder="manager@example.com">
+                                            <div class="help-text">
+                                                <i class="fas fa-info-circle me-1"></i>Email address for the branch owner
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-lg-6">
+                                        <div class="form-row">
+                                            <label for="branch_owner_password" class="form-label">
+                                                <i class="fas fa-lock me-2 text-primary"></i>Password <span class="required">*</span>
+                                            </label>
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" id="branch_owner_password" name="branch_owner_password" 
+                                                       placeholder="Enter secure password" minlength="8">
+                                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-info" type="button" id="generatePassword">
+                                                    <i class="fas fa-random"></i>
+                                                </button>
+                                            </div>
+                                            <div class="help-text">
+                                                <i class="fas fa-shield-alt me-1"></i>Minimum 8 characters. Use the eye icon to show/hide or dice icon to generate
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-lg-6">
+                                        <div class="form-row">
+                                            <label for="branch_owner_name" class="form-label">
+                                                <i class="fas fa-id-card me-2 text-primary"></i>Full Name
+                                            </label>
+                                            <input type="text" class="form-control" id="branch_owner_name" name="branch_owner_name" 
+                                                   placeholder="John Doe">
+                                            <div class="help-text">
+                                                <i class="fas fa-info-circle me-1"></i>Full name of the branch owner
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-info border-0 shadow-sm mt-3">
+                                    <div class="d-flex align-items-start">
+                                        <i class="fas fa-info-circle text-info me-3 mt-1"></i>
+                                        <div>
+                                            <strong>Custom Password:</strong> You can set your own secure password for the branch owner or use the generate button for a random secure password.
+                                        </div>
+                                    </div>
+                                    The branch owner will have full control over their branch location.
+                            </div>
+                            
+                            <div id="existing_user_section" class="mt-3">
+                                <div class="divider-section">
+                                    <div class="divider-line"></div>
+                                    <span class="divider-text">OR</span>
+                                    <div class="divider-line"></div>
+                                </div>
+                                
+                                <h6 class="section-subtitle">
+                                    <i class="fas fa-user-check me-2"></i>Use Existing User (Optional)
+                                </h6>
+                                
+                                <div class="row g-3">
+                                    <div class="col-lg-8">
+                                        <div class="form-row">
+                                            <label for="existing_branch_owner" class="form-label">
+                                                <i class="fas fa-search me-2 text-primary"></i>Existing Username
+                                            </label>
+                                            <input type="text" class="form-control" id="existing_branch_owner" name="branch_owner_username_existing" 
+                                                   placeholder="Enter existing username (optional)">
+                                            <div class="help-text">
+                                                <i class="fas fa-info-circle me-1"></i>Leave blank to manage this branch yourself, or enter username of existing user to assign as branch owner.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Default Settings Section -->
+                        <div class="form-section">
+                            <div class="section-title">
+                                <i class="fas fa-cog me-2"></i>Default Settings
+                            </div>
+                            <p class="text-muted mb-3">
+                                <i class="fas fa-info-circle me-1"></i>These settings will be inherited from your main restaurant and can be changed later.
+                            </p>
+                            
+                            {% if main_restaurant %}
+                            <div class="row g-3">
+                                <div class="col-lg-6">
+                                    <div class="settings-card">
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" id="auto_print_kot" 
+                                                   {% if main_restaurant.auto_print_kot %}checked{% endif %} disabled>
+                                            <label class="form-check-label fw-semibold" for="auto_print_kot">
+                                                <i class="fas fa-utensils me-2 text-primary"></i>Auto Print KOT
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Kitchen Order Tickets print automatically</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-lg-6">
+                                    <div class="settings-card">
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" id="auto_print_bot" 
+                                                   {% if main_restaurant.auto_print_bot %}checked{% endif %} disabled>
+                                            <label class="form-check-label fw-semibold" for="auto_print_bot">
+                                                <i class="fas fa-cocktail me-2 text-primary"></i>Auto Print BOT
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Bar Order Tickets print automatically</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-lg-6">
+                                    <div class="settings-card">
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" id="auto_print_receipt" 
+                                                   {% if main_restaurant.auto_print_receipt %}checked{% endif %} disabled>
+                                            <label class="form-check-label fw-semibold" for="auto_print_receipt">
+                                                <i class="fas fa-receipt me-2 text-primary"></i>Auto Print Receipt
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Payment receipts print automatically</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-lg-6">
+                                    <div class="settings-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <label class="form-label fw-semibold mb-0">
+                                                <i class="fas fa-percentage me-2 text-primary"></i>Tax Rate
+                                            </label>
+                                            <span class="badge bg-info">{{ main_restaurant.tax_rate|default:"0" }}%</span>
+                                        </div>
+                                        <small class="text-muted">Default tax rate for orders</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Action Buttons Section -->
+                        <div class="form-section">
+                            <div class="row g-3">
+                                <div class="col-lg-6">
+                                    <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-outline-secondary w-100">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                </div>
+                                <div class="col-lg-6">
+                                    <button type="submit" class="btn btn-primary w-100" id="submitBtn" form="addBranchForm">
+                                        <i class="fas fa-save me-1"></i>Create Branch
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Form validation
+    $('#addBranchForm').on('submit', function(e) {
+        let isValid = true;
+        let errorMessage = '';
+        
+        // Validate branch name
+        if ($('#name').val().trim() === '') {
+            isValid = false;
+            errorMessage += 'Branch name is required.\n';
+        }
+        
+        // Validate address
+        if ($('#address').val().trim() === '') {
+            isValid = false;
+            errorMessage += 'Address is required.\n';
+        }
+        
+        // Validate credentials if auto create is checked
+        if ($('#auto_create_credentials').is(':checked')) {
+            if ($('#branch_owner_username').val().trim() === '') {
+                isValid = false;
+                errorMessage += 'Username is required when creating new credentials.\n';
+            }
+            
+            if ($('#branch_owner_email').val().trim() === '') {
+                isValid = false;
+                errorMessage += 'Email is required when creating new credentials.\n';
+            }
+            
+            if ($('#branch_owner_password').val().trim() === '') {
+                isValid = false;
+                errorMessage += 'Password is required when creating new credentials.\n';
+            } else if ($('#branch_owner_password').val().length < 8) {
+                isValid = false;
+                errorMessage += 'Password must be at least 8 characters long.\n';
+            }
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            alert(errorMessage);
+            return false;
+        }
+    });
+    
+    // Toggle credentials section
+    $('#auto_create_credentials').change(function() {
+        if ($(this).is(':checked')) {
+            $('#new_credentials_section').slideDown(300);
+            $('#existing_user_section').slideUp(300);
+        } else {
+            $('#new_credentials_section').slideUp(300);
+            $('#existing_user_section').slideDown(300);
+        }
+    });
+    
+    // Password visibility toggle
+    $('#togglePassword').click(function() {
+        const passwordField = $('#branch_owner_password');
+        const icon = $(this).find('i');
+        
+        if (passwordField.attr('type') === 'password') {
+            passwordField.attr('type', 'text');
+            icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        } else {
+            passwordField.attr('type', 'password');
+            icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        }
+    });
+    
+    // Generate random password
+    $('#generatePassword').click(function() {
+        const password = generateRandomPassword();
+        $('#branch_owner_password').val(password);
+        
+        // Show generated password briefly
+        const originalHTML = $(this).html();
+        $(this).html('<i class="fas fa-check text-success"></i>');
+        setTimeout(() => {
+            $(this).html(originalHTML);
+        }, 2000);
+    });
+    
+    // Generate random password function
+    function generateRandomPassword() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        let password = '';
+        for (let i = 0; i < 12; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return password;
+    }
+    
+    // Copy password
+    window.copyPassword = function() {
+        const passwordField = document.getElementById('passwordField');
+        passwordField.select();
+        document.execCommand('copy');
+        
+        // Show success message
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+        }, 2000);
+    };
+    
+    // Copy all credentials
+    window.copyAllCredentials = function() {
+        const credentials = document.querySelectorAll('.credentials-display .h6');
+        let text = 'Branch Owner Login Credentials:\n\n';
+        
+        credentials.forEach(cred => {
+            const label = cred.previousElementSibling.textContent;
+            text += label + ' ' + cred.textContent + '\n';
+        });
+        
+        text += '\nLogin URL: ' + window.location.origin + '/accounts/login/';
+        
+        navigator.clipboard.writeText(text).then(() => {
+            // Show success message
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check text-success me-1"></i>Copied!';
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+            }, 2000);
+        });
+    };
+});
+
+// Print credentials function
+function printCredentials() {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Branch Owner Credentials</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .credentials { background: #f8f9fa; padding: 20px; border: 1px solid #dee2e6; }
+                .credential-row { margin: 10px 0; }
+                .label { font-weight: bold; display: inline-block; width: 120px; }
+                .important { color: #dc3545; font-weight: bold; margin-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>Branch Owner Login Credentials</h2>
+                <p>Restaurant Management System</p>
+            </div>
+            
+            <div class="credentials">
+                <div class="credential-row">
+                    <span class="label">Full Name:</span>
+                    {{ branch_credentials.full_name }}
+                </div>
+                <div class="credential-row">
+                    <span class="label">Username:</span>
+                    {{ branch_credentials.username }}
+                </div>
+                <div class="credential-row">
+                    <span class="label">Email:</span>
+                    {{ branch_credentials.email }}
+                </div>
+                <div class="credential-row">
+                    <span class="label">Password:</span>
+                    {{ branch_credentials.password }}
+                </div>
+                <div class="credential-row">
+                    <span class="label">Role:</span>
+                    {{ branch_credentials.role }}
+                </div>
+                <div class="credential-row">
+                    <span class="label">Login URL:</span>
+                    ${window.location.origin}/accounts/login/
+                </div>
+            </div>
+            
+            <p class="important">
+                IMPORTANT: Save these credentials securely. The password cannot be recovered.
+            </p>
+        </body>
+    </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+</script>
+{% endblock extra_js %}
+                                                <div class="mb-3">
