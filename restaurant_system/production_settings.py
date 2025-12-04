@@ -285,6 +285,7 @@ AXES_IP_WHITELIST = []  # Can add trusted IPs (e.g., admin office, staff network
 # Rate Limiting Configuration
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = 'default'
+RATELIMIT_IP_META_KEY = 'HTTP_X_FORWARDED_FOR'  # Get real IP from nginx proxy
 
 # Redis Cache for Production (Required)
 CACHES = {
