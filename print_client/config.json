@@ -1,0 +1,6 @@
+{
+    "server_url": "https://hospitality.easyfixsoft.com",
+    "api_token": "fbbde181c8675a453d0ea512dbecd4258daf56e6",
+    "poll_interval": 5,
+    "auto_detect_printer": true
+}

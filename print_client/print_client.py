@@ -181,7 +181,12 @@ class PrintClient:
             response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
-                jobs = response.json()
+                data = response.json()
+                # API returns {"count": X, "jobs": [...]}
+                if isinstance(data, dict):
+                    jobs = data.get('jobs', [])
+                else:
+                    jobs = data if isinstance(data, list) else []
                 if jobs:
                     logger.info(f"Retrieved {len(jobs)} pending job(s)")
                 return jobs
