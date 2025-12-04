@@ -1,0 +1,423 @@
+# ============================================================================
+# RESTAURANT SYSTEM - VPS DEPLOYMENT COMMANDS
+# ============================================================================
+# VPS IP: 72.62.51.225
+# Repository: https://github.com/Alhajjmuhammed/Easy-Fix-Hospitality
+# Date: December 2025
+# ============================================================================
+# COPY AND PASTE EACH COMMAND ONE BY ONE
+# WAIT FOR EACH COMMAND TO FINISH BEFORE RUNNING THE NEXT
+# ============================================================================
+
+
+# ===========================================================================
+# STEP 1: SSH INTO YOUR VPS
+# ===========================================================================
+# Run this from your Windows PowerShell or Terminal:
+
+ssh root@72.62.51.225
+
+
+# ===========================================================================
+# STEP 2: UPDATE SYSTEM
+# ===========================================================================
+
+apt update && apt upgrade -y
+
+
+# ===========================================================================
+# STEP 3: INSTALL ALL REQUIRED PACKAGES
+# ===========================================================================
+
+apt install -y python3 python3-pip python3-venv python3-dev postgresql postgresql-contrib nginx redis-server git curl libpq-dev build-essential libffi-dev
+
+
+# ===========================================================================
+# STEP 4: START AND ENABLE POSTGRESQL
+# ===========================================================================
+
+systemctl start postgresql
+systemctl enable postgresql
+
+
+# ===========================================================================
+# STEP 5: CREATE DATABASE AND USER
+# ===========================================================================
+# Run this command to enter PostgreSQL:
+
+sudo -u postgres psql
+
+# INSIDE POSTGRESQL, run these commands ONE BY ONE:
+# (Copy each line and press Enter)
+
+CREATE DATABASE restaurant_db;
+CREATE USER restaurant_user WITH PASSWORD 'RestaurantSecure2024!';
+ALTER ROLE restaurant_user SET client_encoding TO 'utf8';
+ALTER ROLE restaurant_user SET default_transaction_isolation TO 'read committed';
+ALTER ROLE restaurant_user SET timezone TO 'Africa/Nairobi';
+GRANT ALL PRIVILEGES ON DATABASE restaurant_db TO restaurant_user;
+ALTER DATABASE restaurant_db OWNER TO restaurant_user;
+\q
+
+# After \q you will exit PostgreSQL and return to normal terminal
+
+
+# ===========================================================================
+# STEP 6: START AND ENABLE REDIS
+# ===========================================================================
+
+systemctl start redis-server
+systemctl enable redis-server
+
+
+# ===========================================================================
+# STEP 7: CREATE PROJECT DIRECTORY AND CLONE REPOSITORY
+# ===========================================================================
+
+mkdir -p /var/www
+cd /var/www
+git clone https://github.com/Alhajjmuhammed/Easy-Fix-Hospitality.git restaurant
+
+
+# ===========================================================================
+# STEP 8: GO TO PROJECT DIRECTORY
+# ===========================================================================
+
+cd /var/www/restaurant
+
+
+# ===========================================================================
+# STEP 9: CREATE VIRTUAL ENVIRONMENT
+# ===========================================================================
+
+python3 -m venv venv
+
+
+# ===========================================================================
+# STEP 10: ACTIVATE VIRTUAL ENVIRONMENT
+# ===========================================================================
+
+source venv/bin/activate
+
+
+# ===========================================================================
+# STEP 11: UPGRADE PIP
+# ===========================================================================
+
+pip install --upgrade pip setuptools wheel
+
+
+# ===========================================================================
+# STEP 12: INSTALL PYTHON PACKAGES
+# ===========================================================================
+
+pip install -r requirements-production.txt
+
+
+# ===========================================================================
+# STEP 13: CREATE LOGS DIRECTORY
+# ===========================================================================
+
+mkdir -p /var/www/restaurant/logs
+
+
+# ===========================================================================
+# STEP 14: CREATE .ENV FILE
+# ===========================================================================
+# This command creates the .env file with all settings:
+
+cat > /var/www/restaurant/.env << 'EOF'
+DEBUG=False
+SECRET_KEY=django-insecure-xk9#mq2@5v!b8n3$hj6&w1z0p4r7t*fy+u=c%e^g(a)s_d-i
+ALLOWED_HOSTS=72.62.51.225,localhost,127.0.0.1
+
+DB_NAME=restaurant_db
+DB_USER=restaurant_user
+DB_PASSWORD=RestaurantPass123
+DB_HOST=localhost
+DB_PORT=5432
+
+REDIS_URL=redis://localhost:6379/0
+
+SECURE_SSL_REDIRECT=False
+SECURE_HSTS_SECONDS=0
+EOF
+
+
+# ===========================================================================
+# STEP 15: SET DJANGO SETTINGS MODULE
+# ===========================================================================
+
+export DJANGO_SETTINGS_MODULE=restaurant_system.production_settings
+
+
+# ===========================================================================
+# STEP 16: RUN DATABASE MIGRATIONS
+# ===========================================================================
+
+cd /var/www/restaurant
+source venv/bin/activate
+python manage.py migrate --settings=restaurant_system.production_settings
+
+
+# ===========================================================================
+# STEP 17: COLLECT STATIC FILES
+# ===========================================================================
+
+python manage.py collectstatic --noinput --settings=restaurant_system.production_settings
+
+
+# ===========================================================================
+# STEP 18: CREATE SUPERUSER (ADMIN ACCOUNT)
+# ===========================================================================
+# This will ask you for username, email, and password:
+
+python manage.py createsuperuser --settings=restaurant_system.production_settings
+
+
+# ===========================================================================
+# STEP 19: CREATE GUNICORN SERVICE FILE
+# ===========================================================================
+
+cat > /etc/systemd/system/restaurant-gunicorn.service << 'EOF'
+[Unit]
+Description=Restaurant System Gunicorn
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/restaurant
+Environment="PATH=/var/www/restaurant/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=restaurant_system.production_settings"
+ExecStart=/var/www/restaurant/venv/bin/gunicorn --workers 3 --bind unix:/var/www/restaurant/restaurant.sock restaurant_system.wsgi:application
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+# ===========================================================================
+# STEP 20: CREATE DAPHNE SERVICE FILE (FOR WEBSOCKET)
+# ===========================================================================
+
+cat > /etc/systemd/system/restaurant-daphne.service << 'EOF'
+[Unit]
+Description=Restaurant System Daphne WebSocket
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/restaurant
+Environment="PATH=/var/www/restaurant/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=restaurant_system.production_settings"
+ExecStart=/var/www/restaurant/venv/bin/daphne -b 0.0.0.0 -p 8001 restaurant_system.asgi:application
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+# ===========================================================================
+# STEP 21: CREATE NGINX CONFIGURATION
+# ===========================================================================
+
+cat > /etc/nginx/sites-available/restaurant << 'EOF'
+server {
+    listen 80;
+    server_name 72.62.51.225;
+
+    client_max_body_size 10M;
+
+    access_log /var/log/nginx/restaurant_access.log;
+    error_log /var/log/nginx/restaurant_error.log;
+
+    location /static/ {
+        alias /var/www/restaurant/staticfiles/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /media/ {
+        alias /var/www/restaurant/media/;
+        expires 7d;
+    }
+
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;
+    }
+
+    location / {
+        proxy_pass http://unix:/var/www/restaurant/restaurant.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+
+
+# ===========================================================================
+# STEP 22: ENABLE NGINX SITE
+# ===========================================================================
+
+ln -sf /etc/nginx/sites-available/restaurant /etc/nginx/sites-enabled/
+
+
+# ===========================================================================
+# STEP 23: REMOVE DEFAULT NGINX SITE
+# ===========================================================================
+
+rm -f /etc/nginx/sites-enabled/default
+
+
+# ===========================================================================
+# STEP 24: TEST NGINX CONFIGURATION
+# ===========================================================================
+
+nginx -t
+
+
+# ===========================================================================
+# STEP 25: SET FILE PERMISSIONS
+# ===========================================================================
+
+chmod -R 755 /var/www/restaurant
+chown -R root:root /var/www/restaurant
+
+
+# ===========================================================================
+# STEP 26: RELOAD SYSTEMD
+# ===========================================================================
+
+systemctl daemon-reload
+
+
+# ===========================================================================
+# STEP 27: ENABLE ALL SERVICES TO START ON BOOT
+# ===========================================================================
+
+systemctl enable restaurant-gunicorn
+systemctl enable restaurant-daphne
+systemctl enable nginx
+systemctl enable redis-server
+systemctl enable postgresql
+
+
+# ===========================================================================
+# STEP 28: START ALL SERVICES
+# ===========================================================================
+
+systemctl start restaurant-gunicorn
+systemctl start restaurant-daphne
+systemctl restart nginx
+
+
+# ===========================================================================
+# STEP 29: CHECK ALL SERVICES ARE RUNNING
+# ===========================================================================
+
+echo "=== CHECKING SERVICES ==="
+echo ""
+echo "PostgreSQL:"
+systemctl is-active postgresql
+echo ""
+echo "Redis:"
+systemctl is-active redis-server
+echo ""
+echo "Gunicorn:"
+systemctl is-active restaurant-gunicorn
+echo ""
+echo "Daphne:"
+systemctl is-active restaurant-daphne
+echo ""
+echo "Nginx:"
+systemctl is-active nginx
+echo ""
+echo "=== ALL SERVICES SHOULD SAY 'active' ==="
+
+
+# ===========================================================================
+# STEP 30: TEST YOUR WEBSITE
+# ===========================================================================
+# Open your browser and go to:
+# http://72.62.51.225
+#
+# Login with the superuser account you created in Step 18
+
+
+# ============================================================================
+# DEPLOYMENT COMPLETE!
+# ============================================================================
+# Your website should now be running at: http://72.62.51.225
+#
+# Admin panel: http://72.62.51.225/admin/
+# Login page: http://72.62.51.225/accounts/login/
+# ============================================================================
+
+
+# ============================================================================
+# USEFUL COMMANDS FOR LATER
+# ============================================================================
+
+# View Gunicorn logs (if there are errors):
+journalctl -u restaurant-gunicorn -n 50
+
+# View Daphne logs:
+journalctl -u restaurant-daphne -n 50
+
+# View Nginx error logs:
+cat /var/log/nginx/restaurant_error.log
+
+# Restart services after code changes:
+systemctl restart restaurant-gunicorn
+systemctl restart restaurant-daphne
+
+# Pull latest code from GitHub:
+cd /var/www/restaurant
+source venv/bin/activate
+git pull origin main
+python manage.py migrate --settings=restaurant_system.production_settings
+python manage.py collectstatic --noinput --settings=restaurant_system.production_settings
+systemctl restart restaurant-gunicorn
+systemctl restart restaurant-daphne
+
+
+# ============================================================================
+# IF YOU GET ERRORS
+# ============================================================================
+
+# Error: "502 Bad Gateway"
+# Solution: Check if Gunicorn is running:
+systemctl status restaurant-gunicorn
+journalctl -u restaurant-gunicorn -n 50
+
+# Error: "Connection refused"
+# Solution: Check if services are running:
+systemctl status restaurant-gunicorn
+systemctl status restaurant-daphne
+systemctl status nginx
+
+# Error: "Database connection failed"
+# Solution: Check PostgreSQL:
+systemctl status postgresql
+sudo -u postgres psql -c "\l"
+
+# Error: "Static files not loading"
+# Solution: Run collectstatic again:
+cd /var/www/restaurant
+source venv/bin/activate
+python manage.py collectstatic --noinput --settings=restaurant_system.production_settings
+systemctl restart nginx
