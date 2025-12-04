@@ -266,7 +266,7 @@ class Restaurant(models.Model):
             base_url = request.build_absolute_uri('/')
             return f"{base_url}r/{self.qr_code}/"
         else:
-            return f"https://easyfixsoft.com/r/{self.qr_code}/"
+            return f"https://hospitality.easyfixsoft.com/r/{self.qr_code}/"
     
     @property
     def tax_rate_percentage(self):

@@ -233,7 +233,7 @@
                     <div class="col-md-4 text-center">
                         <div class="qr-preview-container p-3 bg-light rounded">
                             <div class="qr-code-display bg-white border rounded d-flex align-items-center justify-content-center" style="width: 150px; height: 150px; margin: 0 auto;">
-                                <img src="{% url 'admin_panel:generate_qr_image' %}" alt="QR Code" class="img-fluid" style="max-width: 140px; max-height: 140px;">
+                                <img src="{% url 'admin_panel:generate_qr_image' %}?t={% now 'U' %}" alt="QR Code" class="img-fluid" style="max-width: 140px; max-height: 140px;">
                             </div>
                             <p class="small text-muted mt-2 mb-0">Scan this code to access your restaurant</p>
                         </div>

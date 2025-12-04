@@ -318,7 +318,7 @@ class User(AbstractUser):
                 return f"{base_url}r/{self.restaurant_qr_code}/"
             else:
                 # Use production domain as fallback
-                return f"https://easyfixsoft.com/r/{self.restaurant_qr_code}/"
+                return f"https://hospitality.easyfixsoft.com/r/{self.restaurant_qr_code}/"
         return None
     
     def save(self, *args, **kwargs):
