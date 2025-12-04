@@ -27,17 +27,28 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 
 
-# Configure logging
+# Configure logging - use UTF-8 encoding to avoid Unicode errors
 LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs')
 os.makedirs(LOG_DIR, exist_ok=True)
+
+# Create handlers with proper encoding
+file_handler = logging.FileHandler(
+    os.path.join(LOG_DIR, f'print_client_{datetime.now().strftime("%Y%m%d")}.log'),
+    encoding='utf-8'
+)
+console_handler = logging.StreamHandler(sys.stdout)
+
+# Set encoding for console on Windows
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except:
+        pass
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, f'print_client_{datetime.now().strftime("%Y%m%d")}.log')),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[file_handler, console_handler]
 )
 logger = logging.getLogger('PrintClient')
 
@@ -117,9 +128,75 @@ class ThermalPrinter:
         """Get list of available printers"""
         return [printer[2] for printer in win32print.EnumPrinters(2)]
     
-    def print_text(self, content: str) -> bool:
-        """Print text content to thermal printer"""
+    def format_for_thermal(self, content: str, job_type: str = 'receipt') -> str:
+        """
+        Add ESC/POS commands for thermal printer formatting
+        
+        Args:
+            content: Plain text content
+            job_type: 'kot', 'bot', or 'receipt'
+        
+        Returns:
+            str: Content with ESC/POS commands
+        """
+        # ESC/POS commands
+        ESC = chr(27)
+        GS = chr(29)
+        
+        # Initialize printer
+        INIT = ESC + '@'
+        
+        # Text formatting
+        BOLD_ON = ESC + 'E' + chr(1)
+        BOLD_OFF = ESC + 'E' + chr(0)
+        
+        # Alignment
+        CENTER = ESC + 'a' + chr(1)
+        LEFT = ESC + 'a' + chr(0)
+        
+        # Text size
+        DOUBLE_HEIGHT = ESC + '!' + chr(16)
+        DOUBLE_WIDTH = ESC + '!' + chr(32)
+        DOUBLE_SIZE = ESC + '!' + chr(48)  # Both height and width
+        NORMAL_SIZE = ESC + '!' + chr(0)
+        
+        # Paper control
+        CUT = GS + 'V' + chr(66) + chr(3)  # Partial cut with feed
+        FEED = '\n\n\n\n\n'  # Feed paper before cut
+        
+        # Build formatted content
+        formatted = INIT  # Initialize printer
+        formatted += LEFT  # Start left-aligned
+        formatted += NORMAL_SIZE  # Normal size
+        
+        # Add header based on job type
+        if job_type == 'kot':
+            formatted += CENTER + DOUBLE_SIZE + BOLD_ON
+            formatted += "KITCHEN ORDER\n"
+            formatted += BOLD_OFF + NORMAL_SIZE + LEFT
+        elif job_type == 'bot':
+            formatted += CENTER + DOUBLE_SIZE + BOLD_ON
+            formatted += "BAR ORDER\n"
+            formatted += BOLD_OFF + NORMAL_SIZE + LEFT
+        elif job_type == 'receipt':
+            # Receipt already has its own formatting in content
+            pass
+        
+        # Add main content
+        formatted += content
+        
+        # Add paper feed and cut
+        formatted += FEED
+        formatted += CUT
+        
+        return formatted
+    
+    def print_text(self, content: str, job_type: str = 'receipt') -> bool:
+        """Print text content to thermal printer with ESC/POS formatting"""
         try:
+            # Add ESC/POS commands for proper thermal printing
+            formatted_content = self.format_for_thermal(content, job_type)
+            
             # Open printer
             hprinter = win32print.OpenPrinter(self.printer_name)
             
@@ -131,8 +208,16 @@ class ThermalPrinter:
                 try:
                     win32print.StartPagePrinter(hprinter)
                     
-                    # Convert content to bytes (CP437 encoding for thermal printers)
-                    content_bytes = content.encode('cp437', errors='replace')
+                    # Try multiple encodings for thermal printers
+                    # CP437 is standard for most thermal printers
+                    # But some may need CP850 or UTF-8
+                    try:
+                        content_bytes = formatted_content.encode('cp437', errors='replace')
+                    except:
+                        try:
+                            content_bytes = formatted_content.encode('cp850', errors='replace')
+                        except:
+                            content_bytes = formatted_content.encode('utf-8', errors='replace')
                     
                     # Send to printer
                     win32print.WritePrinter(hprinter, content_bytes)
@@ -178,7 +263,7 @@ class PrintClient:
         """Fetch pending print jobs from server"""
         try:
             url = f"{self.server_url}/orders/api/print-jobs/pending/"
-            response = self.session.get(url, timeout=10)
+            response = self.session.get(url, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -189,6 +274,12 @@ class PrintClient:
                     jobs = data if isinstance(data, list) else []
                 if jobs:
                     logger.info(f"Retrieved {len(jobs)} pending job(s)")
+                    # Debug: show printer_name from each job
+                    for job in jobs:
+                        job_id = job.get('id')
+                        job_type = job.get('job_type')
+                        printer_name = job.get('printer_name')
+                        logger.info(f"  → Job #{job_id} ({job_type}): server printer = '{printer_name or 'auto-detect'}'")
                 return jobs
             elif response.status_code == 401:
                 logger.error("Authentication failed. Check API token in config.json")
@@ -208,7 +299,7 @@ class PrintClient:
         """Mark job as printing"""
         try:
             url = f"{self.server_url}/orders/api/print-jobs/{job_id}/start_printing/"
-            response = self.session.post(url, timeout=10)
+            response = self.session.post(url, timeout=30)
             return response.status_code == 200
         except Exception as e:
             logger.error(f"Error marking job {job_id} as printing: {str(e)}")
@@ -218,7 +309,7 @@ class PrintClient:
         """Mark job as completed"""
         try:
             url = f"{self.server_url}/orders/api/print-jobs/{job_id}/mark_completed/"
-            response = self.session.post(url, timeout=10)
+            response = self.session.post(url, timeout=30)
             return response.status_code == 200
         except Exception as e:
             logger.error(f"Error marking job {job_id} as completed: {str(e)}")
@@ -229,35 +320,71 @@ class PrintClient:
         try:
             url = f"{self.server_url}/orders/api/print-jobs/{job_id}/mark_failed/"
             data = {'error_message': error_message}
-            response = self.session.post(url, json=data, timeout=10)
+            response = self.session.post(url, json=data, timeout=30)
             return response.status_code == 200
         except Exception as e:
             logger.error(f"Error marking job {job_id} as failed: {str(e)}")
             return False
     
+    def get_printer_for_job(self, job: Dict[str, Any]) -> ThermalPrinter:
+        """
+        Get the appropriate printer for a job.
+        Priority:
+        1. If server specifies printer_name AND that printer exists locally → Use it
+        2. Otherwise → Auto-detect thermal printer
+        """
+        server_printer_name = job.get('printer_name')
+        job_type = job.get('job_type', 'unknown')
+        
+        if server_printer_name:
+            # Check if the specified printer exists on this computer
+            available_printers = self.printer.get_available_printers()
+            logger.info(f"Looking for '{server_printer_name}' in available printers: {available_printers}")
+            
+            # Case-insensitive match
+            for printer in available_printers:
+                if printer.lower() == server_printer_name.lower():
+                    logger.info(f"✓ Found matching printer for {job_type}: {printer}")
+                    return ThermalPrinter(printer_name=printer, auto_detect=False)
+            
+            # Printer name from server doesn't exist locally - auto-detect
+            logger.warning(f"✗ Configured printer '{server_printer_name}' not found locally!")
+            logger.warning(f"  Available printers: {available_printers}")
+            logger.info(f"  Falling back to auto-detect for {job_type}...")
+        else:
+            logger.info(f"No printer configured on server for {job_type}, using auto-detect")
+        
+        # No printer specified or not found - use default auto-detected printer
+        return self.printer
+    
     def process_job(self, job: Dict[str, Any]) -> bool:
         """Process a single print job"""
         job_id = job.get('id')
-        job_type = job.get('job_type')
+        job_type = job.get('job_type', 'receipt')  # kot, bot, or receipt
         content = job.get('content')
+        server_printer = job.get('printer_name')
         
-        logger.info(f"Processing job #{job_id} ({job_type})")
+        logger.info(f"Processing job #{job_id} ({job_type}) - Server printer: {server_printer or 'auto-detect'}")
         
         # Mark as printing
         if not self.mark_job_printing(job_id):
             logger.warning(f"Failed to mark job #{job_id} as printing, continuing anyway")
         
-        # Print content
-        success = self.printer.print_text(content)
+        # Get the right printer for this job
+        printer = self.get_printer_for_job(job)
+        logger.info(f"Printing to: {printer.printer_name}")
+        
+        # Print content with job_type for proper ESC/POS formatting
+        success = printer.print_text(content, job_type)
         
         # Mark result
         if success:
             self.mark_job_completed(job_id)
-            logger.info(f"✓ Job #{job_id} completed successfully")
+            logger.info(f"[OK] Job #{job_id} completed successfully on {printer.printer_name}")
             return True
         else:
-            self.mark_job_failed(job_id, "Print error")
-            logger.error(f"✗ Job #{job_id} failed to print")
+            self.mark_job_failed(job_id, f"Print error on {printer.printer_name}")
+            logger.error(f"[FAILED] Job #{job_id} failed to print on {printer.printer_name}")
             return False
     
     def run(self):
@@ -265,7 +392,8 @@ class PrintClient:
         logger.info("=" * 60)
         logger.info("Print Client Started")
         logger.info(f"Server: {self.server_url}")
-        logger.info(f"Printer: {self.printer.printer_name}")
+        logger.info(f"Default Printer: {self.printer.printer_name}")
+        logger.info(f"Mode: Uses server-configured printer if available, else auto-detect")
         logger.info(f"Poll Interval: {self.poll_interval} seconds")
         logger.info("=" * 60)
         

@@ -4317,7 +4317,15 @@ def save_printer_settings(request):
             elif user.is_owner():
                 current_restaurant = Restaurant.objects.filter(main_owner=user).first()
         
-        # Save to Restaurant model (preferred) or User model (fallback)
+        # ALWAYS save to User model first (ensures backup)
+        user.kitchen_printer_name = kitchen_printer if kitchen_printer else None
+        user.bar_printer_name = bar_printer if bar_printer else None
+        user.receipt_printer_name = receipt_printer if receipt_printer else None
+        user.auto_print_kot = auto_print_kot
+        user.auto_print_bot = auto_print_bot
+        user.save()
+        
+        # ALSO save to Restaurant model if available (for branch support)
         if current_restaurant:
             current_restaurant.kitchen_printer_name = kitchen_printer if kitchen_printer else None
             current_restaurant.bar_printer_name = bar_printer if bar_printer else None
@@ -4331,14 +4339,6 @@ def save_printer_settings(request):
                 'message': f'Printer settings saved for {current_restaurant.name}!'
             })
         else:
-            # Fallback to User model
-            user.kitchen_printer_name = kitchen_printer if kitchen_printer else None
-            user.bar_printer_name = bar_printer if bar_printer else None
-            user.receipt_printer_name = receipt_printer if receipt_printer else None
-            user.auto_print_kot = auto_print_kot
-            user.auto_print_bot = auto_print_bot
-            user.save()
-            
             return JsonResponse({
                 'success': True,
                 'message': 'Printer settings saved successfully!'

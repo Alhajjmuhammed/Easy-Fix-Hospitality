@@ -646,15 +646,129 @@ def auto_print_receipt(payment):
 
 
 def _generate_kot_content(order):
-    """Generate KOT content for print job"""
-    printer = ThermalPrinter()
-    return printer._generate_kot_content(order)
+    """Generate KOT text content (standalone function for queue-based printing)"""
+    lines = []
+    width = 32  # 80mm thermal printer ~32 chars
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("KITCHEN ORDER TICKET (KOT)".center(width))
+    lines.append("=" * width)
+    lines.append("")
+    
+    # Restaurant info - use main restaurant name for branch staff
+    restaurant = order.table_info.owner
+    if restaurant.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=restaurant, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = restaurant.restaurant_name
+    else:
+        restaurant_name = restaurant.restaurant_name
+    
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append("")
+    lines.append("-" * width)
+    lines.append("")
+    
+    # Kitchen items only
+    lines.append("KITCHEN ITEMS:")
+    lines.append("")
+    
+    kitchen_items = [item for item in order.order_items.all() if item.product.station == 'kitchen']
+    
+    for item in kitchen_items:
+        # Item name and quantity
+        lines.append(f"{item.quantity}x {item.product.name}")
+        
+        # Special instructions if any
+        if order.special_instructions:
+            wrapped = textwrap.wrap(f"   Note: {order.special_instructions}", width=width-3)
+            lines.extend(wrapped)
+        
+        lines.append("")
+    
+    # Footer
+    lines.append("-" * width)
+    lines.append(f"Total Items: {len(kitchen_items)}")
+    lines.append(f"Total Qty: {sum(item.quantity for item in kitchen_items)}")
+    lines.append("")
+    lines.append("For kitchen preparation only")
+    lines.append("NOT FOR BILLING")
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
 
 
 def _generate_bot_content(order):
-    """Generate BOT content for print job"""
-    printer = ThermalPrinter()
-    return printer._generate_bot_content(order)
+    """Generate BOT text content (standalone function for queue-based printing)"""
+    lines = []
+    width = 32  # 80mm thermal printer ~32 chars
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("BAR ORDER TICKET (BOT)".center(width))
+    lines.append("=" * width)
+    lines.append("")
+    
+    # Restaurant info - use main restaurant name for branch staff
+    restaurant = order.table_info.owner
+    if restaurant.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=restaurant, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = restaurant.restaurant_name
+    else:
+        restaurant_name = restaurant.restaurant_name
+    
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append("")
+    lines.append("-" * width)
+    lines.append("")
+    
+    # Bar items only
+    lines.append("BAR ITEMS:")
+    lines.append("")
+    
+    bar_items = [item for item in order.order_items.all() if item.product.station == 'bar']
+    
+    for item in bar_items:
+        # Item name and quantity
+        lines.append(f"{item.quantity}x {item.product.name}")
+        
+        # Special instructions if any
+        if order.special_instructions:
+            wrapped = textwrap.wrap(f"   Note: {order.special_instructions}", width=width-3)
+            lines.extend(wrapped)
+        
+        lines.append("")
+    
+    # Footer
+    lines.append("-" * width)
+    lines.append(f"Total Items: {len(bar_items)}")
+    lines.append(f"Total Qty: {sum(item.quantity for item in bar_items)}")
+    lines.append("")
+    lines.append("For bar preparation only")
+    lines.append("NOT FOR BILLING")
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
 
 
 def _generate_receipt_content(payment):
@@ -662,7 +776,7 @@ def _generate_receipt_content(payment):
     from decimal import Decimal
     
     lines = []
-    width = 42  # Match actual thermal printer width (58mm/80mm thermal)
+    width = 32  # Standard 80mm thermal printer width (~32 chars)
     order = payment.order
     restaurant = order.table_info.owner
     

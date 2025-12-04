@@ -233,3 +233,9 @@ To update print client:
 **Version**: 1.0.0  
 **Author**: Restaurant Ordering System  
 **License**: Proprietary
+
+1. Install Python (manual - from website)
+        ↓
+2. Run SETUP.bat (automatic - installs packages + gets token)
+        ↓
+3. Run start_print_client.bat (every day - starts printing)
