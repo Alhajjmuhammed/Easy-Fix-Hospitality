@@ -161,9 +161,12 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow iframes from same origin
 CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 CROSS_ORIGIN_EMBEDDER_POLICY = 'unsafe-none'  # Allow external CDN resources
 
+# SSL/HTTPS Detection - Read from environment
+USE_HTTPS = config('USE_HTTPS', default=False, cast=bool)
+
 # CSRF Settings
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
-CSRF_COOKIE_SECURE = True    # Required for HTTPS
+CSRF_COOKIE_SECURE = USE_HTTPS  # Automatically set based on HTTPS
 CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cookies in same-site context
 CSRF_COOKIE_NAME = 'csrftoken'  # Default name
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie, not session
@@ -183,7 +186,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # Session Configuration
-SESSION_COOKIE_SECURE = True  # Required for HTTPS
+SESSION_COOKIE_SECURE = USE_HTTPS  # Automatically set based on HTTPS
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 
