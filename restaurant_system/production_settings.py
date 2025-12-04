@@ -17,7 +17,14 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-produc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+# Allowed hosts - include all domains that can access this site
+ALLOWED_HOSTS = [
+    'hospitality.easyfixsoft.com',
+    'www.hospitality.easyfixsoft.com',
+    '72.62.51.225',
+    'localhost',
+    '127.0.0.1',
+]
 
 # Application definition
 INSTALLED_APPS = [
