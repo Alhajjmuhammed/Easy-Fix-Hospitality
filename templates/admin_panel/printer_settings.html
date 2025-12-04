@@ -46,9 +46,51 @@
                         <ol class="mb-2">
                             <li>Enter your printer names below (you can find them in Windows: Control Panel → Devices and Printers)</li>
                             <li>Download and run the Print Client on your Windows PC</li>
+                            <li>Configure the Print Client with your API Token (shown below)</li>
                             <li>The Print Client will automatically print orders to your configured printers</li>
                         </ol>
                         <p class="mb-0"><strong>To find printer names on Windows:</strong> Open Command Prompt and run: <code>wmic printer get name</code></p>
+                    </div>
+
+                    <!-- API Token Section -->
+                    <div class="mb-4">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-key"></i> Print Client API Token</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">Use this token in your Print Client <code>config.json</code> file:</p>
+                                
+                                <div class="input-group mb-3">
+                                    <input type="text" 
+                                           id="api_token" 
+                                           class="form-control font-monospace" 
+                                           value="{{ api_token|default:'Token not generated' }}" 
+                                           readonly>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="copyToken()">
+                                        <i class="fas fa-copy"></i> Copy
+                                    </button>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button type="button" class="btn btn-warning" onclick="regenerateToken()">
+                                        <i class="fas fa-sync-alt"></i> Regenerate Token
+                                    </button>
+                                    <small class="text-muted">
+                                        <i class="fas fa-exclamation-triangle"></i> 
+                                        Regenerating will invalidate the old token
+                                    </small>
+                                </div>
+                                
+                                <hr>
+                                <h6>Print Client Configuration Example:</h6>
+                                <pre class="bg-dark text-light p-3 rounded"><code>{
+    "server_url": "https://hospitality.easyfixsoft.com",
+    "api_token": "{{ api_token|default:'YOUR_TOKEN_HERE' }}",
+    "poll_interval": 5
+}</code></pre>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Detect Printers Section (for Print Client users) -->
@@ -244,5 +286,39 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
 });
+
+// Copy API token to clipboard
+function copyToken() {
+    const tokenInput = document.getElementById('api_token');
+    tokenInput.select();
+    document.execCommand('copy');
+    alert('✓ API Token copied to clipboard!');
+}
+
+// Regenerate API token
+function regenerateToken() {
+    if (!confirm('Are you sure you want to regenerate the API token?\n\nThis will invalidate your current token and you will need to update your Print Client config.json file.')) {
+        return;
+    }
+    
+    fetch('{% url "admin_panel:regenerate_api_token" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('api_token').value = data.token;
+            alert('✓ ' + data.message);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error regenerating token: ' + error);
+    });
+}
 </script>
 {% endblock %}

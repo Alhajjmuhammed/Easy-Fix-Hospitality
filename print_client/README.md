@@ -41,7 +41,7 @@ pip install requests pywin32
 
 ```json
 {
-    "server_url": "https://yourserver.com",
+    "server_url": "https://hospitality.easyfixsoft.com",
     "api_token": "YOUR_API_TOKEN_HERE",
     "poll_interval": 5,
     "printer_name": null,
@@ -51,8 +51,8 @@ pip install requests pywin32
 
 **Configuration Options:**
 
-- `server_url` - Your hosted server URL (e.g., `https://restaurant.yourserver.com`)
-- `api_token` - API authentication token (get from system admin)
+- `server_url` - Your hosted server URL (e.g., `https://hospitality.easyfixsoft.com`)
+- `api_token` - API authentication token (get from Printer Settings page)
 - `poll_interval` - How often to check for new jobs (seconds)
 - `printer_name` - Specific printer name (or `null` for auto-detect)
 - `auto_detect_printer` - Automatically find thermal printer (recommended)
@@ -60,11 +60,11 @@ pip install requests pywin32
 ### Step 4: Get Your API Token
 
 1. Log in to your restaurant dashboard
-2. Go to **Settings** → **API Access**
-3. Click **Generate Print Client Token**
-4. Copy token and paste into `config.json`
+2. Go to **Admin Panel** → **Printer Settings**
+3. Copy the **API Token** shown on the page
+4. Paste the token into your `config.json`
 
-*(Note: This feature will be added to the admin panel)*
+**API Endpoint:** `https://hospitality.easyfixsoft.com/orders/api/print-jobs/pending/`
 
 ## Running the Print Client
 

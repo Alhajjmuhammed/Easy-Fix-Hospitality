@@ -4269,6 +4269,14 @@ def printer_settings(request):
         'auto_print_bot': auto_print_bot,
     }
     
+    # Get or create API token for print client
+    try:
+        from rest_framework.authtoken.models import Token
+        token, created = Token.objects.get_or_create(user=user)
+        context['api_token'] = token.key
+    except Exception:
+        context['api_token'] = None
+    
     return render(request, 'admin_panel/printer_settings.html', context)
 
 
@@ -4391,3 +4399,31 @@ def detect_printers(request):
             'error': f'Error: {str(e)}',
             'printers': []
         })
+
+
+@login_required
+@require_POST
+def regenerate_api_token(request):
+    """Regenerate API token for print client authentication"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+    
+    try:
+        from rest_framework.authtoken.models import Token
+        
+        # Delete old token
+        Token.objects.filter(user=request.user).delete()
+        
+        # Create new token
+        token = Token.objects.create(user=request.user)
+        
+        return JsonResponse({
+            'success': True,
+            'token': token.key,
+            'message': 'API token regenerated successfully. Update your Print Client config.json with the new token.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error regenerating token: {str(e)}'
+        }, status=500)

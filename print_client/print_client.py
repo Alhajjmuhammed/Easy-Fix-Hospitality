@@ -177,7 +177,7 @@ class PrintClient:
     def get_pending_jobs(self) -> list:
         """Fetch pending print jobs from server"""
         try:
-            url = f"{self.server_url}/api/print-jobs/pending/"
+            url = f"{self.server_url}/orders/api/print-jobs/pending/"
             response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
@@ -202,7 +202,7 @@ class PrintClient:
     def mark_job_printing(self, job_id: int) -> bool:
         """Mark job as printing"""
         try:
-            url = f"{self.server_url}/api/print-jobs/{job_id}/start_printing/"
+            url = f"{self.server_url}/orders/api/print-jobs/{job_id}/start_printing/"
             response = self.session.post(url, timeout=10)
             return response.status_code == 200
         except Exception as e:
@@ -212,7 +212,7 @@ class PrintClient:
     def mark_job_completed(self, job_id: int) -> bool:
         """Mark job as completed"""
         try:
-            url = f"{self.server_url}/api/print-jobs/{job_id}/mark_completed/"
+            url = f"{self.server_url}/orders/api/print-jobs/{job_id}/mark_completed/"
             response = self.session.post(url, timeout=10)
             return response.status_code == 200
         except Exception as e:
@@ -222,7 +222,7 @@ class PrintClient:
     def mark_job_failed(self, job_id: int, error_message: str) -> bool:
         """Mark job as failed"""
         try:
-            url = f"{self.server_url}/api/print-jobs/{job_id}/mark_failed/"
+            url = f"{self.server_url}/orders/api/print-jobs/{job_id}/mark_failed/"
             data = {'error_message': error_message}
             response = self.session.post(url, json=data, timeout=10)
             return response.status_code == 200

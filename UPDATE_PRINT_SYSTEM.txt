@@ -1,0 +1,51 @@
+# ============================================================================
+# UPDATE PRINT SYSTEM - FIX API URLS
+# ============================================================================
+# Run these commands on your VPS (ssh root@72.62.51.225)
+# ============================================================================
+
+# Step 1: SSH into VPS
+ssh root@72.62.51.225
+
+# Step 2: Navigate to project directory
+cd /var/www/restaurant
+
+# Step 3: Pull latest changes
+git pull origin main
+
+# Step 4: Restart services
+sudo systemctl restart gunicorn
+sudo systemctl restart daphne
+sudo systemctl restart nginx
+
+# Step 5: Verify services are running
+sudo systemctl status gunicorn
+sudo systemctl status daphne
+
+# ============================================================================
+# PRINT CLIENT SETUP INSTRUCTIONS
+# ============================================================================
+# 
+# The Print Client runs on your Windows PC (not on VPS)
+# 
+# 1. On the website, go to Admin Panel → Printer Settings
+# 2. Copy the API Token shown on that page
+# 3. On your Windows PC, copy the print_client folder
+# 4. Create config.json with:
+#    {
+#        "server_url": "https://hospitality.easyfixsoft.com",
+#        "api_token": "YOUR_TOKEN_FROM_PRINTER_SETTINGS_PAGE",
+#        "poll_interval": 5,
+#        "auto_detect_printer": true
+#    }
+# 5. Run: python print_client.py
+#
+# The Print Client will poll the server every 5 seconds for pending print jobs
+# When an order is placed, it creates a PrintJob in the database
+# The Print Client fetches pending jobs and prints them to your Windows printer
+# ============================================================================
+
+# If you need to test the API is working, run this from the VPS:
+curl -H "Authorization: Token YOUR_TOKEN_HERE" https://hospitality.easyfixsoft.com/orders/api/print-jobs/pending/
+
+# You should see: {"count": 0, "jobs": []}

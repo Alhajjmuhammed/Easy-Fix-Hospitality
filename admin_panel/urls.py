@@ -110,4 +110,5 @@ urlpatterns = [
     path('printer-settings/', views.printer_settings, name='printer_settings'),
     path('printer-settings/save/', views.save_printer_settings, name='save_printer_settings'),
     path('printer-settings/detect/', views.detect_printers, name='detect_printers'),
+    path('printer-settings/regenerate-token/', views.regenerate_api_token, name='regenerate_api_token'),
 ]
