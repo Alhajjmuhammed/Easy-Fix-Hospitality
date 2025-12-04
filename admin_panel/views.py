@@ -35,13 +35,13 @@ def get_production_qr_url(request, qr_code):
     """
     Helper function to generate the correct QR URL
     - Local development: http://127.0.0.1:8000/r/{qr_code}/
-    - Production: https://easyfixsoft.com/r/{qr_code}/ or http://72.62.51.225/r/{qr_code}/
+    - Production: https://hospitality.easyfixsoft.com/r/{qr_code}/
     """
     host = request.get_host()
     
     # Force HTTPS for production domains
     if 'easyfixsoft.com' in host or '72.62.51.225' in host:
-        return f'https://easyfixsoft.com/r/{qr_code}/'
+        return f'https://hospitality.easyfixsoft.com/r/{qr_code}/'
     
     # Local development - use HTTP
     if '127.0.0.1' in host or 'localhost' in host:
