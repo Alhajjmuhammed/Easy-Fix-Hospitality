@@ -3,9 +3,28 @@ Server-side printing module for automatic KOT/BOT printing
 Prints directly to thermal printer without browser dialog
 """
 
-import win32print  # type: ignore
-import win32ui  # type: ignore
-import win32con  # type: ignore
+import sys
+import platform
+
+# Windows-only imports - only import on Windows
+if platform.system() == 'Windows':
+    try:
+        import win32print  # type: ignore
+        import win32ui  # type: ignore
+        import win32con  # type: ignore
+        WINDOWS_PRINTING_AVAILABLE = True
+    except ImportError:
+        WINDOWS_PRINTING_AVAILABLE = False
+        win32print = None
+        win32ui = None
+        win32con = None
+else:
+    # Linux/Mac - Windows printing not available
+    WINDOWS_PRINTING_AVAILABLE = False
+    win32print = None
+    win32ui = None
+    win32con = None
+
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 from django.template.loader import render_to_string
@@ -104,6 +123,7 @@ class ThermalPrinter:
     """
     Direct thermal printer interface for Windows
     Automatically prints to default printer without user interaction
+    NOTE: This class only works on Windows. On Linux/Mac, use the print queue system.
     """
     
     def __init__(self, printer_name=None):
@@ -113,6 +133,11 @@ class ThermalPrinter:
         Args:
             printer_name: Specific printer name, or None for auto-detection
         """
+        if not WINDOWS_PRINTING_AVAILABLE:
+            print("⚠ Windows printing not available on this platform. Use print queue instead.")
+            self.printer_name = None
+            return
+            
         if printer_name is None:
             # Auto-detect thermal printer
             self.printer_name = self._find_thermal_printer()
@@ -127,6 +152,9 @@ class ThermalPrinter:
         Returns:
             str: Printer name
         """
+        if not WINDOWS_PRINTING_AVAILABLE:
+            return None
+            
         thermal_keywords = ['POS', 'THERMAL', 'RETSOL', 'TP806', 'TP80', 'TP58', 
                            'RECEIPT', 'EPSON', 'STAR', 'BIXOLON', 'CITIZEN']
         
@@ -150,6 +178,8 @@ class ThermalPrinter:
     
     def get_available_printers(self):
         """Get list of all available printers"""
+        if not WINDOWS_PRINTING_AVAILABLE:
+            return []
         printers = []
         for printer_info in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL):
             printers.append(printer_info[2])  # Printer name
@@ -166,6 +196,14 @@ class ThermalPrinter:
         Returns:
             bool: True if successful, False otherwise
         """
+        if not WINDOWS_PRINTING_AVAILABLE:
+            print("⚠ Windows printing not available. Use print queue instead.")
+            return False
+            
+        if self.printer_name is None:
+            print("⚠ No printer configured.")
+            return False
+            
         try:
             # Open printer
             hPrinter = win32print.OpenPrinter(self.printer_name)
