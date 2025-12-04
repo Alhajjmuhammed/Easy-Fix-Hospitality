@@ -267,18 +267,21 @@ AUTHENTICATION_BACKENDS = [
 AXES_ENABLED = True
 AXES_FAILURE_LIMIT = 10  # Allow 10 failed attempts before lockout (reasonable for busy restaurants)
 AXES_COOLOFF_TIME = timedelta(minutes=30)  # 30-minute cooldown (not too long, not too short)
-AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]  # Lock by username + IP combination
+AXES_LOCKOUT_PARAMETERS = ["username"]  # Lock by username only (simpler and more reliable)
 AXES_RESET_ON_SUCCESS = True  # Reset counter on successful login
 AXES_LOCKOUT_TEMPLATE = 'accounts/account_locked.html'  # Custom lockout page
 AXES_LOCKOUT_URL = None  # Use template instead of redirect
 AXES_VERBOSE = True  # Log all attempts for security audit
 AXES_ENABLE_ACCESS_FAILURE_LOG = True  # Store in database for analysis
-AXES_IPWARE_PROXY_COUNT = 1  # Handle proxy/load balancer correctly
-AXES_IPWARE_META_PRECEDENCE_ORDER = [  # Get real IP behind proxy/load balancer
+
+# IP detection for nginx reverse proxy
+AXES_PROXY_COUNT = 1  # We have 1 proxy (nginx)
+AXES_META_PRECEDENCE_ORDER = [
     'HTTP_X_FORWARDED_FOR',
-    'HTTP_X_REAL_IP',
+    'HTTP_X_REAL_IP', 
     'REMOTE_ADDR',
 ]
+
 AXES_IP_BLACKLIST = []  # Can add known malicious IPs
 AXES_IP_WHITELIST = []  # Can add trusted IPs (e.g., admin office, staff networks)
 
