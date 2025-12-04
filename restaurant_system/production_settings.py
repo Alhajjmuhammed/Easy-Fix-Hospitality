@@ -176,8 +176,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://hospitality.easyfixsoft.com',
     'https://www.hospitality.easyfixsoft.com',
     'http://www.hospitality.easyfixsoft.com',
-    'http://72.62.51.255',
-    'https://72.62.51.255',
+    'http://72.62.51.225',
+    'https://72.62.51.225',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
 ]

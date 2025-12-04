@@ -127,18 +127,22 @@ mkdir -p /var/www/restaurant/logs
 # This command creates the .env file with all settings:
 
 cat > /var/www/restaurant/.env << 'EOF'
+# Django Settings
 DEBUG=False
-SECRET_KEY=django-insecure-xk9#mq2@5v!b8n3$hj6&w1z0p4r7t*fy+u=c%e^g(a)s_d-i
+SECRET_KEY=your-very-secret-key-change-this-in-production-12345
 ALLOWED_HOSTS=72.62.51.225,localhost,127.0.0.1
 
+# Database Configuration
 DB_NAME=restaurant_db
 DB_USER=restaurant_user
-DB_PASSWORD=RestaurantPass123
+DB_PASSWORD=RestaurantSecure2024!
 DB_HOST=localhost
 DB_PORT=5432
 
+# Redis Configuration
 REDIS_URL=redis://localhost:6379/0
 
+# Security Settings
 SECURE_SSL_REDIRECT=False
 SECURE_HSTS_SECONDS=0
 EOF
