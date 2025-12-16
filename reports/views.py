@@ -373,6 +373,12 @@ def export_csv(request):
     if to_date:
         orders = orders.filter(created_at__date__lte=to_date)
     
+    # Apply station filtering (Kitchen/Bar/All)
+    if station_filter == 'kitchen':
+        orders = orders.filter(order_items__product__station='kitchen').distinct()
+    elif station_filter == 'bar':
+        orders = orders.filter(order_items__product__station='bar').distinct()
+    
     # Calculate summary data for the export
     total_orders = orders.count()
     total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
@@ -541,25 +547,28 @@ def export_csv(request):
     writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Cashier'])
     
     for order in orders.order_by('-created_at'):
-        # Filter items based on active filters (same logic as template)
+        # Filter items based on active filters (ALL filters must pass - use AND logic)
         filtered_items = []
         for item in order.order_items.all():
             include_item = True
+            # Check category filter
             if category_id != 'all' and str(item.product.main_category_id) != str(category_id):
                 include_item = False
-            elif subcategory_id != 'all':
+            # Check subcategory filter (independent of category check)
+            if include_item and subcategory_id != 'all':
                 if not item.product.sub_category or str(item.product.sub_category_id) != str(subcategory_id):
                     include_item = False
-            elif station_filter != 'all' and item.product.station != station_filter:
+            # Check station filter (independent of other checks)
+            if include_item and station_filter != 'all' and item.product.station != station_filter:
                 include_item = False
             if include_item:
                 filtered_items.append(item)
         
         # Use filtered items for display
         items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items])
-        categories_list = ', '.join(set([item.product.main_category.name for item in filtered_items]))
-        subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in filtered_items]))
-        stations_list = ', '.join(set([item.product.station.title() for item in filtered_items]))
+        categories_list = ', '.join(set([item.product.main_category.name for item in filtered_items])) if filtered_items else ''
+        subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in filtered_items])) if filtered_items else ''
+        stations_list = ', '.join(set([item.product.station.title() for item in filtered_items])) if filtered_items else ''
         table_number = order.table_info.tbl_no if order.table_info else '-'
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
         cashier_name = f"{order.confirmed_by.first_name} {order.confirmed_by.last_name}" if order.confirmed_by else f"{order.ordered_by.first_name} {order.ordered_by.last_name} (Self)" if order.ordered_by else 'System'
@@ -695,6 +704,12 @@ def export_pdf(request):
         orders = orders.filter(created_at__date__gte=from_date)
     if to_date:
         orders = orders.filter(created_at__date__lte=to_date)
+    
+    # Apply station filtering (Kitchen/Bar/All)
+    if station_filter == 'kitchen':
+        orders = orders.filter(order_items__product__station='kitchen').distinct()
+    elif station_filter == 'bar':
+        orders = orders.filter(order_items__product__station='bar').distinct()
     
     # Calculate summary data for the export
     total_orders = orders.count()
@@ -971,12 +986,15 @@ def export_pdf(request):
         filtered_items = []
         for item in order.order_items.all():
             include_item = True
+            # Check category filter
             if category_id != 'all' and str(item.product.main_category_id) != str(category_id):
                 include_item = False
-            elif subcategory_id != 'all':
+            # Check subcategory filter (independent of category check)
+            if include_item and subcategory_id != 'all':
                 if not item.product.sub_category or str(item.product.sub_category_id) != str(subcategory_id):
                     include_item = False
-            elif station_filter != 'all' and item.product.station != station_filter:
+            # Check station filter (independent of other checks)
+            if include_item and station_filter != 'all' and item.product.station != station_filter:
                 include_item = False
             if include_item:
                 filtered_items.append(item)
