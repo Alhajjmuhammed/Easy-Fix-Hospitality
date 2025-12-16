@@ -541,10 +541,25 @@ def export_csv(request):
     writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Cashier'])
     
     for order in orders.order_by('-created_at'):
-        items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in order.order_items.all()])
-        categories_list = ', '.join([item.product.main_category.name for item in order.order_items.all()])
-        subcategories_list = ', '.join([item.product.sub_category.name if item.product.sub_category else '-' for item in order.order_items.all()])
-        stations_list = ', '.join([item.product.station.title() for item in order.order_items.all()])
+        # Filter items based on active filters (same logic as template)
+        filtered_items = []
+        for item in order.order_items.all():
+            include_item = True
+            if category_id != 'all' and str(item.product.main_category_id) != str(category_id):
+                include_item = False
+            elif subcategory_id != 'all':
+                if not item.product.sub_category or str(item.product.sub_category_id) != str(subcategory_id):
+                    include_item = False
+            elif station_filter != 'all' and item.product.station != station_filter:
+                include_item = False
+            if include_item:
+                filtered_items.append(item)
+        
+        # Use filtered items for display
+        items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items])
+        categories_list = ', '.join(set([item.product.main_category.name for item in filtered_items]))
+        subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in filtered_items]))
+        stations_list = ', '.join(set([item.product.station.title() for item in filtered_items]))
         table_number = order.table_info.tbl_no if order.table_info else '-'
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
         cashier_name = f"{order.confirmed_by.first_name} {order.confirmed_by.last_name}" if order.confirmed_by else f"{order.ordered_by.first_name} {order.ordered_by.last_name} (Self)" if order.ordered_by else 'System'
@@ -952,8 +967,22 @@ def export_pdf(request):
     
     # Table data
     for order in orders.order_by('-created_at'):
-        items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in order.order_items.all()][:3])  # Limit items for PDF
-        if len(order.order_items.all()) > 3:
+        # Filter items based on active filters (same logic as CSV export)
+        filtered_items = []
+        for item in order.order_items.all():
+            include_item = True
+            if category_id != 'all' and str(item.product.main_category_id) != str(category_id):
+                include_item = False
+            elif subcategory_id != 'all':
+                if not item.product.sub_category or str(item.product.sub_category_id) != str(subcategory_id):
+                    include_item = False
+            elif station_filter != 'all' and item.product.station != station_filter:
+                include_item = False
+            if include_item:
+                filtered_items.append(item)
+        
+        items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items][:3])  # Limit items for PDF
+        if len(filtered_items) > 3:
             items_list += "..."
         
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in'
