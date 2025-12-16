@@ -219,6 +219,20 @@ def dashboard(request):
     if category_id != 'all':
         subcategories = subcategories.filter(main_category_id=category_id)
     
+    # Get selected category/subcategory names for template display
+    selected_category_name = None
+    selected_subcategory_name = None
+    if category_id != 'all':
+        try:
+            selected_category_name = MainCategory.objects.get(id=category_id).name
+        except MainCategory.DoesNotExist:
+            pass
+    if subcategory_id != 'all':
+        try:
+            selected_subcategory_name = SubCategory.objects.get(id=subcategory_id).name
+        except SubCategory.DoesNotExist:
+            pass
+    
     # Today's date for template defaults
     today_str = timezone.now().date().strftime('%Y-%m-%d')
     
@@ -235,6 +249,8 @@ def dashboard(request):
         'subcategories': subcategories,
         'selected_category': category_id,
         'selected_subcategory': subcategory_id,
+        'selected_category_name': selected_category_name,
+        'selected_subcategory_name': selected_subcategory_name,
         'station_filter': station_filter,  # NEW: Station filter value
         'kitchen_orders_count': kitchen_orders_count,
         'bar_orders_count': bar_orders_count,

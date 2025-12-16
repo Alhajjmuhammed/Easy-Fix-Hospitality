@@ -337,23 +337,46 @@
                             </td>
                             <td>
                                 <small>
+                                {% comment %}Filter items based on active filters{% endcomment %}
                                 {% for item in order.order_items.all %}
-                                    {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                    {% if selected_category and selected_category != 'all' %}
+                                        {% if item.product.main_category.id|stringformat:"s" == selected_category %}
+                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                        {% endif %}
+                                    {% elif selected_subcategory and selected_subcategory != 'all' %}
+                                        {% if item.product.sub_category and item.product.sub_category.id|stringformat:"s" == selected_subcategory %}
+                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                        {% endif %}
+                                    {% elif station_filter and station_filter != 'all' %}
+                                        {% if item.product.station == station_filter %}
+                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                        {% endif %}
+                                    {% else %}
+                                        {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                    {% endif %}
                                 {% endfor %}
                                 </small>
                             </td>
                             <td>
                                 <small>
-                                {% for item in order.order_items.all %}
-                                    {{ item.product.main_category.name }}{% if not forloop.last %}, {% endif %}
-                                {% endfor %}
+                                {% if selected_category_name %}
+                                    {{ selected_category_name }}
+                                {% else %}
+                                    {% for item in order.order_items.all %}
+                                        {{ item.product.main_category.name }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                {% endif %}
                                 </small>
                             </td>
                             <td>
                                 <small>
-                                {% for item in order.order_items.all %}
-                                    {% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% if not forloop.last %}, {% endif %}
-                                {% endfor %}
+                                {% if selected_subcategory_name %}
+                                    {{ selected_subcategory_name }}
+                                {% else %}
+                                    {% for item in order.order_items.all %}
+                                        {% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                {% endif %}
                                 </small>
                             </td>
                             <td class="text-center">
