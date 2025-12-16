@@ -1100,8 +1100,8 @@ def edit_main_category(request, category_id):
                 target_restaurant = Restaurant.objects.get(id=restaurant_id)
                 
                 # Validate user has permission for this restaurant
-                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
-                if target_restaurant not in accessible_restaurants:
+                accessible_restaurants = restaurant_context.get('accessible_restaurants')
+                if accessible_restaurants is None or not accessible_restaurants.filter(id=target_restaurant.id).exists():
                     return JsonResponse({'success': False, 'message': 'You do not have permission to assign categories to this restaurant'})
                 
                 # Determine owner based on restaurant type
@@ -1680,8 +1680,8 @@ def add_product(request):
             try:
                 target_restaurant = Restaurant.objects.get(id=restaurant_id)
                 # Verify user has access to this restaurant
-                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
-                if target_restaurant not in accessible_restaurants:
+                accessible_restaurants = restaurant_context.get('accessible_restaurants')
+                if accessible_restaurants is None or not accessible_restaurants.filter(id=target_restaurant.id).exists():
                     return JsonResponse({'success': False, 'message': 'You do not have permission to add products to this restaurant'})
                 current_restaurant = target_restaurant
             except Restaurant.DoesNotExist:
@@ -2687,8 +2687,8 @@ def update_table(request):
                 target_restaurant = Restaurant.objects.get(id=restaurant_id)
                 
                 # Validate user has permission for this restaurant
-                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
-                if target_restaurant not in accessible_restaurants:
+                accessible_restaurants = restaurant_context.get('accessible_restaurants')
+                if accessible_restaurants is None or not accessible_restaurants.filter(id=target_restaurant.id).exists():
                     return JsonResponse({'success': False, 'message': 'You do not have permission to assign tables to this restaurant'})
                 
                 # Determine owner based on restaurant type
@@ -3409,8 +3409,8 @@ def import_products_csv(request):
             try:
                 target_restaurant = Restaurant.objects.get(id=restaurant_id)
                 # Verify user has access to this restaurant
-                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
-                if target_restaurant not in accessible_restaurants:
+                accessible_restaurants = restaurant_context.get('accessible_restaurants')
+                if accessible_restaurants is None or not accessible_restaurants.filter(id=target_restaurant.id).exists():
                     messages.error(request, 'You do not have permission to import products to this restaurant')
                     return redirect('admin_panel:manage_products')
                 current_restaurant = target_restaurant
@@ -3626,8 +3626,8 @@ def import_products_excel(request):
             try:
                 target_restaurant = Restaurant.objects.get(id=restaurant_id)
                 # Verify user has access to this restaurant
-                accessible_restaurants = restaurant_context.get('accessible_restaurants', [])
-                if target_restaurant not in accessible_restaurants:
+                accessible_restaurants = restaurant_context.get('accessible_restaurants')
+                if accessible_restaurants is None or not accessible_restaurants.filter(id=target_restaurant.id).exists():
                     messages.error(request, 'You do not have permission to import products to this restaurant')
                     return redirect('admin_panel:manage_products')
                 current_restaurant = target_restaurant
