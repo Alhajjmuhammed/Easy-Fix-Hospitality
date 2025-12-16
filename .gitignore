@@ -47,3 +47,22 @@ debug_settings.py
 # Database
 db.sqlite3
 db.sqlite3-journal
+
+# Test scripts (local only)
+test_*.py
+check_*.py
+fix_*.py
+verify_*.py
+diagnose_*.py
+*_check.py
+
+# Build artifacts
+print_client/build/
+print_client/dist/
+*.spec
+
+# Local documentation
+*_REPORT.md
+*_FIX*.md
+*_ANALYSIS.md
+*_VERIFICATION*.md

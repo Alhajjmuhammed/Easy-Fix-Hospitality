@@ -720,18 +720,22 @@ def create_restaurant_owner(request):
 
 @login_required
 def get_restaurant_details(request, restaurant_id):
-    """Get detailed restaurant information via AJAX"""
+    """Get detailed restaurant information via AJAX - NEW Restaurant model version"""
     if not request.user.is_administrator():
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     try:
-        restaurant = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
+        # Fetch Restaurant model (not User model!)
+        restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+        
+        # Get main owner information
+        main_owner = restaurant.main_owner
         
         # Parse restaurant description for additional info
         cuisine_type = ""
         opening_hours = ""
-        if restaurant.restaurant_description:
-            for line in restaurant.restaurant_description.splitlines():
+        if restaurant.description:
+            for line in restaurant.description.splitlines():
                 if "Cuisine Type:" in line:
                     cuisine_type = line.replace("Cuisine Type:", "").strip()
                 elif "Opening Hours:" in line:
@@ -742,17 +746,17 @@ def get_restaurant_details(request, restaurant_id):
         from orders.models import Order
         
         stats = {
-            'categories': MainCategory.objects.filter(owner=restaurant).count(),
-            'products': Product.objects.filter(main_category__owner=restaurant).count(),
-            'tables': TableInfo.objects.filter(owner=restaurant).count(),
-            'orders': Order.objects.filter(table_info__owner=restaurant).count(),
-            'staff': User.objects.filter(owner=restaurant).count(),
+            'categories': MainCategory.objects.filter(owner=main_owner).count(),
+            'products': Product.objects.filter(main_category__owner=main_owner).count(),
+            'tables': TableInfo.objects.filter(owner=main_owner).count(),
+            'orders': Order.objects.filter(table_info__owner=main_owner).count(),
+            'staff': User.objects.filter(owner=main_owner).count(),
         }
         
-        # Get subscription information
+        # Get subscription information from main_owner
         subscription_data = None
-        if hasattr(restaurant, 'subscription'):
-            subscription = restaurant.subscription
+        if hasattr(main_owner, 'subscription'):
+            subscription = main_owner.subscription
             subscription_data = {
                 'start_date': subscription.subscription_start_date.strftime('%Y-%m-%d'),
                 'end_date': subscription.subscription_end_date.strftime('%Y-%m-%d'),
@@ -763,18 +767,21 @@ def get_restaurant_details(request, restaurant_id):
         
         data = {
             'id': restaurant.id,
-            'restaurant_name': restaurant.restaurant_name,
-            'restaurant_description': restaurant.restaurant_description or '',
+            'restaurant_name': restaurant.name,
+            'restaurant_description': restaurant.description or '',
             'cuisine_type': cuisine_type,
             'opening_hours': opening_hours,
-            'username': restaurant.username,
-            'email': restaurant.email,
-            'first_name': restaurant.first_name,
-            'last_name': restaurant.last_name,
-            'phone_number': restaurant.phone_number or '',
+            'username': main_owner.username,
+            'email': main_owner.email,
+            'first_name': main_owner.first_name,
+            'last_name': main_owner.last_name,
+            'phone_number': main_owner.phone_number or '',
             'address': restaurant.address or '',
-            'date_joined': restaurant.date_joined.strftime('%B %d, %Y'),
+            'date_joined': main_owner.date_joined.strftime('%B %d, %Y'),
             'is_active': restaurant.is_active,
+            'subscription_plan': restaurant.get_subscription_display(),
+            'is_main_restaurant': restaurant.is_main_restaurant,
+            'branch_count': restaurant.branches.count() if restaurant.is_main_restaurant else 0,
             'stats': stats,
             'subscription': subscription_data,
         }
@@ -786,12 +793,14 @@ def get_restaurant_details(request, restaurant_id):
 
 @login_required
 def edit_restaurant(request, restaurant_id):
-    """Edit restaurant information"""
+    """Edit restaurant information - NEW Restaurant model version"""
     if not request.user.is_administrator():
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    restaurant = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
+    # Fetch Restaurant model (not User model!)
+    restaurant_model = get_object_or_404(Restaurant, id=restaurant_id)
+    main_owner = restaurant_model.main_owner
     
     if request.method == 'POST':
         try:
@@ -867,11 +876,11 @@ def edit_restaurant(request, restaurant_id):
                 except ValueError:
                     errors.append('Invalid date format for subscription dates.')
             
-            # Check for existing username and email (exclude current restaurant)
-            if username and User.objects.filter(username=username).exclude(id=restaurant_id).exists():
+            # Check for existing username and email (exclude current main_owner)
+            if username and User.objects.filter(username=username).exclude(id=main_owner.id).exists():
                 errors.append(f'Username "{username}" already exists.')
             
-            if email and User.objects.filter(email=email).exclude(id=restaurant_id).exists():
+            if email and User.objects.filter(email=email).exclude(id=main_owner.id).exists():
                 errors.append(f'Email "{email}" already exists.')
             
             if errors:
@@ -884,57 +893,36 @@ def edit_restaurant(request, restaurant_id):
             if opening_hours:
                 enhanced_description += f"\nOpening Hours: {opening_hours}"
             
-            # Update restaurant with all fields
-            restaurant.restaurant_name = restaurant_name
-            restaurant.restaurant_description = enhanced_description.strip()
-            restaurant.phone_number = phone_number
-            restaurant.address = address
-            restaurant.username = username
-            restaurant.email = email
-            restaurant.first_name = first_name
-            restaurant.last_name = last_name
-            restaurant.is_active = is_active  # Update account active status
+            # Update Restaurant model
+            restaurant_model.name = restaurant_name
+            restaurant_model.description = enhanced_description.strip()
+            restaurant_model.address = address
+            restaurant_model.is_active = is_active
+            restaurant_model.save(update_fields=['name', 'description', 'address', 'is_active', 'updated_at'])
+            
+            # Update main_owner User model
+            main_owner.username = username
+            main_owner.email = email
+            main_owner.first_name = first_name
+            main_owner.last_name = last_name
+            main_owner.phone_number = phone_number
+            main_owner.is_active = is_active
             
             # Update password only if provided
             if password:
-                restaurant.password = make_password(password)
+                main_owner.set_password(password)
             
-            restaurant.save()
-            
-            # Also update the corresponding Restaurant model object if it exists
-            try:
-                restaurant_model = Restaurant.objects.get(main_owner=restaurant, is_main_restaurant=True)
-                
-                # Debug: Print before update
-                print(f"[DEBUG] Before update - Restaurant model address: {restaurant_model.address}")
-                print(f"[DEBUG] New address from form: {address}")
-                
-                restaurant_model.name = restaurant_name
-                restaurant_model.description = enhanced_description.strip()
-                restaurant_model.address = address
-                restaurant_model.is_active = is_active
-                restaurant_model.save(update_fields=['name', 'description', 'address', 'is_active', 'updated_at'])
-                
-                # Debug: Print after update
-                restaurant_model.refresh_from_db()
-                print(f"[DEBUG] After update - Restaurant model address: {restaurant_model.address}")
-                print(f"[SYSTEM ADMIN] Successfully updated Restaurant model for {restaurant_name}")
-                
-            except Restaurant.DoesNotExist:
-                print(f"[SYSTEM ADMIN] No Restaurant model found for user {restaurant.username}, only User model updated")
-            except Exception as e:
-                print(f"[SYSTEM ADMIN] Error updating Restaurant model: {str(e)}")
-                import traceback
-                traceback.print_exc()
+            main_owner.save()
             
             # Handle subscription update or creation only if dates are provided
+            subscription_msg = ''
             if subscription_start_date and subscription_end_date:
                 start_date_obj = datetime.strptime(subscription_start_date, '%Y-%m-%d').date()
                 end_date_obj = datetime.strptime(subscription_end_date, '%Y-%m-%d').date()
                 
-                if hasattr(restaurant, 'subscription'):
+                if hasattr(main_owner, 'subscription'):
                     # Update existing subscription
-                    subscription = restaurant.subscription
+                    subscription = main_owner.subscription
                     old_start_date = subscription.subscription_start_date
                     old_end_date = subscription.subscription_end_date
                     old_status = subscription.subscription_status
@@ -945,10 +933,11 @@ def edit_restaurant(request, restaurant_id):
                     subscription.save()
                     
                     # Log subscription update
+                    from accounts.models import SubscriptionLog
                     SubscriptionLog.objects.create(
                         subscription=subscription,
                         action='updated',
-                        description=f"Subscription updated: dates changed from {old_start_date}-{old_end_date} to {start_date_obj}-{end_date_obj}, status changed from {old_status} to {subscription_status}",
+                        description=f"Subscription updated by admin: dates {old_start_date}-{old_end_date} → {start_date_obj}-{end_date_obj}, status {old_status} → {subscription_status}",
                         old_status=old_status,
                         new_status=subscription_status,
                         performed_by=request.user
@@ -957,8 +946,9 @@ def edit_restaurant(request, restaurant_id):
                     subscription_msg = f' Subscription updated: {subscription_status} from {start_date_obj} to {end_date_obj}.'
                 else:
                     # Create new subscription
+                    from accounts.models import RestaurantSubscription, SubscriptionLog
                     subscription = RestaurantSubscription.objects.create(
-                        restaurant_owner=restaurant,
+                        restaurant_owner=main_owner,
                         subscription_start_date=start_date_obj,
                         subscription_end_date=end_date_obj,
                         subscription_status=subscription_status,
@@ -969,23 +959,19 @@ def edit_restaurant(request, restaurant_id):
                     SubscriptionLog.objects.create(
                         subscription=subscription,
                         action='created',
-                        description=f"New subscription created during edit: {subscription_status} from {start_date_obj} to {end_date_obj}",
+                        description=f"New subscription created by admin: {subscription_status} from {start_date_obj} to {end_date_obj}",
                         old_status='none',
                         new_status=subscription_status,
                         performed_by=request.user
                     )
                     
                     subscription_msg = f' New subscription created: {subscription_status} from {start_date_obj} to {end_date_obj}.'
-            else:
-                subscription_msg = ''  # No subscription changes
             
             success_msg = f'Restaurant "{restaurant_name}" updated successfully!'
             success_msg += subscription_msg
             if password:
                 success_msg += ' Password has been changed.'
             
-            # Don't use messages.success() here since we return JSON and show toast notification
-            # The page will reload and would show duplicate messages
             return JsonResponse({'success': True, 'message': success_msg})
             
         except Exception as e:
@@ -997,65 +983,47 @@ def edit_restaurant(request, restaurant_id):
 
 @login_required
 def delete_restaurant(request, restaurant_id):
-    """Delete a restaurant and all its data with comprehensive cascade deletion"""
+    """Delete a restaurant (branch or main) - NEW Restaurant model version"""
     if not request.user.is_administrator():
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
+    # Fetch Restaurant model (not User model!)
+    restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     
     if request.method == 'POST':
-        restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
-        
-        # Get statistics before deletion for logging
-        stats = {
-            'staff_count': restaurant_owner.owned_users.count(),
-            'categories_count': MainCategory.objects.filter(owner=restaurant_owner).count(),
-            'products_count': Product.objects.filter(main_category__owner=restaurant_owner).count(),
-            'tables_count': TableInfo.objects.filter(owner=restaurant_owner).count(),
-            'orders_count': Order.objects.filter(table_info__owner=restaurant_owner).count(),
-        }
+        restaurant_name = restaurant.name
+        is_main = restaurant.is_main_restaurant
         
         try:
-            # Log subscription deletion if exists
-            if hasattr(restaurant_owner, 'subscription'):
-                subscription = restaurant_owner.subscription
-                SubscriptionLog.objects.create(
-                    subscription=subscription,
-                    action='cancelled',
-                    description=f"Restaurant deleted by administrator: {restaurant_name}",
-                    old_status=subscription.subscription_status,
-                    new_status='cancelled',
-                    performed_by=request.user
-                )
+            # If main restaurant, delete all branches first
+            if is_main:
+                branches = list(restaurant.branches.all())
+                branch_count = len(branches)
+                
+                for branch in branches:
+                    # Only clear branch_owner (don't clear parent_restaurant - violates CHECK constraint)
+                    if branch.branch_owner:
+                        branch.branch_owner = None
+                        branch.save(update_fields=['branch_owner'])
+                    # Delete branch directly
+                    branch.delete()
+                
+                success_msg = f'Main restaurant "{restaurant_name}" and {branch_count} branch(es) deleted successfully.'
+            else:
+                # Branch deletion - simpler
+                success_msg = f'Branch "{restaurant_name}" deleted successfully.'
             
-            # Delete the restaurant owner (this will cascade delete everything)
-            # Due to foreign key relationships, this will delete:
-            # - All staff users (owned_users)
-            # - All categories and subcategories
-            # - All products
-            # - All tables
-            # - All orders and order items
-            # - All payments and transactions
-            # - All waste records
-            # - All reports
-            # - All subscriptions and logs
-            restaurant_owner.delete()
+            # Clear branch_owner if exists (don't clear parent_restaurant for branches)
+            if restaurant.branch_owner:
+                restaurant.branch_owner = None
+                restaurant.save(update_fields=['branch_owner'])
             
-            # Create detailed success message
-            success_msg = f'Restaurant "{restaurant_name}" has been completely deleted including:'
-            success_msg += f' {stats["staff_count"]} staff members,'
-            success_msg += f' {stats["categories_count"]} categories,'
-            success_msg += f' {stats["products_count"]} products,'
-            success_msg += f' {stats["tables_count"]} tables,'
-            success_msg += f' {stats["orders_count"]} orders,'
-            success_msg += ' and all related data.'
+            # Delete the restaurant
+            restaurant.delete()
             
             messages.success(request, success_msg)
-            
-            # Log the deletion for audit
-            print(f"[SYSTEM ADMIN] Restaurant deleted: {restaurant_name} by {request.user.username}")
-            print(f"[SYSTEM ADMIN] Deleted data: {stats}")
+            print(f"[SYSTEM ADMIN] Restaurant deleted: {restaurant_name} (is_main={is_main}) by {request.user.username}")
             
         except Exception as e:
             messages.error(request, f'Error deleting restaurant: {str(e)}')
@@ -2927,6 +2895,26 @@ def delete_restaurant_admin(request):
             restaurant = get_object_or_404(Restaurant, id=restaurant_id)
             
             restaurant_name = restaurant.name
+            main_owner = restaurant.main_owner
+            
+            # Delete all branches first if this is a main restaurant
+            if restaurant.is_main_restaurant:
+                branches = list(restaurant.branches.all())
+                for branch in branches:
+                    # Only clear branch_owner (don't clear parent_restaurant - violates CHECK constraint)
+                    if branch.branch_owner:
+                        branch.branch_owner = None
+                        branch.save(update_fields=['branch_owner'])
+                    # Delete branch directly
+                    branch.delete()
+            
+            # For branch deletion - don't clear parent_restaurant (violates CHECK constraint)
+            # Just clear branch_owner if exists
+            if restaurant.branch_owner:
+                restaurant.branch_owner = None
+                restaurant.save(update_fields=['branch_owner'])
+            
+            # Delete the restaurant directly (parent_restaurant stays until deletion)
             restaurant.delete()
             
             return JsonResponse({

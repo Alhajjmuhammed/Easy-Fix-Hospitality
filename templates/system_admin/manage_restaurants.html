@@ -337,11 +337,11 @@
                                     <td>
                                         <div class="btn-group-vertical d-grid gap-1" role="group">
                                             <button class="btn btn-sm btn-outline-primary view-restaurant" 
-                                                    data-restaurant-id="{{ restaurant.main_owner.id }}" title="View Details">
+                                                    data-restaurant-id="{{ restaurant.id }}" title="View Details">
                                                 <i class="fas fa-eye me-1"></i>View
                                             </button>
                                             <button class="btn btn-sm btn-outline-warning edit-restaurant" 
-                                                    data-restaurant-id="{{ restaurant.main_owner.id }}" title="Edit Restaurant">
+                                                    data-restaurant-id="{{ restaurant.id }}" title="Edit Restaurant">
                                                 <i class="fas fa-edit me-1"></i>Edit
                                             </button>
                                             
@@ -380,7 +380,7 @@
                                             {% endif %}
                                             
                                             <button class="btn btn-sm btn-outline-danger delete-restaurant" 
-                                                    data-restaurant-id="{{ restaurant.main_owner.id }}" 
+                                                    data-restaurant-id="{{ restaurant.id }}" 
                                                     data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" title="Delete Restaurant">
                                                 <i class="fas fa-trash me-1"></i>Delete
                                             </button>
@@ -1024,7 +1024,8 @@
                         </div>
                     </div>
 
-                    <!-- Owner Information Section -->
+                    <!-- Owner Information Section - Only for Main Restaurants -->
+                    <div id="edit_owner_section" style="display: none;">
                     <div class="section-header mb-4">
                         <div class="row align-items-center">
                             <div class="col">
@@ -1132,8 +1133,11 @@
                             </div>
                         </div>
                     </div>
+                    </div>
+                    <!-- End Owner Information Section -->
 
-                    <!-- Subscription Management Section -->
+                    <!-- Subscription Management Section - Only for Main Restaurants -->
+                    <div id="edit_subscription_section" style="display: none;">
                     <div class="section-header mb-4 mt-5">
                         <div class="row align-items-center">
                             <div class="col">
@@ -1238,6 +1242,17 @@
                                 <i class="fas fa-exclamation-triangle me-2"></i>
                                 <strong>Warning:</strong> Changing subscription settings takes effect immediately and will affect restaurant access in real-time.
                             </div>
+                        </div>
+                    </div>
+                    </div>
+                    <!-- End Subscription Management Section -->
+
+                    <!-- Branch Info Notice - Only for Branches -->
+                    <div id="edit_branch_notice" style="display: none;">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Branch Restaurant:</strong> This is a branch managed by the main restaurant owner. 
+                            Owner information and subscription settings are controlled at the main restaurant level.
                         </div>
                     </div>
 
@@ -1868,6 +1883,19 @@ function editRestaurant(restaurantId) {
             
             // Account Status
             document.getElementById('edit_is_active').value = data.is_active ? 'true' : 'false';
+            
+            // Show/hide sections based on restaurant type
+            if (data.is_main_restaurant) {
+                // Main restaurant - show owner and subscription sections
+                document.getElementById('edit_owner_section').style.display = 'block';
+                document.getElementById('edit_subscription_section').style.display = 'block';
+                document.getElementById('edit_branch_notice').style.display = 'none';
+            } else {
+                // Branch - hide owner and subscription sections, show notice
+                document.getElementById('edit_owner_section').style.display = 'none';
+                document.getElementById('edit_subscription_section').style.display = 'none';
+                document.getElementById('edit_branch_notice').style.display = 'block';
+            }
             
             // Set up quick period handler for edit form
             setupEditFormSubscriptionHandlers();

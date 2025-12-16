@@ -54,6 +54,7 @@
                             </p>
                         </div>
                     </div>
+                    {% if can_manage_branches %}
                     <div class="d-flex gap-3">
                         <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-light px-4 py-2 d-flex align-items-center gap-2" style="border-radius: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: all 0.3s ease;">
                             <i class="fas fa-cog"></i>
@@ -64,6 +65,7 @@
                             <span>Switch Restaurant</span>
                         </a>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -22,16 +22,33 @@ def manage_branches(request):
         messages.error(request, 'Only main owners can manage branches.')
         return redirect('admin_panel:admin_dashboard')
     
-    # Check PRO plan access for branch features
-    if not request.user.can_access_branch_features():
-        messages.error(request, 'Branch management requires a PRO subscription. Please upgrade your plan.')
-        return redirect('admin_panel:admin_dashboard')
-    
     # Get all restaurants owned by this main owner
     restaurants = Restaurant.objects.filter(main_owner=request.user).order_by('-is_main_restaurant', 'name')
     
     # Get main restaurant
     main_restaurant = restaurants.filter(is_main_restaurant=True).first()
+    
+    # If no main restaurant exists, this is a legacy user who needs to upgrade
+    if not main_restaurant:
+        context = {
+            'restaurants': [],
+            'total_restaurants': 0,
+            'main_restaurant': None,
+            'branches': [],
+            'can_add_branch': False,
+            'subscription_plan': 'Not Set',
+            'subscription_plan_code': 'NONE',
+            'branches_allowed': 0,
+            'needs_upgrade': True,
+            'user': request.user
+        }
+        messages.warning(request, 'Please upgrade to PRO plan to start managing your restaurant network.')
+        return render(request, 'admin_panel/manage_branches.html', context)
+    
+    # Check PRO plan access for branch features
+    if not request.user.can_access_branch_features():
+        messages.info(request, 'Upgrade to PRO plan to create branches and manage multiple locations.')
+        # Don't block access, just show limited view
     
     # Pagination
     paginator = Paginator(restaurants, 10)
@@ -242,22 +259,24 @@ def edit_branch(request, restaurant_id):
             restaurant.bar_printer_name = request.POST.get('bar_printer_name', '').strip()
             restaurant.receipt_printer_name = request.POST.get('receipt_printer_name', '').strip()
             
-            # Update branch owner if specified
-            branch_owner_username = request.POST.get('branch_owner', '').strip()
-            if branch_owner_username and branch_owner_username != restaurant.branch_owner.username:
-                try:
-                    branch_owner = User.objects.get(username=branch_owner_username)
-                    restaurant.branch_owner = branch_owner
-                except User.DoesNotExist:
-                    messages.error(request, f'User "{branch_owner_username}" not found.')
-                    return render(request, 'admin_panel/edit_branch.html', {'restaurant': restaurant})
-            
             # Update branch owner details if they exist
             if restaurant.branch_owner:
+                # Get new values from form
+                new_username = request.POST.get('branch_owner', '').strip()
                 branch_owner_email = request.POST.get('branch_owner_email', '').strip()
                 branch_owner_first_name = request.POST.get('branch_owner_first_name', '').strip()
                 branch_owner_last_name = request.POST.get('branch_owner_last_name', '').strip()
+                new_password = request.POST.get('new_password', '').strip()
                 
+                # Check if username changed
+                if new_username and new_username != restaurant.branch_owner.username:
+                    # Check if new username is already taken
+                    if User.objects.filter(username=new_username).exclude(id=restaurant.branch_owner.id).exists():
+                        messages.error(request, f'Username "{new_username}" is already taken by another user.')
+                        return render(request, 'admin_panel/edit_branch.html', {'restaurant': restaurant})
+                    restaurant.branch_owner.username = new_username
+                
+                # Check if email changed
                 if branch_owner_email and branch_owner_email != restaurant.branch_owner.email:
                     # Check if email is already used by another user
                     if User.objects.filter(email=branch_owner_email).exclude(id=restaurant.branch_owner.id).exists():
@@ -265,6 +284,7 @@ def edit_branch(request, restaurant_id):
                         return render(request, 'admin_panel/edit_branch.html', {'restaurant': restaurant})
                     restaurant.branch_owner.email = branch_owner_email
                 
+                # Update name fields
                 if branch_owner_first_name:
                     restaurant.branch_owner.first_name = branch_owner_first_name
                 
@@ -272,7 +292,6 @@ def edit_branch(request, restaurant_id):
                     restaurant.branch_owner.last_name = branch_owner_last_name
                 
                 # Update password if provided
-                new_password = request.POST.get('new_password', '').strip()
                 if new_password:
                     restaurant.branch_owner.set_password(new_password)
                 
@@ -312,21 +331,36 @@ def delete_branch(request, restaurant_id):
                 messages.error(request, 'Permission denied')
                 return redirect('admin_panel:main_owner_dashboard')
         
-        # Cannot delete main restaurant
-        if restaurant.is_main_restaurant:
-            print(f"DEBUG: Attempted to delete main restaurant")
+        # Check if this is main restaurant with branches
+        if restaurant.is_main_restaurant and restaurant.branches.exists():
+            branch_count = restaurant.branches.count()
+            print(f"DEBUG: Cannot delete main restaurant with {branch_count} branches")
+            error_msg = f'Cannot delete main restaurant while it has {branch_count} branch(es). Delete all branches first.'
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'error': 'Cannot delete main restaurant'})
+                return JsonResponse({'success': False, 'error': error_msg})
             else:
-                messages.error(request, 'Cannot delete main restaurant')
+                messages.error(request, error_msg)
                 return redirect('admin_panel:main_owner_dashboard')
+        
+        # Allow deleting main restaurant if it has NO branches
+        if restaurant.is_main_restaurant and not restaurant.branches.exists():
+            print(f"DEBUG: Deleting main restaurant with no branches (allowed)")
         
         # Store data before any operations (to avoid reference issues)
         restaurant_name = restaurant.name
         branch_owner = restaurant.branch_owner
         restaurant_id = restaurant.id
+        main_owner = restaurant.main_owner
         
-        print(f"DEBUG: Stored data - restaurant_name={restaurant_name}, branch_owner={branch_owner}, branch_owner_id={branch_owner.id if branch_owner else None}")
+        # Check if branch owner is ONLY managing this branch (not the main owner)
+        is_dedicated_branch_owner = (
+            branch_owner and 
+            branch_owner != main_owner and
+            branch_owner.role and 
+            branch_owner.role.name == 'branch_owner'
+        )
+        
+        print(f"DEBUG: Stored data - restaurant_name={restaurant_name}, branch_owner={branch_owner}, is_dedicated={is_dedicated_branch_owner}")
         
         # Check for dependent data that might prevent deletion
         from restaurant.models import TableInfo, Product, MainCategory
@@ -421,26 +455,40 @@ def delete_branch(request, restaurant_id):
         tables.delete()
         print(f"DEBUG: Deleted {table_count} tables")
         
-        # 8. Delete all users (staff) that belong to this branch owner
-        # Store info before deleting
-        branch_staff = User.objects.filter(owner=branch_owner)
-        staff_count = branch_staff.count()
-        if staff_count > 0:
-            staff_names = [f"{u.username} ({u.get_full_name()})" for u in branch_staff[:5]]  # Log first 5
-            print(f"DEBUG: Deleting {staff_count} staff members: {', '.join(staff_names)}")
-        branch_staff.delete()
-        print(f"DEBUG: Deleted {staff_count} staff members")
+        # 8. Delete all users (staff) that belong to this branch owner (if dedicated branch owner)
+        if is_dedicated_branch_owner and branch_owner:
+            branch_staff = User.objects.filter(owner=branch_owner)
+            staff_count = branch_staff.count()
+            if staff_count > 0:
+                staff_names = [f"{u.username} ({u.get_full_name()})" for u in branch_staff[:5]]  # Log first 5
+                print(f"DEBUG: Deleting {staff_count} staff members: {', '.join(staff_names)}")
+                branch_staff.delete()
+                print(f"DEBUG: Deleted {staff_count} staff members")
+        else:
+            print(f"DEBUG: Branch owner is main owner - NOT deleting staff")
         
-        # 9. Delete the restaurant first (before branch owner to avoid cascade issues)
-        restaurant_id = restaurant.id
+        # 9. Clear NULLABLE foreign key references before deleting (to bypass PROTECT)
+        print(f"DEBUG: Clearing foreign key references...")
+        
+        # Only clear branch_owner (don't clear parent_restaurant - violates CHECK constraint)
+        # Branches MUST have parent_restaurant until deletion per CHECK constraint
+        if restaurant.branch_owner:
+            restaurant.branch_owner = None
+            restaurant.save(update_fields=['branch_owner'])
+            print(f"DEBUG: Cleared branch_owner reference")
+        
+        # 10. Now we can safely delete the restaurant (parent_restaurant stays until deletion)
         restaurant.delete()
         print(f"DEBUG: Deleted restaurant {restaurant_name}")
         
-        # 10. Finally delete the branch owner user account (this will cascade delete their subscription if exists)
-        branch_owner_name = branch_owner.get_full_name() or branch_owner.username
-        branch_owner_username = branch_owner.username
-        branch_owner.delete()
-        print(f"DEBUG: Deleted branch owner: {branch_owner_name} (username: {branch_owner_username})")
+        # 11. Finally delete the branch owner user account ONLY if it's a dedicated branch owner
+        if is_dedicated_branch_owner and branch_owner:
+            branch_owner_name = branch_owner.get_full_name() or branch_owner.username
+            branch_owner_username = branch_owner.username
+            branch_owner.delete()
+            print(f"DEBUG: Deleted dedicated branch owner: {branch_owner_name} (username: {branch_owner_username})")
+        else:
+            print(f"DEBUG: Branch owner is main owner - NOT deleting user account")
         
         print(f"DEBUG: Successfully deleted restaurant {restaurant_name}")
         
@@ -628,7 +676,37 @@ def upgrade_to_pro(request):
         main_restaurant = Restaurant.objects.filter(main_owner=request.user, is_main_restaurant=True).first()
         
         if not main_restaurant:
-            return JsonResponse({'success': False, 'error': 'No main restaurant found.'})
+            # Legacy user upgrading from SINGLE to PRO - need to create Restaurant record
+            import uuid
+            
+            # Get user's restaurant info from User model (legacy)
+            restaurant_name = request.user.restaurant_name or f"{request.user.get_full_name()}'s Restaurant"
+            restaurant_desc = request.user.restaurant_description or ""
+            
+            # Create main restaurant record
+            main_restaurant = Restaurant.objects.create(
+                name=restaurant_name,
+                description=restaurant_desc,
+                address=request.user.address or "No address provided",
+                main_owner=request.user,
+                branch_owner=request.user,
+                is_main_restaurant=True,
+                subscription_plan='PRO',  # Create as PRO directly
+                qr_code=request.user.restaurant_qr_code or f"REST-{uuid.uuid4().hex[:12].upper()}",
+                tax_rate=request.user.tax_rate,
+                auto_print_kot=request.user.auto_print_kot,
+                auto_print_bot=request.user.auto_print_bot,
+                kitchen_printer_name=request.user.kitchen_printer_name,
+                bar_printer_name=request.user.bar_printer_name,
+                receipt_printer_name=request.user.receipt_printer_name,
+            )
+            
+            return JsonResponse({
+                'success': True, 
+                'message': f'Successfully upgraded {main_restaurant.name} to PRO plan! You can now create unlimited branches and manage your restaurant network.',
+                'new_plan': 'Pro Plan (Multi-Branch)',
+                'first_time_upgrade': True
+            })
         
         if main_restaurant.subscription_plan == 'PRO':
             return JsonResponse({'success': False, 'error': 'Already on PRO plan.'})
@@ -644,6 +722,8 @@ def upgrade_to_pro(request):
             return JsonResponse({'success': False, 'error': 'Failed to upgrade subscription plan.'})
             
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JsonResponse({'success': False, 'error': f'Error upgrading subscription: {str(e)}'})
 
 

@@ -511,7 +511,10 @@ def place_order(request):
                     
                     # ✨ SERVER-SIDE AUTO-PRINT (NO BROWSER DIALOG!)
                     try:
+                        print(f"🖨️ [DEBUG] Starting auto_print_order for Order #{order.order_number}")
+                        print(f"🖨️ [DEBUG] Order ID: {order.id}, Table: {order.table_info.tbl_no}")
                         print_result = auto_print_order(order)
+                        print(f"🖨️ [DEBUG] Print result: {print_result}")
                         if print_result['kot_printed']:
                             messages.success(request, '🖨️ KOT printed automatically!')
                         if print_result['bot_printed']:
@@ -522,7 +525,9 @@ def place_order(request):
                     except Exception as e:
                         # Print error doesn't stop order processing
                         messages.warning(request, f'Auto-print unavailable: {str(e)}')
-                        print(f"Auto-print error: {str(e)}")
+                        print(f"🖨️ [DEBUG] Auto-print EXCEPTION: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
                     
                     # Check if order has kitchen or bar items for browser fallback
                     has_kitchen_items = any(item.product.station == 'kitchen' for item in order.order_items.all())

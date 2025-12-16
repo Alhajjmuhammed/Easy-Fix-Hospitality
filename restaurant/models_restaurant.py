@@ -55,7 +55,7 @@ class Restaurant(models.Model):
     # Hierarchical Ownership
     main_owner = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='owned_restaurants',
         limit_choices_to={'role__name': 'main_owner'},
         help_text="Main owner who controls this restaurant and its branches"
@@ -63,7 +63,7 @@ class Restaurant(models.Model):
     
     branch_owner = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='managed_restaurant',
         limit_choices_to={'role__name__in': ['main_owner', 'branch_owner']},
         null=True,
@@ -79,7 +79,7 @@ class Restaurant(models.Model):
     
     parent_restaurant = models.ForeignKey(
         'self',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name='branches',

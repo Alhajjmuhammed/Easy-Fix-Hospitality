@@ -811,7 +811,7 @@ def manage_tables(request):
         if search_query:
             tables = tables.filter(
                 Q(tbl_no__icontains=search_query) |
-                Q(no_of_seats__icontains=search_query)
+                Q(capacity__icontains=search_query)
             )
         
         # Apply status filter
@@ -2929,9 +2929,22 @@ def add_order(request):
                 status='pending'
             )
             
+            # ✨ SERVER-SIDE AUTO-PRINT
+            try:
+                from orders.printing import auto_print_order
+                print_result = auto_print_order(order)
+                print_message = f'Order #{order_number} created successfully'
+                if print_result['kot_printed']:
+                    print_message += ' | KOT printed!'
+                if print_result['bot_printed']:
+                    print_message += ' | BOT printed!'
+            except Exception as print_error:
+                print(f"Auto-print error: {print_error}")
+                print_message = f'Order #{order_number} created (auto-print unavailable)'
+            
             return JsonResponse({
                 'success': True,
-                'message': f'Order #{order_number} created successfully'
+                'message': print_message
             })
             
         except Exception as e:
