@@ -357,19 +357,27 @@
                                 </small>
                             </td>
                             <td class="text-center">
-                                {% comment %}Show station based on first item - simplified approach{% endcomment %}
-                                {% if order.order_items.exists %}
-                                    {% with first_item=order.order_items.first %}
-                                        {% if first_item.product.station == 'kitchen' %}
-                                            <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Kitchen</span>
-                                        {% elif first_item.product.station == 'bar' %}
-                                            <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Bar</span>
+                                {% comment %}Show station based on filter OR all stations in the order{% endcomment %}
+                                {% if station_filter == 'kitchen' %}
+                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Kitchen</span>
+                                {% elif station_filter == 'bar' %}
+                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Bar</span>
+                                {% else %}
+                                    {% comment %}Show all stations present in the order{% endcomment %}
+                                    {% with stations=order.order_items.all %}
+                                        {% if stations %}
+                                            {% regroup stations by product.station as station_list %}
+                                            {% for station in station_list %}
+                                                {% if station.grouper == 'kitchen' %}
+                                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Kitchen</span>
+                                                {% elif station.grouper == 'bar' %}
+                                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Bar</span>
+                                                {% endif %}
+                                            {% endfor %}
                                         {% else %}
-                                            <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">General</span>
+                                            <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Unknown</span>
                                         {% endif %}
                                     {% endwith %}
-                                {% else %}
-                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Unknown</span>
                                 {% endif %}
                             </td>
                             <td class="font-weight-bold">${{ order.total_amount|floatformat:2 }}</td>

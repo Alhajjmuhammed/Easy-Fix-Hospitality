@@ -3425,8 +3425,23 @@ def import_products_csv(request):
         
         owner_filter = get_owner_filter(request.user)
         
-        # Read CSV file
-        decoded_file = csv_file.read().decode('utf-8-sig')  # utf-8-sig handles BOM
+        # Read CSV file - try multiple encodings
+        file_content = csv_file.read()
+        decoded_file = None
+        
+        # Try different encodings
+        encodings = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        for encoding in encodings:
+            try:
+                decoded_file = file_content.decode(encoding)
+                break
+            except (UnicodeDecodeError, LookupError):
+                continue
+        
+        if decoded_file is None:
+            messages.error(request, 'Could not read the CSV file. Please save it with UTF-8 encoding.')
+            return redirect('admin_panel:manage_products')
+        
         csv_data = csv.DictReader(io.StringIO(decoded_file))
         
         imported_count = 0
@@ -3718,16 +3733,27 @@ def import_products_excel(request):
                         error_count += 1
                         continue
                     
-                    # Find main category for the selected restaurant
+                    # Find or CREATE main category for the selected restaurant
                     main_category_filter = {'name__iexact': main_category_name, 'restaurant': current_restaurant}
                     
                     main_category = MainCategory.objects.filter(**main_category_filter).first()
                     if not main_category:
-                        errors.append(f"Row {row_num}: Main category '{main_category_name}' not found")
-                        error_count += 1
-                        continue
+                        # Auto-create main category (same logic as CSV import)
+                        if current_restaurant.is_main_restaurant:
+                            category_owner = current_restaurant.main_owner
+                        else:
+                            category_owner = current_restaurant.branch_owner or current_restaurant.main_owner
+                        
+                        main_category = MainCategory.objects.create(
+                            name=main_category_name,
+                            is_active=True,
+                            description='',
+                            owner=category_owner,
+                            restaurant=current_restaurant
+                        )
+                        messages.info(request, f"Created main category '{main_category_name}' for this import.")
                     
-                    # Handle subcategory
+                    # Handle subcategory - CREATE if not exists
                     sub_category = None
                     if 'sub_category' in col_mapping:
                         sub_category_name = str(row[col_mapping['sub_category']] or '').strip()
@@ -3737,9 +3763,14 @@ def import_products_excel(request):
                                 main_category=main_category
                             ).first()
                             if not sub_category:
-                                errors.append(f"Row {row_num}: Sub category '{sub_category_name}' not found")
-                                error_count += 1
-                                continue
+                                # Auto-create subcategory
+                                sub_category = SubCategory.objects.create(
+                                    main_category=main_category,
+                                    name=sub_category_name,
+                                    description='',
+                                    is_active=True
+                                )
+                                messages.info(request, f"Created sub category '{sub_category_name}' under '{main_category_name}'.")
                     
                     # Prepare product data
                     product_data = {
