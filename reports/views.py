@@ -546,29 +546,66 @@ def export_csv(request):
     writer.writerow(['DETAILED SALES DATA'])
     writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Cashier'])
     
+    # Get selected category/subcategory names for display (same as web)
+    selected_category_name = None
+    selected_subcategory_name = None
+    if category_id != 'all':
+        try:
+            selected_category_name = MainCategory.objects.get(id=category_id).name
+        except:
+            pass
+    if subcategory_id != 'all':
+        try:
+            selected_subcategory_name = SubCategory.objects.get(id=subcategory_id).name
+        except:
+            pass
+    
     for order in orders.order_by('-created_at'):
-        # Filter items based on active filters (ALL filters must pass - use AND logic)
-        filtered_items = []
-        for item in order.order_items.all():
-            include_item = True
-            # Check category filter
-            if category_id != 'all' and str(item.product.main_category_id) != str(category_id):
-                include_item = False
-            # Check subcategory filter (independent of category check)
-            if include_item and subcategory_id != 'all':
-                if not item.product.sub_category or str(item.product.sub_category_id) != str(subcategory_id):
-                    include_item = False
-            # Check station filter (independent of other checks)
-            if include_item and station_filter != 'all' and item.product.station != station_filter:
-                include_item = False
-            if include_item:
-                filtered_items.append(item)
+        all_items = list(order.order_items.all())
         
-        # Use filtered items for display
+        # Filter items for Items column based on active filter (same logic as web template)
+        # Web uses: if category -> elif subcategory -> elif station -> else all
+        filtered_items = []
+        if category_id != 'all':
+            # Filter by category
+            for item in all_items:
+                if str(item.product.main_category_id) == str(category_id):
+                    filtered_items.append(item)
+        elif subcategory_id != 'all':
+            # Filter by subcategory
+            for item in all_items:
+                if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
+                    filtered_items.append(item)
+        elif station_filter != 'all':
+            # Filter by station
+            for item in all_items:
+                if item.product.station == station_filter:
+                    filtered_items.append(item)
+        else:
+            # No filter - show all items
+            filtered_items = all_items
+        
+        # Items column: shows filtered items
         items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items])
-        categories_list = ', '.join(set([item.product.main_category.name for item in filtered_items])) if filtered_items else ''
-        subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in filtered_items])) if filtered_items else ''
-        stations_list = ', '.join(set([item.product.station.title() for item in filtered_items])) if filtered_items else ''
+        
+        # Categories column: if filter active show filter name, else show ALL categories from ALL items
+        if selected_category_name:
+            categories_list = selected_category_name
+        else:
+            categories_list = ', '.join(set([item.product.main_category.name for item in all_items])) if all_items else ''
+        
+        # SubCategories column: if filter active show filter name, else show ALL subcategories from ALL items
+        if selected_subcategory_name:
+            subcategories_list = selected_subcategory_name
+        else:
+            subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in all_items])) if all_items else ''
+        
+        # Stations column: if filter active show filter name, else show ALL stations from ALL items
+        if station_filter != 'all':
+            stations_list = station_filter.title()
+        else:
+            stations_list = ', '.join(set([item.product.station.title() for item in all_items])) if all_items else ''
+        
         table_number = order.table_info.tbl_no if order.table_info else '-'
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
         cashier_name = f"{order.confirmed_by.first_name} {order.confirmed_by.last_name}" if order.confirmed_by else f"{order.ordered_by.first_name} {order.ordered_by.last_name} (Self)" if order.ordered_by else 'System'
@@ -982,22 +1019,29 @@ def export_pdf(request):
     
     # Table data
     for order in orders.order_by('-created_at'):
-        # Filter items based on active filters (same logic as CSV export)
+        all_items = list(order.order_items.all())
+        
+        # Filter items for Items column based on active filter (same logic as web template)
+        # Web uses: if category -> elif subcategory -> elif station -> else all
         filtered_items = []
-        for item in order.order_items.all():
-            include_item = True
-            # Check category filter
-            if category_id != 'all' and str(item.product.main_category_id) != str(category_id):
-                include_item = False
-            # Check subcategory filter (independent of category check)
-            if include_item and subcategory_id != 'all':
-                if not item.product.sub_category or str(item.product.sub_category_id) != str(subcategory_id):
-                    include_item = False
-            # Check station filter (independent of other checks)
-            if include_item and station_filter != 'all' and item.product.station != station_filter:
-                include_item = False
-            if include_item:
-                filtered_items.append(item)
+        if category_id != 'all':
+            # Filter by category
+            for item in all_items:
+                if str(item.product.main_category_id) == str(category_id):
+                    filtered_items.append(item)
+        elif subcategory_id != 'all':
+            # Filter by subcategory
+            for item in all_items:
+                if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
+                    filtered_items.append(item)
+        elif station_filter != 'all':
+            # Filter by station
+            for item in all_items:
+                if item.product.station == station_filter:
+                    filtered_items.append(item)
+        else:
+            # No filter - show all items
+            filtered_items = all_items
         
         items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items][:3])  # Limit items for PDF
         if len(filtered_items) > 3:
