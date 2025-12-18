@@ -195,8 +195,11 @@ class ThermalPrinter:
         formatted += CUT
         
         # Open cash drawer for receipts only (not KOT/BOT)
+        # Some printers need drawer command AFTER cut, some BEFORE
+        # We send it AFTER cut which works for most printers
         if job_type == 'receipt':
             formatted += OPEN_DRAWER
+            logger.info("💰 Cash drawer command added to receipt")
         
         return formatted
     
