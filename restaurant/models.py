@@ -23,14 +23,7 @@ class TableInfo(models.Model):
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    class Meta:
-        # Ensure either owner or restaurant is set
-        constraints = [
-            models.CheckConstraint(
-                check=models.Q(owner__isnull=False) | models.Q(restaurant__isnull=False),
-                name='table_must_have_owner_or_restaurant'
-            ),
-        ]
+    # Note: Meta class is defined after all methods (see below)
     
     def __str__(self):
         if self.restaurant:

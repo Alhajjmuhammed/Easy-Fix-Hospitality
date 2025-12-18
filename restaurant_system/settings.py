@@ -405,6 +405,15 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+    # Rate limiting to protect against abuse
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/minute',   # Anonymous users: 100 requests/minute
+        'user': '1000/minute',  # Authenticated users: 1000 requests/minute (PrintClient uses ~12/min)
+    },
 }
 
 # ============================================================================
