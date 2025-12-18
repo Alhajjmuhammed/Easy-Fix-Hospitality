@@ -164,6 +164,11 @@ class ThermalPrinter:
         CUT = GS + 'V' + chr(66) + chr(3)  # Partial cut with feed
         FEED = '\n\n\n\n\n'  # Feed paper before cut
         
+        # Cash drawer kick command - ESC p 0 n1 n2
+        # Pin 2 (most common): ESC p 0 25 250
+        # This sends a pulse to open the cash drawer
+        OPEN_DRAWER = ESC + chr(112) + chr(0) + chr(25) + chr(250)
+        
         # Build formatted content
         formatted = INIT  # Initialize printer
         formatted += LEFT  # Start left-aligned
@@ -188,6 +193,10 @@ class ThermalPrinter:
         # Add paper feed and cut
         formatted += FEED
         formatted += CUT
+        
+        # Open cash drawer for receipts only (not KOT/BOT)
+        if job_type == 'receipt':
+            formatted += OPEN_DRAWER
         
         return formatted
     

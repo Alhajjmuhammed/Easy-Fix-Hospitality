@@ -719,7 +719,7 @@ class ThermalPrinter:
         
         Args:
             content: Text content
-            ticket_type: "KOT" or "BOT"
+            ticket_type: "KOT", "BOT", or "RECEIPT"
         
         Returns:
             str: Formatted content with ESC/POS commands
@@ -735,6 +735,11 @@ class ThermalPrinter:
         LARGE = ESC + '!' + chr(16)  # Large text
         NORMAL = ESC + '!' + chr(0)  # Normal text
         
+        # Cash drawer kick command - ESC p m t1 t2
+        # m=0 (pin 2), t1=25 (on time), t2=250 (off time)
+        # This opens the cash drawer connected to the printer
+        OPEN_DRAWER = ESC + chr(112) + chr(0) + chr(25) + chr(250)
+        
         # Build formatted content
         formatted = INIT  # Initialize
         formatted += CENTER + LARGE + BOLD_ON
@@ -743,6 +748,10 @@ class ThermalPrinter:
         formatted += content
         formatted += "\n\n\n"  # Add spacing before cut
         formatted += CUT  # Cut paper
+        
+        # Open cash drawer for RECEIPT only (not KOT/BOT)
+        if ticket_type == "RECEIPT":
+            formatted += OPEN_DRAWER
         
         return formatted
 
