@@ -737,8 +737,13 @@ def order_list(request):
     if request.user.is_customer_care():
         orders = Order.objects.filter(ordered_by=request.user)
     else:
-        # Admin, kitchen, owner can see all orders
-        orders = Order.objects.all()
+        # Filter by restaurant owner - each owner/staff sees only their restaurant's orders
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            orders = Order.objects.filter(table_info__owner=owner_filter)
+        else:
+            # Only system admin (no owner) can see all orders
+            orders = Order.objects.all()
     
     # Order by most recent first
     orders = orders.select_related('table_info', 'ordered_by').prefetch_related('order_items__product').order_by('-created_at')
@@ -857,7 +862,12 @@ def confirm_order(request, order_id):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     try:
-        order = get_object_or_404(Order, id=order_id, status='pending')
+        # Get owner filter to ensure kitchen staff can only confirm their restaurant's orders
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            order = get_object_or_404(Order, id=order_id, status='pending', table_info__owner=owner_filter)
+        else:
+            order = get_object_or_404(Order, id=order_id, status='pending')
         
         order.status = 'confirmed'
         order.confirmed_by = request.user
@@ -1596,8 +1606,6 @@ def reprint_kot(request, order_id):
     Reprint Kitchen Order Ticket for existing order
     Same as print_kot but with a different message for tracking
     """
-    order = get_object_or_404(Order, id=order_id)
-    
     # Permission check
     if not (request.user.is_kitchen_staff() or 
             request.user.is_customer_care() or 
@@ -1606,6 +1614,16 @@ def reprint_kot(request, order_id):
             request.user.is_administrator()):
         messages.error(request, 'Access denied. Staff privileges required.')
         return redirect('orders:my_orders')
+    
+    # Get order with owner filtering to prevent cross-restaurant access
+    if request.user.is_administrator():
+        order = get_object_or_404(Order, id=order_id)
+    else:
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            order = get_object_or_404(Order, id=order_id, table_info__owner=owner_filter)
+        else:
+            order = get_object_or_404(Order, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
     owner = order.table_info.owner
@@ -1701,8 +1719,6 @@ def reprint_bot(request, order_id):
     Reprint Bar Order Ticket for existing order
     Same as print_bot but with a different message for tracking
     """
-    order = get_object_or_404(Order, id=order_id)
-    
     # Permission check
     if not (hasattr(request.user, 'role') and request.user.role and request.user.role.name == 'bar') and not (
             request.user.is_customer_care() or 
@@ -1711,6 +1727,16 @@ def reprint_bot(request, order_id):
             request.user.is_administrator()):
         messages.error(request, 'Access denied. Staff privileges required.')
         return redirect('orders:my_orders')
+    
+    # Get order with owner filtering to prevent cross-restaurant access
+    if request.user.is_administrator():
+        order = get_object_or_404(Order, id=order_id)
+    else:
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            order = get_object_or_404(Order, id=order_id, table_info__owner=owner_filter)
+        else:
+            order = get_object_or_404(Order, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
     owner = order.table_info.owner
