@@ -66,3 +66,6 @@ print_client/dist/
 *_FIX*.md
 *_ANALYSIS.md
 *_VERIFICATION*.md
+
+# Binary / zip files
+*.zip
