@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Customer Care Profile - Restaurant System{% endblock %}
 
@@ -108,7 +109,7 @@
                         <div class="col-md-3 mb-3">
                             <div class="card bg-light">
                                 <div class="card-body">
-                                    <h4 class="text-success mb-1">$0.00</h4>
+                                    <h4 class="text-success mb-1">{% currency_symbol %}0.00</h4>
                                     <small class="text-muted">Revenue</small>
                                 </div>
                             </div>
@@ -158,7 +159,7 @@
                                     <i class="bi bi-calendar"></i> {{ order.created_at|date:"M d, Y H:i" }}
                                 </div>
                                 <div class="mb-2">
-                                    <strong>${{ order.total_amount|floatformat:2 }}</strong>
+                                    <strong>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                                 </div>
                                 <div class="mb-2">
                                     <i class="bi bi-table"></i> Table {{ order.table.tbl_no }}

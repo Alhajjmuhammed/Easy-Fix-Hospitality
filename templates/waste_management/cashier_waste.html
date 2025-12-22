@@ -1,4 +1,5 @@
 {% extends 'cashier_base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Record Waste - Cashier{% endblock %}
 
@@ -27,7 +28,7 @@
                                 <option value="">Select a product...</option>
                                 {% for product in products %}
                                     <option value="{{ product.id }}" data-price="{{ product.price }}">
-                                        {{ product.name }} - ${{ product.price }}
+                                        {{ product.name }} - {% currency_symbol %}{{ product.price }}
                                     </option>
                                 {% endfor %}
                             </select>
@@ -83,7 +84,7 @@
                     <!-- Cost Preview -->
                     <div id="costPreview" class="alert alert-warning" style="display: none;">
                         <i class="fas fa-dollar-sign me-2"></i>
-                        <strong>Estimated Cost Impact: $<span id="estimatedCost">0.00</span></strong>
+                        <strong>Estimated Cost Impact: {% currency_symbol %}<span id="estimatedCost">0.00</span></strong>
                     </div>
                     
                     <div class="d-flex justify-content-between align-items-center mt-4">
@@ -125,6 +126,9 @@
 
 {% block extra_js %}
 <script>
+// Currency symbol for JavaScript
+const CURRENCY_SYMBOL = '{% currency_symbol %}';
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('wasteForm');
     const productSelect = document.getElementById('product');
@@ -190,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 wasteDetails.innerHTML = `
                     <strong>${data.waste_log.product_name}</strong> - 
                     Quantity: ${data.waste_log.quantity_wasted} - 
-                    Cost: $${data.waste_log.total_cost}
+                    Cost: ${CURRENCY_SYMBOL}${data.waste_log.total_cost}
                 `;
                 
                 form.style.display = 'none';

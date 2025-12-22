@@ -1,5 +1,6 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Branch Reports{% endblock %}
 
@@ -203,7 +204,7 @@
     <!-- Summary Statistics -->
     <div class="summary-stats">
         <div class="stat-card">
-            <div class="stat-value text-primary">${{ total_revenue|floatformat:0 }}</div>
+            <div class="stat-value text-primary">{% currency_symbol %}{{ total_revenue|floatformat:0 }}</div>
             <div class="stat-label">Total Revenue</div>
         </div>
         <div class="stat-card">
@@ -215,7 +216,7 @@
             <div class="stat-label">Active Branches</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value text-warning">${{ average_order_value|floatformat:2 }}</div>
+            <div class="stat-value text-warning">{% currency_symbol %}{{ average_order_value|floatformat:2 }}</div>
             <div class="stat-label">Avg Order Value</div>
         </div>
     </div>
@@ -282,10 +283,10 @@
                                 <strong>{{ branch.total_orders|default:0 }}</strong>
                             </td>
                             <td class="performance-metric">
-                                <strong>${{ branch.total_revenue|floatformat:2|default:"0.00" }}</strong>
+                                <strong>{% currency_symbol %}{{ branch.total_revenue|floatformat:2|default:"0.00" }}</strong>
                             </td>
                             <td class="performance-metric">
-                                <strong>${{ branch.avg_order_value|floatformat:2|default:"0.00" }}</strong>
+                                <strong>{% currency_symbol %}{{ branch.avg_order_value|floatformat:2|default:"0.00" }}</strong>
                             </td>
                             <td class="performance-metric">
                                 {% if branch.performance_score >= 80 %}
@@ -342,6 +343,9 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// Currency symbol for JavaScript
+const CURRENCY_SYMBOL = '{% currency_symbol %}';
+
 $(document).ready(function() {
     // Initialize revenue chart
     const ctx = document.getElementById('revenueChart').getContext('2d');
@@ -376,7 +380,7 @@ $(document).ready(function() {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '$' + value.toLocaleString();
+                            return CURRENCY_SYMBOL + value.toLocaleString();
                         }
                     }
                 }

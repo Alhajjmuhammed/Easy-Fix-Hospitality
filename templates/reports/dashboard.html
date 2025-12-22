@@ -1,4 +1,5 @@
 {% extends 'admin_panel/base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Sales Reports{% endblock %}
 
@@ -14,7 +15,7 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL REVENUE</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">${{ total_revenue|floatformat:0 }}</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ total_revenue|floatformat:0 }}</div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-dollar-sign fa-2x text-primary" style="opacity: 0.3;"></i>
@@ -65,7 +66,7 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">AVG ORDER VALUE</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">${{ avg_order_value|floatformat:0 }}</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ avg_order_value|floatformat:0 }}</div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-chart-line fa-2x text-warning" style="opacity: 0.3;"></i>
@@ -157,7 +158,7 @@
                                                 {{ product.total_quantity }} sold
                                             </div>
                                             <div class="text-xs text-muted">
-                                                Revenue: ${{ product.total_revenue|floatformat:0 }}
+                                                Revenue: {% currency_symbol %}{{ product.total_revenue|floatformat:0 }}
                                             </div>
                                         </div>
                                         <div class="col-auto">
@@ -294,7 +295,7 @@
             </h6>
             <div class="d-flex">
                 <span class="badge me-3" style="background-color: #343a40; color: white; font-weight: bold;">{{ total_orders }} Orders</span>
-                <span class="badge" style="background-color: #343a40; color: white; font-weight: bold;">${{ total_revenue|floatformat:0 }}</span>
+                <span class="badge" style="background-color: #343a40; color: white; font-weight: bold;">{% currency_symbol %}{{ total_revenue|floatformat:0 }}</span>
             </div>
         </div>
         <div class="card-body">
@@ -403,7 +404,7 @@
                                     {% endwith %}
                                 {% endif %}
                             </td>
-                            <td class="font-weight-bold">${{ order.total_amount|floatformat:2 }}</td>
+                            <td class="font-weight-bold">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</td>
                             <td class="text-center">
                                 {% if order.payment_status == 'paid' %}
                                     <span class="badge" style="color: white; background-color: #28a745; font-weight: bold;">Paid</span>

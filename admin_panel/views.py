@@ -3186,6 +3186,52 @@ def profile(request):
             except Exception as e:
                 messages.error(request, f"Error updating restaurant: {str(e)}")
         
+        elif action == 'update_currency':
+            # Update currency settings (for owners only)
+            try:
+                if not request.user.is_owner():
+                    messages.error(request, "Only restaurant owners can update currency settings.")
+                    return redirect('admin_panel:profile')
+                
+                currency_code = request.POST.get('currency_code', 'USD').strip().upper()
+                
+                # Validate currency code
+                valid_currencies = ['USD', 'EUR', 'GBP', 'KES', 'TZS', 'UGX', 'RWF', 'ZAR', 'NGN', 'GHS', 'INR', 'AED', 'SAR', 'CNY', 'JPY']
+                if currency_code not in valid_currencies:
+                    messages.error(request, "Invalid currency code selected.")
+                    return redirect('admin_panel:profile')
+                
+                # Update the user's currency code
+                request.user.currency_code = currency_code
+                request.user.save()
+                
+                # Also update the Restaurant model if it exists (for PRO plan branches)
+                try:
+                    from restaurant.models_restaurant import Restaurant
+                    
+                    # Update main restaurant if user is main_owner
+                    if request.user.is_main_owner():
+                        restaurants = Restaurant.objects.filter(main_owner=request.user)
+                        restaurants.update(currency_code=currency_code)
+                    # Update specific branch if user is branch_owner
+                    elif request.user.is_branch_owner():
+                        restaurants = Restaurant.objects.filter(branch_owner=request.user)
+                        restaurants.update(currency_code=currency_code)
+                    # For legacy owner role
+                    else:
+                        restaurants = Restaurant.objects.filter(
+                            models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
+                        )
+                        restaurants.update(currency_code=currency_code)
+                except Exception as e:
+                    # Restaurant model update failed, but user currency is saved
+                    pass
+                
+                messages.success(request, f"Currency updated to {currency_code} successfully.")
+                
+            except Exception as e:
+                messages.error(request, f"Error updating currency: {str(e)}")
+        
         return redirect('admin_panel:profile')
     
     context = {

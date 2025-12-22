@@ -1,5 +1,6 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Waste Cost Settings{% endblock %}
 
@@ -159,7 +160,7 @@
                     <div class="mb-3">
                         <label class="form-label">Sample Menu Item Price</label>
                         <div class="input-group">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="number" class="form-control" id="sample_price" value="15.00" step="0.01">
                         </div>
                     </div>
@@ -170,19 +171,19 @@
                             <table class="table table-sm table-borderless mb-0">
                                 <tr>
                                     <td>Ingredient Cost:</td>
-                                    <td class="text-end">$<span id="calc_ingredient">{{ current_settings.ingredient_cost_percentage|floatformat:1 }}</span></td>
+                                    <td class="text-end">{% currency_symbol %}<span id="calc_ingredient">{{ current_settings.ingredient_cost_percentage|floatformat:1 }}</span></td>
                                 </tr>
                                 <tr>
                                     <td>Labor Cost:</td>
-                                    <td class="text-end">$<span id="calc_labor">{{ current_settings.labor_cost_percentage|floatformat:1 }}</span></td>
+                                    <td class="text-end">{% currency_symbol %}<span id="calc_labor">{{ current_settings.labor_cost_percentage|floatformat:1 }}</span></td>
                                 </tr>
                                 <tr>
                                     <td>Overhead Cost:</td>
-                                    <td class="text-end">$<span id="calc_overhead">{{ current_settings.overhead_cost_percentage|floatformat:1 }}</span></td>
+                                    <td class="text-end">{% currency_symbol %}<span id="calc_overhead">{{ current_settings.overhead_cost_percentage|floatformat:1 }}</span></td>
                                 </tr>
                                 <tr class="border-top">
                                     <td><strong>Total Waste Cost:</strong></td>
-                                    <td class="text-end"><strong>$<span id="calc_total">0.00</span></strong></td>
+                                    <td class="text-end"><strong>{% currency_symbol %}<span id="calc_total">0.00</span></strong></td>
                                 </tr>
                             </table>
                         </div>

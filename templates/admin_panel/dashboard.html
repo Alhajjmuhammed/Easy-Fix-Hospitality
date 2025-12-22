@@ -1,4 +1,5 @@
 {% extends 'admin_panel/base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Dashboard - Admin Panel{% endblock %}
 
@@ -173,7 +174,7 @@
                     </div>
                     <div class="col-md-4 text-center">
                         <div class="bg-light rounded p-3">
-                            <h3 class="text-success mb-2">${{ today_revenue|floatformat:2 }}</h3>
+                            <h3 class="text-success mb-2">{% currency_symbol %}{{ today_revenue|floatformat:2 }}</h3>
                             <p class="text-muted mb-0 small">Today's Revenue</p>
                         </div>
                     </div>

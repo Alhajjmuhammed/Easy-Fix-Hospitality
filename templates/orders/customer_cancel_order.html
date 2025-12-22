@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Cancel Order - Restaurant System{% endblock %}
 
@@ -40,12 +41,12 @@
                             {% for item in order.order_items.all %}
                                 <div class="d-flex justify-content-between">
                                     <span>{{ item.product.name }} ({{ item.quantity }}x)</span>
-                                    <span>${{ item.unit_price|floatformat:2 }}</span>
+                                    <span>{% currency_symbol %}{{ item.unit_price|floatformat:2 }}</span>
                                 </div>
                             {% endfor %}
                             <hr>
                             <div class="d-flex justify-content-between">
-                                <strong>Total: ${{ order.total_amount|floatformat:2 }}</strong>
+                                <strong>Total: {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                             </div>
                         </div>
                     </div>

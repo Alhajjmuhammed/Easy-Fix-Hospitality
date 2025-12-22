@@ -1,3 +1,4 @@
+{% load restaurant_tags %}
 <div class="order-details">
     <div class="row">
         <div class="col-md-6">
@@ -25,7 +26,7 @@
                 </tr>
                 <tr>
                     <td><strong>Total Amount:</strong></td>
-                    <td><strong>${{ order.total_amount|floatformat:2 }}</strong></td>
+                    <td><strong>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong></td>
                 </tr>
                 <tr>
                     <td><strong>Payment Status:</strong></td>
@@ -100,15 +101,15 @@
                                 {% endif %}
                             </td>
                             <td>{{ item.quantity }}</td>
-                            <td>${{ item.unit_price|floatformat:2 }}</td>
-                            <td><strong>${{ item.get_subtotal|floatformat:2 }}</strong></td>
+                            <td>{% currency_symbol %}{{ item.unit_price|floatformat:2 }}</td>
+                            <td><strong>{% currency_symbol %}{{ item.get_subtotal|floatformat:2 }}</strong></td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
                         <tr class="table-light">
                             <th colspan="3">Total:</th>
-                            <th>${{ order.total_amount|floatformat:2 }}</th>
+                            <th>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</th>
                         </tr>
                     </tfoot>
                 </table>

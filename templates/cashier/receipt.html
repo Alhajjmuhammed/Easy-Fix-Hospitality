@@ -1,4 +1,5 @@
 {% load static %}
+{% load restaurant_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -311,7 +312,7 @@
                             <br><small>  (Happy Hour {{ item.product.get_active_promotion.discount_percentage|floatformat:0 }}% off)</small>
                             {% endif %}
                         </div>
-                        <div class="item-price">${{ item.get_total_price|floatformat:2 }}</div>
+                        <div class="item-price">{% currency_symbol %}{{ item.get_total_price|floatformat:2 }}</div>
                     </div>
                 {% endfor %}
             </div>
@@ -320,21 +321,21 @@
             <div class="receipt-totals">
                 <div class="total-row">
                     <div>Subtotal:</div>
-                    <div>${{ order.get_subtotal|floatformat:2 }}</div>
+                    <div>{% currency_symbol %}{{ order.get_subtotal|floatformat:2 }}</div>
                 </div>
                 {% if order.get_total_discount > 0 %}
                 <div class="total-row text-danger">
                     <div><strong>Discount:</strong></div>
-                    <div><strong>-${{ order.get_total_discount|floatformat:2 }}</strong></div>
+                    <div><strong>-{% currency_symbol %}{{ order.get_total_discount|floatformat:2 }}</strong></div>
                 </div>
                 {% endif %}
                 <div class="total-row">
                     <div>Tax ({{ order.tax_rate|floatformat:1 }}%):</div>
-                    <div>${{ order.get_tax_amount|floatformat:2 }}</div>
+                    <div>{% currency_symbol %}{{ order.get_tax_amount|floatformat:2 }}</div>
                 </div>
                 <div class="total-row grand-total">
                     <div>TOTAL:</div>
-                    <div>${{ order.get_total|floatformat:2 }}</div>
+                    <div>{% currency_symbol %}{{ order.get_total|floatformat:2 }}</div>
                 </div>
             </div>
             
@@ -347,7 +348,7 @@
                 </div>
                 <div class="total-row">
                     <div>Amount Paid:</div>
-                    <div>${{ payment.amount|floatformat:2 }}</div>
+                    <div>{% currency_symbol %}{{ payment.amount|floatformat:2 }}</div>
                 </div>
                 {% if payment.reference_number %}
                 <div class="total-row">
@@ -360,7 +361,7 @@
                 {% if change_amount > 0 %}
                 <div class="total-row" style="font-weight: bold;">
                     <div>Change:</div>
-                    <div>${{ change_amount|floatformat:2 }}</div>
+                    <div>{% currency_symbol %}{{ change_amount|floatformat:2 }}</div>
                 </div>
                 {% endif %}
                 
@@ -368,7 +369,7 @@
                 {% if remaining_balance > 0 %}
                 <div class="total-row text-danger">
                     <div><strong>Remaining:</strong></div>
-                    <div><strong>${{ remaining_balance|floatformat:2 }}</strong></div>
+                    <div><strong>{% currency_symbol %}{{ remaining_balance|floatformat:2 }}</strong></div>
                 </div>
                 {% endif %}
             </div>

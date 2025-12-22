@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Menu - {{ restaurant_name|default:"Restaurant" }}{% endblock %}
 
@@ -1049,13 +1050,13 @@
                                                                     <div class="product-meta">
                                                                         <div class="price-section">
                                                                             {% if product.has_active_promotion %}
-                                                                                <div class="original-price text-decoration-line-through text-muted">${{ product.price }}</div>
-                                                                                <div class="price-badge promotional-price">${{ product.get_current_price }}</div>
+                                                                                <div class="original-price text-decoration-line-through text-muted">{% currency_symbol %}{{ product.price }}</div>
+                                                                                <div class="price-badge promotional-price">{% currency_symbol %}{{ product.get_current_price }}</div>
                                                                                 <div class="happy-hour-badge">
                                                                                     <i class="fas fa-fire"></i> {{ product.get_active_promotion.discount_percentage|floatformat:0 }}% OFF
                                                                                 </div>
                                                                             {% else %}
-                                                                                <div class="price-badge">${{ product.price }}</div>
+                                                                                <div class="price-badge">{% currency_symbol %}{{ product.price }}</div>
                                                                             {% endif %}
                                                                         </div>
                                                                         <div class="product-details text-end">
@@ -1136,6 +1137,9 @@
 
 {% block extra_js %}
 <script>
+// Currency symbol for JavaScript
+const CURRENCY_SYMBOL = '{% currency_symbol %}';
+
 document.addEventListener('DOMContentLoaded', function() {
     // Real category data from Django template
     const categoryData = {
@@ -1222,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <h6 class="card-title">${product.name}</h6>
                                             <p class="card-text">${product.description}</p>
                                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <span class="h6 mb-0">$${product.price}</span>
+                                                <span class="h6 mb-0">${CURRENCY_SYMBOL}${product.price}</span>
                                                 <small class="text-muted">Stock: ${product.stock}</small>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
@@ -1747,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <h6 class="card-title">${product}</h6>
                                                 <p class="card-text">Delicious ${product.toLowerCase()}</p>
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <span class="h6 mb-0">$12.99</span>
+                                                    <span class="h6 mb-0">${CURRENCY_SYMBOL}12.99</span>
                                                     <button class="btn btn-primary btn-sm">Add to Cart</button>
                                                 </div>
                                             </div>

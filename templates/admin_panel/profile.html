@@ -264,18 +264,70 @@
                 <div class="border rounded p-3 bg-light" id="taxPreviewExample">
                     <div class="d-flex justify-content-between mb-2">
                         <span>Example Order:</span>
-                        <span>$100.00</span>
+                        <span><span class="currency-symbol">{{ user.get_currency_symbol }}</span>100.00</span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Tax (<span class="tax-rate-display">{{ user.get_tax_rate_percentage|floatformat:2 }}</span>%):</span>
-                        <span>$<span class="tax-amount-display">{{ user.get_tax_rate_percentage|floatformat:2 }}</span></span>
+                        <span><span class="currency-symbol">{{ user.get_currency_symbol }}</span><span class="tax-amount-display">{{ user.get_tax_rate_percentage|floatformat:2 }}</span></span>
                     </div>
                     <hr class="my-2">
                     <div class="d-flex justify-content-between fw-bold">
                         <span>Total:</span>
-                        <span>$<span class="total-amount-display">{{ user.get_tax_rate_percentage|add:100|floatformat:2 }}</span></span>
+                        <span><span class="currency-symbol">{{ user.get_currency_symbol }}</span><span class="total-amount-display">{{ user.get_tax_rate_percentage|add:100|floatformat:2 }}</span></span>
                     </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Currency Settings Card -->
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-coins me-2"></i>
+                <h5 class="mb-0">Currency Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="currencyForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_currency">
+                    
+                    <div class="mb-3">
+                        <label for="currency_code" class="form-label">Display Currency</label>
+                        <select class="form-select" id="currency_code" name="currency_code">
+                            <option value="USD" {% if user.currency_code == 'USD' %}selected{% endif %}>$ - US Dollar (USD)</option>
+                            <option value="EUR" {% if user.currency_code == 'EUR' %}selected{% endif %}>€ - Euro (EUR)</option>
+                            <option value="GBP" {% if user.currency_code == 'GBP' %}selected{% endif %}>£ - British Pound (GBP)</option>
+                            <option value="KES" {% if user.currency_code == 'KES' %}selected{% endif %}>KSh - Kenyan Shilling (KES)</option>
+                            <option value="TZS" {% if user.currency_code == 'TZS' %}selected{% endif %}>TSh - Tanzanian Shilling (TZS)</option>
+                            <option value="UGX" {% if user.currency_code == 'UGX' %}selected{% endif %}>USh - Ugandan Shilling (UGX)</option>
+                            <option value="RWF" {% if user.currency_code == 'RWF' %}selected{% endif %}>RF - Rwandan Franc (RWF)</option>
+                            <option value="ZAR" {% if user.currency_code == 'ZAR' %}selected{% endif %}>R - South African Rand (ZAR)</option>
+                            <option value="NGN" {% if user.currency_code == 'NGN' %}selected{% endif %}>₦ - Nigerian Naira (NGN)</option>
+                            <option value="GHS" {% if user.currency_code == 'GHS' %}selected{% endif %}>GH₵ - Ghanaian Cedi (GHS)</option>
+                            <option value="INR" {% if user.currency_code == 'INR' %}selected{% endif %}>₹ - Indian Rupee (INR)</option>
+                            <option value="AED" {% if user.currency_code == 'AED' %}selected{% endif %}>AED - UAE Dirham (AED)</option>
+                            <option value="SAR" {% if user.currency_code == 'SAR' %}selected{% endif %}>SAR - Saudi Riyal (SAR)</option>
+                            <option value="CNY" {% if user.currency_code == 'CNY' %}selected{% endif %}>¥ - Chinese Yuan (CNY)</option>
+                            <option value="JPY" {% if user.currency_code == 'JPY' %}selected{% endif %}>¥ - Japanese Yen (JPY)</option>
+                        </select>
+                        <div class="form-text">Select the currency symbol to display for all prices</div>
+                    </div>
+                    
+                    <div class="text-center mb-3">
+                        <div class="display-6 text-success" id="currencyPreview">
+                            <span class="currency-preview-symbol">{{ user.get_currency_symbol }}</span>
+                        </div>
+                        <p class="text-muted small">Current Currency Symbol</p>
+                    </div>
+                    
+                    <div class="alert alert-info py-2">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <small>This only changes the display symbol. Price values remain unchanged.</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-1"></i>Save Currency
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -495,7 +547,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 {% if user.is_owner %}
-// Initialize tax preview calculations
+// Currency symbols mapping
+const currencySymbols = {
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£',
+    'KES': 'KSh',
+    'TZS': 'TSh',
+    'UGX': 'USh',
+    'RWF': 'RF',
+    'ZAR': 'R',
+    'NGN': '₦',
+    'GHS': 'GH₵',
+    'INR': '₹',
+    'AED': 'AED',
+    'SAR': 'SAR',
+    'CNY': '¥',
+    'JPY': '¥'
+};
+
+// Initialize tax preview calculations and currency
 document.addEventListener('DOMContentLoaded', function() {
     // Calculate and display initial tax preview
     const currentTaxRate = {{ user.get_tax_rate_percentage|floatformat:2 }};
@@ -507,6 +578,27 @@ document.addEventListener('DOMContentLoaded', function() {
         taxRateInput.addEventListener('input', function() {
             const newTaxRate = parseFloat(this.value) || 0;
             updateStaticTaxPreview(newTaxRate);
+        });
+    }
+    
+    // Currency selector live preview
+    const currencySelect = document.getElementById('currency_code');
+    if (currencySelect) {
+        currencySelect.addEventListener('change', function() {
+            const selectedCurrency = this.value;
+            const symbol = currencySymbols[selectedCurrency] || '$';
+            
+            // Update the preview symbol
+            const previewSymbol = document.querySelector('.currency-preview-symbol');
+            if (previewSymbol) {
+                previewSymbol.textContent = symbol;
+            }
+            
+            // Update all currency symbols on page
+            const allSymbols = document.querySelectorAll('.currency-symbol');
+            allSymbols.forEach(function(el) {
+                el.textContent = symbol;
+            });
         });
     }
 });

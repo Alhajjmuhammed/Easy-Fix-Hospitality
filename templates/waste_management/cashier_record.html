@@ -1,5 +1,6 @@
 {% extends 'cashier_base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Record Food Waste - Cashier{% endblock %}
 
@@ -82,7 +83,7 @@
                             <select class="form-select" id="product" name="product" required>
                                 <option value="">Select a product...</option>
                                 {% for product in products %}
-                                    <option value="{{ product.id }}">{{ product.name }} - ${{ product.price }}</option>
+                                    <option value="{{ product.id }}">{{ product.name }} - {% currency_symbol %}{{ product.price }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -162,6 +163,8 @@
 </div>
 
 <script>
+const CURRENCY_SYMBOL = '{% currency_symbol %}';
+
 document.getElementById('wasteForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -189,7 +192,7 @@ document.getElementById('wasteForm').addEventListener('submit', function(e) {
             document.getElementById('wasteDetails').innerHTML = `
                 <strong>Product:</strong> ${data.waste_log.product_name}<br>
                 <strong>Quantity:</strong> ${data.waste_log.quantity_wasted}<br>
-                <strong>Estimated Cost:</strong> $${data.waste_log.total_cost}
+                <strong>Estimated Cost:</strong> ${CURRENCY_SYMBOL}${data.waste_log.total_cost}
             `;
             
             const modal = new bootstrap.Modal(document.getElementById('successModal'));

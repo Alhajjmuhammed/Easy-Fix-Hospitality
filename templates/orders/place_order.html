@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Place Order - Restaurant System{% endblock %}
 
@@ -39,15 +40,15 @@
                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                     <div>
                                         <strong>{{ item.name }}</strong><br>
-                                        <small class="text-muted">{{ item.quantity }}x ${{ item.price }}</small>
+                                        <small class="text-muted">{{ item.quantity }}x {% currency_symbol %}{{ item.price }}</small>
                                     </div>
-                                    <span>${{ item.total|floatformat:2 }}</span>
+                                    <span>{% currency_symbol %}{{ item.total|floatformat:2 }}</span>
                                 </div>
                             {% endfor %}
                             
                             <div class="d-flex justify-content-between align-items-center pt-3">
                                 <strong>Total:</strong>
-                                <strong class="text-primary">${{ cart_total|floatformat:2 }}</strong>
+                                <strong class="text-primary">{% currency_symbol %}{{ cart_total|floatformat:2 }}</strong>
                             </div>
                         </div>
                     </div>

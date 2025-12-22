@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Order #{{ order.order_number }} - Track Your Order{% endblock %}
 
@@ -318,25 +319,25 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-center">{{ item.quantity }}</td>
-                                <td class="text-end">${{ item.unit_price }}</td>
-                                <td class="text-end"><strong>${{ item.get_subtotal }}</strong></td>
+                                <td class="text-end">{% currency_symbol %}{{ item.unit_price }}</td>
+                                <td class="text-end"><strong>{% currency_symbol %}{{ item.get_subtotal }}</strong></td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
                                 <th colspan="3" class="text-end">Total Amount:</th>
-                                <th class="text-end">${{ order.total_amount }}</th>
+                                <th class="text-end">{% currency_symbol %}{{ order.total_amount }}</th>
                             </tr>
                             {% if order.payment_amount %}
                             <tr>
                                 <th colspan="3" class="text-end">Paid Amount:</th>
-                                <th class="text-end">${{ order.payment_amount }}</th>
+                                <th class="text-end">{% currency_symbol %}{{ order.payment_amount }}</th>
                             </tr>
                             {% if order.payment_status != 'paid' %}
                             <tr>
                                 <th colspan="3" class="text-end">Remaining:</th>
-                                <th class="text-end">${{ order.total_amount|add:order.payment_amount|add:"-"|floatformat:2 }}</th>
+                                <th class="text-end">{% currency_symbol %}{{ order.total_amount|add:order.payment_amount|add:"-"|floatformat:2 }}</th>
                             </tr>
                             {% endif %}
                             {% endif %}
@@ -368,7 +369,7 @@
                     </tr>
                     <tr>
                         <td><strong>Total:</strong></td>
-                        <td class="text-end"><strong>${{ order.total_amount }}</strong></td>
+                        <td class="text-end"><strong>{% currency_symbol %}{{ order.total_amount }}</strong></td>
                     </tr>
                     <tr>
                         <td><strong>Payment:</strong></td>

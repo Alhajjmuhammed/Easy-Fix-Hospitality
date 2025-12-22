@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Receipt Management - Customer Care{% endblock %}
 
@@ -84,7 +85,7 @@
                                                 <span class="badge bg-secondary">Table {{ payment.order.table_info.tbl_no }}</span>
                                             </td>
                                             <td>
-                                                <strong>${{ payment.amount|floatformat:2 }}</strong>
+                                                <strong>{% currency_symbol %}{{ payment.amount|floatformat:2 }}</strong>
                                             </td>
                                             <td>
                                                 <span class="badge bg-info">{{ payment.get_payment_method_display }}</span>

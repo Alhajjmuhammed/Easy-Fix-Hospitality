@@ -1,3 +1,4 @@
+{% load restaurant_tags %}
 {% if orders %}
 <div class="modern-table">
     <div class="table-responsive">
@@ -49,7 +50,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <strong style="font-size: 0.8rem;">${{ order.total_amount|floatformat:2 }}</strong>
+                        <strong style="font-size: 0.8rem;">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                     </td>
                     <td>
                         {% if order.special_instructions %}

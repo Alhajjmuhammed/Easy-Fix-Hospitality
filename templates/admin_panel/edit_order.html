@@ -1,5 +1,6 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Edit Order #{{ order.order_number }}{% endblock %}
 
@@ -72,7 +73,7 @@
                                 <div class="mb-3">
                                     <label for="order_total" class="form-label">Total Amount</label>
                                     <input type="text" class="form-control" id="order_total" 
-                                           value="${{ order.total_amount|floatformat:2 }}" readonly>
+                                           value="{% currency_symbol %}{{ order.total_amount|floatformat:2 }}" readonly>
                                 </div>
                             </div>
                         </div>
@@ -136,7 +137,7 @@
                     
                     <div class="mb-3">
                         <small class="text-muted">Total Amount</small>
-                        <div class="h5 text-success">${{ order.total_amount|floatformat:2 }}</div>
+                        <div class="h5 text-success">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</div>
                     </div>
                 </div>
             </div>
@@ -153,8 +154,8 @@
                                 <small class="text-muted">Qty: {{ item.quantity }}</small>
                             </div>
                             <div class="text-end">
-                                <div class="fw-bold">${{ item.total_price|floatformat:2 }}</div>
-                                <small class="text-muted">${{ item.price|floatformat:2 }} each</small>
+                                <div class="fw-bold">{% currency_symbol %}{{ item.total_price|floatformat:2 }}</div>
+                                <small class="text-muted">{% currency_symbol %}{{ item.price|floatformat:2 }} each</small>
                             </div>
                         </div>
                     {% empty %}

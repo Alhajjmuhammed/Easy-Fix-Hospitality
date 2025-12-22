@@ -70,6 +70,51 @@ class User(AbstractUser):
     # Tax configuration for restaurant owners
     tax_rate = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal('0.0800'), 
                                  help_text="Tax rate as decimal (e.g., 0.0800 for 8%, 0.0500 for 5%)")
+    
+    # Currency configuration for restaurant owners
+    CURRENCY_CHOICES = [
+        ('USD', 'USD - US Dollar ($)'),
+        ('EUR', 'EUR - Euro (€)'),
+        ('GBP', 'GBP - British Pound (£)'),
+        ('KES', 'KES - Kenyan Shilling (KSh)'),
+        ('TZS', 'TZS - Tanzanian Shilling (TSh)'),
+        ('UGX', 'UGX - Ugandan Shilling (USh)'),
+        ('RWF', 'RWF - Rwandan Franc (RF)'),
+        ('ZAR', 'ZAR - South African Rand (R)'),
+        ('NGN', 'NGN - Nigerian Naira (₦)'),
+        ('GHS', 'GHS - Ghanaian Cedi (GH₵)'),
+        ('INR', 'INR - Indian Rupee (₹)'),
+        ('AED', 'AED - UAE Dirham (AED)'),
+        ('SAR', 'SAR - Saudi Riyal (SAR)'),
+        ('CNY', 'CNY - Chinese Yuan (¥)'),
+        ('JPY', 'JPY - Japanese Yen (¥)'),
+    ]
+    
+    CURRENCY_SYMBOLS = {
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£',
+        'KES': 'KSh',
+        'TZS': 'TSh',
+        'UGX': 'USh',
+        'RWF': 'RF',
+        'ZAR': 'R',
+        'NGN': '₦',
+        'GHS': 'GH₵',
+        'INR': '₹',
+        'AED': 'AED',
+        'SAR': 'SAR',
+        'CNY': '¥',
+        'JPY': '¥',
+    }
+    
+    currency_code = models.CharField(
+        max_length=3, 
+        choices=CURRENCY_CHOICES, 
+        default='USD',
+        help_text="Currency for displaying prices"
+    )
+    
     # Auto-print settings for restaurant operations
     auto_print_kot = models.BooleanField(default=True, 
                                         help_text="Automatically print Kitchen Order Tickets when order is placed")
@@ -301,6 +346,32 @@ class User(AbstractUser):
     def get_tax_rate_percentage(self):
         """Get the tax rate as percentage for display (e.g., 8.0 for 8%)"""
         return float(self.get_tax_rate() * 100)
+    
+    def get_currency_symbol(self):
+        """Get the currency symbol for this user's restaurant"""
+        owner = self.get_owner()
+        if owner:
+            return self.CURRENCY_SYMBOLS.get(owner.currency_code, '$')
+        return '$'
+    
+    def get_currency_code(self):
+        """Get the currency code for this user's restaurant"""
+        owner = self.get_owner()
+        if owner:
+            return owner.currency_code
+        return 'USD'
+    
+    def format_currency(self, amount):
+        """Format an amount with the correct currency symbol"""
+        symbol = self.get_currency_symbol()
+        try:
+            amount = float(amount)
+            # For currencies that typically use integer values (like KES, TZS)
+            if self.get_currency_code() in ['KES', 'TZS', 'UGX', 'RWF', 'JPY']:
+                return f"{symbol}{amount:,.0f}"
+            return f"{symbol}{amount:,.2f}"
+        except (TypeError, ValueError):
+            return f"{symbol}0.00"
     
     def generate_qr_code(self):
         """Generate unique QR code for restaurant"""

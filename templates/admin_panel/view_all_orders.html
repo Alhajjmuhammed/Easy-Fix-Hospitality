@@ -1,5 +1,6 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}All Orders - Branch Monitoring{% endblock %}
 
@@ -285,11 +286,11 @@
             <div class="stat-label">Total Orders</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value text-success">${{ total_revenue|floatformat:2 }}</div>
+            <div class="stat-value text-success">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</div>
             <div class="stat-label">Total Revenue</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value text-info">${{ average_order_value|floatformat:2 }}</div>
+            <div class="stat-value text-info">{% currency_symbol %}{{ average_order_value|floatformat:2 }}</div>
             <div class="stat-label">Avg Order Value</div>
         </div>
         <div class="stat-card">
@@ -372,7 +373,7 @@
                             </td>
                             <td>
                                 <div class="order-value text-success">
-                                    ${{ order.total|floatformat:2 }}
+                                    {% currency_symbol %}{{ order.total|floatformat:2 }}
                                 </div>
                                 {% if order.payment_method %}
                                     <small class="text-muted">{{ order.payment_method|title }}</small>

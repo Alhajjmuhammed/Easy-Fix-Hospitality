@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %}\n{% load restaurant_tags %}
 
 {% block title %}Owner Dashboard - Restaurant System                            <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-outline-success w-100">
                                 <i class="bi bi-box-seam"></i> Manage Products
@@ -230,16 +230,16 @@
                         <div class="border rounded p-3 bg-light">
                             <div class="d-flex justify-content-between">
                                 <span>Subtotal:</span>
-                                <span>$100.00</span>
+                                <span>{% currency_symbol %}100.00</span>
                             </div>
                             <div class="d-flex justify-content-between">
                                 <span>Tax (<span id="previewTaxRate">{{ user.get_tax_rate_percentage|floatformat:2 }}</span>%):</span>
-                                <span>$<span id="previewTaxAmount">{{ user.get_tax_rate_percentage|floatformat:2 }}</span></span>
+                                <span>{% currency_symbol %}<span id="previewTaxAmount">{{ user.get_tax_rate_percentage|floatformat:2 }}</span></span>
                             </div>
                             <hr class="my-2">
                             <div class="d-flex justify-content-between fw-bold">
                                 <span>Total:</span>
-                                <span>$<span id="previewTotal">{{ user.get_tax_rate_percentage|add:100|floatformat:2 }}</span></span>
+                                <span>{% currency_symbol %}<span id="previewTotal">{{ user.get_tax_rate_percentage|add:100|floatformat:2 }}</span></span>
                             </div>
                         </div>
                     </div>

@@ -101,6 +101,50 @@ class Restaurant(models.Model):
         help_text="Tax rate as decimal (e.g., 0.0800 for 8%)"
     )
     
+    # Currency configuration for restaurant/branch
+    CURRENCY_CHOICES = [
+        ('USD', 'USD - US Dollar ($)'),
+        ('EUR', 'EUR - Euro (€)'),
+        ('GBP', 'GBP - British Pound (£)'),
+        ('KES', 'KES - Kenyan Shilling (KSh)'),
+        ('TZS', 'TZS - Tanzanian Shilling (TSh)'),
+        ('UGX', 'UGX - Ugandan Shilling (USh)'),
+        ('RWF', 'RWF - Rwandan Franc (RF)'),
+        ('ZAR', 'ZAR - South African Rand (R)'),
+        ('NGN', 'NGN - Nigerian Naira (₦)'),
+        ('GHS', 'GHS - Ghanaian Cedi (GH₵)'),
+        ('INR', 'INR - Indian Rupee (₹)'),
+        ('AED', 'AED - UAE Dirham (AED)'),
+        ('SAR', 'SAR - Saudi Riyal (SAR)'),
+        ('CNY', 'CNY - Chinese Yuan (¥)'),
+        ('JPY', 'JPY - Japanese Yen (¥)'),
+    ]
+    
+    CURRENCY_SYMBOLS = {
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£',
+        'KES': 'KSh',
+        'TZS': 'TSh',
+        'UGX': 'USh',
+        'RWF': 'RF',
+        'ZAR': 'R',
+        'NGN': '₦',
+        'GHS': 'GH₵',
+        'INR': '₹',
+        'AED': 'AED',
+        'SAR': 'SAR',
+        'CNY': '¥',
+        'JPY': '¥',
+    }
+    
+    currency_code = models.CharField(
+        max_length=3,
+        choices=CURRENCY_CHOICES,
+        default='USD',
+        help_text="Currency for displaying prices in this restaurant/branch"
+    )
+    
     # Printing Configuration
     auto_print_kot = models.BooleanField(
         default=True,
@@ -272,6 +316,26 @@ class Restaurant(models.Model):
     def tax_rate_percentage(self):
         """Get tax rate as percentage (e.g., 8.0 for 8%)"""
         return float(self.tax_rate * 100)
+    
+    def get_currency_symbol(self):
+        """Get the currency symbol for this restaurant"""
+        return self.CURRENCY_SYMBOLS.get(self.currency_code, '$')
+    
+    def get_currency_code_display(self):
+        """Get the currency code"""
+        return self.currency_code
+    
+    def format_currency(self, amount):
+        """Format an amount with the correct currency symbol"""
+        symbol = self.get_currency_symbol()
+        try:
+            amount = float(amount)
+            # For currencies that typically use integer values
+            if self.currency_code in ['KES', 'TZS', 'UGX', 'RWF', 'JPY']:
+                return f"{symbol}{amount:,.0f}"
+            return f"{symbol}{amount:,.2f}"
+        except (TypeError, ValueError):
+            return f"{symbol}0.00"
     
     @classmethod
     def get_accessible_restaurants(cls, user):

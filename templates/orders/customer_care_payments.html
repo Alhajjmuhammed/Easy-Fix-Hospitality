@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}
     {% if user.is_owner %}Payment Management - Owner{% else %}Payment Processing - Customer Care{% endif %}
@@ -172,13 +173,13 @@
                                             </small>
                                         </td>
                                         <td>
-                                            <strong class="text-primary">${{ order.total_amount|floatformat:2 }}</strong>
+                                            <strong class="text-primary">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                                         </td>
                                         <td>
-                                            <span class="text-success">${{ order.paid_amount|default:0|floatformat:2 }}</span>
+                                            <span class="text-success">{% currency_symbol %}{{ order.paid_amount|default:0|floatformat:2 }}</span>
                                         </td>
                                         <td>
-                                            <strong class="text-danger">${{ order.balance|default:order.total_amount|floatformat:2 }}</strong>
+                                            <strong class="text-danger">{% currency_symbol %}{{ order.balance|default:order.total_amount|floatformat:2 }}</strong>
                                         </td>
                                         <td>
                                             <span class="badge 
@@ -256,7 +257,7 @@
                     <div class="mb-3">
                         <label class="form-label">Amount Due</label>
                         <div class="input-group">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="text" class="form-control form-control-lg" id="amountDue" readonly>
                         </div>
                     </div>
@@ -274,7 +275,7 @@
                     <div class="mb-3">
                         <label for="amountPaid" class="form-label">Amount Paid *</label>
                         <div class="input-group">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="number" class="form-control" id="amountPaid" name="amount_paid" 
                                    step="0.01" min="0" required>
                         </div>

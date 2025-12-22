@@ -1,5 +1,6 @@
 {% extends 'cashier_base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Waste Recording - Cashier{% endblock %}
 
@@ -261,7 +262,7 @@
                                 <option value="">🔍 Select a product...</option>
                                 {% for product in products %}
                                     <option value="{{ product.id }}" data-price="{{ product.price }}">
-                                        {{ product.name }} - ${{ product.price }}
+                                        {{ product.name }} - {% currency_symbol %}{{ product.price }}
                                     </option>
                                 {% endfor %}
                             </select>
@@ -319,7 +320,7 @@
                     <!-- Cost Preview -->
                     <div id="costPreview" class="cost-preview" style="display: none;">
                         <i class="fas fa-dollar-sign me-2"></i>
-                        Estimated Cost Impact: <span id="estimatedCost">$0.00</span>
+                        Estimated Cost Impact: <span id="estimatedCost">{% currency_symbol %}0.00</span>
                     </div>
                     
                     <!-- Action Buttons -->
@@ -382,6 +383,9 @@
 
 {% block extra_js %}
 <script>
+// Currency symbol for JavaScript
+const CURRENCY_SYMBOL = '{% currency_symbol %}';
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('cashierWasteForm');
     const productSelect = document.getElementById('productSelect');
@@ -399,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (selectedOption && selectedOption.dataset.price && quantity > 0) {
             const price = parseFloat(selectedOption.dataset.price);
             const totalCost = (price * quantity).toFixed(2);
-            estimatedCost.textContent = '$' + totalCost;
+            estimatedCost.textContent = CURRENCY_SYMBOL + totalCost;
             costPreview.style.display = 'block';
         } else {
             costPreview.style.display = 'none';
@@ -451,7 +455,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-6"><strong>Reason:</strong></div>
                         <div class="col-6">${data.waste_log.waste_reason}</div>
                         <div class="col-6"><strong>Cost Impact:</strong></div>
-                        <div class="col-6 text-danger"><strong>$${data.waste_log.total_cost}</strong></div>
+                        <div class="col-6 text-danger"><strong>${CURRENCY_SYMBOL}${data.waste_log.total_cost}</strong></div>
                     </div>
                 `;
                 

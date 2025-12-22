@@ -1,5 +1,6 @@
 {% extends 'system_admin/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Manage Orders - System Admin{% endblock %}
 
@@ -382,7 +383,7 @@
                             </div>
                             
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="amount-text">${{ order.total_amount|floatformat:2 }}</span>
+                                <span class="amount-text">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</span>
                                 <small class="text-muted">{{ order.created_at|date:"M d, Y H:i" }}</small>
                             </div>
                             
@@ -448,7 +449,7 @@
                                     <span class="badge bg-secondary">{{ order.get_total_products }} item{{ order.get_total_products|pluralize }}</span>
                                 </td>
                                 <td>
-                                    <strong class="text-success">${{ order.total_amount|floatformat:2 }}</strong>
+                                    <strong class="text-success">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                                 </td>
                                 <td>
                                     <span class="badge status-badge 
@@ -637,7 +638,7 @@
                     <div class="mb-3">
                         <label for="paymentAmount" class="form-label">Payment Amount</label>
                         <div class="input-group">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="number" class="form-control" id="paymentAmount" name="payment_amount" step="0.01" min="0">
                         </div>
                         <small class="form-text text-muted">Leave empty to keep current amount</small>

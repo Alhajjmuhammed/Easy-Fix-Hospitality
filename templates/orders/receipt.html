@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Receipt - Order #{{ order.order_number }}{% endblock %}
 
@@ -196,7 +197,7 @@
                         <div class="item-row">
                             <div class="item-name">{{ item.product.name }}</div>
                             <div class="item-qty">{{ item.quantity }}x</div>
-                            <div class="item-price">${{ item.get_total_price|floatformat:2 }}</div>
+                            <div class="item-price">{% currency_symbol %}{{ item.get_total_price|floatformat:2 }}</div>
                         </div>
                         {% if item.special_notes %}
                             <div class="text-muted small ps-2">
@@ -215,21 +216,21 @@
                 <div class="total-section">
                     <div class="total-row">
                         <span>Subtotal:</span>
-                        <span>${{ subtotal|floatformat:2 }}</span>
+                        <span>{% currency_symbol %}{{ subtotal|floatformat:2 }}</span>
                     </div>
                     {% if discount_amount > 0 %}
                         <div class="total-row text-success">
                             <span>Discount:</span>
-                            <span>-${{ discount_amount|floatformat:2 }}</span>
+                            <span>-{% currency_symbol %}{{ discount_amount|floatformat:2 }}</span>
                         </div>
                     {% endif %}
                     <div class="total-row">
                         <span>Tax ({{ order.tax_rate }}%):</span>
-                        <span>${{ tax_amount|floatformat:2 }}</span>
+                        <span>{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
                     </div>
                     <div class="total-row grand-total">
                         <span>Total Paid:</span>
-                        <span>${{ total_amount|floatformat:2 }}</span>
+                        <span>{% currency_symbol %}{{ total_amount|floatformat:2 }}</span>
                     </div>
                 </div>
             </div>
@@ -244,7 +245,7 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <p class="mb-1"><strong>Payment Method:</strong> {{ payment.get_payment_method_display }}</p>
-                                <p class="mb-1"><strong>Amount:</strong> ${{ payment.amount|floatformat:2 }}</p>
+                                <p class="mb-1"><strong>Amount:</strong> {% currency_symbol %}{{ payment.amount|floatformat:2 }}</p>
                             </div>
                             <div class="col-md-6">
                                 <p class="mb-1"><strong>Processed by:</strong> {{ payment.processed_by.get_full_name|default:payment.processed_by.username }}</p>

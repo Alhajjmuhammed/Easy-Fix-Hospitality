@@ -1,5 +1,6 @@
 {% extends 'system_admin/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Manage Products - System Admin{% endblock %}
 
@@ -346,7 +347,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-success fs-6">${{ product.price }}</span>
+                                        <span class="badge bg-success fs-6">{% currency_symbol %}{{ product.price }}</span>
                                     </td>
                                     <td>
                                         <span class="badge {% if product.is_available %}bg-success{% else %}bg-danger{% endif %}">
@@ -522,7 +523,7 @@
                     <div class="mb-3">
                         <label for="createPrice" class="form-label">Price *</label>
                         <div class="input-group">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="number" class="form-control" id="createPrice" name="price" step="0.01" min="0" required>
                         </div>
                     </div>
@@ -587,7 +588,7 @@
                     <div class="mb-3">
                         <label for="editPrice" class="form-label">Price *</label>
                         <div class="input-group">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="number" class="form-control" id="editPrice" name="price" step="0.01" min="0" required>
                         </div>
                     </div>

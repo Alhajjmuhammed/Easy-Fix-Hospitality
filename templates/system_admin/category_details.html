@@ -1,3 +1,4 @@
+{% load restaurant_tags %}
 <div class="category-details">
     <div class="row">
         <div class="col-md-6">
@@ -53,7 +54,7 @@
                             <div>
                                 <h6 class="mb-1">{{ product.name }}</h6>
                                 <small class="text-muted">
-                                    ${{ product.price }}
+                                    {% currency_symbol %}{{ product.price }}
                                     {% if product.sub_category %} • {{ product.sub_category.name }}{% endif %}
                                 </small>
                             </div>

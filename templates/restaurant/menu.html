@@ -1,4 +1,5 @@
 ﻿{% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Menu - {{ restaurant_name|default:"Restaurant" }}{% endblock %}
 
@@ -1183,13 +1184,13 @@
                                                                     <div class="product-meta">
                                                                         <div class="price-section">
                                                                             {% if product.has_active_promotion %}
-                                                                                <div class="original-price text-decoration-line-through text-muted">${{ product.price }}</div>
-                                                                                <div class="price-badge promotional-price">${{ product.get_current_price }}</div>
+                                                                                <div class="original-price text-decoration-line-through text-muted">{% currency_symbol %}{{ product.price }}</div>
+                                                                                <div class="price-badge promotional-price">{% currency_symbol %}{{ product.get_current_price }}</div>
                                                                                 <div class="happy-hour-badge">
                                                                                     <i class="fas fa-fire"></i> {{ product.get_active_promotion.discount_percentage|floatformat:0 }}% OFF
                                                                                 </div>
                                                                             {% else %}
-                                                                                <div class="price-badge">${{ product.price }}</div>
+                                                                                <div class="price-badge">{% currency_symbol %}{{ product.price }}</div>
                                                                             {% endif %}
                                                                         </div>
                                                                         <div class="product-details text-end">
@@ -1270,6 +1271,9 @@
 
 {% block extra_js %}
 <script>
+// Currency symbol from server-side context
+const CURRENCY_SYMBOL = '{% currency_symbol %}';
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded - Modal functionality starting');
 
@@ -1367,8 +1371,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             products.forEach(product => {
                                 if (product.is_available && product.stock > 0) {
                                     const priceDisplay = product.has_promotion ? 
-                                        `<span class="h6 mb-0 text-success">$${product.price}</span> <small class="text-muted text-decoration-line-through">$${product.original_price}</small>` :
-                                        `<span class="h6 mb-0">$${product.original_price}</span>`;
+                                        `<span class="h6 mb-0 text-success">${CURRENCY_SYMBOL}${product.price}</span> <small class="text-muted text-decoration-line-through">${CURRENCY_SYMBOL}${product.original_price}</small>` :
+                                        `<span class="h6 mb-0">${CURRENCY_SYMBOL}${product.original_price}</span>`;
                                     
                                     const discountBadge = product.has_promotion ? 
                                         `<div class="happy-hour-badge mt-1"><i class="fas fa-fire"></i> ${Math.round(product.discount_percentage)}% OFF</div>` : '';
@@ -1572,7 +1576,7 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
                                     <h6 class="card-title">Coffee</h6>
                                     <p class="card-text">Fresh brewed coffee</p>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="h6 mb-0">$3.99</span>
+                                        <span class="h6 mb-0">${CURRENCY_SYMBOL}3.99</span>
                                         <small class="text-muted">Available</small>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
@@ -1599,7 +1603,7 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
                                     <h6 class="card-title">Hot Chocolate</h6>
                                     <p class="card-text">Rich hot chocolate</p>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="h6 mb-0">$4.99</span>
+                                        <span class="h6 mb-0">${CURRENCY_SYMBOL}4.99</span>
                                         <small class="text-muted">Available</small>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">

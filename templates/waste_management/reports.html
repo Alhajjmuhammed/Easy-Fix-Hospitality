@@ -1,5 +1,6 @@
 ﻿{% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Waste Reports{% endblock %}
 
@@ -116,7 +117,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td>${{ perf.total_cost|floatformat:2 }}</td>
+                        <td>{% currency_symbol %}{{ perf.total_cost|floatformat:2 }}</td>
                         <td>
                             <div class="d-flex align-items-center">
                                 <span class="mr-2">{{ perf.cost_percentage }}%</span>
@@ -129,7 +130,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td>${{ perf.avg_cost|floatformat:2 }}</td>
+                        <td>{% currency_symbol %}{{ perf.avg_cost|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

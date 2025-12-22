@@ -1,3 +1,4 @@
+{% load restaurant_tags %}
 <div class="table-details">
     <div class="row">
         <div class="col-md-6">
@@ -20,7 +21,7 @@
                     <small class="text-muted">Total Orders</small>
                 </div>
                 <div class="stat-item">
-                    <h5>${{ total_revenue|floatformat:2 }}</h5>
+                    <h5>{% currency_symbol %}{{ total_revenue|floatformat:2 }}</h5>
                     <small class="text-muted">Total Revenue</small>
                 </div>
             </div>
@@ -62,7 +63,7 @@
                                         {{ order.get_status_display }}
                                     </span>
                                 </td>
-                                <td>${{ order.total_amount|floatformat:2 }}</td>
+                                <td>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</td>
                                 <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
                             </tr>
                             {% endfor %}

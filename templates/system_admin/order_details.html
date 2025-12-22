@@ -1,3 +1,4 @@
+{% load restaurant_tags %}
 <div class="order-details">
     <div class="row">
         <div class="col-md-6">
@@ -33,9 +34,9 @@
         <div class="col-md-6">
             <div class="order-summary">
                 <h5>Order Summary</h5>
-                <p><strong>Total Amount:</strong> ${{ order.total_amount|floatformat:2 }}</p>
+                <p><strong>Total Amount:</strong> {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</p>
                 {% if order.payment_amount %}
-                <p><strong>Payment Amount:</strong> ${{ order.payment_amount|floatformat:2 }}</p>
+                <p><strong>Payment Amount:</strong> {% currency_symbol %}{{ order.payment_amount|floatformat:2 }}</p>
                 {% endif %}
                 <p><strong>Order Date:</strong> {{ order.created_at|date:"M d, Y H:i" }}</p>
                 {% if order.updated_at != order.created_at %}
@@ -87,8 +88,8 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ item.quantity }}</td>
-                                <td>${{ item.unit_price|floatformat:2 }}</td>
-                                <td>${{ item.get_subtotal|floatformat:2 }}</td>
+                                <td>{% currency_symbol %}{{ item.unit_price|floatformat:2 }}</td>
+                                <td>{% currency_symbol %}{{ item.get_subtotal|floatformat:2 }}</td>
                                 <td>{{ item.special_notes|default:"-" }}</td>
                             </tr>
                             {% endfor %}
@@ -96,7 +97,7 @@
                         <tfoot>
                             <tr class="table-dark">
                                 <th colspan="4">Total</th>
-                                <th>${{ order.total_amount|floatformat:2 }}</th>
+                                <th>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</th>
                                 <th></th>
                             </tr>
                         </tfoot>

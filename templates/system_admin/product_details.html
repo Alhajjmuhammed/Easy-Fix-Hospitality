@@ -1,3 +1,4 @@
+{% load restaurant_tags %}
 <div class="product-details">
     <div class="row">
         <div class="col-md-6">
@@ -8,7 +9,7 @@
             <p><strong>Sub Category:</strong> {{ product.sub_category.name }}</p>
             {% endif %}
             <p><strong>Description:</strong> {{ product.description|default:"No description provided" }}</p>
-            <p><strong>Price:</strong> ${{ product.price }}</p>
+            <p><strong>Price:</strong> {% currency_symbol %}{{ product.price }}</p>
             <p><strong>Status:</strong> 
                 <span class="badge {% if product.availability %}bg-success{% else %}bg-danger{% endif %}">
                     {% if product.availability %}Available{% else %}Unavailable{% endif %}
@@ -26,7 +27,7 @@
                     <small class="text-muted">Quantity Sold</small>
                 </div>
                 <div class="stat-item">
-                    <h5>${{ total_revenue|floatformat:2 }}</h5>
+                    <h5>{% currency_symbol %}{{ total_revenue|floatformat:2 }}</h5>
                     <small class="text-muted">Total Revenue</small>
                 </div>
             </div>
@@ -58,8 +59,8 @@
                                 <td>{{ item.order.order_number }}</td>
                                 <td>Table {{ item.order.table_info.tbl_no }}</td>
                                 <td>{{ item.quantity }}</td>
-                                <td>${{ item.unit_price }}</td>
-                                <td>${{ item.get_subtotal|floatformat:2 }}</td>
+                                <td>{% currency_symbol %}{{ item.unit_price }}</td>
+                                <td>{% currency_symbol %}{{ item.get_subtotal|floatformat:2 }}</td>
                                 <td>{{ item.created_at|date:"M d, Y" }}</td>
                             </tr>
                             {% endfor %}

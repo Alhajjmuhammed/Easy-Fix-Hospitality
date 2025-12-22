@@ -1,5 +1,6 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}Main Owner Dashboard{% endblock %}
 
@@ -108,7 +109,7 @@
     <div class="col-xl-3 col-lg-6 col-md-6">
         <div class="card stats-card">
             <div class="card-body position-relative">
-                <div class="stats-number">${{ total_revenue|floatformat:2 }}</div>
+                <div class="stats-number">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</div>
                 <div class="stats-label">Today's Revenue</div>
                 <i class="fas fa-dollar-sign stats-icon text-warning"></i>
             </div>
@@ -191,7 +192,7 @@
                                     <span class="badge bg-info">{{ stat.orders_count }}</span>
                                 </td>
                                 <td class="text-center">
-                                    <strong>${{ stat.today_revenue|floatformat:2 }}</strong>
+                                    <strong>{% currency_symbol %}{{ stat.today_revenue|floatformat:2 }}</strong>
                                 </td>
                                 <td class="text-center">
                                     <span class="badge bg-secondary">{{ stat.staff_count }}</span>

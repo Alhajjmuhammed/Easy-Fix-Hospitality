@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
 {% block title %}Menu - {{ user.get_restaurant_name }}{% endblock %}
 
@@ -99,7 +100,7 @@
                                         <p class="card-text text-muted small flex-grow-1">{{ product.description|truncatechars:100 }}</p>
                                         
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="h5 text-primary mb-0">${{ product.price }}</span>
+                                            <span class="h5 text-primary mb-0">{% currency_symbol %}{{ product.price }}</span>
                                             <small class="text-muted">
                                                 <i class="bi bi-clock"></i> {{ product.preparation_time }} min
                                             </small>
@@ -147,7 +148,7 @@
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <strong>{{ cart_count }} items • ${{ cart_total|floatformat:2 }}</strong>
+                <strong>{{ cart_count }} items • {% currency_symbol %}{{ cart_total|floatformat:2 }}</strong>
             </div>
             <a href="{% url 'orders:view_cart' %}" class="btn btn-primary">
                 <i class="bi bi-cart-check"></i> View Cart

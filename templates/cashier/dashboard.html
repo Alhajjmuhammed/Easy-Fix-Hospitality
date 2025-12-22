@@ -1,5 +1,6 @@
 {% extends 'cashier_base.html' %}
 {% load static %}
+{% load restaurant_tags %}
 
 {% block title %}
     {% if user.is_customer_care %}Payment Processing - Customer Care{% elif user.is_owner %}Payment Processing - Owner{% else %}Cashier Dashboard{% endif %}
@@ -73,6 +74,9 @@
 
 {% block extra_js %}
 <script>
+    // Currency symbol for JavaScript
+    const CURRENCY_SYMBOL = '{% currency_symbol %}';
+    
     // Pass products data from Django template to JavaScript
     const wasteProducts = [
         {% for product in waste_products %}
@@ -208,16 +212,16 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <strong>${{ order.total_amount }}</strong>
+                                                <strong>{% currency_symbol %}{{ order.total_amount }}</strong>
                                             </td>
                                             <td>
-                                                <span class="text-success">${{ order.total_paid }}</span>
+                                                <span class="text-success">{% currency_symbol %}{{ order.total_paid }}</span>
                                             </td>
                                             <td>
                                                 {% if order.balance_due > 0 %}
-                                                    <span class="text-danger">${{ order.balance_due }}</span>
+                                                    <span class="text-danger">{% currency_symbol %}{{ order.balance_due }}</span>
                                                 {% else %}
-                                                    <span class="text-success">$0.00</span>
+                                                    <span class="text-success">{% currency_symbol %}0.00</span>
                                                 {% endif %}
                                             </td>
                                             <td>
@@ -366,8 +370,8 @@ function processPayment(orderId) {
                             <strong>Table:</strong> ${data.table_number}
                         </div>
                         <div class="col-sm-6 text-end">
-                            <strong>Total:</strong> $${data.total_amount}<br>
-                            <strong>Balance Due:</strong> <span class="text-danger">$${data.balance_due}</span>
+                            <strong>Total:</strong> ${CURRENCY_SYMBOL}${data.total_amount}<br>
+                            <strong>Balance Due:</strong> <span class="text-danger">${CURRENCY_SYMBOL}${data.balance_due}</span>
                         </div>
                     </div>
                 </div>
@@ -428,7 +432,7 @@ function processPayment(orderId) {
                                     ${data.items.map(item => `
                                         <tr>
                                             <td>${item.product_name}</td>
-                                            <td>$${item.unit_price}</td>
+                                            <td>${CURRENCY_SYMBOL}${item.unit_price}</td>
                                             <td>${item.remaining_quantity}</td>
                                             <td>
                                                 <input type="number" class="form-control form-control-sm item-quantity" 
@@ -436,7 +440,7 @@ function processPayment(orderId) {
                                                        min="0" max="${item.remaining_quantity}" value="0"
                                                        onchange="updateItemTotal()">
                                             </td>
-                                            <td class="item-total">$0.00</td>
+                                            <td class="item-total">${CURRENCY_SYMBOL}0.00</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -490,7 +494,7 @@ function updateItemTotal() {
         const itemTotal = quantity * unitPrice;
         
         const row = input.closest('tr');
-        row.querySelector('.item-total').textContent = `$${itemTotal.toFixed(2)}`;
+        row.querySelector('.item-total').textContent = `${CURRENCY_SYMBOL}${itemTotal.toFixed(2)}`;
         
         total += itemTotal;
     });
@@ -578,7 +582,7 @@ function viewPaymentHistory(orderId) {
                             ${data.payments.map(payment => `
                                 <tr class="${payment.is_voided ? 'table-secondary' : ''}">
                                     <td>${payment.created_at}</td>
-                                    <td>$${payment.amount}</td>
+                                    <td>${CURRENCY_SYMBOL}${payment.amount}</td>
                                     <td>${payment.payment_method}</td>
                                     <td>${payment.processed_by}</td>
                                     <td>
@@ -719,7 +723,7 @@ function getCookie(name) {
                                 <select class="form-select" id="product" name="product" required>
                                     <option value="">Select a product...</option>
                                     {% for product in waste_products %}
-                                        <option value="{{ product.id }}">{{ product.name }} - ${{ product.price }}</option>
+                                        <option value="{{ product.id }}">{{ product.name }} - {% currency_symbol %}{{ product.price }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -853,7 +857,7 @@ $(document).ready(function() {
                     <div class="alert alert-light border text-start">
                         <strong>${data.waste_log.product_name}</strong><br>
                         Quantity: ${data.waste_log.quantity_wasted}<br>
-                        Total Cost: $${data.waste_log.total_cost.toFixed(2)}<br>
+                        Total Cost: ${CURRENCY_SYMBOL}${data.waste_log.total_cost.toFixed(2)}<br>
                         Reason: ${data.waste_log.waste_reason}
                     </div>
                 `);
@@ -894,7 +898,7 @@ $(document).ready(function() {
                             <div class="list-group-item px-0">
                                 <div class="d-flex justify-content-between">
                                     <span><strong>${record.product_name}</strong> × ${record.quantity}</span>
-                                    <span class="text-danger">$${record.cost.toFixed(2)}</span>
+                                    <span class="text-danger">${CURRENCY_SYMBOL}${record.cost.toFixed(2)}</span>
                                 </div>
                                 <small class="text-muted d-block">${record.reason} • ${record.date}</small>
                             </div>
