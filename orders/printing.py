@@ -1089,11 +1089,27 @@ def _generate_bot_content(order):
 def _generate_receipt_content(payment):
     """Generate receipt text content for payment - optimized for thermal printer"""
     from decimal import Decimal
+    from accounts.models import User
     
     lines = []
     width = 48  # 80mm thermal printer - full width utilization
     order = payment.order
     restaurant = order.table_info.owner
+    
+    # Get currency symbol for this owner/restaurant
+    currency_symbol = '$'  # Default
+    if isinstance(restaurant, User):
+        currency_symbol = restaurant.get_currency_symbol()
+    else:
+        # Try to get from restaurant object
+        try:
+            from restaurant.models_restaurant import Restaurant
+            if isinstance(restaurant, Restaurant):
+                owner = restaurant.branch_owner or restaurant.main_owner
+                if owner:
+                    currency_symbol = owner.get_currency_symbol()
+        except:
+            pass
     
     # Get restaurant name - use main restaurant name for branch staff
     if restaurant.role and restaurant.role.name == 'branch_owner':
@@ -1159,7 +1175,7 @@ def _generate_receipt_content(payment):
         item_total = item.get_total_price()
         qty_str = f"{item.quantity}x"
         item_name = item.product.name[:width-16]  # Truncate long names
-        price_str = f"${float(item_total):.2f}"
+        price_str = f"{currency_symbol}{float(item_total):.2f}"
         
         # Format: "2x Item Name..................$10.00"
         name_section = f"{qty_str:4} {item_name}"
@@ -1178,21 +1194,21 @@ def _generate_receipt_content(payment):
     
     # Subtotal - right-aligned EXACTLY like HTML
     subtotal_label = "Subtotal:"
-    subtotal_value = f"${float(subtotal):.2f}"
+    subtotal_value = f"{currency_symbol}{float(subtotal):.2f}"
     spacing = width - len(subtotal_label) - len(subtotal_value)
     lines.append(subtotal_label + (" " * spacing) + subtotal_value)
     
     # Discount (if any) - right-aligned EXACTLY like HTML
     if discount > 0:
         discount_label = "Discount:"
-        discount_value = f"-${float(discount):.2f}"
+        discount_value = f"-{currency_symbol}{float(discount):.2f}"
         spacing = width - len(discount_label) - len(discount_value)
         lines.append(discount_label + (" " * spacing) + discount_value)
     
     # Tax - right-aligned EXACTLY like HTML
     tax_percentage = float(tax_rate * 100)
     tax_label = f"Tax ({tax_percentage:.1f}%):"
-    tax_value = f"${float(tax_amount):.2f}"
+    tax_value = f"{currency_symbol}{float(tax_amount):.2f}"
     spacing = width - len(tax_label) - len(tax_value)
     lines.append(tax_label + (" " * spacing) + tax_value)
     
@@ -1201,7 +1217,7 @@ def _generate_receipt_content(payment):
     
     # Grand Total - right-aligned EXACTLY like HTML
     total_label = "TOTAL:"
-    total_value = f"${float(total):.2f}"
+    total_value = f"{currency_symbol}{float(total):.2f}"
     spacing = width - len(total_label) - len(total_value)
     lines.append(total_label + (" " * spacing) + total_value)
     
@@ -1226,7 +1242,7 @@ def _generate_receipt_content(payment):
     
     # Amount paid - right-aligned EXACTLY like HTML
     amount_label = "Amount Paid:"
-    amount_value = f"${float(payment.amount):.2f}"
+    amount_value = f"{currency_symbol}{float(payment.amount):.2f}"
     spacing = width - len(amount_label) - len(amount_value)
     lines.append(amount_label + (" " * spacing) + amount_value)
     
@@ -1241,7 +1257,7 @@ def _generate_receipt_content(payment):
     if payment.payment_method == 'cash' and payment.amount > total:
         change = payment.amount - total
         change_label = "Change:"
-        change_value = f"${float(change):.2f}"
+        change_value = f"{currency_symbol}{float(change):.2f}"
         spacing = width - len(change_label) - len(change_value)
         lines.append(change_label + (" " * spacing) + change_value)
     
