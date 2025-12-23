@@ -938,6 +938,269 @@ def auto_print_receipt(payment):
     return result
 
 
+def auto_print_bill(order, printed_by=None):
+    """
+    Print bill for an order (before payment) - shows what customer owes
+    Uses the same receipt printer settings.
+    
+    Args:
+        order: Order instance
+        printed_by: User who requested the bill print
+    
+    Returns:
+        dict: Status of print operation
+    """
+    from django.conf import settings
+    
+    result = {
+        'bill_printed': False,
+        'errors': []
+    }
+    
+    try:
+        # Get printer settings for this specific restaurant/branch
+        print_settings = get_restaurant_print_settings(order)
+        
+        print(f"🧾 Bill print settings from {print_settings['source']}: {print_settings['name']}")
+        
+        # Determine print mode
+        use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
+        
+        # Get the owner for queue-based printing (PrintJob requires User)
+        owner = print_settings['owner']
+        
+        if use_queue:
+            # Queue-based printing for hosted deployment
+            content = _generate_bill_content(order, printed_by)
+            printer_name = print_settings['receipt_printer_name']  # Use receipt printer for bills
+            job = create_print_job(owner, 'bill', content, order=order, printer_name=printer_name)
+            result['bill_printed'] = True
+            print(f"✓ Queued bill print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
+        else:
+            # Direct local printing - use receipt printer (SAME as print_receipt method)
+            printer_name = print_settings['receipt_printer_name']
+            
+            # Determine which printer to use - EXACT same logic as print_receipt
+            if printer_name:
+                # ALWAYS try configured printer if it EXISTS
+                if WINDOWS_PRINTING_AVAILABLE:
+                    temp_printer = ThermalPrinter()
+                    if temp_printer._printer_exists(printer_name):
+                        printer = ThermalPrinter(printer_name=printer_name)
+                        print(f"✓ Using configured receipt printer for bill: {printer_name}")
+                    else:
+                        print(f"⚠ Configured printer '{printer_name}' not found, auto-detecting...")
+                        printer = ThermalPrinter()  # Auto-detect
+                else:
+                    printer = ThermalPrinter()
+            else:
+                # No printer configured, use auto-detected
+                printer = ThermalPrinter()
+            
+            # Generate bill content
+            content = _generate_bill_content(order, printed_by)
+            
+            # Format for thermal printer (NO cash drawer kick for bills)
+            thermal_content = printer._format_for_thermal(content, "BILL")
+            
+            # Send to printer
+            success = printer.print_text(thermal_content, f"Bill-{order.order_number}")
+            result['bill_printed'] = success
+            
+            if success:
+                print(f"✓ Bill printed for Order #{order.order_number} (printer: {printer.printer_name})")
+            else:
+                result['errors'].append("Bill print failed")
+        
+    except Exception as e:
+        result['errors'].append(str(e))
+        print(f"✗ Bill print error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    
+    return result
+
+
+def _generate_bill_content(order, printed_by=None):
+    """Generate bill text content for order (before payment) - shows what customer owes"""
+    from decimal import Decimal
+    from accounts.models import User
+    
+    lines = []
+    width = 48  # 80mm thermal printer - full width utilization
+    restaurant = order.table_info.owner
+    
+    # Get currency symbol for this owner/restaurant
+    currency_symbol = '$'  # Default
+    if isinstance(restaurant, User):
+        currency_symbol = restaurant.get_currency_symbol()
+    else:
+        try:
+            from restaurant.models_restaurant import Restaurant
+            if isinstance(restaurant, Restaurant):
+                owner = restaurant.branch_owner or restaurant.main_owner
+                if owner:
+                    currency_symbol = owner.get_currency_symbol()
+        except:
+            pass
+    
+    # Get restaurant name - use main restaurant name for branch staff
+    if restaurant.role and restaurant.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=restaurant, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = (branch_restaurant.parent_restaurant.name or "RESTAURANT NAME").upper()
+        else:
+            restaurant_name = (restaurant.restaurant_name or "RESTAURANT NAME").upper()
+    else:
+        restaurant_name = (restaurant.restaurant_name or "RESTAURANT NAME").upper()
+    
+    # Restaurant Header
+    lines.append("=" * width)
+    lines.append(restaurant_name.center(width))
+    lines.append("=" * width)
+    
+    # Bill title
+    lines.append("")
+    lines.append("** BILL **".center(width))
+    lines.append("")
+    
+    # Order details
+    lines.append(f"Order: {order.order_number}")
+    lines.append(f"Date: {timezone.now().strftime('%b %d, %Y')}")
+    lines.append(f"Time: {timezone.now().strftime('%H:%M')}")
+    lines.append(f"Table: {order.table_info.tbl_no or 'Takeaway'}")
+    
+    # Ordered by (person who created the order)
+    ordered_by = order.ordered_by
+    if ordered_by:
+        if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+            role = "Waiter"
+        elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+            role = "Cashier"
+        elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+            role = "Customer Care"
+        elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+            role = "Owner"
+        elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+            role = "Customer"
+        else:
+            role = "Staff"
+        
+        full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+        if not full_name:
+            full_name = ordered_by.username
+        lines.append(f"Ordered by: {full_name} ({role})")
+    
+    # Printed by (person who requested bill print)
+    if printed_by:
+        if hasattr(printed_by, 'is_cashier') and printed_by.is_cashier():
+            print_role = "Cashier"
+        elif hasattr(printed_by, 'is_customer_care') and printed_by.is_customer_care():
+            print_role = "Customer Care"
+        elif hasattr(printed_by, 'is_owner') and printed_by.is_owner():
+            print_role = "Owner"
+        else:
+            print_role = "Staff"
+        
+        print_name = f"{printed_by.first_name} {printed_by.last_name}".strip()
+        if not print_name:
+            print_name = printed_by.username
+        lines.append(f"Printed by: {print_name} ({print_role})")
+    
+    lines.append("-" * width)
+    
+    # Items section
+    lines.append("ITEMS:")
+    lines.append("-" * width)
+    
+    # Items list with better alignment
+    for item in order.order_items.all():
+        item_total = item.get_total_price()
+        qty_str = f"{item.quantity}x"
+        item_name = item.product.name[:width-16]  # Truncate long names
+        price_str = f"{currency_symbol}{float(item_total):.2f}"
+        
+        # Format: "2x Item Name..................$10.00"
+        name_section = f"{qty_str:4} {item_name}"
+        dots_needed = width - len(name_section) - len(price_str)
+        line = name_section + ("." * dots_needed) + price_str
+        lines.append(line)
+    
+    # Separator
+    lines.append("-" * width)
+    
+    # Totals section
+    subtotal = order.get_subtotal()
+    discount = order.get_total_discount() if hasattr(order, 'get_total_discount') else Decimal('0')
+    tax_rate = restaurant.tax_rate
+    tax_amount = order.get_tax_amount() if hasattr(order, 'get_tax_amount') else (subtotal * tax_rate)
+    total = order.get_total() if hasattr(order, 'get_total') else (subtotal - discount + tax_amount)
+    
+    # Subtotal
+    subtotal_label = "Subtotal:"
+    subtotal_value = f"{currency_symbol}{float(subtotal):.2f}"
+    spacing = width - len(subtotal_label) - len(subtotal_value)
+    lines.append(subtotal_label + (" " * spacing) + subtotal_value)
+    
+    # Discount (if any)
+    if discount > 0:
+        discount_label = "Discount:"
+        discount_value = f"-{currency_symbol}{float(discount):.2f}"
+        spacing = width - len(discount_label) - len(discount_value)
+        lines.append(discount_label + (" " * spacing) + discount_value)
+    
+    # Tax
+    tax_percentage = float(tax_rate * 100)
+    tax_label = f"Tax ({tax_percentage:.1f}%):"
+    tax_value = f"{currency_symbol}{float(tax_amount):.2f}"
+    spacing = width - len(tax_label) - len(tax_value)
+    lines.append(tax_label + (" " * spacing) + tax_value)
+    
+    # Separator
+    lines.append("-" * width)
+    
+    # Grand Total
+    total_label = "TOTAL DUE:"
+    total_value = f"{currency_symbol}{float(total):.2f}"
+    spacing = width - len(total_label) - len(total_value)
+    lines.append(total_label + (" " * spacing) + total_value)
+    
+    # Check for partial payments
+    from django.db.models import Sum
+    total_paid = order.payments.filter(is_voided=False).aggregate(
+        total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    if total_paid > 0:
+        lines.append("-" * width)
+        paid_label = "Amount Paid:"
+        paid_value = f"{currency_symbol}{float(total_paid):.2f}"
+        spacing = width - len(paid_label) - len(paid_value)
+        lines.append(paid_label + (" " * spacing) + paid_value)
+        
+        remaining = total - total_paid
+        remaining_label = "BALANCE DUE:"
+        remaining_value = f"{currency_symbol}{float(remaining):.2f}"
+        spacing = width - len(remaining_label) - len(remaining_value)
+        lines.append(remaining_label + (" " * spacing) + remaining_value)
+    
+    # Separator
+    lines.append("-" * width)
+    
+    # Footer
+    lines.append("")
+    lines.append("*** THIS IS NOT A RECEIPT ***".center(width))
+    lines.append("Payment required".center(width))
+    lines.append("")
+    lines.append("Thank you for dining with us!".center(width))
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
+
+
 def _generate_kot_content(order):
     """Generate KOT text content (standalone function for queue-based printing)"""
     lines = []

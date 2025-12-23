@@ -284,7 +284,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 'X-CSRFToken': formData.get('csrfmiddlewaretoken')
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            // Check if response is OK before parsing JSON
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}`);
+                });
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 alert('✓ ' + data.message);
@@ -294,7 +302,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            alert('Error saving settings: ' + error);
+            console.error('Save settings error:', error);
+            alert('Error saving settings: ' + error.message);
         });
     });
     

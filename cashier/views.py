@@ -13,7 +13,7 @@ from orders.models import Order, OrderItem
 from restaurant.models import TableInfo, Product
 from waste_management.models import FoodWasteLog
 from .models import Payment, OrderItemPayment, VoidTransaction
-from orders.printing import auto_print_receipt  # Auto-print receipt
+from orders.printing import auto_print_receipt, auto_print_bill  # Auto-print receipt and bill
 
 
 @login_required
@@ -485,3 +485,45 @@ def receipt_management(request):
     }
     
     return render(request, 'cashier/receipt_management.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def print_bill(request, order_id):
+    """Print bill for an order (before payment) - shows what customer owes"""
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+    
+    owner = get_owner_filter(request.user)
+    order = get_object_or_404(Order, id=order_id, table_info__owner=owner)
+    
+    # Check if order is cancelled
+    if order.status == 'cancelled':
+        return JsonResponse({'error': 'Cannot print bill for cancelled order'}, status=400)
+    
+    # Check if order is already fully paid
+    total_paid = order.payments.filter(is_voided=False).aggregate(
+        total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    if total_paid >= order.total_amount:
+        return JsonResponse({'error': 'Order is already fully paid. Use receipt instead.'}, status=400)
+    
+    try:
+        # Print the bill using the receipt printer
+        print_result = auto_print_bill(order, printed_by=request.user)
+        bill_printed = print_result.get('bill_printed', False)
+        
+        if bill_printed:
+            return JsonResponse({
+                'success': True,
+                'message': f'Bill printed successfully for Order #{order.order_number}'
+            })
+        else:
+            errors = print_result.get('errors', ['Unknown error'])
+            return JsonResponse({
+                'success': False,
+                'message': f'Bill print failed: {", ".join(errors)}'
+            })
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

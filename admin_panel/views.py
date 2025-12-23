@@ -4374,6 +4374,7 @@ def printer_settings(request):
 @require_POST
 def save_printer_settings(request):
     """Save printer configuration - saves to Restaurant model for proper per-restaurant settings"""
+    # Return JSON for AJAX requests even if permission denied
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
     
@@ -4381,12 +4382,21 @@ def save_printer_settings(request):
         user = request.user
         from restaurant.models_restaurant import Restaurant
         
-        # Get form data
-        kitchen_printer = request.POST.get('kitchen_printer', '').strip()
-        bar_printer = request.POST.get('bar_printer', '').strip()
-        receipt_printer = request.POST.get('receipt_printer', '').strip()
-        auto_print_kot = request.POST.get('auto_print_kot') == 'on'
-        auto_print_bot = request.POST.get('auto_print_bot') == 'on'
+        # Get form data - handle both FormData and JSON
+        if request.content_type and 'application/json' in request.content_type:
+            import json
+            data = json.loads(request.body)
+            kitchen_printer = data.get('kitchen_printer', '').strip()
+            bar_printer = data.get('bar_printer', '').strip()
+            receipt_printer = data.get('receipt_printer', '').strip()
+            auto_print_kot = data.get('auto_print_kot', False)
+            auto_print_bot = data.get('auto_print_bot', False)
+        else:
+            kitchen_printer = request.POST.get('kitchen_printer', '').strip()
+            bar_printer = request.POST.get('bar_printer', '').strip()
+            receipt_printer = request.POST.get('receipt_printer', '').strip()
+            auto_print_kot = request.POST.get('auto_print_kot') == 'on'
+            auto_print_bot = request.POST.get('auto_print_bot') == 'on'
         
         # Get the current restaurant based on session or user type
         current_restaurant = None
@@ -4435,6 +4445,9 @@ def save_printer_settings(request):
             })
         
     except Exception as e:
+        import traceback
+        print(f"ERROR in save_printer_settings: {e}")
+        traceback.print_exc()
         return JsonResponse({
             'success': False,
             'error': str(e)

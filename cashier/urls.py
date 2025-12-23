@@ -12,4 +12,5 @@ urlpatterns = [
     path('receipt/<int:payment_id>/', views.generate_receipt, name='generate_receipt'),
     path('reprint/<int:payment_id>/', views.reprint_receipt, name='reprint_receipt'),
     path('receipts/', views.receipt_management, name='receipt_management'),
+    path('print-bill/<int:order_id>/', views.print_bill, name='print_bill'),
 ]

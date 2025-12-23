@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 from django.contrib.auth import logout
+from django.http import JsonResponse
 import time
 
 
@@ -33,7 +34,27 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
         '/media/',
         '/service-worker.js',
         '/manifest.json',
+        '/api/',  # API endpoints handle their own auth
     ]
+    
+    def _is_ajax_request(self, request):
+        """Check if request is AJAX/fetch"""
+        # Check XMLHttpRequest header
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return True
+        # Check Accept header for JSON
+        accept = request.headers.get('Accept', '')
+        if 'application/json' in accept:
+            return True
+        # Check Content-Type for JSON
+        content_type = request.content_type or ''
+        if 'application/json' in content_type:
+            return True
+        # Check if it's a fetch request (usually has specific headers)
+        if request.headers.get('X-CSRFToken'):
+            # If CSRF token is in header (not form), it's likely AJAX
+            return True
+        return False
     
     def process_request(self, request):
         """
@@ -64,15 +85,23 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
             
             if inactive_duration > timeout_seconds:
                 # Session timed out - logout user
+                logout(request)
+                
+                # Check if this is an AJAX request
+                if self._is_ajax_request(request):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Session expired. Please refresh the page and log in again.',
+                        'session_expired': True
+                    }, status=401)
+                
+                # Regular request - redirect to login
                 messages.warning(
                     request,
                     'Your session has expired due to inactivity. '
                     'Please log in again to continue. '
                     f'(Auto-logout after {timeout_seconds // 60} minutes of inactivity)'
                 )
-                
-                # Logout user
-                logout(request)
                 
                 # Redirect to login page
                 return redirect(reverse('accounts:login'))

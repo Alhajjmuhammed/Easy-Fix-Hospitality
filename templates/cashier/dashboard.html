@@ -245,6 +245,9 @@
                                                         <button type="button" class="btn btn-success btn-sm" onclick="processPayment({{ order.id }})">
                                                             💳 Pay
                                                         </button>
+                                                        <button type="button" class="btn btn-secondary btn-sm" onclick="printBill({{ order.id }}, '{{ order.order_number }}')">
+                                                            🧾 Print Bill
+                                                        </button>
                                                     {% endif %}
                                                     
                                                     {% if order.total_paid > 0 %}
@@ -348,6 +351,34 @@
 <script>
 let currentOrderId = null;
 let currentPaymentId = null;
+
+function printBill(orderId, orderNumber) {
+    if (!confirm(`Print bill for Order #${orderNumber}?`)) {
+        return;
+    }
+    
+    fetch(`/cashier/print-bill/${orderId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+        } else if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message || 'Bill print failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while printing the bill');
+    });
+}
 
 function processPayment(orderId) {
     currentOrderId = orderId;
