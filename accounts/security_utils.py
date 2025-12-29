@@ -308,6 +308,7 @@ def ajax_restaurant_required(view_func):
 def log_security_event(event_type, user, description, ip_address=None, extra_data=None):
     """
     Log security-related events for audit trail.
+    Designed to be non-blocking - failures here should never break main operations.
     
     Args:
         event_type: Type of event (login, logout, failed_login, permission_denied, etc.)
@@ -316,9 +317,21 @@ def log_security_event(event_type, user, description, ip_address=None, extra_dat
         ip_address: Client IP address
         extra_data: Dict of additional data to log
     """
-    from accounts.models import AuditLog
+    from django.db import connection
     
     try:
+        # Import inside function to avoid circular imports
+        from accounts.models import AuditLog
+        
+        # Check if table exists first to avoid transaction errors
+        table_name = AuditLog._meta.db_table
+        all_tables = connection.introspection.table_names()
+        
+        if table_name not in all_tables:
+            logger.warning(f"AuditLog table '{table_name}' does not exist. Run migrations.")
+            return
+        
+        # Safe to create the log entry
         AuditLog.objects.create(
             event_type=event_type,
             user=user if user and user.is_authenticated else None,
@@ -328,7 +341,8 @@ def log_security_event(event_type, user, description, ip_address=None, extra_dat
             extra_data=extra_data or {}
         )
     except Exception as e:
-        logger.error(f"Failed to create audit log: {e}")
+        # Silently fail - audit logging should never break main application flow
+        logger.warning(f"Audit log skipped (non-critical): {e}")
 
 
 def get_client_ip(request):

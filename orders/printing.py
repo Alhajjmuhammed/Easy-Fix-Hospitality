@@ -1425,7 +1425,15 @@ def _generate_bill_content(order, printed_by=None):
     # Totals section
     subtotal = order.get_subtotal()
     discount = order.get_total_discount() if hasattr(order, 'get_total_discount') else Decimal('0')
-    tax_rate = restaurant.tax_rate
+    
+    # Get tax rate from correct source (Restaurant model first, then User)
+    # Priority 1: Restaurant model (for branches)
+    if hasattr(order.table_info, 'restaurant') and order.table_info.restaurant:
+        tax_rate = order.table_info.restaurant.tax_rate
+    else:
+        # Priority 2: User (owner) model
+        tax_rate = restaurant.tax_rate if hasattr(restaurant, 'tax_rate') else Decimal('0.0800')
+    
     tax_amount = order.get_tax_amount() if hasattr(order, 'get_tax_amount') else (subtotal * tax_rate)
     total = order.get_total() if hasattr(order, 'get_total') else (subtotal - discount + tax_amount)
     
@@ -1888,7 +1896,15 @@ def _generate_receipt_content(payment):
     # Totals section - EXACTLY like HTML
     subtotal = order.get_subtotal()
     discount = order.get_total_discount() if hasattr(order, 'get_total_discount') else Decimal('0')
-    tax_rate = restaurant.tax_rate
+    
+    # Get tax rate from correct source (Restaurant model first, then User)
+    # Priority 1: Restaurant model (for branches)
+    if hasattr(order.table_info, 'restaurant') and order.table_info.restaurant:
+        tax_rate = order.table_info.restaurant.tax_rate
+    else:
+        # Priority 2: User (owner) model
+        tax_rate = restaurant.tax_rate if hasattr(restaurant, 'tax_rate') else Decimal('0.0800')
+    
     tax_amount = order.get_tax_amount() if hasattr(order, 'get_tax_amount') else (subtotal * tax_rate)
     total = order.get_total() if hasattr(order, 'get_total') else (subtotal - discount + tax_amount)
     
