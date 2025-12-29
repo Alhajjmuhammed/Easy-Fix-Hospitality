@@ -63,6 +63,18 @@ class TableInfo(models.Model):
             return self.restaurant.branch_owner or self.restaurant.main_owner
         return self.owner
     
+    def get_tax_rate(self):
+        """Get tax rate for this table from Restaurant or Owner"""
+        from decimal import Decimal
+        # Priority 1: Restaurant model
+        if self.restaurant:
+            return self.restaurant.tax_rate
+        # Priority 2: Table's owner
+        if self.owner and hasattr(self.owner, 'tax_rate'):
+            return self.owner.tax_rate
+        # Default fallback
+        return Decimal('0.0800')
+    
     def get_active_orders(self):
         """Get active orders for this table"""
         return self.orders.filter(

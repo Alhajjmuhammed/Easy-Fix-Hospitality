@@ -70,33 +70,16 @@ class Order(models.Model):
     
     def get_tax_amount(self):
         """Calculate tax amount using restaurant/branch configured tax rate"""
-        # Get tax rate from Restaurant model first (for branches), then User model
-        tax_rate = Decimal('0.0800')  # Default 8% fallback
-        
-        # Priority 1: Get from Restaurant model (for branches)
-        if hasattr(self.table_info, 'restaurant') and self.table_info.restaurant:
-            tax_rate = self.table_info.restaurant.tax_rate
-        else:
-            # Priority 2: Get from table's owner directly
-            owner = self.table_info.owner
-            if owner and hasattr(owner, 'tax_rate'):
-                tax_rate = owner.tax_rate
-        
+        # Use centralized tax rate from table
+        tax_rate = self.table_info.get_tax_rate()
         return self.get_subtotal() * tax_rate
     
     @property
     def tax_rate(self):
         """Tax rate as percentage for display"""
-        # Get from Restaurant model first (for branches), then User model
-        if hasattr(self.table_info, 'restaurant') and self.table_info.restaurant:
-            return float(self.table_info.restaurant.tax_rate * 100)  # Convert decimal to percentage
-        
-        # Get from table's owner directly
-        owner = self.table_info.owner
-        if owner and hasattr(owner, 'tax_rate'):
-            return float(owner.tax_rate * 100)  # Convert decimal to percentage
-        
-        return 8.0  # Default 8% fallback
+        # Use centralized tax rate from table
+        tax_rate_decimal = self.table_info.get_tax_rate()
+        return float(tax_rate_decimal * 100)
     
     def get_total(self):
         """Get final total including tax"""
