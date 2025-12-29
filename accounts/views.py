@@ -45,10 +45,12 @@ def login_view(request):
                 
                 # Log successful login
                 try:
-                    from .security_utils import log_security_event
+                    from .security_utils import log_security_event, get_client_ip
                     log_security_event(
-                        request, 'login', user,
+                        event_type='login',
+                        user=user,
                         description=f"User '{user.username}' logged in successfully",
+                        ip_address=get_client_ip(request),
                         extra_data={'role': user.role.name if user.role else 'no_role'}
                     )
                 except Exception as e:
@@ -72,10 +74,12 @@ def login_view(request):
             else:
                 # Log failed login attempt
                 try:
-                    from .security_utils import log_security_event
+                    from .security_utils import log_security_event, get_client_ip
                     log_security_event(
-                        request, 'login_failed', None,
+                        event_type='login_failed',
+                        user=None,
                         description=f"Failed login attempt for username: {username}",
+                        ip_address=get_client_ip(request),
                         extra_data={'attempted_username': username}
                     )
                 except Exception as e:
@@ -94,10 +98,12 @@ def logout_view(request):
     # Log logout event before clearing session
     try:
         if request.user.is_authenticated:
-            from .security_utils import log_security_event
+            from .security_utils import log_security_event, get_client_ip
             log_security_event(
-                request, 'logout', request.user,
-                description=f"User '{request.user.username}' logged out"
+                event_type='logout',
+                user=request.user,
+                description=f"User '{request.user.username}' logged out",
+                ip_address=get_client_ip(request)
             )
     except Exception as e:
         logger.warning(f"Failed to log logout event: {e}")

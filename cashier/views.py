@@ -203,17 +203,19 @@ def process_payment(request, order_id):
         
         # Log payment event for audit trail
         try:
-            from accounts.security_utils import log_security_event
+            from accounts.security_utils import log_security_event, get_client_ip
             log_security_event(
-                request, 'payment_processed', request.user,
+                event_type='payment_processed',
+                user=request.user,
                 description=f"Payment of ${amount} for Order #{order.order_number}",
-                target_model='Payment', target_id=str(payment.id),
+                ip_address=get_client_ip(request),
                 extra_data={
                     'order_id': order.id,
                     'order_number': order.order_number,
                     'amount': str(amount),
                     'payment_method': payment_method,
                     'payment_status': order.payment_status,
+                    'payment_id': str(payment.id),
                 }
             )
         except Exception as audit_error:
@@ -301,17 +303,19 @@ def void_payment(request, payment_id):
         
         # Log void event for audit trail
         try:
-            from accounts.security_utils import log_security_event
+            from accounts.security_utils import log_security_event, get_client_ip
             log_security_event(
-                request, 'payment_voided', request.user,
+                event_type='payment_voided',
+                user=request.user,
                 description=f"Payment #{payment.id} voided for Order #{order.order_number}. Reason: {void_reason[:100] if void_reason else 'Not specified'}",
-                target_model='Payment', target_id=str(payment.id),
+                ip_address=get_client_ip(request),
                 extra_data={
                     'order_id': order.id,
                     'order_number': order.order_number,
                     'voided_amount': str(payment.amount),
                     'void_reason': void_reason,
                     'refund_method': refund_method,
+                    'payment_id': str(payment.id),
                 }
             )
         except Exception as audit_error:

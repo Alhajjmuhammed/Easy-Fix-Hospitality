@@ -561,36 +561,39 @@ def place_order(request):
                         }
                     )
                     
-                    # Send real-time notification to restaurant staff
-                    restaurant_id = current_restaurant.id
-                    async_to_sync(channel_layer.group_send)(
-                        f'restaurant_{restaurant_id}',
-                        {
-                            'type': 'new_order',
-                            'order_id': str(order.id),
-                            'order_number': order.order_number,
-                            'table_number': str(table.tbl_no),
-                            'customer_name': request.user.get_full_name() or request.user.username,
-                            'items_count': len(cart),
-                            'total_amount': str(total_amount),
-                            'message': f'New order #{order.order_number} from Table {table.tbl_no}',
-                            'timestamp': order.created_at.isoformat()
-                        }
-                    )
-                    
-                    # Send real-time update to order tracking
-                    async_to_sync(channel_layer.group_send)(
-                        f'order_{order.id}',
-                        {
-                            'type': 'order_status_update',
-                            'order_id': str(order.id),
-                            'status': order.status,
-                            'status_display': order.get_status_display(),
-                            'message': 'Order placed successfully! Kitchen will start preparing your order soon.',
-                            'updated_by': request.user.get_full_name() or request.user.username,
-                            'timestamp': order.created_at.isoformat()
-                        }
-                    )
+                    # Send real-time notifications (non-blocking - failures won't break order)
+                    try:
+                        restaurant_id = current_restaurant.id
+                        async_to_sync(channel_layer.group_send)(
+                            f'restaurant_{restaurant_id}',
+                            {
+                                'type': 'new_order',
+                                'order_id': str(order.id),
+                                'order_number': order.order_number,
+                                'table_number': str(table.tbl_no),
+                                'customer_name': request.user.get_full_name() or request.user.username,
+                                'items_count': len(cart),
+                                'total_amount': str(total_amount),
+                                'message': f'New order #{order.order_number} from Table {table.tbl_no}',
+                                'timestamp': order.created_at.isoformat()
+                            }
+                        )
+                        
+                        async_to_sync(channel_layer.group_send)(
+                            f'order_{order.id}',
+                            {
+                                'type': 'order_status_update',
+                                'order_id': str(order.id),
+                                'status': order.status,
+                                'status_display': order.get_status_display(),
+                                'message': 'Order placed successfully! Kitchen will start preparing your order soon.',
+                                'updated_by': request.user.get_full_name() or request.user.username,
+                                'timestamp': order.created_at.isoformat()
+                            }
+                        )
+                    except Exception as ws_error:
+                        # WebSocket notification failure shouldn't break order placement
+                        logger.warning(f"WebSocket notification failed (non-critical): {ws_error}")
                     
                     # Clear cart and table selection
                     del request.session['cart']
