@@ -77,8 +77,8 @@ class Order(models.Model):
         if hasattr(self.table_info, 'restaurant') and self.table_info.restaurant:
             tax_rate = self.table_info.restaurant.tax_rate
         else:
-            # Priority 2: Get from User (owner) model
-            owner = self.owner
+            # Priority 2: Get from table's owner directly
+            owner = self.table_info.owner
             if owner and hasattr(owner, 'tax_rate'):
                 tax_rate = owner.tax_rate
         
@@ -91,7 +91,8 @@ class Order(models.Model):
         if hasattr(self.table_info, 'restaurant') and self.table_info.restaurant:
             return float(self.table_info.restaurant.tax_rate * 100)  # Convert decimal to percentage
         
-        owner = self.owner
+        # Get from table's owner directly
+        owner = self.table_info.owner
         if owner and hasattr(owner, 'tax_rate'):
             return float(owner.tax_rate * 100)  # Convert decimal to percentage
         
