@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KOT - {{ order.order_number }}</title>
+    <title>BUFFET - {{ order.order_number }}</title>
     <style>
         /* Print optimizations for thermal/POS printer */
         @media print {
@@ -25,7 +25,7 @@
                 color: black !important;
             }
             
-            .kot-container {
+            .BUFFET-container {
                 margin: 0 !important;
                 padding: 0 !important;
                 max-width: none !important;
@@ -40,11 +40,11 @@
                 visibility: hidden;
             }
             
-            .kot-container, .kot-container * {
+            .BUFFET-container, .BUFFET-container * {
                 visibility: visible;
             }
             
-            .kot-container {
+            .BUFFET-container {
                 position: absolute;
                 left: 0;
                 top: 0;
@@ -60,27 +60,28 @@
             margin: 0;
         }
         
-        .kot-container {
+        .BUFFET-container {
             background: white;
             max-width: 80mm;
             margin: 0 auto;
             padding: 10px;
-            border: 2px dashed #333;
+            border: 2px dashed #1e90ff;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        .kot-header {
+        .BUFFET-header {
             text-align: center;
-            border-bottom: 2px dashed #333;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            border-BUFFETtom: 2px dashed #1e90ff;
+            padding-BUFFETtom: 10px;
+            margin-BUFFETtom: 10px;
         }
         
-        .kot-title {
+        .BUFFET-title {
             font-size: 24px;
             font-weight: bold;
             margin: 5px 0;
             letter-spacing: 2px;
+            color: #1e90ff;
         }
         
         .restaurant-name {
@@ -89,66 +90,67 @@
             margin: 5px 0;
         }
         
-        .kot-info {
+        .BUFFET-info {
             margin: 10px 0;
             font-size: 14px;
         }
         
-        .kot-info-row {
+        .BUFFET-info-row {
             display: flex;
             justify-content: space-between;
             margin: 5px 0;
             padding: 3px 0;
         }
         
-        .kot-info-label {
+        .BUFFET-info-label {
             font-weight: bold;
         }
         
-        .kot-divider {
-            border-top: 1px dashed #333;
+        .BUFFET-divider {
+            border-top: 1px dashed #1e90ff;
             margin: 10px 0;
         }
         
-        .kot-items {
+        .BUFFET-items {
             margin: 10px 0;
         }
         
-        .kot-items-title {
+        .BUFFET-items-title {
             font-size: 16px;
             font-weight: bold;
             text-align: center;
             margin: 10px 0;
             text-decoration: underline;
+            color: #1e90ff;
         }
         
-        .kot-item {
+        .BUFFET-item {
             margin: 8px 0;
             padding: 5px 0;
-            border-bottom: 1px dotted #ccc;
+            border-BUFFETtom: 1px dotted #ccc;
         }
         
-        .kot-item:last-child {
-            border-bottom: none;
+        .BUFFET-item:last-child {
+            border-BUFFETtom: none;
         }
         
         .item-qty-name {
             font-size: 16px;
             font-weight: bold;
-            margin-bottom: 3px;
+            margin-BUFFETtom: 3px;
         }
         
         .item-notes {
             font-size: 13px;
             font-style: italic;
             margin-left: 20px;
-            color: #c00;
+            color: #1e90ff;
             margin-top: 3px;
         }
         
         .special-instructions {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
+            background: #e7f3ff;
+            border: 2px solid #1e90ff;
             padding: 10px;
             margin: 10px 0;
             font-size: 14px;
@@ -158,18 +160,18 @@
         .special-instructions-title {
             font-size: 16px;
             text-decoration: underline;
-            margin-bottom: 5px;
+            margin-BUFFETtom: 5px;
         }
         
-        .kot-footer {
+        .BUFFET-footer {
             text-align: center;
-            border-top: 2px dashed #333;
+            border-top: 2px dashed #1e90ff;
             padding-top: 10px;
             margin-top: 10px;
             font-size: 12px;
         }
         
-        .kot-time {
+        .BUFFET-time {
             font-size: 13px;
             margin-top: 5px;
         }
@@ -181,7 +183,7 @@
         }
         
         .print-btn {
-            background: #28a745;
+            background: #1e90ff;
             color: white;
             border: none;
             padding: 15px 40px;
@@ -193,153 +195,142 @@
         }
         
         .print-btn:hover {
-            background: #218838;
+            background: #1873cc;
         }
         
         .back-btn {
             background: #6c757d;
+            color: white;
         }
         
         .back-btn:hover {
-            background: #5a6268;
+            background: #545b62;
         }
         
-        .order-status {
-            background: #ffc107;
-            color: #000;
+        .station-badge {
+            display: inline-block;
+            background: #1e90ff;
+            color: white;
             padding: 5px 10px;
             border-radius: 3px;
+            font-size: 12px;
             font-weight: bold;
-            font-size: 14px;
-            display: inline-block;
-        }
-        
-        .urgent-note {
-            background: #dc3545;
-            color: white;
-            text-align: center;
-            padding: 10px;
-            margin: 10px 0;
-            font-weight: bold;
-            font-size: 16px;
-            border-radius: 3px;
+            margin-top: 5px;
         }
     </style>
 </head>
 <body>
-    <!-- Print Buttons (hidden when printing) -->
     <div class="print-buttons no-print">
-        <button class="print-btn" onclick="window.print()">🖨️ Print KOT</button>
-        <a href="{% url 'orders:select_table' %}" class="print-btn back-btn" style="text-decoration: none; display: inline-block;">← Back to Dashboard</a>
+        <button class="print-btn" onclick="window.print()">
+            🖨️ Print BUFFET
+        </button>
+        <button class="print-btn back-btn" onclick="window.location.href='{% url 'orders:buffet_dashboard' %}'">
+            ← Back to Buffet Dashboard
+        </button>
     </div>
 
-    <!-- KOT Container -->
-    <div class="kot-container">
+    <div class="BUFFET-container">
         <!-- Header -->
-        <div class="kot-header">
-            <div class="kot-title">*** KITCHEN ORDER TICKET ***</div>
+        <div class="BUFFET-header">
+            <div class="BUFFET-title">BUFFET ORDER TICKET</div>
             <div class="restaurant-name">{{ restaurant_name|upper }}</div>
+            <span class="station-badge">BUFFET STATION</span>
         </div>
-        
+
         <!-- Order Information -->
-        <div class="kot-info">
-            <div class="kot-info-row">
-                <span class="kot-info-label">Order #:</span>
+        <div class="BUFFET-info">
+            <div class="BUFFET-info-row">
+                <span class="BUFFET-info-label">Order #:</span>
                 <span>{{ order.order_number }}</span>
             </div>
-            <div class="kot-info-row">
-                <span class="kot-info-label">Table:</span>
-                <span>{{ order.table_info.tbl_no }}</span>
+            <div class="BUFFET-info-row">
+                <span class="BUFFET-info-label">Table:</span>
+                <span>{{ order.table_info.table_number }}</span>
             </div>
-            <div class="kot-info-row">
-                <span class="kot-info-label">Date:</span>
-                <span>{{ order.created_at|date:"d/m/Y" }}</span>
-            </div>
-            <div class="kot-info-row">
-                <span class="kot-info-label">Time:</span>
-                <span>{{ order.created_at|date:"h:i A" }}</span>
-            </div>
-            <div class="kot-info-row">
-                <span class="kot-info-label">Ordered By:</span>
+            <div class="BUFFET-info-row">
+                <span class="BUFFET-info-label">Customer:</span>
                 <span>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</span>
             </div>
-            <div class="kot-info-row">
-                <span class="kot-info-label">Status:</span>
-                <span class="order-status">{{ order.get_status_display|upper }}</span>
+            <div class="BUFFET-info-row">
+                <span class="BUFFET-info-label">Status:</span>
+                <span>{{ order.get_status_display|upper }}</span>
             </div>
+            <div class="BUFFET-info-row">
+                <span class="BUFFET-info-label">Order Time:</span>
+                <span>{{ order.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            {% if order.confirmed_by %}
+            <div class="BUFFET-info-row">
+                <span class="BUFFET-info-label">Confirmed By:</span>
+                <span>{{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</span>
+            </div>
+            {% endif %}
         </div>
-        
-        <div class="kot-divider"></div>
-        
-        <!-- Items to Prepare -->
-        <div class="kot-items">
-            <div class="kot-items-title">ITEMS TO PREPARE</div>
-            
+
+        <div class="BUFFET-divider"></div>
+
+        <!-- Buffet Items -->
+        <div class="BUFFET-items">
+            <div class="BUFFET-items-title">BUFFET ITEMS</div>
             {% for item in order.order_items.all %}
-                {% if item.product.station == 'kitchen' %}
-                <div class="kot-item">
-                    <div class="item-qty-name">
-                        {{ item.quantity }}x {{ item.product.name|upper }}
+                {% if item.product.station == 'buffet' %}
+                    <div class="BUFFET-item">
+                        <div class="item-qty-name">
+                            {{ item.quantity }}x {{ item.product.name|upper }}
+                        </div>
+                        {% if item.notes %}
+                            <div class="item-notes">
+                                ➤ {{ item.notes }}
+                            </div>
+                        {% endif %}
                     </div>
-                    {% if item.special_notes %}
-                    <div class="item-notes">
-                        ⚠ Note: {{ item.special_notes }}
-                    </div>
-                    {% endif %}
-                </div>
                 {% endif %}
             {% endfor %}
         </div>
-        
-        <div class="kot-divider"></div>
-        
-        <!-- Special Instructions -->
+
         {% if order.special_instructions %}
+        <div class="BUFFET-divider"></div>
         <div class="special-instructions">
-            <div class="special-instructions-title">⚠ SPECIAL INSTRUCTIONS:</div>
-            <div>{{ order.special_instructions }}</div>
+            <div class="special-instructions-title">⚠️ SPECIAL INSTRUCTIONS</div>
+            {{ order.special_instructions }}
         </div>
         {% endif %}
-        
-        <!-- Urgent Note for Pending Orders -->
-        {% if order.status == 'pending' %}
-        <div class="urgent-note">
-            🔥 NEW ORDER - PREPARE IMMEDIATELY 🔥
-        </div>
-        {% endif %}
-        
+
+        <div class="BUFFET-divider"></div>
+
         <!-- Footer -->
-        <div class="kot-footer">
-            <div>Total Items: {{ order.order_items.count }}</div>
-            <div>Total Quantity: {{ order.get_total_products }}</div>
-            <div class="kot-time">Printed: {{ now|date:"d/m/Y h:i A" }}</div>
+        <div class="BUFFET-footer">
+            <div>BUFFET STATION - PRIORITY ORDER</div>
+            <div class="BUFFET-time">Printed: {{ now|date:"d/m/Y H:i:s" }}</div>
             <div style="margin-top: 10px; font-size: 10px;">
-                This is a kitchen copy only - Not for billing
+                Thank you for your service! 🍽️
             </div>
         </div>
     </div>
 
     <script>
-        // Auto-print when page loads (triggered from order confirmation)
-        window.onload = function() {
-            // Small delay to ensure page is fully rendered
+        // Auto-print on load when triggered from order confirmation
+        window.addEventListener('load', function() {
             setTimeout(function() {
                 window.print();
             }, 500);
-        };
+        });
         
         // Auto-close window after printing
         window.onafterprint = function() {
-            // Auto-close after printing to clean up
             setTimeout(function() {
                 window.close();
             }, 1000);
         };
-        
-        // Also handle print dialog cancel
-        window.onbeforeprint = function() {
-            // Print dialog opened
-        };
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + P for print
+            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+        });
     </script>
 </body>
 </html>

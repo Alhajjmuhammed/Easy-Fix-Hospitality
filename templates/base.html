@@ -253,6 +253,14 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:bar_dashboard' %}">Bar</a>
                             </li>
+                        {% elif user.is_buffet_staff %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'orders:buffet_dashboard' %}">Buffet</a>
+                            </li>
+                        {% elif user.is_service_staff %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'orders:service_dashboard' %}">Service</a>
+                            </li>
                         {% elif user.is_customer %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:my_orders' %}">
@@ -315,9 +323,14 @@
                                     <i class="bi bi-person"></i> Profile
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">
-                                    <i class="bi bi-box-arrow-right"></i> Logout
-                                </a></li>
+                                <li>
+                                    <form method="post" action="{% url 'accounts:logout' %}" style="display: inline; width: 100%;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+                                            <i class="bi bi-box-arrow-right"></i> Logout
+                                        </button>
+                                    </form>
+                                </li>
                             </ul>
                         </li>
                     {% else %}

@@ -12,13 +12,13 @@ from django.http import HttpResponse
 def rate_limit_login(func):
     """
     Rate limiter for login attempts
-    - Allows reasonable login attempts
+    - Blocks excessive login attempts
     - Works in harmony with django-axes (which handles failed attempts)
     - Rate limiting is per IP address
     """
     @wraps(func)
-    @ratelimit(key='ip', rate='20/m', block=False, method='POST')  # 20 attempts per minute (very lenient)
-    @ratelimit(key='ip', rate='60/h', block=False, method='POST')  # 60 attempts per hour
+    @ratelimit(key='ip', rate='20/m', block=True, method='POST')  # 20 attempts per minute - BLOCKS if exceeded
+    @ratelimit(key='ip', rate='60/h', block=True, method='POST')  # 60 attempts per hour - BLOCKS if exceeded
     def wrapper(request, *args, **kwargs):
         # Check if rate limited
         was_limited = getattr(request, 'limited', False)

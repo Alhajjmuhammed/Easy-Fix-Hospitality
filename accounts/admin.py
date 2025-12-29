@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
-from .models import User, Role
+from .models import User, Role, AuditLog, RestaurantSubscription, SubscriptionLog
 
 # Import Token model only if rest_framework is installed
 try:
@@ -16,6 +16,32 @@ class RoleAdmin(admin.ModelAdmin):
     list_display = ['name', 'description', 'created_at']
     list_filter = ['name', 'created_at']
     search_fields = ['name', 'description']
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    """Admin for viewing audit logs - read-only"""
+    list_display = ['created_at', 'event_type', 'username', 'short_description', 'ip_address']
+    list_filter = ['event_type', 'created_at']
+    search_fields = ['username', 'description', 'ip_address', 'target_model', 'target_id']
+    readonly_fields = ['event_type', 'user', 'username', 'description', 'ip_address', 
+                       'user_agent', 'extra_data', 'target_model', 'target_id', 'created_at']
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+    
+    def short_description(self, obj):
+        """Truncate description for list display"""
+        return obj.description[:100] + '...' if len(obj.description) > 100 else obj.description
+    short_description.short_description = 'Description'
+    
+    def has_add_permission(self, request):
+        return False  # Audit logs should only be created programmatically
+    
+    def has_change_permission(self, request, obj=None):
+        return False  # Audit logs should never be modified
+    
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser  # Only superusers can delete (for cleanup)
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):

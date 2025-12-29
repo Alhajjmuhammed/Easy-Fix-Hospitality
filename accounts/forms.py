@@ -1,5 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import User
 
 class UserLoginForm(forms.Form):
@@ -20,6 +22,7 @@ class UserLoginForm(forms.Form):
     )
 
 class UserRegistrationForm(forms.ModelForm):
+    """Registration form - role is NOT exposed to users (set programmatically)"""
     password = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
@@ -35,20 +38,23 @@ class UserRegistrationForm(forms.ModelForm):
         })
     )
     
-    role = forms.ModelChoiceField(
-        queryset=None,
-        required=True,
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        help_text="Select the role for this user."
+    # Honeypot field to detect bots
+    website = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'style': 'display:none;',
+            'tabindex': '-1',
+            'autocomplete': 'off'
+        })
     )
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'first_name', 'last_name', 'phone_number', 'address', 'role']
+        # SECURITY: Role field removed - assigned programmatically in views
+        fields = ['username', 'email', 'first_name', 'last_name', 'phone_number', 'address']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from .models import Role
-        self.fields['role'].queryset = Role.objects.all()
         
         # Apply Bootstrap classes to all form fields
         self.fields['username'].widget.attrs.update({
@@ -86,8 +92,19 @@ class UserRegistrationForm(forms.ModelForm):
         password = cleaned_data.get('password')
         confirm_password = cleaned_data.get('confirm_password')
         
+        # Honeypot check - if filled, it's a bot
+        if cleaned_data.get('website'):
+            raise forms.ValidationError("Bot detected.")
+        
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords don't match.")
+        
+        # SECURITY: Validate password strength using Django validators
+        if password:
+            try:
+                validate_password(password)
+            except DjangoValidationError as e:
+                self.add_error('password', e.messages)
         
         return cleaned_data
     
@@ -151,22 +168,27 @@ class OwnerRegistrationForm(forms.ModelForm):
         }),
         help_text="Choose your subscription plan. You can upgrade later if needed."
     )
-
-    role = forms.ModelChoiceField(
-        queryset=None,
-        required=True,
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        help_text="Select the role for this user."
+    
+    # Honeypot field to detect bots
+    website = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'style': 'display:none;',
+            'tabindex': '-1',
+            'autocomplete': 'off'
+        })
     )
+    
+    # SECURITY: Role field REMOVED - set programmatically in view to prevent privilege escalation
 
     class Meta:
         model = User
+        # Role removed from fields for security
         fields = ['username', 'email', 'first_name', 'last_name', 'phone_number', 'address', 
-                 'restaurant_name', 'restaurant_description', 'subscription_plan', 'role']
+                 'restaurant_name', 'restaurant_description', 'subscription_plan']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from .models import Role
-        self.fields['role'].queryset = Role.objects.all()
+        # SECURITY: Role field removed - no longer setting queryset
         widgets = {
             'username': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -209,6 +231,13 @@ class OwnerRegistrationForm(forms.ModelForm):
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords don't match.")
         
+        # SECURITY: Validate password strength using Django validators
+        if password:
+            try:
+                validate_password(password)
+            except DjangoValidationError as e:
+                self.add_error('password', e.messages)
+        
         return cleaned_data
 
 
@@ -226,6 +255,16 @@ class CustomerRegistrationForm(forms.ModelForm):
             'class': 'form-control',
             'placeholder': 'Confirm password',
             'required': True
+        })
+    )
+    
+    # Honeypot field to detect bots
+    website = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'style': 'display:none;',
+            'tabindex': '-1',
+            'autocomplete': 'off'
         })
     )
 
@@ -264,7 +303,18 @@ class CustomerRegistrationForm(forms.ModelForm):
         password = cleaned_data.get('password')
         confirm_password = cleaned_data.get('confirm_password')
         
+        # Honeypot check - if filled, it's a bot
+        if cleaned_data.get('website'):
+            raise forms.ValidationError("Bot detected.")
+        
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords don't match.")
+        
+        # SECURITY: Validate password strength using Django validators
+        if password:
+            try:
+                validate_password(password)
+            except DjangoValidationError as e:
+                self.add_error('password', e.messages)
         
         return cleaned_data

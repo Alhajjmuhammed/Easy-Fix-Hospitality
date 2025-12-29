@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, date
 from decimal import Decimal
 import json
 import csv
+import logging
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -28,6 +29,8 @@ from accounts.models import get_owner_filter
 from orders.models import Order, OrderItem
 from restaurant.models import Product
 from .models import FoodWasteLog, OrderCostBreakdown, WasteReportSummary, ProductCostSettings
+
+logger = logging.getLogger(__name__)
 from admin_panel.restaurant_utils import get_restaurant_context
 
 
@@ -829,7 +832,8 @@ def auto_detect_waste(request):
             'message': f'Auto-detection complete. Found {detected_count} waste incidents.'
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        logger.error(f"Error in trigger_automatic_waste_detection: {str(e)}", exc_info=True)
+        return JsonResponse({'success': False, 'error': 'An error occurred during waste detection.'}, status=500)
 
 
 @login_required
@@ -885,7 +889,8 @@ def record_food_waste(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Error in record_food_waste: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'An error occurred while recording waste.'}, status=500)
         
         if order_item_id:
             order_item = get_object_or_404(OrderItem, id=order_item_id)
@@ -939,7 +944,8 @@ def record_food_waste(request):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f"Error recording waste: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'An error occurred while recording waste.'}, status=400)
 
 
 @login_required
@@ -1418,7 +1424,7 @@ def export_excel(report_data, date_from, date_to):
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
-                except:
+                except (TypeError, AttributeError):
                     pass
             adjusted_width = min(max_length + 2, 50)
             sheet.column_dimensions[column_letter].width = adjusted_width
@@ -1616,7 +1622,8 @@ def update_cost_settings(request):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f"Error updating cost setting: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'An error occurred while updating cost settings.'}, status=400)
 
 
 @login_required

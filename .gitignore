@@ -48,6 +48,9 @@ debug_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Print client sensitive config (contains API tokens)
+print_client/config.json
+
 # Test scripts (local only)
 test_*.py
 check_*.py
@@ -61,6 +64,9 @@ print_client/build/
 print_client/dist/
 *.spec
 
+# Print client config with API tokens (use config.json.example as template)
+print_client/config.json
+
 # Local documentation
 *_REPORT.md
 *_FIX*.md
@@ -69,3 +75,6 @@ print_client/dist/
 
 # Binary / zip files
 *.zip
+
+# Deployment scripts with credentials (use deploy.sh.example as template)
+deploy.sh

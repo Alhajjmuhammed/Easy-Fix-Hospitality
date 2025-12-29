@@ -1275,13 +1275,11 @@
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded - Modal functionality starting');
 
     // Handle category card clicks
     document.querySelectorAll('.category-card').forEach(card => {
         card.addEventListener('click', function() {
             const categoryName = this.getAttribute('data-category-name');
-            console.log('Category clicked:', categoryName);
             
             // Update modal title
             document.getElementById('categoryModalLabel').textContent = categoryName + ' Menu';
@@ -1334,14 +1332,11 @@ document.addEventListener('DOMContentLoaded', function() {
             {% endfor %}
             {% endif %}
 
-            console.log('Categories data:', categoriesData);
-
             // Check if category exists in real data
             if (categoriesData[categoryName] && 
                 categoriesData[categoryName].subcategories && 
                 Object.keys(categoriesData[categoryName].subcategories).length > 0) {
                 
-                console.log('Using dynamic data for', categoryName);
                 const subcategories = categoriesData[categoryName].subcategories;
                 const subcategoryNames = Object.keys(subcategories);
                 
@@ -1430,7 +1425,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 tabsContainer.innerHTML = tabsHtml;
                 contentContainer.innerHTML = contentHtml;
             } else {
-                console.log('Using hardcoded fallback for', categoryName);
                 useHardcodedFallback(categoryName, tabsContainer, contentContainer);
             }
 
@@ -1490,17 +1484,14 @@ function addToCartDemo(productName, productId = null) {
     })
     .then(response => response.json())
     .then(data => {
-        console.log('Add to cart response:', data);
         if (data.success) {
             showAlert(data.message, 'success');
-            console.log('Updating cart count to:', data.cart_count);
             updateCartCount(data.cart_count);
         } else {
             showAlert(data.message, 'danger');
         }
     })
     .catch(error => {
-        console.error('Error adding to cart:', error);
         showAlert('Error adding item to cart', 'danger');
     });
 }
@@ -1523,22 +1514,17 @@ function getCookie(name) {
 
 // Function to update cart count display
 function updateCartCount(count) {
-    console.log('updateCartCount called with count:', count);
     
     // Method 1: Update just the count span (most efficient)
     const cartCountSpan = document.getElementById('cartCount');
     if (cartCountSpan) {
         cartCountSpan.textContent = count;
-        console.log('Cart count span updated successfully');
-    } else {
-        console.warn('Cart count span not found');
     }
     
     // Method 2: Fallback - update the entire button if span not found
     const viewCartBtn = document.getElementById('viewCartBtn');
     if (viewCartBtn && !cartCountSpan) {
         viewCartBtn.innerHTML = `<i class="bi bi-cart3"></i> View Cart (<span id="cartCount">${count}</span>)`;
-        console.log('Cart button updated successfully');
     }
     
     // Method 3: Final fallback - search by href
@@ -1546,9 +1532,6 @@ function updateCartCount(count) {
         const btnByHref = document.querySelector('a[href*="view_cart"]');
         if (btnByHref) {
             btnByHref.innerHTML = `<i class="bi bi-cart3"></i> View Cart (${count})`;
-            console.log('Cart button updated via href search');
-        } else {
-            console.error('Could not find cart button by any method');
         }
     }
 }
@@ -1662,11 +1645,7 @@ function showAlert(message, type) {
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) {
-            registration.unregister().then(function(success) {
-                if (success) {
-                    console.log('Service worker unregistered successfully');
-                }
-            });
+            registration.unregister();
         }
     });
 }

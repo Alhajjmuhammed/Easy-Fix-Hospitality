@@ -194,7 +194,9 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
                 return
             
             # Only staff members can connect to restaurant updates
-            if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_kitchen_staff() or user.is_customer_care() or user.is_cashier()):
+            if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or 
+                    user.is_kitchen_staff() or user.is_bar_staff() or user.is_buffet_staff() or 
+                    user.is_service_staff() or user.is_customer_care() or user.is_cashier()):
                 logger.warning(f"User {user.username} with role {user.role} attempted unauthorized restaurant WebSocket connection")
                 await self.close(code=4003)
                 return
@@ -287,9 +289,12 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
                 logger.error(f"Invalid owner_id format: {owner_id}")
                 return False
             
-            # Check if the owner exists
+            # Check if the owner exists (support all owner types)
             try:
-                owner = User.objects.get(id=owner_id, role__name='owner')
+                owner = User.objects.get(
+                    id=owner_id, 
+                    role__name__in=['owner', 'main_owner', 'branch_owner']
+                )
             except User.DoesNotExist:
                 logger.error(f"Owner with id {owner_id} not found")
                 return False
@@ -298,8 +303,8 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
             if user.is_administrator():
                 return True
             
-            # Owner can access their own restaurant
-            if user.is_owner() and user.id == owner_id:
+            # Owner/main_owner/branch_owner can access their own restaurant
+            if (user.is_owner() or user.is_main_owner() or user.is_branch_owner()) and user.id == owner_id:
                 return True
                 
             # Staff can access their owner's restaurant

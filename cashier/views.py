@@ -7,6 +7,9 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 from accounts.models import get_owner_filter
 from orders.models import Order, OrderItem
@@ -198,20 +201,36 @@ def process_payment(request, order_id):
         
         order.save()
         
+        # Log payment event for audit trail
+        try:
+            from accounts.security_utils import log_security_event
+            log_security_event(
+                request, 'payment_processed', request.user,
+                description=f"Payment of ${amount} for Order #{order.order_number}",
+                target_model='Payment', target_id=str(payment.id),
+                extra_data={
+                    'order_id': order.id,
+                    'order_number': order.order_number,
+                    'amount': str(amount),
+                    'payment_method': payment_method,
+                    'payment_status': order.payment_status,
+                }
+            )
+        except Exception as audit_error:
+            logger.warning(f"Failed to log payment audit: {audit_error}")
+        
         # ✨ AUTO-PRINT RECEIPT (NO BROWSER DIALOG!)
         receipt_printed = False
         try:
             print_result = auto_print_receipt(payment)
             receipt_printed = print_result.get('receipt_printed', False)
             if receipt_printed:
-                print(f"✓ Auto-printed receipt for Payment #{payment.id}")
+                logger.info(f"Auto-printed receipt for Payment #{payment.id}")
             else:
-                print(f"⚠ Receipt auto-print returned False for Payment #{payment.id}")
+                logger.warning(f"Receipt auto-print returned False for Payment #{payment.id}")
         except Exception as e:
             # Print error doesn't stop payment processing
-            print(f"⚠ Receipt auto-print failed: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            logger.warning(f"Receipt auto-print failed: {str(e)}", exc_info=True)
         
         return JsonResponse({
             'success': True,
@@ -222,7 +241,8 @@ def process_payment(request, order_id):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f'Error processing payment: {str(e)}')
+        return JsonResponse({'error': 'Error processing payment. Please try again.'}, status=400)
 
 
 @login_required
@@ -279,6 +299,24 @@ def void_payment(request, payment_id):
         
         order.save()
         
+        # Log void event for audit trail
+        try:
+            from accounts.security_utils import log_security_event
+            log_security_event(
+                request, 'payment_voided', request.user,
+                description=f"Payment #{payment.id} voided for Order #{order.order_number}. Reason: {void_reason[:100] if void_reason else 'Not specified'}",
+                target_model='Payment', target_id=str(payment.id),
+                extra_data={
+                    'order_id': order.id,
+                    'order_number': order.order_number,
+                    'voided_amount': str(payment.amount),
+                    'void_reason': void_reason,
+                    'refund_method': refund_method,
+                }
+            )
+        except Exception as audit_error:
+            logger.warning(f"Failed to log void audit: {audit_error}")
+        
         return JsonResponse({
             'success': True,
             'message': f'Payment voided successfully. Refund: ${payment.amount}',
@@ -286,7 +324,8 @@ def void_payment(request, payment_id):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f'Error voiding payment: {str(e)}')
+        return JsonResponse({'error': 'Error voiding payment. Please try again.'}, status=400)
 
 
 @login_required
@@ -325,7 +364,8 @@ def cancel_order(request, order_id):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f'Error cancelling order: {str(e)}')
+        return JsonResponse({'error': 'Error cancelling order. Please try again.'}, status=400)
 
 
 @login_required
@@ -526,4 +566,5 @@ def print_bill(request, order_id):
             })
             
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f'Error printing bill: {str(e)}')
+        return JsonResponse({'error': 'Error printing bill. Please try again.'}, status=400)

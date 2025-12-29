@@ -1,16 +1,33 @@
 """
 Django settings for restaurant_system project.
+
+⚠️  WARNING: This file is for DEVELOPMENT ONLY!
+    For production, use: production_settings.py
+    Set DJANGO_SETTINGS_MODULE=restaurant_system.production_settings
 """
 
 from pathlib import Path
 from datetime import timedelta
 import os
+import sys
+from decouple import config
+
+# ============================================================================
+# DEVELOPMENT SETTINGS SAFEGUARD
+# ============================================================================
+# Prevent accidental use of development settings in production
+if os.environ.get('DJANGO_ENV') == 'production':
+    raise RuntimeError(
+        "\n\n🚫 SECURITY ERROR: Development settings.py cannot be used in production!\n"
+        "   Set DJANGO_SETTINGS_MODULE=restaurant_system.production_settings\n"
+    )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-your-secret-key-here'
+# This is for DEVELOPMENT ONLY - production uses environment variable
+SECRET_KEY = config('SECRET_KEY', default='dev-only-insecure-key-do-not-use-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -175,7 +192,7 @@ try:
             },
         },
     }
-    print("Success: Using Redis for WebSocket channels")
+    sys.stderr.write("Info: Using Redis for WebSocket channels\n")
 except (ImportError, redis.ConnectionError, redis.ResponseError):
     # Redis not available, use in-memory channels (development only)
     CHANNEL_LAYERS = {
@@ -183,7 +200,7 @@ except (ImportError, redis.ConnectionError, redis.ResponseError):
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
     }
-    print("Warning: Using in-memory channels (development only) - Install and start Redis for production")
+    sys.stderr.write("Warning: Using in-memory channels (development only) - Install and start Redis for production\n")
 LOGOUT_REDIRECT_URL = '/'
 
 # Custom Security Headers Middleware Class
@@ -265,9 +282,9 @@ try:
             }
         }
     }
-    print("Success: Using Redis for caching and rate limiting")
-except:
-    print("Warning: Using in-memory cache - Redis recommended for production")
+    sys.stderr.write("Info: Using Redis for caching and rate limiting\n")
+except Exception:
+    sys.stderr.write("Warning: Using in-memory cache - Redis recommended for production\n")
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
@@ -423,4 +440,4 @@ REST_FRAMEWORK = {
 # Set to False for local direct printing (uses win32print directly)
 USE_PRINT_QUEUE = False  # DISABLED for local development - direct printing
 
-print("Success: Security configuration loaded")
+sys.stderr.write("Info: Security configuration loaded\n")

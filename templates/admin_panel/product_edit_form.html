@@ -55,8 +55,10 @@
                             <select class="form-select" id="editProductStation" name="station" required>
                                 <option value="kitchen" {% if product.station == 'kitchen' %}selected{% endif %}>🍴 Kitchen</option>
                                 <option value="bar" {% if product.station == 'bar' %}selected{% endif %}>🍸 Bar</option>
+                                <option value="buffet" {% if product.station == 'buffet' %}selected{% endif %}>🍽️ Buffet</option>
+                                <option value="service" {% if product.station == 'service' %}selected{% endif %}>🛎️ Service</option>
                             </select>
-                            <div class="form-text">Assign this product to Kitchen or Bar station</div>
+                            <div class="form-text">Assign this product to Kitchen, Bar, Buffet, or Service station</div>
                         </div>
                         <div class="col-md-12">
                             <div class="form-check">

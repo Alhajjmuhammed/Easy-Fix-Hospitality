@@ -13,7 +13,6 @@ from restaurant.models_restaurant import Restaurant
 from orders.models import Order, OrderItem
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_http_methods
-from django.views.decorators.csrf import csrf_exempt
 from django.template.loader import render_to_string
 from django.core.exceptions import PermissionDenied
 import json
@@ -29,6 +28,9 @@ try:
     import openpyxl
 except ImportError:
     openpyxl = None
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 def get_production_qr_url(request, qr_code):
@@ -294,10 +296,12 @@ def admin_dashboard(request):
                 pending_orders = Order.objects.filter(status='pending').count()
             
     except PermissionDenied as e:
-        messages.error(request, str(e))
+        logger.error(f'Permission denied in dashboard: {str(e)}')
+        messages.error(request, 'Access denied. Please contact an administrator.')
         return redirect('restaurant:home')
     except Exception as e:
-        messages.error(request, f'Error loading dashboard: {str(e)}')
+        logger.error(f'Error loading dashboard: {str(e)}')
+        messages.error(request, 'Error loading dashboard. Please try again.')
         return redirect('restaurant:home')
 
     # Get restaurant context using utility
@@ -453,7 +457,10 @@ def manage_users(request):
             pass
 
     # Pagination
-    per_page = int(request.GET.get('per_page', 20))
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+    except (ValueError, TypeError):
+        per_page = 20
     paginator = Paginator(users, per_page)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -493,7 +500,10 @@ def manage_products(request):
         search_query = request.GET.get('search', '').strip()
         category_filter = request.GET.get('category', '').strip()
         restaurant_filter = request.GET.get('restaurant', '').strip()
-        per_page = int(request.GET.get('per_page', 10))
+        try:
+            per_page = int(request.GET.get('per_page', 10))
+        except (ValueError, TypeError):
+            per_page = 10
 
         # Determine which restaurant to filter by
         target_restaurant = None
@@ -829,7 +839,10 @@ def manage_tables(request):
         return redirect('restaurant:home')
 
     # Pagination
-    per_page = int(request.GET.get('per_page', 5))
+    try:
+        per_page = int(request.GET.get('per_page', 5))
+    except (ValueError, TypeError):
+        per_page = 5
     paginator = Paginator(tables, per_page)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -953,7 +966,10 @@ def manage_categories(request):
             pass
 
     # Pagination for main categories
-    per_page = int(request.GET.get('per_page', 20))
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+    except (ValueError, TypeError):
+        per_page = 20
     paginator = Paginator(main_categories, per_page)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -1052,7 +1068,8 @@ def add_main_category(request):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error adding main category: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to add category. Please try again.'})
 
 
 @login_required
@@ -1143,7 +1160,8 @@ def edit_main_category(request, category_id):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error editing main category: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to update category. Please try again.'})
 
 
 @login_required
@@ -1191,7 +1209,8 @@ def delete_main_category(request, category_id):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error deleting main category: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to delete category. Please try again.'})
 
 
 @login_required
@@ -1234,7 +1253,8 @@ def toggle_main_category(request, category_id):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error toggling main category: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to toggle category. Please try again.'})
 
 
 @login_required
@@ -1319,7 +1339,8 @@ def add_subcategory(request):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error adding subcategory: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to add subcategory. Please try again.'})
 
 
 @login_required
@@ -1373,7 +1394,8 @@ def edit_subcategory(request, subcategory_id):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error editing subcategory: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to update subcategory. Please try again.'})
 
 
 @login_required
@@ -1421,7 +1443,8 @@ def delete_subcategory(request, subcategory_id):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error deleting subcategory: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to delete subcategory. Please try again.'})
 
 
 @login_required
@@ -1464,7 +1487,8 @@ def toggle_subcategory(request, subcategory_id):
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error toggling subcategory: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to toggle subcategory. Please try again.'})
 
 
 # Product CRUD API Views
@@ -1532,7 +1556,8 @@ def get_subcategories(request, main_category_id):
             'subcategories': list(subcategories)
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error getting subcategories: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to get subcategories. Please try again.'})
 
 
 @login_required
@@ -1599,7 +1624,8 @@ def bulk_delete_main_categories(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Invalid JSON data'})
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error bulk deleting main categories: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to delete categories. Please try again.'})
 
 
 @login_required
@@ -1657,7 +1683,8 @@ def bulk_delete_subcategories(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Invalid JSON data'})
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error bulk deleting subcategories: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to delete subcategories. Please try again.'})
 
 
 @login_required
@@ -1765,7 +1792,8 @@ def add_product(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error adding product: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to add product. Please try again.'})
 
 
 @login_required
@@ -1796,7 +1824,8 @@ def view_product(request, product_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error viewing product: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to load product details. Please try again.'})
 
 
 @login_required
@@ -1839,7 +1868,8 @@ def edit_product(request, product_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error loading product edit form: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to load product form. Please try again.'})
 
 
 @login_required
@@ -1889,13 +1919,22 @@ def update_product(request, product_id):
             product.sub_category = get_object_or_404(SubCategory, id=request.POST.get('sub_category'))
         
         if request.POST.get('price'):
-            product.price = float(request.POST.get('price'))
+            try:
+                product.price = float(request.POST.get('price'))
+            except (ValueError, TypeError):
+                pass  # Keep existing price if invalid
         
         if request.POST.get('available_in_stock'):
-            product.available_in_stock = int(request.POST.get('available_in_stock'))
+            try:
+                product.available_in_stock = int(request.POST.get('available_in_stock'))
+            except (ValueError, TypeError):
+                pass  # Keep existing stock if invalid
         
         if request.POST.get('preparation_time'):
-            product.preparation_time = int(request.POST.get('preparation_time'))
+            try:
+                product.preparation_time = int(request.POST.get('preparation_time'))
+            except (ValueError, TypeError):
+                pass  # Keep existing prep time if invalid
         
         if request.POST.get('station'):
             product.station = request.POST.get('station')
@@ -1916,11 +1955,11 @@ def update_product(request, product_id):
             return redirect('admin_panel:manage_products')
         
     except Exception as e:
-        print(f"Error updating product: {str(e)}")
+        logger.error(f"Error updating product: {str(e)}")
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'message': str(e)})
+            return JsonResponse({'success': False, 'message': 'Failed to update product. Please try again.'})
         else:
-            messages.error(request, f'Error updating product: {str(e)}')
+            messages.error(request, 'Error updating product. Please try again.')
             return redirect('admin_panel:manage_products')
 
 
@@ -1958,7 +1997,8 @@ def toggle_product_availability(request, product_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error toggling product availability: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to toggle product. Please try again.'})
 
 
 @login_required
@@ -1990,7 +2030,8 @@ def delete_product(request, product_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error deleting product: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Failed to delete product. Please try again.'})
 
 
 # ============================================================================
@@ -2113,7 +2154,8 @@ def add_user(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error creating user: {str(e)}'})
+        logger.error(f'Error creating user: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error creating user. Please try again.'})
 
 
 @login_required
@@ -2151,7 +2193,8 @@ def get_user_data(request, user_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error getting user data: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error retrieving user data. Please try again.'})
 
 
 @login_required
@@ -2255,7 +2298,8 @@ def update_user(request, user_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error updating user: {str(e)}'})
+        logger.error(f'Error updating user: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error updating user. Please try again.'})
 
 
 @login_required
@@ -2295,7 +2339,8 @@ def toggle_user_status(request, user_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error toggling user status: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error updating user status. Please try again.'})
 
 
 @login_required
@@ -2332,7 +2377,8 @@ def delete_user(request, user_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error deleting user: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error deleting user. Please try again.'})
 
 
 # ============================================================================
@@ -2382,7 +2428,8 @@ def add_role(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error creating role: {str(e)}'})
+        logger.error(f'Error creating role: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error creating role. Please try again.'})
 
 
 @login_required
@@ -2408,7 +2455,8 @@ def get_role_data(request, role_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error creating role: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error creating role. Please try again.'})
 
 
 @login_required
@@ -2439,7 +2487,8 @@ def update_role(request, role_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error updating role: {str(e)}'})
+        logger.error(f'Error updating role: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error updating role. Please try again.'})
 
 
 @login_required
@@ -2476,7 +2525,8 @@ def delete_role(request, role_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error deleting role: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error deleting role. Please try again.'})
 
 
 @login_required
@@ -2601,7 +2651,8 @@ def add_table(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error adding table: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error adding table. Please try again.'})
 
 
 @login_required
@@ -2625,7 +2676,8 @@ def get_table(request):
             }
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error getting table: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error retrieving table data. Please try again.'})
 
 
 @login_required
@@ -2727,7 +2779,8 @@ def update_table(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error updating table: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error updating table. Please try again.'})
 
 
 @login_required
@@ -2778,7 +2831,8 @@ def toggle_table_status(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error toggling table status: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error updating table status. Please try again.'})
 
 
 @login_required
@@ -2820,7 +2874,8 @@ def delete_table(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error deleting table: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error deleting table. Please try again.'})
 
 
 # Order Management CRUD Views
@@ -2843,7 +2898,8 @@ def view_order(request, order_id):
         return JsonResponse({'success': True, 'html': html})
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error viewing order: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error viewing order. Please try again.'})
 
 
 @login_required
@@ -2883,7 +2939,8 @@ def update_order_status(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error updating order status: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error updating order status. Please try again.'})
 
 
 @login_required
@@ -2939,7 +2996,7 @@ def add_order(request):
                 if print_result['bot_printed']:
                     print_message += ' | BOT printed!'
             except Exception as print_error:
-                print(f"Auto-print error: {print_error}")
+                logger.warning(f"Auto-print error: {print_error}")
                 print_message = f'Order #{order_number} created (auto-print unavailable)'
             
             return JsonResponse({
@@ -2948,7 +3005,8 @@ def add_order(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': str(e)})
+            logger.error(f'Error adding order: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error adding order. Please try again.'})
     
     # GET request - show form with owner filtering
     owner_filter = get_owner_filter(request.user)
@@ -3019,7 +3077,8 @@ def edit_order(request, order_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': str(e)})
+            logger.error(f'Error editing order: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error editing order. Please try again.'})
     
     # GET request - show form
     # Filter tables and customers by owner if owner, otherwise show all
@@ -3065,7 +3124,8 @@ def delete_order(request, order_id):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error deleting order: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error deleting order. Please try again.'})
 
 
 @login_required
@@ -3100,7 +3160,8 @@ def profile(request):
                 messages.success(request, "Profile updated successfully.")
                 
             except Exception as e:
-                messages.error(request, f"Error updating profile: {str(e)}")
+                logger.error(f'Error updating profile: {str(e)}')
+                messages.error(request, "Error updating profile. Please try again.")
                 
         elif action == 'change_password':
             # Change password
@@ -3131,7 +3192,8 @@ def profile(request):
                 messages.success(request, "Password changed successfully.")
                 
             except Exception as e:
-                messages.error(request, f"Error changing password: {str(e)}")
+                logger.error(f'Error changing password: {str(e)}')
+                messages.error(request, "Error changing password. Please try again.")
         
         elif action == 'update_restaurant':
             # Update restaurant information (for owners only)
@@ -3151,16 +3213,16 @@ def profile(request):
                 
                 # Validate tax rate
                 try:
-                    if tax_rate_percentage:
+                    if tax_rate_percentage != '':  # Check explicitly for empty string (allow "0")
                         tax_rate_float = float(tax_rate_percentage)
                         if tax_rate_float < 0 or tax_rate_float > 99.99:
                             messages.error(request, "Tax rate must be between 0% and 99.99%.")
                             return redirect('admin_panel:profile')
                         
-                        # Convert percentage to decimal for storage
+                        # Convert percentage to decimal for storage (0% = 0.00, 15% = 0.15, etc.)
                         tax_rate_decimal = Decimal(str(tax_rate_float / 100))
                     else:
-                        # Use default tax rate from User model default
+                        # If field is empty, use default tax rate from User model default
                         tax_rate_decimal = Decimal('0.0800')  # Same as User model default
                         
                 except (ValueError, InvalidOperation):
@@ -3171,6 +3233,15 @@ def profile(request):
                 request.user.restaurant_name = restaurant_name
                 request.user.restaurant_description = restaurant_description
                 request.user.tax_rate = tax_rate_decimal
+                
+                # ALSO update Restaurant model tax_rate if user has a restaurant
+                from restaurant.models_restaurant import Restaurant
+                user_restaurants = Restaurant.objects.filter(
+                    models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
+                )
+                for restaurant in user_restaurants:
+                    restaurant.tax_rate = tax_rate_decimal
+                    restaurant.save()
                 
                 # Handle auto-print settings (checkboxes)
                 request.user.auto_print_kot = request.POST.get('auto_print_kot') == 'on'
@@ -3184,7 +3255,8 @@ def profile(request):
                 messages.success(request, "Restaurant information updated successfully.")
                 
             except Exception as e:
-                messages.error(request, f"Error updating restaurant: {str(e)}")
+                logger.error(f'Error updating restaurant: {str(e)}')
+                messages.error(request, "Error updating restaurant. Please try again.")
         
         elif action == 'update_currency':
             # Update currency settings (for owners only)
@@ -3230,7 +3302,8 @@ def profile(request):
                 messages.success(request, f"Currency updated to {currency_code} successfully.")
                 
             except Exception as e:
-                messages.error(request, f"Error updating currency: {str(e)}")
+                logger.error(f'Error updating currency: {str(e)}')
+                messages.error(request, "Error updating currency. Please try again.")
         
         return redirect('admin_panel:profile')
     
@@ -3569,7 +3642,7 @@ def import_products_csv(request):
                 
                 # Get station (default to kitchen if not specified)
                 station = row.get('station', '').strip().lower()
-                if station not in ['kitchen', 'bar']:
+                if station not in ['kitchen', 'bar', 'buffet', 'service']:
                     station = 'kitchen'  # Default to kitchen
                 
                 # Prepare product data
@@ -3629,7 +3702,8 @@ def import_products_csv(request):
             messages.warning(request, 'No data found in the CSV file.')
             
     except Exception as e:
-        messages.error(request, f'Error processing CSV file: {str(e)}')
+        logger.error(f'Error processing CSV file: {str(e)}')
+        messages.error(request, 'Error processing CSV file. Please check the format and try again.')
     
     return redirect('admin_panel:manage_products')
 
@@ -3839,7 +3913,7 @@ def import_products_excel(request):
                     # Handle station (default to kitchen if not specified)
                     if 'station' in col_mapping:
                         station = str(row[col_mapping['station']] or '').strip().lower()
-                        product_data['station'] = station if station in ['kitchen', 'bar'] else 'kitchen'
+                        product_data['station'] = station if station in ['kitchen', 'bar', 'buffet', 'service'] else 'kitchen'
                     else:
                         product_data['station'] = 'kitchen'
                     
@@ -3894,7 +3968,8 @@ def import_products_excel(request):
                 os.unlink(temp_file.name)
                 
     except Exception as e:
-        messages.error(request, f'Error processing Excel file: {str(e)}')
+        logger.error(f'Error processing Excel file: {str(e)}')
+        messages.error(request, 'Error processing Excel file. Please check the format and try again.')
     
     return redirect('admin_panel:manage_products')
 
@@ -4077,13 +4152,13 @@ def bulk_delete_products(request):
         # Perform bulk deletion
         deleted_count, deleted_details = products_to_delete.delete()
         
-        # Log the deletion (optional)
+        # Log the deletion
         if hasattr(request.user, 'get_full_name'):
             user_name = request.user.get_full_name() or request.user.username
         else:
             user_name = request.user.username
             
-        print(f"Bulk delete performed by {user_name}: {deleted_count} products deleted - {', '.join(product_names[:5])}")
+        logger.info(f"Bulk delete performed by {user_name}: {deleted_count} products deleted - {', '.join(product_names[:5])}")
         
         return JsonResponse({
             'success': True,
@@ -4094,7 +4169,7 @@ def bulk_delete_products(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON data.'})
     except Exception as e:
-        print(f"Error in bulk delete: {str(e)}")
+        logger.error(f"Error in bulk delete: {str(e)}")
         return JsonResponse({'success': False, 'error': 'An error occurred while deleting products.'})
 
 
@@ -4336,16 +4411,24 @@ def printer_settings(request):
     if current_restaurant:
         kitchen_printer = current_restaurant.kitchen_printer_name or ''
         bar_printer = current_restaurant.bar_printer_name or ''
+        buffet_printer = current_restaurant.buffet_printer_name or ''
+        service_printer = current_restaurant.service_printer_name or ''
         receipt_printer = current_restaurant.receipt_printer_name or ''
         auto_print_kot = current_restaurant.auto_print_kot
         auto_print_bot = current_restaurant.auto_print_bot
+        auto_print_buffet = current_restaurant.auto_print_buffet
+        auto_print_service = current_restaurant.auto_print_service
         settings_source = 'restaurant'
     else:
         kitchen_printer = user.kitchen_printer_name or ''
         bar_printer = user.bar_printer_name or ''
+        buffet_printer = getattr(user, 'buffet_printer_name', '') or ''
+        service_printer = getattr(user, 'service_printer_name', '') or ''
         receipt_printer = user.receipt_printer_name or ''
         auto_print_kot = user.auto_print_kot
         auto_print_bot = user.auto_print_bot
+        auto_print_buffet = getattr(user, 'auto_print_buffet', True)
+        auto_print_service = getattr(user, 'auto_print_service', True)
         settings_source = 'user'
     
     context = {
@@ -4354,9 +4437,13 @@ def printer_settings(request):
         'settings_source': settings_source,
         'kitchen_printer': kitchen_printer,
         'bar_printer': bar_printer,
+        'buffet_printer': buffet_printer,
+        'service_printer': service_printer,
         'receipt_printer': receipt_printer,
         'auto_print_kot': auto_print_kot,
         'auto_print_bot': auto_print_bot,
+        'auto_print_buffet': auto_print_buffet,
+        'auto_print_service': auto_print_service,
     }
     
     # Get or create API token for print client
@@ -4388,15 +4475,23 @@ def save_printer_settings(request):
             data = json.loads(request.body)
             kitchen_printer = data.get('kitchen_printer', '').strip()
             bar_printer = data.get('bar_printer', '').strip()
+            buffet_printer = data.get('buffet_printer', '').strip()
+            service_printer = data.get('service_printer', '').strip()
             receipt_printer = data.get('receipt_printer', '').strip()
             auto_print_kot = data.get('auto_print_kot', False)
             auto_print_bot = data.get('auto_print_bot', False)
+            auto_print_buffet = data.get('auto_print_buffet', False)
+            auto_print_service = data.get('auto_print_service', False)
         else:
             kitchen_printer = request.POST.get('kitchen_printer', '').strip()
             bar_printer = request.POST.get('bar_printer', '').strip()
+            buffet_printer = request.POST.get('buffet_printer', '').strip()
+            service_printer = request.POST.get('service_printer', '').strip()
             receipt_printer = request.POST.get('receipt_printer', '').strip()
             auto_print_kot = request.POST.get('auto_print_kot') == 'on'
             auto_print_bot = request.POST.get('auto_print_bot') == 'on'
+            auto_print_buffet = request.POST.get('auto_print_buffet') == 'on'
+            auto_print_service = request.POST.get('auto_print_service') == 'on'
         
         # Get the current restaurant based on session or user type
         current_restaurant = None
@@ -4420,18 +4515,30 @@ def save_printer_settings(request):
         # ALWAYS save to User model first (ensures backup)
         user.kitchen_printer_name = kitchen_printer if kitchen_printer else None
         user.bar_printer_name = bar_printer if bar_printer else None
+        if hasattr(user, 'buffet_printer_name'):
+            user.buffet_printer_name = buffet_printer if buffet_printer else None
+        if hasattr(user, 'service_printer_name'):
+            user.service_printer_name = service_printer if service_printer else None
         user.receipt_printer_name = receipt_printer if receipt_printer else None
         user.auto_print_kot = auto_print_kot
         user.auto_print_bot = auto_print_bot
+        if hasattr(user, 'auto_print_buffet'):
+            user.auto_print_buffet = auto_print_buffet
+        if hasattr(user, 'auto_print_service'):
+            user.auto_print_service = auto_print_service
         user.save()
         
         # ALSO save to Restaurant model if available (for branch support)
         if current_restaurant:
             current_restaurant.kitchen_printer_name = kitchen_printer if kitchen_printer else None
             current_restaurant.bar_printer_name = bar_printer if bar_printer else None
+            current_restaurant.buffet_printer_name = buffet_printer if buffet_printer else None
+            current_restaurant.service_printer_name = service_printer if service_printer else None
             current_restaurant.receipt_printer_name = receipt_printer if receipt_printer else None
             current_restaurant.auto_print_kot = auto_print_kot
             current_restaurant.auto_print_bot = auto_print_bot
+            current_restaurant.auto_print_buffet = auto_print_buffet
+            current_restaurant.auto_print_service = auto_print_service
             current_restaurant.save()
             
             return JsonResponse({
@@ -4445,12 +4552,10 @@ def save_printer_settings(request):
             })
         
     except Exception as e:
-        import traceback
-        print(f"ERROR in save_printer_settings: {e}")
-        traceback.print_exc()
+        logger.exception(f"ERROR in save_printer_settings: {e}")
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'Failed to save printer settings. Please try again.'
         }, status=400)
 
 
@@ -4465,7 +4570,7 @@ def detect_printers(request):
         
         try:
             default_printer = win32print.GetDefaultPrinter()
-        except:
+        except Exception:
             pass
         
         # Get all local printers
@@ -4478,9 +4583,10 @@ def detect_printers(request):
                 })
         except Exception as enum_error:
             # If EnumPrinters fails, return empty list with error
+            logger.error(f'Could not enumerate printers: {str(enum_error)}')
             return JsonResponse({
                 'success': False,
-                'error': f'Could not enumerate printers: {str(enum_error)}',
+                'error': 'Could not enumerate printers. Please check printer configuration.',
                 'printers': []
             })
         
@@ -4497,9 +4603,10 @@ def detect_printers(request):
             'printers': []
         })
     except Exception as e:
+        logger.error(f'Error detecting printers: {str(e)}')
         return JsonResponse({
             'success': False,
-            'error': f'Error: {str(e)}',
+            'error': 'Error detecting printers. Please try again.',
             'printers': []
         })
 
@@ -4526,7 +4633,8 @@ def regenerate_api_token(request):
             'message': 'API token regenerated successfully. Update your Print Client config.json with the new token.'
         })
     except Exception as e:
+        logger.error(f'Error regenerating token: {str(e)}')
         return JsonResponse({
             'success': False,
-            'error': f'Error regenerating token: {str(e)}'
+            'error': 'Error regenerating token. Please try again.'
         }, status=500)

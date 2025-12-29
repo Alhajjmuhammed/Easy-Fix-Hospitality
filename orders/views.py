@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_protect
 from django.db import transaction
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
@@ -11,66 +12,62 @@ from asgiref.sync import async_to_sync
 from decimal import Decimal
 import json
 import uuid
+import logging
 
 from .models import Order, OrderItem, BillRequest
 from .forms import TableSelectionForm, OrderForm, OrderStatusForm, CancelOrderForm
 from restaurant.models import TableInfo, Product, MainCategory
 from accounts.models import User, get_owner_filter, check_owner_permission
+from accounts.security_utils import (
+    validate_session_restaurant_id, 
+    validate_session_table,
+    validate_cart_data,
+    sanitize_special_instructions,
+    require_restaurant_context,
+    require_table_selection,
+    ajax_restaurant_required,
+    get_client_ip,
+    log_security_event
+)
 from .printing import auto_print_order  # Server-side printing
+
+logger = logging.getLogger(__name__)
 
 # Initialize channel layer for WebSocket communication
 channel_layer = get_channel_layer()
 
+
+@require_restaurant_context
 def select_table(request):
     """Customer selects table from available tables in restaurant"""
-    restaurant = None
+    # Validate restaurant from session (already validated by decorator)
+    restaurant = validate_session_restaurant_id(request.session)
     
-    # For staff users (customer_care, kitchen, bar, cashier), use their assigned restaurant
+    # For staff users, get their assigned restaurant
     if request.user.is_authenticated and (
         request.user.is_customer_care() or 
         request.user.is_kitchen_staff() or 
         request.user.is_bar_staff() or 
+        request.user.is_buffet_staff() or 
+        request.user.is_service_staff() or 
         request.user.is_cashier()
     ):
-        # Staff users get their restaurant from User.owner
         restaurant = request.user.get_owner()
         if restaurant:
-            # Set session data for consistency with QR code flow
             request.session['selected_restaurant_id'] = restaurant.id
             request.session['selected_restaurant_name'] = restaurant.restaurant_name
         else:
             messages.error(request, 'You are not assigned to any restaurant. Please contact your administrator.')
             return redirect('accounts:login')
-    else:
-        # Check if restaurant is selected via QR code or session
-        selected_restaurant_id = request.session.get('selected_restaurant_id')
-        
-        if selected_restaurant_id:
-            try:
-                # Support all owner types: owner, main_owner, branch_owner
-                restaurant = User.objects.get(
-                    id=selected_restaurant_id,
-                    role__name__in=['owner', 'main_owner', 'branch_owner']
-                )
-            except User.DoesNotExist:
-                messages.error(request, 'Selected restaurant not found.')
-                return redirect('accounts:login')
-        else:
-            # SECURITY CHECK: Customer must access via QR code or restaurant link
-            # Prevent direct access to table selection without scanning QR code
-            if request.user.is_authenticated and request.user.is_customer():
-                messages.error(request, 'Unauthorized access. Please scan the restaurant QR code to order.')
-                return redirect('accounts:login')
-            # For non-customer users (staff, admin), allow access
-            elif not request.user.is_authenticated:
-                messages.warning(request, 'Please scan a restaurant QR code to start ordering.')
-                return redirect('accounts:login')
     
     if request.method == 'POST':
         # Handle table selection from visual interface
         selected_table_id = request.POST.get('table_id')
         if selected_table_id:
             try:
+                # Validate table_id is numeric
+                selected_table_id = int(selected_table_id)
+                
                 # Get the table by ID and verify it belongs to the restaurant
                 if restaurant:
                     table = TableInfo.objects.get(id=selected_table_id, owner=restaurant)
@@ -92,6 +89,9 @@ def select_table(request):
                         messages.error(request, f'Table {table.tbl_no} is currently occupied by Order #{occupying_order.order_number}.')
                     else:
                         messages.error(request, f'Table {table.tbl_no} is currently not available.')
+            except (ValueError, TypeError):
+                messages.error(request, 'Invalid table selection.')
+                logger.warning(f"Invalid table_id format: {request.POST.get('table_id')} from IP {get_client_ip(request)}")
             except TableInfo.DoesNotExist:
                 messages.error(request, 'Invalid table selection. Please try again.')
     
@@ -111,51 +111,53 @@ def select_table(request):
     }
     return render(request, 'orders/select_table.html', context)
 
+
+@require_restaurant_context
+@require_table_selection
 def browse_menu(request):
     """Browse menu and add items to cart"""
-    # Check if table is selected
-    if 'selected_table' not in request.session:
-        messages.warning(request, 'Please select your table number first.')
-        return redirect('orders:select_table')
-    
+    # Session validated by decorators
     table_number = request.session['selected_table']
+    restaurant = validate_session_restaurant_id(request.session)
     
-    # Filter categories by user's owner
+    # Filter categories by restaurant
     try:
-        owner_filter = get_owner_filter(request.user)
-        if owner_filter:
+        if restaurant:
             categories = MainCategory.objects.filter(
                 is_active=True, 
-                owner=owner_filter
+                owner=restaurant
             ).prefetch_related('subcategories__products').order_by('name')
+        elif request.user.is_authenticated:
+            owner_filter = get_owner_filter(request.user)
+            if owner_filter:
+                categories = MainCategory.objects.filter(
+                    is_active=True, 
+                    owner=owner_filter
+                ).prefetch_related('subcategories__products').order_by('name')
+            else:
+                categories = MainCategory.objects.filter(is_active=True).prefetch_related(
+                    'subcategories__products'
+                ).order_by('name')
         else:
-            # Administrator can see all categories
-            categories = MainCategory.objects.filter(is_active=True).prefetch_related(
-                'subcategories__products'
-            ).order_by('name')
+            categories = MainCategory.objects.none()
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
     
-    # Get cart from session - handle empty cart safely
+    # Get and validate cart from session
     cart = request.session.get('cart', {})
+    cart = validate_cart_data(cart)
+    request.session['cart'] = cart  # Store validated cart back
+    
     cart_count = 0
     cart_total = 0
     
     if cart:
-        try:
-            cart_count = sum(item.get('quantity', 0) for item in cart.values() if isinstance(item, dict))
-            cart_total = sum(
-                float(item.get('price', 0)) * item.get('quantity', 0) 
-                for item in cart.values() 
-                if isinstance(item, dict)
-            )
-        except (ValueError, TypeError):
-            # Reset cart if there's corrupted data
-            cart = {}
-            request.session['cart'] = cart
-            cart_count = 0
-            cart_total = 0
+        cart_count = sum(item.get('quantity', 0) for item in cart.values())
+        cart_total = sum(
+            float(item.get('price', 0)) * item.get('quantity', 0) 
+            for item in cart.values()
+        )
     
     context = {
         'categories': categories,
@@ -167,18 +169,45 @@ def browse_menu(request):
     
     return render(request, 'orders/browse_menu.html', context)
 
+
+@csrf_protect
 @require_POST
+@ajax_restaurant_required
 def add_to_cart(request):
     """Add item to cart via AJAX"""
     if 'selected_table' not in request.session:
         return JsonResponse({'success': False, 'message': 'Please select a table first.'})
+    
+    # Validate restaurant context
+    restaurant = validate_session_restaurant_id(request.session)
+    if not restaurant:
+        return JsonResponse({'success': False, 'message': 'Restaurant context lost. Please scan QR code again.'})
     
     try:
         data = json.loads(request.body)
         product_id = data.get('product_id')
         quantity = int(data.get('quantity', 1))
         
-        product = get_object_or_404(Product, id=product_id, is_available=True)
+        # Validate product_id
+        try:
+            product_id = int(product_id)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid product_id: {data.get('product_id')} from IP {get_client_ip(request)}")
+            return JsonResponse({'success': False, 'message': 'Invalid product.'})
+        
+        # Validate quantity
+        if quantity < 1 or quantity > 100:
+            return JsonResponse({'success': False, 'message': 'Invalid quantity.'})
+        
+        # Get product and verify it belongs to this restaurant
+        product = Product.objects.filter(
+            id=product_id, 
+            is_available=True,
+            main_category__owner=restaurant
+        ).first()
+        
+        if not product:
+            return JsonResponse({'success': False, 'message': 'Product not found or not available.'})
         
         # Check stock
         if product.available_in_stock < quantity:
@@ -187,8 +216,8 @@ def add_to_cart(request):
                 'message': f'Only {product.available_in_stock} items available in stock.'
             })
         
-        # Get or create cart in session
-        cart = request.session.get('cart', {})
+        # Get and validate cart
+        cart = validate_cart_data(request.session.get('cart', {}))
         
         if str(product_id) in cart:
             # Update existing item with current promotional pricing
@@ -198,6 +227,8 @@ def add_to_cart(request):
                     'success': False,
                     'message': f'Cannot add more. Only {product.available_in_stock} items available.'
                 })
+            if new_quantity > 100:
+                return JsonResponse({'success': False, 'message': 'Maximum quantity exceeded.'})
             
             # Update quantity and recalculate promotional pricing
             current_price = product.get_current_price()
@@ -211,7 +242,7 @@ def add_to_cart(request):
             # Add new item with promotional pricing
             current_price = product.get_current_price()
             cart[str(product_id)] = {
-                'name': product.name,
+                'name': product.name[:200],  # Limit name length
                 'price': str(current_price),
                 'original_price': str(product.price),
                 'has_promotion': product.has_active_promotion(),
@@ -233,15 +264,32 @@ def add_to_cart(request):
             'cart_total': cart_total,
         })
         
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Invalid request data.'})
     except Exception as e:
+        logger.error(f"Error in add_to_cart: {e}")
         return JsonResponse({'success': False, 'message': 'An error occurred.'})
 
+
+@csrf_protect
 @require_POST
+@ajax_restaurant_required
 def remove_from_cart(request):
     """Remove item from cart via AJAX"""
     try:
+        # Validate restaurant context to prevent cross-restaurant manipulation
+        restaurant = validate_session_restaurant_id(request.session)
+        if not restaurant:
+            return JsonResponse({'success': False, 'message': 'Invalid session. Please select a restaurant.'})
+        
         data = json.loads(request.body)
         product_id = str(data.get('product_id'))
+        
+        # Validate product_id is numeric
+        try:
+            int(product_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'message': 'Invalid product ID.'})
         
         cart = request.session.get('cart', {})
         
@@ -263,10 +311,16 @@ def remove_from_cart(request):
         
         return JsonResponse({'success': False, 'message': 'Item not found in cart.'})
         
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Invalid request data.'})
     except Exception as e:
+        logger.error(f"Error in remove_from_cart: {e}")
         return JsonResponse({'success': False, 'message': 'An error occurred.'})
 
+
+@csrf_protect
 @require_POST
+@ajax_restaurant_required
 def update_cart_quantity(request):
     """Update item quantity in cart via AJAX"""
     try:
@@ -277,7 +331,28 @@ def update_cart_quantity(request):
         if quantity <= 0:
             return JsonResponse({'success': False, 'message': 'Quantity must be greater than 0.'})
         
-        product = get_object_or_404(Product, id=product_id)
+        if quantity > 100:
+            return JsonResponse({'success': False, 'message': 'Maximum quantity is 100.'})
+        
+        # Validate product_id is numeric
+        try:
+            int(product_id)
+        except ValueError:
+            return JsonResponse({'success': False, 'message': 'Invalid product.'})
+        
+        # Validate restaurant context
+        restaurant = validate_session_restaurant_id(request.session)
+        if not restaurant:
+            return JsonResponse({'success': False, 'message': 'Restaurant context lost.'})
+        
+        # Get product and verify it belongs to this restaurant
+        product = Product.objects.filter(
+            id=product_id,
+            main_category__owner=restaurant
+        ).first()
+        
+        if not product:
+            return JsonResponse({'success': False, 'message': 'Product not found.'})
         
         if quantity > product.available_in_stock:
             return JsonResponse({
@@ -285,7 +360,8 @@ def update_cart_quantity(request):
                 'message': f'Only {product.available_in_stock} items available.'
             })
         
-        cart = request.session.get('cart', {})
+        # Get and validate cart
+        cart = validate_cart_data(request.session.get('cart', {}))
         
         if product_id in cart:
             # Update quantity and recalculate promotional pricing
@@ -313,20 +389,26 @@ def update_cart_quantity(request):
         
         return JsonResponse({'success': False, 'message': 'Item not found in cart.'})
         
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Invalid request data.'})
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'message': 'Invalid quantity.'})
     except Exception as e:
+        logger.error(f"Error in update_cart_quantity: {e}")
         return JsonResponse({'success': False, 'message': 'An error occurred.'})
 
+
+@require_restaurant_context
+@require_table_selection
 def view_cart(request):
     """View cart contents"""
-    if 'selected_table' not in request.session:
-        messages.warning(request, 'Please select your table number first.')
-        return redirect('orders:select_table')
-    
-    cart = request.session.get('cart', {})
+    # Get and validate cart
+    cart = validate_cart_data(request.session.get('cart', {}))
+    request.session['cart'] = cart  # Store validated cart back
     
     if not cart:
         messages.info(request, 'Your cart is empty.')
-        return redirect('restaurant:menu')  # Redirect to restaurant menu instead
+        return redirect('restaurant:menu')
     
     # Calculate totals
     cart_items = []
@@ -344,22 +426,9 @@ def view_cart(request):
             'image': item.get('image'),
         })
     
-    # Get restaurant owner's tax rate
-    try:
-        selected_restaurant_id = request.session.get('selected_restaurant_id')
-        if selected_restaurant_id:
-            # Support all owner types: owner, main_owner, branch_owner
-            restaurant_owner = User.objects.get(
-                id=selected_restaurant_id,
-                role__name__in=['owner', 'main_owner', 'branch_owner']
-            )
-            tax_rate = float(restaurant_owner.tax_rate)  # Convert decimal to float
-        else:
-            # Use default tax rate from User model default
-            tax_rate = float(Decimal('0.0800'))  # Use same default as model
-    except (User.DoesNotExist, TypeError):
-        # Use default tax rate from User model default
-        tax_rate = float(Decimal('0.0800'))  # Use same default as model
+    # Get restaurant owner's tax rate from validated session
+    restaurant = validate_session_restaurant_id(request.session)
+    tax_rate = float(restaurant.tax_rate) if restaurant else float(Decimal('0.0800'))
     
     # Calculate tax and final total
     tax_amount = cart_total * tax_rate
@@ -378,13 +447,13 @@ def view_cart(request):
     return render(request, 'orders/view_cart.html', context)
 
 @login_required
+@require_restaurant_context
+@require_table_selection
 def place_order(request):
     """Place order from cart"""
-    if 'selected_table' not in request.session:
-        messages.warning(request, 'Please select your table number first.')
-        return redirect('orders:select_table')
-    
-    cart = request.session.get('cart', {})
+    # Validate cart
+    cart = validate_cart_data(request.session.get('cart', {}))
+    request.session['cart'] = cart
     
     if not cart:
         messages.error(request, 'Your cart is empty.')
@@ -395,61 +464,65 @@ def place_order(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    # Get current restaurant - for staff users, use their assigned restaurant
-                    current_restaurant = None
+                    # Get current restaurant from validated session
+                    current_restaurant = validate_session_restaurant_id(request.session)
                     
-                    if request.user.is_customer_care() or request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_cashier():
-                        # Staff users use their assigned restaurant
+                    # For staff users, use their assigned restaurant
+                    if request.user.is_customer_care() or request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_buffet_staff() or request.user.is_service_staff() or request.user.is_cashier():
                         current_restaurant = request.user.get_owner()
                         if not current_restaurant:
                             messages.error(request, 'You are not assigned to any restaurant. Please contact your administrator.')
                             return redirect('orders:select_table')
-                    else:
-                        # Regular customers use QR code session
-                        selected_restaurant_id = request.session.get('selected_restaurant_id')
-                        if not selected_restaurant_id:
-                            messages.error(request, 'Restaurant context not found. Please scan QR code again.')
-                            return redirect('orders:select_table')
-                        
-                        try:
-                            # Support all owner types: owner, main_owner, branch_owner
-                            current_restaurant = User.objects.get(
-                                id=selected_restaurant_id,
-                                role__name__in=['owner', 'main_owner', 'branch_owner']
-                            )
-                        except User.DoesNotExist:
-                            messages.error(request, 'Selected restaurant not found.')
-                            return redirect('orders:select_table')
+                    
+                    if not current_restaurant:
+                        messages.error(request, 'Restaurant context not found. Please scan QR code again.')
+                        return redirect('orders:select_table')
+                    
+                    # Validate table
+                    table_number, table_id = validate_session_table(request.session, current_restaurant)
+                    if not table_number:
+                        messages.error(request, 'Invalid table selection.')
+                        return redirect('orders:select_table')
                     
                     # Get table for the specific restaurant
                     try:
                         table = TableInfo.objects.get(
-                            tbl_no=request.session['selected_table'],
+                            tbl_no=table_number,
                             owner=current_restaurant
                         )
                     except TableInfo.DoesNotExist:
-                        messages.error(request, f'Table {request.session["selected_table"]} not found in {current_restaurant.restaurant_name}.')
+                        messages.error(request, f'Table {table_number} not found in {current_restaurant.restaurant_name}.')
                         return redirect('orders:select_table')
                     except TableInfo.MultipleObjectsReturned:
-                        # This shouldn't happen now, but just in case
                         table = TableInfo.objects.filter(
-                            tbl_no=request.session['selected_table'],
+                            tbl_no=table_number,
                             owner=current_restaurant
                         ).first()
+                    
+                    # Sanitize special instructions
+                    special_instructions = sanitize_special_instructions(
+                        form.cleaned_data['special_instructions']
+                    )
                     
                     # Create order
                     order = Order.objects.create(
                         order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
                         table_info=table,
                         ordered_by=request.user,
-                        special_instructions=form.cleaned_data['special_instructions'],
+                        special_instructions=special_instructions,
                         status='pending'
                     )
                     
-                    # Create order items
+                    # Create order items - verify each product belongs to restaurant
                     total_amount = 0
                     for product_id, item in cart.items():
-                        product = get_object_or_404(Product, id=product_id)
+                        product = Product.objects.filter(
+                            id=product_id,
+                            main_category__owner=current_restaurant
+                        ).first()
+                        
+                        if not product:
+                            raise Exception(f'Product not available')
                         
                         # Check stock again
                         if product.available_in_stock < item['quantity']:
@@ -472,6 +545,21 @@ def place_order(request):
                     # Update order total
                     order.total_amount = total_amount
                     order.save()
+                    
+                    # Log the order placement
+                    log_security_event(
+                        event_type='order_placed',
+                        user=request.user,
+                        description=f"Order {order.order_number} placed for table {table.tbl_no}",
+                        ip_address=get_client_ip(request),
+                        extra_data={
+                            'order_id': order.id,
+                            'order_number': order.order_number,
+                            'table': table.tbl_no,
+                            'total': str(total_amount),
+                            'items_count': len(cart)
+                        }
+                    )
                     
                     # Send real-time notification to restaurant staff
                     restaurant_id = current_restaurant.id
@@ -511,38 +599,44 @@ def place_order(request):
                     
                     # ✨ SERVER-SIDE AUTO-PRINT (NO BROWSER DIALOG!)
                     try:
-                        print(f"🖨️ [DEBUG] Starting auto_print_order for Order #{order.order_number}")
-                        print(f"🖨️ [DEBUG] Order ID: {order.id}, Table: {order.table_info.tbl_no}")
+                        logger.info(f"Starting auto_print_order for Order #{order.order_number}")
+                        logger.debug(f"Order ID: {order.id}, Table: {order.table_info.tbl_no}")
                         print_result = auto_print_order(order)
-                        print(f"🖨️ [DEBUG] Print result: {print_result}")
-                        if print_result['kot_printed']:
+                        logger.info(f"Print result: {print_result}")
+                        if print_result.get('kot_printed'):
                             messages.success(request, '🖨️ KOT printed automatically!')
-                        if print_result['bot_printed']:
+                        if print_result.get('bot_printed'):
                             messages.success(request, '🖨️ BOT printed automatically!')
-                        if print_result['errors']:
-                            for error in print_result['errors']:
-                                messages.warning(request, f'Print warning: {error}')
+                        if print_result.get('buffet_printed'):
+                            messages.success(request, '🖨️ BUFFET printed automatically!')
+                        if print_result.get('service_printed'):
+                            messages.success(request, '🖨️ SERVICE printed automatically!')
+                        for error in print_result.get('errors', []):
+                            messages.warning(request, f'Print warning: {error}')
                     except Exception as e:
                         # Print error doesn't stop order processing
-                        messages.warning(request, f'Auto-print unavailable: {str(e)}')
-                        print(f"🖨️ [DEBUG] Auto-print EXCEPTION: {str(e)}")
-                        import traceback
-                        traceback.print_exc()
+                        messages.warning(request, 'Auto-print unavailable. Order was placed successfully.')
+                        logger.exception(f"Auto-print exception for Order #{order.order_number}: {str(e)}")
                     
-                    # Check if order has kitchen or bar items for browser fallback
+                    # Check if order has kitchen, bar, buffet, or service items for browser fallback
                     has_kitchen_items = any(item.product.station == 'kitchen' for item in order.order_items.all())
                     has_bar_items = any(item.product.station == 'bar' for item in order.order_items.all())
+                    has_buffet_items = any(item.product.station == 'buffet' for item in order.order_items.all())
+                    has_service_items = any(item.product.station == 'service' for item in order.order_items.all())
                     
                     # Store order ID and browser print flags (fallback if server print fails)
                     request.session['new_order_id'] = order.id
                     request.session['print_kot'] = has_kitchen_items and current_restaurant.auto_print_kot
                     request.session['print_bot'] = has_bar_items and current_restaurant.auto_print_bot
+                    request.session['print_buffet'] = has_buffet_items and current_restaurant.auto_print_buffet
+                    request.session['print_service'] = has_service_items and current_restaurant.auto_print_service
                     
                     messages.success(request, f'Order {order.order_number} placed successfully!')
                     return redirect('restaurant:menu')  # Redirect to menu instead of order confirmation
                     
             except Exception as e:
-                messages.error(request, f'Error placing order: {str(e)}')
+                logger.error(f'Error placing order: {str(e)}')
+                messages.error(request, 'Error placing order. Please try again.')
                 return redirect('orders:view_cart')
     else:
         form = OrderForm()
@@ -755,6 +849,7 @@ def order_list(request):
     
     return render(request, 'orders/order_list.html', context)
 
+@login_required
 def create_order(request):
     """Placeholder for create order - redirect to table selection"""
     return redirect('orders:select_table')
@@ -855,6 +950,98 @@ def bar_dashboard(request):
     return render(request, 'orders/bar_dashboard.html', context)
 
 @login_required
+def buffet_dashboard(request):
+    """Buffet staff dashboard to manage buffet orders"""
+    if not (hasattr(request.user, 'role') and request.user.role and request.user.role.name == 'buffet'):
+        messages.error(request, 'Access denied. Buffet staff privileges required.')
+        return redirect('restaurant:home')
+
+    # Get filter parameters
+    status_filter = request.GET.get('status', 'pending')
+
+    try:
+        owner_filter = get_owner_filter(request.user)
+        base_queryset = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items__product')
+        
+        # Filter by owner
+        if owner_filter:
+            base_queryset = base_queryset.filter(table_info__owner=owner_filter)
+        
+        # Filter to only include orders with buffet items (database-level)
+        base_queryset = base_queryset.filter(order_items__product__station='buffet').distinct()
+    except PermissionDenied:
+        messages.error(request, 'You are not associated with any restaurant.')
+        return redirect('restaurant:home')
+
+    # Get orders by status
+    pending_orders = base_queryset.filter(status='pending').order_by('-created_at')
+    confirmed_orders = base_queryset.filter(status='confirmed').order_by('-created_at')
+    preparing_orders = base_queryset.filter(status='preparing').order_by('-created_at')
+    ready_orders = base_queryset.filter(status='ready').order_by('-created_at')
+    served_orders = base_queryset.filter(status='served').order_by('-created_at')
+
+    context = {
+        'pending_orders': pending_orders,
+        'confirmed_orders': confirmed_orders,
+        'preparing_orders': preparing_orders,
+        'ready_orders': ready_orders,
+        'served_orders': served_orders,
+        'pending_count': len(pending_orders),
+        'confirmed_count': len(confirmed_orders),
+        'preparing_count': len(preparing_orders),
+        'ready_count': len(ready_orders),
+        'served_count': len(served_orders),
+        'status_choices': Order.STATUS_CHOICES,
+    }
+    return render(request, 'orders/buffet_dashboard.html', context)
+
+@login_required
+def service_dashboard(request):
+    """Service staff dashboard to manage service orders"""
+    if not (hasattr(request.user, 'role') and request.user.role and request.user.role.name == 'service'):
+        messages.error(request, 'Access denied. Service staff privileges required.')
+        return redirect('restaurant:home')
+
+    # Get filter parameters
+    status_filter = request.GET.get('status', 'pending')
+
+    try:
+        owner_filter = get_owner_filter(request.user)
+        base_queryset = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items__product')
+        
+        # Filter by owner
+        if owner_filter:
+            base_queryset = base_queryset.filter(table_info__owner=owner_filter)
+        
+        # Filter to only include orders with service items (database-level)
+        base_queryset = base_queryset.filter(order_items__product__station='service').distinct()
+    except PermissionDenied:
+        messages.error(request, 'You are not associated with any restaurant.')
+        return redirect('restaurant:home')
+
+    # Get orders by status
+    pending_orders = base_queryset.filter(status='pending').order_by('-created_at')
+    confirmed_orders = base_queryset.filter(status='confirmed').order_by('-created_at')
+    preparing_orders = base_queryset.filter(status='preparing').order_by('-created_at')
+    ready_orders = base_queryset.filter(status='ready').order_by('-created_at')
+    served_orders = base_queryset.filter(status='served').order_by('-created_at')
+
+    context = {
+        'pending_orders': pending_orders,
+        'confirmed_orders': confirmed_orders,
+        'preparing_orders': preparing_orders,
+        'ready_orders': ready_orders,
+        'served_orders': served_orders,
+        'pending_count': len(pending_orders),
+        'confirmed_count': len(confirmed_orders),
+        'preparing_count': len(preparing_orders),
+        'ready_count': len(ready_orders),
+        'served_count': len(served_orders),
+        'status_choices': Order.STATUS_CHOICES,
+    }
+    return render(request, 'orders/service_dashboard.html', context)
+
+@login_required
 @require_POST
 def confirm_order(request, order_id):
     """Kitchen staff confirms a pending order"""
@@ -891,7 +1078,7 @@ def confirm_order(request, order_id):
 @require_POST
 def update_order_status(request, order_id):
     """Update order status"""
-    if not (request.user.is_kitchen_staff() or request.user.is_bar_staff()):
+    if not (request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_buffet_staff() or request.user.is_service_staff()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     try:
@@ -927,6 +1114,18 @@ def update_order_status(request, order_id):
             if not has_kitchen_items:
                 return JsonResponse({'success': False, 'message': 'Access denied. This order contains no kitchen items.'})
         
+        # Check if buffet staff is trying to update an order without buffet items
+        if request.user.is_buffet_staff():
+            has_buffet_items = any(item.product.station == 'buffet' for item in order.order_items.all())
+            if not has_buffet_items:
+                return JsonResponse({'success': False, 'message': 'Access denied. This order contains no buffet items.'})
+        
+        # Check if service staff is trying to update an order without service items
+        if request.user.is_service_staff():
+            has_service_items = any(item.product.station == 'service' for item in order.order_items.all())
+            if not has_service_items:
+                return JsonResponse({'success': False, 'message': 'Access denied. This order contains no service items.'})
+        
         # More flexible status transitions for mobile/real-world usage
         valid_transitions = {
             'pending': ['confirmed', 'cancelled'],
@@ -938,7 +1137,7 @@ def update_order_status(request, order_id):
         }
         
         # Allow kitchen staff and bar staff to change status backwards for corrections
-        if request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner():
+        if request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_buffet_staff() or request.user.is_service_staff() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner():
             valid_transitions.update({
                 'confirmed': ['pending', 'preparing', 'cancelled'],
                 'preparing': ['confirmed', 'ready', 'cancelled'], 
@@ -1014,6 +1213,10 @@ def update_order_status(request, order_id):
             messages.success(request, f'Order {order.order_number} updated to {order.get_status_display()}!')
             if request.user.is_bar_staff():
                 return redirect('orders:bar_dashboard')
+            elif request.user.is_buffet_staff():
+                return redirect('orders:buffet_dashboard')
+            elif request.user.is_service_staff():
+                return redirect('orders:service_dashboard')
             else:
                 return redirect('orders:kitchen_dashboard')
         
@@ -1024,6 +1227,10 @@ def update_order_status(request, order_id):
             messages.error(request, 'An error occurred while updating the order.')
             if request.user.is_bar_staff():
                 return redirect('orders:bar_dashboard')
+            elif request.user.is_buffet_staff():
+                return redirect('orders:buffet_dashboard')
+            elif request.user.is_service_staff():
+                return redirect('orders:service_dashboard')
             else:
                 return redirect('orders:kitchen_dashboard')
 
@@ -1764,6 +1971,232 @@ def reprint_bot(request, order_id):
     }
     
     return render(request, 'orders/bot.html', context)
+
+
+@login_required
+def print_buffet(request, order_id):
+    """
+    Generate Buffet Order Ticket (BUFFET) for buffet staff
+    
+    BUFFET is printed when:
+    - Order contains buffet items
+    - Buffet staff needs to prepare food
+    - Order is confirmed and needs buffet preparation
+    
+    Accessible by: Buffet staff, Customer care, Cashier, Owner, Administrator
+    """
+    # Get the order
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Permission check - only staff can print BUFFET
+    if not (hasattr(request.user, 'role') and request.user.role and request.user.role.name == 'buffet') and not (
+            request.user.is_customer_care() or 
+            request.user.is_cashier() or
+            request.user.is_owner() or 
+            request.user.is_administrator()):
+        messages.error(request, 'Access denied. Staff privileges required to print BUFFET.')
+        return redirect('orders:my_orders')
+    
+    # Check owner permission (ensure user can access this restaurant's order)
+    try:
+        if not request.user.is_administrator():
+            owner_filter = get_owner_filter(request.user)
+            if owner_filter and order.table_info.owner != owner_filter:
+                messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                return redirect('orders:buffet_dashboard')
+    except Exception:
+        messages.error(request, 'Permission error. Please contact administrator.')
+        return redirect('orders:buffet_dashboard')
+    
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
+    # Context for BUFFET template
+    context = {
+        'order': order,
+        'now': timezone.now(),
+        'restaurant_name': restaurant_name,
+    }
+    
+    return render(request, 'orders/buffet.html', context)
+
+
+@login_required  
+def reprint_buffet(request, order_id):
+    """
+    Reprint Buffet Order Ticket for existing order
+    Same as print_buffet but with a different message for tracking
+    """
+    # Permission check
+    if not (hasattr(request.user, 'role') and request.user.role and request.user.role.name == 'buffet') and not (
+            request.user.is_customer_care() or 
+            request.user.is_cashier() or
+            request.user.is_owner() or 
+            request.user.is_administrator()):
+        messages.error(request, 'Access denied. Staff privileges required.')
+        return redirect('orders:my_orders')
+    
+    # Get order with owner filtering to prevent cross-restaurant access
+    if request.user.is_administrator():
+        order = get_object_or_404(Order, id=order_id)
+    else:
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            order = get_object_or_404(Order, id=order_id, table_info__owner=owner_filter)
+        else:
+            order = get_object_or_404(Order, id=order_id)
+    
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
+    # Add reprint message
+    messages.info(request, f'Reprinting BUFFET for Order #{order.order_number}')
+    
+    context = {
+        'order': order,
+        'now': timezone.now(),
+        'is_reprint': True,
+        'restaurant_name': restaurant_name,
+    }
+    
+    return render(request, 'orders/buffet.html', context)
+
+
+@login_required
+def print_service(request, order_id):
+    """
+    Generate Service Order Ticket (SERVICE) for service staff
+    
+    SERVICE is printed when:
+    - Order contains service items
+    - Service staff needs to prepare items
+    - Order is confirmed and needs service preparation
+    
+    Accessible by: Service staff, Customer care, Cashier, Owner, Administrator
+    """
+    # Get the order
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Permission check - only staff can print SERVICE
+    if not (hasattr(request.user, 'role') and request.user.role and request.user.role.name == 'service') and not (
+            request.user.is_customer_care() or 
+            request.user.is_cashier() or
+            request.user.is_owner() or 
+            request.user.is_administrator()):
+        messages.error(request, 'Access denied. Staff privileges required to print SERVICE.')
+        return redirect('orders:my_orders')
+    
+    # Check owner permission (ensure user can access this restaurant's order)
+    try:
+        if not request.user.is_administrator():
+            owner_filter = get_owner_filter(request.user)
+            if owner_filter and order.table_info.owner != owner_filter:
+                messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                return redirect('orders:service_dashboard')
+    except Exception:
+        messages.error(request, 'Permission error. Please contact administrator.')
+        return redirect('orders:service_dashboard')
+    
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
+    # Context for SERVICE template
+    context = {
+        'order': order,
+        'now': timezone.now(),
+        'restaurant_name': restaurant_name,
+    }
+    
+    return render(request, 'orders/service.html', context)
+
+
+@login_required  
+def reprint_service(request, order_id):
+    """
+    Reprint Service Order Ticket for existing order
+    Same as print_service but with a different message for tracking
+    """
+    # Permission check
+    if not (hasattr(request.user, 'role') and request.user.role and request.user.role.name == 'service') and not (
+            request.user.is_customer_care() or 
+            request.user.is_cashier() or
+            request.user.is_owner() or 
+            request.user.is_administrator()):
+        messages.error(request, 'Access denied. Staff privileges required.')
+        return redirect('orders:my_orders')
+    
+    # Get order with owner filtering to prevent cross-restaurant access
+    if request.user.is_administrator():
+        order = get_object_or_404(Order, id=order_id)
+    else:
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            order = get_object_or_404(Order, id=order_id, table_info__owner=owner_filter)
+        else:
+            order = get_object_or_404(Order, id=order_id)
+    
+    # Get restaurant name - use main restaurant name for branch staff
+    owner = order.table_info.owner
+    if owner.role.name == 'branch_owner':
+        from restaurant.models import Restaurant
+        branch_restaurant = Restaurant.objects.filter(
+            branch_owner=owner, 
+            is_main_restaurant=False
+        ).first()
+        if branch_restaurant and branch_restaurant.parent_restaurant:
+            restaurant_name = branch_restaurant.parent_restaurant.name
+        else:
+            restaurant_name = owner.restaurant_name
+    else:
+        restaurant_name = owner.restaurant_name
+    
+    # Add reprint message
+    messages.info(request, f'Reprinting SERVICE for Order #{order.order_number}')
+    
+    context = {
+        'order': order,
+        'now': timezone.now(),
+        'is_reprint': True,
+        'restaurant_name': restaurant_name,
+    }
+    
+    return render(request, 'orders/service.html', context)
 
 
 

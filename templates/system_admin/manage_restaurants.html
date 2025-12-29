@@ -1533,8 +1533,6 @@ function initializeCreateRestaurantForm() {
                 
                 startDateInput.value = startDate.toISOString().split('T')[0];
                 endDateInput.value = endDate.toISOString().split('T')[0];
-                
-                console.log(`Preset period set: ${days} days from ${startDate.toDateString()} to ${endDate.toDateString()}`);
             }
         }
     }
@@ -1551,25 +1549,15 @@ function initializeCreateRestaurantForm() {
             const startDate = new Date(startDateInput.value);
             const endDate = new Date(endDateInput.value);
             
-            console.log('Validating dates:', {
-                start: startDateInput.value,
-                end: endDateInput.value,
-                startDateObj: startDate,
-                endDateObj: endDate,
-                isEndAfterStart: endDate > startDate
-            });
-            
             if (endDate <= startDate) {
                 endDateInput.setCustomValidity('End date must be after start date');
                 endDateInput.classList.add('is-invalid');
                 endDateInput.classList.remove('is-valid');
-                console.log('Date validation failed: End date not after start date');
                 return false;
             } else {
                 endDateInput.setCustomValidity('');
                 endDateInput.classList.remove('is-invalid');
                 endDateInput.classList.add('is-valid');
-                console.log('Date validation passed');
                 return true;
             }
         }
@@ -1590,8 +1578,6 @@ function initializeCreateRestaurantForm() {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        console.log('Form submission started');
-        
         // Remove existing validation classes
         form.querySelectorAll('.form-control').forEach(input => {
             input.classList.remove('is-invalid', 'is-valid');
@@ -1605,7 +1591,6 @@ function initializeCreateRestaurantForm() {
             if (!field.value.trim()) {
                 field.classList.add('is-invalid');
                 isValid = false;
-                console.log('Required field missing:', field.name);
             } else {
                 field.classList.add('is-valid');
             }
@@ -1617,14 +1602,12 @@ function initializeCreateRestaurantForm() {
         if (emailField.value && !emailRegex.test(emailField.value)) {
             emailField.classList.add('is-invalid');
             isValid = false;
-            console.log('Invalid email format');
         }
 
         // Validate password confirmation
         if (passwordInput.value !== confirmPasswordInput.value) {
             confirmPasswordInput.classList.add('is-invalid');
             isValid = false;
-            console.log('Password confirmation mismatch');
         }
 
         // Validate username format (no spaces, special characters)
@@ -1634,24 +1617,18 @@ function initializeCreateRestaurantForm() {
             usernameField.classList.add('is-invalid');
             usernameField.nextElementSibling.textContent = 'Username can only contain letters, numbers, and underscores';
             isValid = false;
-            console.log('Invalid username format');
         }
 
         // Validate subscription dates
         if (!validateDates()) {
             isValid = false;
-            console.log('Invalid subscription dates');
         }
-
-        console.log('Form validation result:', isValid);
 
         if (isValid) {
             // Show loading state
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating...';
             submitBtn.disabled = true;
 
-            console.log('Submitting form traditionally...');
-            
             // Use traditional form submission instead of fetch API
             // Remove the event listener to allow normal submission
             form.removeEventListener('submit', arguments.callee);
@@ -2002,12 +1979,8 @@ document.getElementById('editRestaurantForm').addEventListener('submit', functio
 });
 
 function confirmDelete(restaurantName, restaurantId) {
-    console.log('Delete confirmation for restaurant:', restaurantId, restaurantName);
-    
     document.getElementById('restaurantNameToDelete').textContent = restaurantName;
     document.getElementById('deleteForm').action = `{% url 'system_admin:delete_restaurant' 0 %}`.replace('0', restaurantId);
-    
-    console.log('Delete form action set to:', document.getElementById('deleteForm').action);
     
     const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
     modal.show();
@@ -2119,8 +2092,6 @@ function setupEditFormSubscriptionHandlers() {
                 endDateInput.classList.remove('is-valid');
             }, 2000);
             
-            console.log(`Edit form: Extended by ${days} days to ${newEndDate.toDateString()}`);
-            
             // Reset select to custom
             this.value = 'custom';
         }
@@ -2156,20 +2127,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteForm = document.getElementById('deleteForm');
     if (deleteForm) {
         deleteForm.addEventListener('submit', function(e) {
-            console.log('Delete form submitted');
-            
             const submitBtn = this.querySelector('button[type="submit"]');
             if (submitBtn.disabled) {
-                console.log('Delete already in progress, preventing double submission');
                 e.preventDefault();
                 return false;
             }
             
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
             submitBtn.disabled = true;
-            
-            // Don't prevent default - let the form submit normally
-            console.log('Proceeding with delete...');
         });
     }
 });

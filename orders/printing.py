@@ -5,6 +5,10 @@ Prints directly to thermal printer without browser dialog
 
 import sys
 import platform
+import logging
+
+# Initialize logger for printing module
+logger = logging.getLogger(__name__)
 
 # Windows-only imports - only import on Windows
 if platform.system() == 'Windows':
@@ -68,7 +72,7 @@ def get_restaurant_display_name(order):
                 ).first()
                 if branch_restaurant and branch_restaurant.parent_restaurant:
                     return branch_restaurant.parent_restaurant.name
-            except:
+            except Exception:
                 pass
         
         return table.owner.restaurant_name or "Restaurant"
@@ -104,8 +108,12 @@ def get_restaurant_print_settings(order):
             'name': restaurant.name,
             'auto_print_kot': restaurant.auto_print_kot,
             'auto_print_bot': restaurant.auto_print_bot,
+            'auto_print_buffet': getattr(restaurant, 'auto_print_buffet', False),
+            'auto_print_service': getattr(restaurant, 'auto_print_service', False),
             'kitchen_printer_name': normalize_printer_name(restaurant.kitchen_printer_name),
             'bar_printer_name': normalize_printer_name(restaurant.bar_printer_name),
+            'buffet_printer_name': normalize_printer_name(getattr(restaurant, 'buffet_printer_name', None)),
+            'service_printer_name': normalize_printer_name(getattr(restaurant, 'service_printer_name', None)),
             'receipt_printer_name': normalize_printer_name(restaurant.receipt_printer_name),
             'restaurant_obj': restaurant,
             'owner': restaurant.branch_owner or restaurant.main_owner,
@@ -119,8 +127,12 @@ def get_restaurant_print_settings(order):
             'name': owner.restaurant_name,
             'auto_print_kot': owner.auto_print_kot,
             'auto_print_bot': owner.auto_print_bot,
+            'auto_print_buffet': getattr(owner, 'auto_print_buffet', False),
+            'auto_print_service': getattr(owner, 'auto_print_service', False),
             'kitchen_printer_name': normalize_printer_name(owner.kitchen_printer_name),
             'bar_printer_name': normalize_printer_name(owner.bar_printer_name),
+            'buffet_printer_name': normalize_printer_name(getattr(owner, 'buffet_printer_name', None)),
+            'service_printer_name': normalize_printer_name(getattr(owner, 'service_printer_name', None)),
             'receipt_printer_name': normalize_printer_name(owner.receipt_printer_name),
             'restaurant_obj': None,
             'owner': owner,
@@ -132,8 +144,12 @@ def get_restaurant_print_settings(order):
         'name': 'Unknown',
         'auto_print_kot': False,
         'auto_print_bot': False,
+        'auto_print_buffet': False,
+        'auto_print_service': False,
         'kitchen_printer_name': None,
         'bar_printer_name': None,
+        'buffet_printer_name': None,
+        'service_printer_name': None,
         'receipt_printer_name': None,
         'restaurant_obj': None,
         'owner': None,
@@ -158,7 +174,7 @@ def create_print_job(restaurant, job_type, content, order=None, payment=None, pr
     )
     
     restaurant_name = getattr(restaurant, 'restaurant_name', 'Unknown')
-    print(f"✓ Created print job #{job.id} ({job_type}) for {restaurant_name} (printer: {printer_name or 'auto-detect'})")
+    logger.info(f" Created print job #{job.id} ({job_type}) for {restaurant_name} (printer: {printer_name or 'auto-detect'})")
     return job
 
 
@@ -177,7 +193,7 @@ class ThermalPrinter:
             printer_name: Specific printer name, or None for auto-detection
         """
         if not WINDOWS_PRINTING_AVAILABLE:
-            print("⚠ Windows printing not available on this platform. Use print queue instead.")
+            logger.warning(" Windows printing not available on this platform. Use print queue instead.")
             self.printer_name = None
             return
             
@@ -204,7 +220,7 @@ class ThermalPrinter:
             win32print.ClosePrinter(hPrinter)
             return True
         except Exception as e:
-            print(f"  ✗ Printer '{printer_name}' not found: {e}")
+            logger.error(f" Printer '{printer_name}' not found: {e}")
             return False
     
     def _get_printer_status(self, printer_name):
@@ -267,15 +283,15 @@ class ThermalPrinter:
                 
                 # If printer has critical error, it's NOT ready
                 if status in critical_errors:
-                    print(f"  ✗ Printer '{printer_name}' is OFFLINE/UNAVAILABLE (status: {status})")
+                    logger.error(f" Printer '{printer_name}' is OFFLINE/UNAVAILABLE (status: {status})")
                     return False
                 
                 # For ALL other statuses (including 0=Ready, 2=Error, etc), consider it READY
                 # Many thermal printers report status 2 even when working perfectly!
                 if status == 0:
-                    print(f"  ✓ Printer '{printer_name}' is READY (status: {status})")
+                    logger.info(f" Printer '{printer_name}' is READY (status: {status})")
                 else:
-                    print(f"  ⚠ Printer '{printer_name}' status={status} (will try anyway - many printers report errors when working)")
+                    logger.warning(f" Printer '{printer_name}' status={status} (will try anyway - many printers report errors when working)")
                 
                 return True
                 
@@ -283,7 +299,7 @@ class ThermalPrinter:
                 win32print.ClosePrinter(hPrinter)
                 
         except Exception as e:
-            print(f"  ✗ Cannot open printer '{printer_name}': {e}")
+            logger.error(f" Cannot open printer '{printer_name}': {e}")
             return False
     
     def _find_thermal_printer(self):
@@ -325,18 +341,18 @@ class ThermalPrinter:
             'ISSYZONEPOS'
         ]
         
-        print("🔍 Searching for thermal printers...")
+        logger.info("Searching for thermal printers...")
         
         # Get Windows default printer first
         default_printer = win32print.GetDefaultPrinter()
-        print(f"  Windows default printer: {default_printer}")
+        logger.info(f"  Windows default printer: {default_printer}")
         
         # Get all local printers
         all_printers = []
         for printer_info in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL):
             all_printers.append(printer_info[2])
         
-        print(f"  Found {len(all_printers)} printer(s) installed")
+        logger.info(f"  Found {len(all_printers)} printer(s) installed")
         
         # Find ALL thermal printers (don't filter by status - they all work!)
         thermal_printers = []
@@ -348,24 +364,24 @@ class ThermalPrinter:
                 # Check if printer exists and can be opened
                 if self._printer_exists(printer):
                     thermal_printers.append(printer)
-                    print(f"  ✓ Found thermal printer: {printer}")
+                    logger.info(f" Found thermal printer: {printer}")
         
         # Check if Windows default is thermal - if so, use it
         default_upper = default_printer.upper()
         is_default_thermal = any(keyword in default_upper for keyword in thermal_keywords)
         
         if is_default_thermal and default_printer in thermal_printers:
-            print(f"✓ Using Windows default thermal printer: {default_printer}")
+            logger.info(f" Using Windows default thermal printer: {default_printer}")
             return default_printer
         
         # Use first available thermal printer
         if thermal_printers:
             selected = thermal_printers[0]
-            print(f"✓ Auto-detected thermal printer: {selected}")
+            logger.info(f" Auto-detected thermal printer: {selected}")
             return selected
         
         # Fallback: Use Windows default printer
-        print(f"⚠ No thermal printer found, using Windows default: {default_printer}")
+        logger.warning(f" No thermal printer found, using Windows default: {default_printer}")
         return default_printer
     
     def get_available_printers(self):
@@ -389,11 +405,11 @@ class ThermalPrinter:
             bool: True if successful, False otherwise
         """
         if not WINDOWS_PRINTING_AVAILABLE:
-            print("⚠ Windows printing not available. Use print queue instead.")
+            logger.warning(" Windows printing not available. Use print queue instead.")
             return False
             
         if self.printer_name is None:
-            print("⚠ No printer configured.")
+            logger.warning(" No printer configured.")
             return False
             
         try:
@@ -414,7 +430,7 @@ class ThermalPrinter:
                     win32print.WritePrinter(hPrinter, raw_data)
                     win32print.EndPagePrinter(hPrinter)
                     
-                    print(f"✓ Printed to {self.printer_name}: {job_name}")
+                    logger.info(f" Printed to {self.printer_name}: {job_name}")
                     return True
                     
                 finally:
@@ -423,7 +439,7 @@ class ThermalPrinter:
                 win32print.ClosePrinter(hPrinter)
                 
         except Exception as e:
-            print(f"✗ Print Error: {str(e)}")
+            logger.error(f" Print Error: {str(e)}")
             return False
     
     def print_kot(self, order):
@@ -449,10 +465,10 @@ class ThermalPrinter:
                 if self._printer_exists(printer_name):
                     printer = ThermalPrinter(printer_name=printer_name)
                     status, status_text = self._get_printer_status(printer_name)
-                    print(f"✓ Using configured kitchen printer: {printer_name} (status: {status_text})")
+                    logger.info(f" Using configured kitchen printer: {printer_name} (status: {status_text})")
                 else:
                     # Configured printer doesn't exist at all, fall back to auto-detect
-                    print(f"⚠ Configured printer '{printer_name}' not found, auto-detecting...")
+                    logger.warning(f" Configured printer '{printer_name}' not found, auto-detecting...")
                     printer = ThermalPrinter()  # Auto-detect
             else:
                 # No printer configured, use auto-detected
@@ -468,9 +484,7 @@ class ThermalPrinter:
             return printer.print_text(thermal_content, f"KOT-{order.order_number}")
             
         except Exception as e:
-            print(f"✗ KOT Print Error: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f" KOT Print Error: {str(e)}", exc_info=True)
             return False
     
     def print_bot(self, order):
@@ -496,10 +510,10 @@ class ThermalPrinter:
                 if self._printer_exists(printer_name):
                     printer = ThermalPrinter(printer_name=printer_name)
                     status, status_text = self._get_printer_status(printer_name)
-                    print(f"✓ Using configured bar printer: {printer_name} (status: {status_text})")
+                    logger.info(f" Using configured bar printer: {printer_name} (status: {status_text})")
                 else:
                     # Configured printer doesn't exist at all, fall back to auto-detect
-                    print(f"⚠ Configured printer '{printer_name}' not found, auto-detecting...")
+                    logger.warning(f" Configured printer '{printer_name}' not found, auto-detecting...")
                     printer = ThermalPrinter()  # Auto-detect
             else:
                 # No printer configured, use auto-detected
@@ -515,9 +529,7 @@ class ThermalPrinter:
             return printer.print_text(thermal_content, f"BOT-{order.order_number}")
             
         except Exception as e:
-            print(f"✗ BOT Print Error: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f" BOT Print Error: {str(e)}", exc_info=True)
             return False
     
     def print_receipt(self, payment):
@@ -543,10 +555,10 @@ class ThermalPrinter:
                 if self._printer_exists(printer_name):
                     printer = ThermalPrinter(printer_name=printer_name)
                     status, status_text = self._get_printer_status(printer_name)
-                    print(f"✓ Using configured receipt printer: {printer_name} (status: {status_text})")
+                    logger.info(f" Using configured receipt printer: {printer_name} (status: {status_text})")
                 else:
                     # Configured printer doesn't exist at all, fall back to auto-detect
-                    print(f"⚠ Configured printer '{printer_name}' not found, auto-detecting...")
+                    logger.warning(f" Configured printer '{printer_name}' not found, auto-detecting...")
                     printer = ThermalPrinter()  # Auto-detect
             else:
                 # No printer configured, use auto-detected
@@ -562,9 +574,97 @@ class ThermalPrinter:
             return printer.print_text(thermal_content, f"Receipt-{payment.order.order_number}")
             
         except Exception as e:
-            print(f"✗ Receipt Print Error: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f" Receipt Print Error: {str(e)}", exc_info=True)
+            return False
+    
+    def print_buffet(self, order):
+        """
+        Print Buffet Order Ticket directly to thermal printer
+        Uses buffet-specific printer from restaurant/branch settings
+        ALWAYS tries configured printer first if it exists!
+        
+        Args:
+            order: Order instance
+        
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Get printer settings for this specific restaurant/branch
+            print_settings = get_restaurant_print_settings(order)
+            printer_name = print_settings.get('buffet_printer_name')
+            
+            # Determine which printer to use
+            if printer_name:
+                # ALWAYS try configured printer if it EXISTS (don't check status - it's unreliable!)
+                if self._printer_exists(printer_name):
+                    printer = ThermalPrinter(printer_name=printer_name)
+                    status, status_text = self._get_printer_status(printer_name)
+                    logger.info(f" Using configured buffet printer: {printer_name} (status: {status_text})")
+                else:
+                    # Configured printer doesn't exist at all, fall back to auto-detect
+                    logger.warning(f" Configured printer '{printer_name}' not found, auto-detecting...")
+                    printer = ThermalPrinter()  # Auto-detect
+            else:
+                # No printer configured, use auto-detected
+                printer = self
+            
+            # Generate BUFFET content
+            content = printer._generate_buffet_content(order)
+            
+            # Print with ESC/POS commands for thermal printer
+            thermal_content = printer._format_for_thermal(content, "BUFFET")
+            
+            # Send to printer
+            return printer.print_text(thermal_content, f"BUFFET-{order.order_number}")
+            
+        except Exception as e:
+            logger.error(f" BUFFET Print Error: {str(e)}", exc_info=True)
+            return False
+    
+    def print_service(self, order):
+        """
+        Print Service Order Ticket directly to thermal printer
+        Uses service-specific printer from restaurant/branch settings
+        ALWAYS tries configured printer first if it exists!
+        
+        Args:
+            order: Order instance
+        
+        Returns:
+            bool: Success status
+        """
+        try:
+            # Get printer settings for this specific restaurant/branch
+            print_settings = get_restaurant_print_settings(order)
+            printer_name = print_settings.get('service_printer_name')
+            
+            # Determine which printer to use
+            if printer_name:
+                # ALWAYS try configured printer if it EXISTS (don't check status - it's unreliable!)
+                if self._printer_exists(printer_name):
+                    printer = ThermalPrinter(printer_name=printer_name)
+                    status, status_text = self._get_printer_status(printer_name)
+                    logger.info(f" Using configured service printer: {printer_name} (status: {status_text})")
+                else:
+                    # Configured printer doesn't exist at all, fall back to auto-detect
+                    logger.warning(f" Configured printer '{printer_name}' not found, auto-detecting...")
+                    printer = ThermalPrinter()  # Auto-detect
+            else:
+                # No printer configured, use auto-detected
+                printer = self
+            
+            # Generate SERVICE content
+            content = printer._generate_service_content(order)
+            
+            # Print with ESC/POS commands for thermal printer
+            thermal_content = printer._format_for_thermal(content, "SERVICE")
+            
+            # Send to printer
+            return printer.print_text(thermal_content, f"SERVICE-{order.order_number}")
+            
+        except Exception as e:
+            logger.error(f" SERVICE Print Error: {str(e)}", exc_info=True)
             return False
     
     def _generate_kot_content(self, order):
@@ -713,6 +813,152 @@ class ThermalPrinter:
         
         return "\n".join(lines)
     
+    def _generate_buffet_content(self, order):
+        """Generate BUFFET text content"""
+        lines = []
+        width = 48  # 80mm thermal printer - full width utilization
+        
+        # Header
+        lines.append("=" * width)
+        lines.append("BUFFET ORDER TICKET".center(width))
+        lines.append("=" * width)
+        
+        # Restaurant info - use unified function
+        restaurant_name = get_restaurant_display_name(order)
+        
+        lines.append("")
+        lines.append(f"Restaurant: {restaurant_name}")
+        lines.append(f"Order #: {order.order_number}")
+        lines.append(f"Table: {order.table_info.tbl_no}")
+        lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+        
+        # Show who placed the order
+        ordered_by = order.ordered_by
+        if ordered_by:
+            if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+                role = "Waiter"
+            elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+                role = "Cashier"
+            elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+                role = "Customer Care"
+            elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+                role = "Owner"
+            elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+                role = "Customer"
+            else:
+                role = "Staff"
+            
+            full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+            if not full_name:
+                full_name = ordered_by.username
+            
+            lines.append(f"Ordered by: {full_name} ({role})")
+        
+        lines.append("-" * width)
+        
+        # Buffet items only
+        lines.append("")
+        lines.append("BUFFET ITEMS:")
+        lines.append("-" * width)
+        
+        buffet_items = [item for item in order.order_items.all() if item.product.station == 'buffet']
+        
+        for item in buffet_items:
+            # Item name and quantity - left aligned
+            qty_text = f"{item.quantity}x"
+            lines.append(f"{qty_text:4} {item.product.name}")
+            
+            # Special instructions if any
+            if order.special_instructions:
+                wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+                for line in wrapped:
+                    lines.append(f"     {line}")
+        
+        # Footer
+        lines.append("-" * width)
+        total_items = len(buffet_items)
+        total_qty = sum(item.quantity for item in buffet_items)
+        lines.append(f"Total Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+        lines.append("-" * width)
+        lines.append("For buffet station only".center(width))
+        lines.append("NOT FOR BILLING".center(width))
+        lines.append("=" * width)
+        
+        return "\n".join(lines)
+    
+    def _generate_service_content(self, order):
+        """Generate SERVICE text content"""
+        lines = []
+        width = 48  # 80mm thermal printer - full width utilization
+        
+        # Header
+        lines.append("=" * width)
+        lines.append("SERVICE ORDER TICKET".center(width))
+        lines.append("=" * width)
+        
+        # Restaurant info - use unified function
+        restaurant_name = get_restaurant_display_name(order)
+        
+        lines.append("")
+        lines.append(f"Restaurant: {restaurant_name}")
+        lines.append(f"Order #: {order.order_number}")
+        lines.append(f"Table: {order.table_info.tbl_no}")
+        lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+        
+        # Show who placed the order
+        ordered_by = order.ordered_by
+        if ordered_by:
+            if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+                role = "Waiter"
+            elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+                role = "Cashier"
+            elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+                role = "Customer Care"
+            elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+                role = "Owner"
+            elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+                role = "Customer"
+            else:
+                role = "Staff"
+            
+            full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+            if not full_name:
+                full_name = ordered_by.username
+            
+            lines.append(f"Ordered by: {full_name} ({role})")
+        
+        lines.append("-" * width)
+        
+        # Service items only
+        lines.append("")
+        lines.append("SERVICE ITEMS:")
+        lines.append("-" * width)
+        
+        service_items = [item for item in order.order_items.all() if item.product.station == 'service']
+        
+        for item in service_items:
+            # Item name and quantity - left aligned
+            qty_text = f"{item.quantity}x"
+            lines.append(f"{qty_text:4} {item.product.name}")
+            
+            # Special instructions if any
+            if order.special_instructions:
+                wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+                for line in wrapped:
+                    lines.append(f"     {line}")
+        
+        # Footer
+        lines.append("-" * width)
+        total_items = len(service_items)
+        total_qty = sum(item.quantity for item in service_items)
+        lines.append(f"Total Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+        lines.append("-" * width)
+        lines.append("For service station only".center(width))
+        lines.append("NOT FOR BILLING".center(width))
+        lines.append("=" * width)
+        
+        return "\n".join(lines)
+    
     def _format_for_thermal(self, content, ticket_type):
         """
         Format content with ESC/POS commands for thermal printer
@@ -776,11 +1022,11 @@ def auto_print_order(order):
     logger = logging.getLogger('orders.printing')
     
     # VERBOSE DEBUG LOGGING - output to BOTH stdout and stderr
-    print("=" * 60)
-    print(f"🖨️ AUTO_PRINT_ORDER CALLED for Order #{order.order_number}")
-    print(f"🖨️ WINDOWS_PRINTING_AVAILABLE = {WINDOWS_PRINTING_AVAILABLE}")
-    print(f"🖨️ platform.system() = {platform.system()}")
-    print("=" * 60)
+    logger.debug("=" * 60)
+    logger.debug(f" AUTO_PRINT_ORDER CALLED for Order #{order.order_number}")
+    logger.debug(f" WINDOWS_PRINTING_AVAILABLE = {WINDOWS_PRINTING_AVAILABLE}")
+    logger.debug(f" platform.system() = {platform.system()}")
+    logger.debug("=" * 60)
     sys.stdout.flush()
     
     # Also log to Django's logging system
@@ -790,6 +1036,8 @@ def auto_print_order(order):
     result = {
         'kot_printed': False,
         'bot_printed': False,
+        'buffet_printed': False,
+        'service_printed': False,
         'errors': []
     }
     
@@ -797,20 +1045,27 @@ def auto_print_order(order):
         # Get printer settings for this specific restaurant/branch
         print_settings = get_restaurant_print_settings(order)
         
-        print(f"🖨️ Print settings from {print_settings['source']}: {print_settings['name']}")
-        print(f"   auto_print_kot: {print_settings['auto_print_kot']}, auto_print_bot: {print_settings['auto_print_bot']}")
+        logger.debug(f" Print settings from {print_settings['source']}: {print_settings['name']}")
+        logger.debug(f"auto_print_kot: {print_settings['auto_print_kot']}, auto_print_bot: {print_settings['auto_print_bot']}")
+        logger.debug(f"auto_print_buffet: {print_settings.get('auto_print_buffet', False)}, auto_print_service: {print_settings.get('auto_print_service', False)}")
         sys.stdout.flush()
         
-        # Check restaurant auto-print settings
-        if not (print_settings['auto_print_kot'] or print_settings['auto_print_bot']):
-            print(f"⚠ Auto-print disabled for {print_settings['name']}")
+        # Check restaurant auto-print settings (check all station types)
+        any_auto_print = (
+            print_settings['auto_print_kot'] or 
+            print_settings['auto_print_bot'] or 
+            print_settings.get('auto_print_buffet', False) or 
+            print_settings.get('auto_print_service', False)
+        )
+        if not any_auto_print:
+            logger.warning(f" Auto-print disabled for {print_settings['name']}")
             return result
         
-        # Check for kitchen items
+        # Check for items by station
         has_kitchen_items = any(item.product.station == 'kitchen' for item in order.order_items.all())
-        
-        # Check for bar items
         has_bar_items = any(item.product.station == 'bar' for item in order.order_items.all())
+        has_buffet_items = any(item.product.station == 'buffet' for item in order.order_items.all())
+        has_service_items = any(item.product.station == 'service' for item in order.order_items.all())
         
         # Determine print mode
         use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
@@ -825,56 +1080,94 @@ def auto_print_order(order):
                 printer_name = print_settings['kitchen_printer_name']
                 job = create_print_job(owner, 'kot', content, order=order, printer_name=printer_name)
                 result['kot_printed'] = True
-                print(f"✓ Queued KOT print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
+                logger.info(f" Queued KOT print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
             
             if has_bar_items and print_settings['auto_print_bot']:
                 content = _generate_bot_content(order)
                 printer_name = print_settings['bar_printer_name']
                 job = create_print_job(owner, 'bot', content, order=order, printer_name=printer_name)
                 result['bot_printed'] = True
-                print(f"✓ Queued BOT print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
+                logger.info(f" Queued BOT print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
+            
+            if has_buffet_items and print_settings.get('auto_print_buffet', False):
+                content = _generate_buffet_content(order)
+                printer_name = print_settings.get('buffet_printer_name')
+                job = create_print_job(owner, 'buffet', content, order=order, printer_name=printer_name)
+                result['buffet_printed'] = True
+                logger.info(f" Queued BUFFET print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
+            
+            if has_service_items and print_settings.get('auto_print_service', False):
+                content = _generate_service_content(order)
+                printer_name = print_settings.get('service_printer_name')
+                job = create_print_job(owner, 'service', content, order=order, printer_name=printer_name)
+                result['service_printed'] = True
+                logger.info(f" Queued SERVICE print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
         else:
             # Direct local printing - auto-detect ready printer
             # The ThermalPrinter class handles checking if configured printer is ready
             # and falls back to auto-detection if not
-            print(f"🖨️ ENTERING LOCAL PRINT MODE (USE_PRINT_QUEUE=False)")
-            print(f"🖨️ has_kitchen_items: {has_kitchen_items}, auto_print_kot: {print_settings['auto_print_kot']}")
-            print(f"🖨️ has_bar_items: {has_bar_items}, auto_print_bot: {print_settings['auto_print_bot']}")
+            logger.debug(f" ENTERING LOCAL PRINT MODE (USE_PRINT_QUEUE=False)")
+            logger.debug(f" has_kitchen_items: {has_kitchen_items}, auto_print_kot: {print_settings['auto_print_kot']}")
+            logger.debug(f" has_bar_items: {has_bar_items}, auto_print_bot: {print_settings['auto_print_bot']}")
             sys.stdout.flush()
             
             if has_kitchen_items and print_settings['auto_print_kot']:
-                print(f"🖨️ PRINTING KOT - Creating ThermalPrinter...")
+                logger.debug(f" PRINTING KOT - Creating ThermalPrinter...")
                 sys.stdout.flush()
                 printer = ThermalPrinter()  # Auto-detect ready thermal printer
-                print(f"🖨️ ThermalPrinter created: printer_name={printer.printer_name}")
+                logger.debug(f" ThermalPrinter created: printer_name={printer.printer_name}")
                 sys.stdout.flush()
                 success = printer.print_kot(order)
-                print(f"🖨️ print_kot() returned: {success}")
+                logger.debug(f" print_kot() returned: {success}")
                 sys.stdout.flush()
                 result['kot_printed'] = success
                 if success:
-                    print(f"✓ KOT printed for Order #{order.order_number} (printer: {printer.printer_name})")
+                    logger.info(f" KOT printed for Order #{order.order_number} (printer: {printer.printer_name})")
                 else:
                     result['errors'].append("KOT print failed")
             
             if has_bar_items and print_settings['auto_print_bot']:
-                print(f"🖨️ PRINTING BOT - Creating ThermalPrinter...")
+                logger.debug(f" PRINTING BOT - Creating ThermalPrinter...")
                 sys.stdout.flush()
                 printer = ThermalPrinter()  # Auto-detect ready thermal printer
-                print(f"🖨️ ThermalPrinter created: printer_name={printer.printer_name}")
+                logger.debug(f" ThermalPrinter created: printer_name={printer.printer_name}")
                 sys.stdout.flush()
                 success = printer.print_bot(order)
                 result['bot_printed'] = success
                 if success:
-                    print(f"✓ BOT printed for Order #{order.order_number} (printer: {printer.printer_name})")
+                    logger.info(f" BOT printed for Order #{order.order_number} (printer: {printer.printer_name})")
                 else:
                     result['errors'].append("BOT print failed")
+            
+            if has_buffet_items and print_settings.get('auto_print_buffet', False):
+                logger.debug(f" PRINTING BUFFET - Creating ThermalPrinter...")
+                sys.stdout.flush()
+                printer = ThermalPrinter()  # Auto-detect ready thermal printer
+                logger.debug(f" ThermalPrinter created: printer_name={printer.printer_name}")
+                sys.stdout.flush()
+                success = printer.print_buffet(order)
+                result['buffet_printed'] = success
+                if success:
+                    logger.info(f" BUFFET printed for Order #{order.order_number} (printer: {printer.printer_name})")
+                else:
+                    result['errors'].append("BUFFET print failed")
+            
+            if has_service_items and print_settings.get('auto_print_service', False):
+                logger.debug(f" PRINTING SERVICE - Creating ThermalPrinter...")
+                sys.stdout.flush()
+                printer = ThermalPrinter()  # Auto-detect ready thermal printer
+                logger.debug(f" ThermalPrinter created: printer_name={printer.printer_name}")
+                sys.stdout.flush()
+                success = printer.print_service(order)
+                result['service_printed'] = success
+                if success:
+                    logger.info(f" SERVICE printed for Order #{order.order_number} (printer: {printer.printer_name})")
+                else:
+                    result['errors'].append("SERVICE print failed")
         
     except Exception as e:
-        result['errors'].append(str(e))
-        print(f"✗ Print error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        result['errors'].append('Print operation failed')
+        logger.error(f" Print error: {str(e)}", exc_info=True)
     
     return result
 
@@ -902,7 +1195,7 @@ def auto_print_receipt(payment):
         # Get printer settings for this specific restaurant/branch
         print_settings = get_restaurant_print_settings(payment.order)
         
-        print(f"🧾 Receipt print settings from {print_settings['source']}: {print_settings['name']}")
+        logger.info(f" Receipt print settings from {print_settings['source']}: {print_settings['name']}")
         
         # Determine print mode
         use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
@@ -916,7 +1209,7 @@ def auto_print_receipt(payment):
             printer_name = print_settings['receipt_printer_name']
             job = create_print_job(owner, 'receipt', content, order=payment.order, payment=payment, printer_name=printer_name)
             result['receipt_printed'] = True
-            print(f"✓ Queued receipt print job #{job.id} for Payment #{payment.id} (printer: {printer_name or 'auto'})")
+            logger.info(f" Queued receipt print job #{job.id} for Payment #{payment.id} (printer: {printer_name or 'auto'})")
         else:
             # Direct local printing - auto-detect ready printer
             # The ThermalPrinter class handles checking if configured printer is ready
@@ -925,15 +1218,13 @@ def auto_print_receipt(payment):
             success = printer.print_receipt(payment)
             result['receipt_printed'] = success
             if success:
-                print(f"✓ Receipt printed for Payment #{payment.id} (printer: {printer.printer_name})")
+                logger.info(f" Receipt printed for Payment #{payment.id} (printer: {printer.printer_name})")
             else:
                 result['errors'].append("Receipt print failed")
         
     except Exception as e:
-        result['errors'].append(str(e))
-        print(f"✗ Receipt print error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        result['errors'].append('Receipt print operation failed')
+        logger.error(f" Receipt print error: {str(e)}", exc_info=True)
     
     return result
 
@@ -961,7 +1252,7 @@ def auto_print_bill(order, printed_by=None):
         # Get printer settings for this specific restaurant/branch
         print_settings = get_restaurant_print_settings(order)
         
-        print(f"🧾 Bill print settings from {print_settings['source']}: {print_settings['name']}")
+        logger.info(f" Bill print settings from {print_settings['source']}: {print_settings['name']}")
         
         # Determine print mode
         use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
@@ -975,7 +1266,7 @@ def auto_print_bill(order, printed_by=None):
             printer_name = print_settings['receipt_printer_name']  # Use receipt printer for bills
             job = create_print_job(owner, 'bill', content, order=order, printer_name=printer_name)
             result['bill_printed'] = True
-            print(f"✓ Queued bill print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
+            logger.info(f" Queued bill print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
         else:
             # Direct local printing - use receipt printer (SAME as print_receipt method)
             printer_name = print_settings['receipt_printer_name']
@@ -987,9 +1278,9 @@ def auto_print_bill(order, printed_by=None):
                     temp_printer = ThermalPrinter()
                     if temp_printer._printer_exists(printer_name):
                         printer = ThermalPrinter(printer_name=printer_name)
-                        print(f"✓ Using configured receipt printer for bill: {printer_name}")
+                        logger.info(f" Using configured receipt printer for bill: {printer_name}")
                     else:
-                        print(f"⚠ Configured printer '{printer_name}' not found, auto-detecting...")
+                        logger.warning(f" Configured printer '{printer_name}' not found, auto-detecting...")
                         printer = ThermalPrinter()  # Auto-detect
                 else:
                     printer = ThermalPrinter()
@@ -1008,15 +1299,13 @@ def auto_print_bill(order, printed_by=None):
             result['bill_printed'] = success
             
             if success:
-                print(f"✓ Bill printed for Order #{order.order_number} (printer: {printer.printer_name})")
+                logger.info(f" Bill printed for Order #{order.order_number} (printer: {printer.printer_name})")
             else:
                 result['errors'].append("Bill print failed")
         
     except Exception as e:
-        result['errors'].append(str(e))
-        print(f"✗ Bill print error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        result['errors'].append('Bill print operation failed')
+        logger.error(f" Bill print error: {str(e)}", exc_info=True)
     
     return result
 
@@ -1041,7 +1330,7 @@ def _generate_bill_content(order, printed_by=None):
                 owner = restaurant.branch_owner or restaurant.main_owner
                 if owner:
                     currency_symbol = owner.get_currency_symbol()
-        except:
+        except Exception:
             pass
     
     # Get restaurant name - use main restaurant name for branch staff
@@ -1349,6 +1638,154 @@ def _generate_bot_content(order):
     return "\n".join(lines)
 
 
+def _generate_buffet_content(order):
+    """Generate BUFFET text content (standalone function for queue-based printing)"""
+    lines = []
+    width = 48  # 80mm thermal printer - full width utilization
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("BUFFET ORDER TICKET".center(width))
+    lines.append("=" * width)
+    
+    # Restaurant info - use unified function
+    restaurant_name = get_restaurant_display_name(order)
+    
+    lines.append("")
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Show who placed the order
+    ordered_by = order.ordered_by
+    if ordered_by:
+        if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+            role = "Waiter"
+        elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+            role = "Cashier"
+        elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+            role = "Customer Care"
+        elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+            role = "Owner"
+        elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+            role = "Customer"
+        else:
+            role = "Staff"
+        
+        full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+        if not full_name:
+            full_name = ordered_by.username
+        
+        lines.append(f"Ordered by: {full_name} ({role})")
+    
+    lines.append("-" * width)
+    
+    # Buffet items only
+    lines.append("")
+    lines.append("BUFFET ITEMS:")
+    lines.append("-" * width)
+    
+    buffet_items = [item for item in order.order_items.all() if item.product.station == 'buffet']
+    
+    for item in buffet_items:
+        # Item name and quantity - left aligned
+        qty_text = f"{item.quantity}x"
+        lines.append(f"{qty_text:4} {item.product.name}")
+        
+        # Special instructions if any
+        if order.special_instructions:
+            wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+            for line in wrapped:
+                lines.append(f"     {line}")
+    
+    # Footer
+    lines.append("-" * width)
+    total_items = len(buffet_items)
+    total_qty = sum(item.quantity for item in buffet_items)
+    lines.append(f"Total Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+    lines.append("-" * width)
+    lines.append("For buffet station only".center(width))
+    lines.append("NOT FOR BILLING".center(width))
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
+
+
+def _generate_service_content(order):
+    """Generate SERVICE text content (standalone function for queue-based printing)"""
+    lines = []
+    width = 48  # 80mm thermal printer - full width utilization
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("SERVICE ORDER TICKET".center(width))
+    lines.append("=" * width)
+    
+    # Restaurant info - use unified function
+    restaurant_name = get_restaurant_display_name(order)
+    
+    lines.append("")
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Show who placed the order
+    ordered_by = order.ordered_by
+    if ordered_by:
+        if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+            role = "Waiter"
+        elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+            role = "Cashier"
+        elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+            role = "Customer Care"
+        elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+            role = "Owner"
+        elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+            role = "Customer"
+        else:
+            role = "Staff"
+        
+        full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+        if not full_name:
+            full_name = ordered_by.username
+        
+        lines.append(f"Ordered by: {full_name} ({role})")
+    
+    lines.append("-" * width)
+    
+    # Service items only
+    lines.append("")
+    lines.append("SERVICE ITEMS:")
+    lines.append("-" * width)
+    
+    service_items = [item for item in order.order_items.all() if item.product.station == 'service']
+    
+    for item in service_items:
+        # Item name and quantity - left aligned
+        qty_text = f"{item.quantity}x"
+        lines.append(f"{qty_text:4} {item.product.name}")
+        
+        # Special instructions if any
+        if order.special_instructions:
+            wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+            for line in wrapped:
+                lines.append(f"     {line}")
+    
+    # Footer
+    lines.append("-" * width)
+    total_items = len(service_items)
+    total_qty = sum(item.quantity for item in service_items)
+    lines.append(f"Total Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+    lines.append("-" * width)
+    lines.append("For service station only".center(width))
+    lines.append("NOT FOR BILLING".center(width))
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
+
+
 def _generate_receipt_content(payment):
     """Generate receipt text content for payment - optimized for thermal printer"""
     from decimal import Decimal
@@ -1371,7 +1808,7 @@ def _generate_receipt_content(payment):
                 owner = restaurant.branch_owner or restaurant.main_owner
                 if owner:
                     currency_symbol = owner.get_currency_symbol()
-        except:
+        except Exception:
             pass
     
     # Get restaurant name - use main restaurant name for branch staff

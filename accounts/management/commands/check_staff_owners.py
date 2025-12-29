@@ -16,7 +16,7 @@ class Command(BaseCommand):
             self.stdout.write(f'{user.username} - Role: {role_name} - Owner: {owner_name}')
         
         self.stdout.write('\n=== STAFF WITHOUT OWNERS ===')
-        staff_roles = ['customer_care', 'kitchen', 'bar', 'cashier']
+        staff_roles = ['customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']
         orphaned_staff = []
         
         for role_name in staff_roles:

@@ -34,30 +34,22 @@ def main_owner_dashboard(request):
     view_all_restaurants = request.session.get('view_all_restaurants', False)
     current_restaurant = None
     
-    print(f"DEBUG: main_owner_dashboard - selected_restaurant_id={selected_restaurant_id}, view_all_restaurants={view_all_restaurants}")
-    
     # Get base queryset of restaurants owned by this main owner
     base_restaurants = Restaurant.objects.filter(main_owner=request.user)
-    print(f"DEBUG: base_restaurants count={base_restaurants.count()}")
     
     if selected_restaurant_id and not view_all_restaurants:
         # Viewing a specific restaurant
         try:
             current_restaurant = base_restaurants.get(id=selected_restaurant_id)
             restaurants = [current_restaurant]  # Only show selected restaurant
-            print(f"DEBUG: Found current_restaurant={current_restaurant.name}")
         except Restaurant.DoesNotExist:
             # Invalid restaurant, clear session and show all
-            print(f"DEBUG: Restaurant not found, clearing session")
             if 'selected_restaurant_id' in request.session:
                 del request.session['selected_restaurant_id']
             restaurants = base_restaurants.order_by('-is_main_restaurant', 'name')
     else:
         # Viewing all restaurants
-        print(f"DEBUG: Viewing all restaurants")
         restaurants = base_restaurants.order_by('-is_main_restaurant', 'name')
-    
-    print(f"DEBUG: Final restaurants count={len(restaurants)}")
     
     # Get main restaurant for context
     main_restaurant = base_restaurants.filter(is_main_restaurant=True).first()

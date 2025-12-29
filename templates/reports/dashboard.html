@@ -246,6 +246,8 @@
                         <option value="all" {% if station_filter == 'all' %}selected{% endif %}>All Stations</option>
                         <option value="kitchen" {% if station_filter == 'kitchen' %}selected{% endif %}>Kitchen</option>
                         <option value="bar" {% if station_filter == 'bar' %}selected{% endif %}>Bar</option>
+                        <option value="buffet" {% if station_filter == 'buffet' %}selected{% endif %}>Buffet</option>
+                        <option value="service" {% if station_filter == 'service' %}selected{% endif %}>Service</option>
                     </select>
                 </div>
                 
@@ -386,6 +388,10 @@
                                     <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Kitchen</span>
                                 {% elif station_filter == 'bar' %}
                                     <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Bar</span>
+                                {% elif station_filter == 'buffet' %}
+                                    <span class="badge" style="color: white; background-color: #ffc107; font-weight: bold;">Buffet</span>
+                                {% elif station_filter == 'service' %}
+                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Service</span>
                                 {% else %}
                                     {% comment %}Show all stations present in the order{% endcomment %}
                                     {% with stations=order.order_items.all %}
@@ -396,6 +402,10 @@
                                                     <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Kitchen</span>
                                                 {% elif station.grouper == 'bar' %}
                                                     <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Bar</span>
+                                                {% elif station.grouper == 'buffet' %}
+                                                    <span class="badge" style="color: white; background-color: #ffc107; font-weight: bold;">Buffet</span>
+                                                {% elif station.grouper == 'service' %}
+                                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Service</span>
                                                 {% endif %}
                                             {% endfor %}
                                         {% else %}

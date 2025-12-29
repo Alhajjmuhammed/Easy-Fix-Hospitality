@@ -69,18 +69,32 @@ class Order(models.Model):
         return total_discount
     
     def get_tax_amount(self):
-        """Calculate tax amount using restaurant owner's configured tax rate"""
-        # Get tax rate from the restaurant owner
-        owner = self.owner
-        tax_rate = owner.tax_rate if owner else Decimal('0.0800')  # Default 8% fallback
+        """Calculate tax amount using restaurant/branch configured tax rate"""
+        # Get tax rate from Restaurant model first (for branches), then User model
+        tax_rate = Decimal('0.0800')  # Default 8% fallback
+        
+        # Priority 1: Get from Restaurant model (for branches)
+        if hasattr(self.table_info, 'restaurant') and self.table_info.restaurant:
+            tax_rate = self.table_info.restaurant.tax_rate
+        else:
+            # Priority 2: Get from User (owner) model
+            owner = self.owner
+            if owner and hasattr(owner, 'tax_rate'):
+                tax_rate = owner.tax_rate
+        
         return self.get_subtotal() * tax_rate
     
     @property
     def tax_rate(self):
         """Tax rate as percentage for display"""
+        # Get from Restaurant model first (for branches), then User model
+        if hasattr(self.table_info, 'restaurant') and self.table_info.restaurant:
+            return float(self.table_info.restaurant.tax_rate * 100)  # Convert decimal to percentage
+        
         owner = self.owner
-        if owner:
+        if owner and hasattr(owner, 'tax_rate'):
             return float(owner.tax_rate * 100)  # Convert decimal to percentage
+        
         return 8.0  # Default 8% fallback
     
     def get_total(self):
@@ -129,6 +143,12 @@ class Order(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['payment_status']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['table_info', 'status']),  # Compound index for common queries
+        ]
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items')

@@ -36,7 +36,7 @@ class Command(BaseCommand):
             # Get default printer
             try:
                 default_printer = win32print.GetDefaultPrinter()
-            except:
+            except Exception:
                 default_printer = None
             
             # Display printers

@@ -11,8 +11,28 @@ from django.db import transaction
 from django.db.models import Q
 from django.core.paginator import Paginator
 from decimal import Decimal
+import logging
 from accounts.models import User, Role
 from restaurant.models_restaurant import Restaurant
+
+# Import bleach for input sanitization
+try:
+    import bleach
+    def sanitize_input(text, max_length=500):
+        """Sanitize text input to prevent XSS"""
+        if not text:
+            return ''
+        # Strip all HTML tags and limit length
+        return bleach.clean(str(text), tags=[], strip=True)[:max_length]
+except ImportError:
+    def sanitize_input(text, max_length=500):
+        """Fallback sanitization without bleach"""
+        if not text:
+            return ''
+        import html
+        return html.escape(str(text))[:max_length]
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -99,13 +119,13 @@ def add_branch(request):
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                # Get form data
-                name = request.POST.get('name', '').strip()
-                description = request.POST.get('description', '').strip()
-                address = request.POST.get('address', '').strip()
+                # Get and sanitize form data to prevent XSS
+                name = sanitize_input(request.POST.get('name', ''), max_length=200)
+                description = sanitize_input(request.POST.get('description', ''), max_length=1000)
+                address = sanitize_input(request.POST.get('address', ''), max_length=500)
                 branch_owner_username = request.POST.get('branch_owner_username', '').strip()
                 branch_owner_email = request.POST.get('branch_owner_email', '').strip()
-                branch_owner_name = request.POST.get('branch_owner_name', '').strip()
+                branch_owner_name = sanitize_input(request.POST.get('branch_owner_name', ''), max_length=200)
                 branch_owner_password = request.POST.get('branch_owner_password', '').strip()
                 auto_create_credentials = request.POST.get('auto_create_credentials') == 'on'
                 
@@ -222,7 +242,8 @@ def add_branch(request):
                 return redirect('admin_panel:main_owner_dashboard')
                 
         except Exception as e:
-            messages.error(request, f'Error creating branch: {str(e)}')
+            logger.error(f'Error creating branch: {str(e)}')
+            messages.error(request, 'Error creating branch. Please try again.')
     
     context = {
         'main_restaurant': main_restaurant,
@@ -252,7 +273,10 @@ def edit_branch(request, restaurant_id):
             restaurant.name = request.POST.get('name', '').strip()
             restaurant.description = request.POST.get('description', '').strip()
             restaurant.address = request.POST.get('address', '').strip()
-            restaurant.tax_rate = float(request.POST.get('tax_rate', 8.0)) / 100
+            try:
+                restaurant.tax_rate = float(request.POST.get('tax_rate', 8.0)) / 100
+            except (ValueError, TypeError):
+                restaurant.tax_rate = 0.08  # Default to 8%
             restaurant.auto_print_kot = request.POST.get('auto_print_kot') == 'on'
             restaurant.auto_print_bot = request.POST.get('auto_print_bot') == 'on'
             restaurant.kitchen_printer_name = request.POST.get('kitchen_printer_name', '').strip()
@@ -303,7 +327,8 @@ def edit_branch(request, restaurant_id):
             return redirect('admin_panel:manage_branches')
             
         except Exception as e:
-            messages.error(request, f'Error updating branch: {str(e)}')
+            logger.error(f'Error updating branch: {str(e)}')
+            messages.error(request, 'Error updating branch. Please try again.')
     
     context = {
         'restaurant': restaurant,
@@ -316,15 +341,15 @@ def edit_branch(request, restaurant_id):
 @require_POST
 def delete_branch(request, restaurant_id):
     """Delete a branch"""
-    print(f"DEBUG: delete_branch called for restaurant_id={restaurant_id} by user={request.user}")
+    
     
     try:
         restaurant = get_object_or_404(Restaurant, id=restaurant_id)
-        print(f"DEBUG: Found restaurant={restaurant.name}, is_main={restaurant.is_main_restaurant}")
+        
         
         # Check permissions
         if not (request.user.is_main_owner() and restaurant.main_owner == request.user):
-            print(f"DEBUG: Permission denied - user.is_main_owner={request.user.is_main_owner()}, restaurant.main_owner={restaurant.main_owner}")
+            
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'success': False, 'error': 'Permission denied'})
             else:
@@ -334,7 +359,7 @@ def delete_branch(request, restaurant_id):
         # Check if this is main restaurant with branches
         if restaurant.is_main_restaurant and restaurant.branches.exists():
             branch_count = restaurant.branches.count()
-            print(f"DEBUG: Cannot delete main restaurant with {branch_count} branches")
+            
             error_msg = f'Cannot delete main restaurant while it has {branch_count} branch(es). Delete all branches first.'
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'success': False, 'error': error_msg})
@@ -344,7 +369,7 @@ def delete_branch(request, restaurant_id):
         
         # Allow deleting main restaurant if it has NO branches
         if restaurant.is_main_restaurant and not restaurant.branches.exists():
-            print(f"DEBUG: Deleting main restaurant with no branches (allowed)")
+            pass  # Main restaurant with no branches can be deleted
         
         # Store data before any operations (to avoid reference issues)
         restaurant_name = restaurant.name
@@ -360,8 +385,6 @@ def delete_branch(request, restaurant_id):
             branch_owner.role.name == 'branch_owner'
         )
         
-        print(f"DEBUG: Stored data - restaurant_name={restaurant_name}, branch_owner={branch_owner}, is_dedicated={is_dedicated_branch_owner}")
-        
         # Check for dependent data that might prevent deletion
         from restaurant.models import TableInfo, Product, MainCategory
         from orders.models import Order
@@ -376,8 +399,6 @@ def delete_branch(request, restaurant_id):
             Q(table_info__restaurant_id=restaurant_id) | Q(table_info__owner=branch_owner)
         ).count()
         
-        print(f"DEBUG: Dependent data - tables:{dependent_tables}, categories:{dependent_categories}, orders:{dependent_orders}")
-        
         # Warning if there is dependent data
         if dependent_tables > 0 or dependent_categories > 0 or dependent_orders > 0:
             warning_parts = []
@@ -389,7 +410,6 @@ def delete_branch(request, restaurant_id):
                 warning_parts.append(f"{dependent_orders} orders")
             
             warning_msg = f"This branch has {', '.join(warning_parts)}. Deleting it will also delete all related data. Are you sure?"
-            print(f"DEBUG: Warning message: {warning_msg}")
         
         # Delete all related data explicitly
         from waste_management.models import FoodWasteLog
@@ -398,7 +418,7 @@ def delete_branch(request, restaurant_id):
         from orders.models_printjob import PrintJob
         from accounts.models import User
         
-        print(f"DEBUG: Starting deletion of all related data for {restaurant_name}")
+        
         
         # 1. Delete waste logs related to products from this restaurant
         waste_logs = FoodWasteLog.objects.filter(
@@ -407,19 +427,19 @@ def delete_branch(request, restaurant_id):
         )
         waste_count = waste_logs.count()
         waste_logs.delete()
-        print(f"DEBUG: Deleted {waste_count} waste logs")
+        
         
         # 2. Delete reports related to this branch owner (will cascade to ProductSalesDetail, etc.)
         sales_reports = SalesReport.objects.filter(owner=branch_owner)
         report_count = sales_reports.count()
         sales_reports.delete()
-        print(f"DEBUG: Deleted {report_count} sales reports")
+        
         
         # 3. Delete print jobs
         print_jobs = PrintJob.objects.filter(restaurant_id=restaurant_id)
         print_count = print_jobs.count()
         print_jobs.delete()
-        print(f"DEBUG: Deleted {print_count} print jobs")
+        
         
         # 4. Delete bill requests
         bill_requests = BillRequest.objects.filter(
@@ -428,7 +448,7 @@ def delete_branch(request, restaurant_id):
         )
         bill_count = bill_requests.count()
         bill_requests.delete()
-        print(f"DEBUG: Deleted {bill_count} bill requests")
+        
         
         # 5. Delete orders (this will cascade to order items)
         orders = Order.objects.filter(
@@ -437,7 +457,7 @@ def delete_branch(request, restaurant_id):
         )
         order_count = orders.count()
         orders.delete()
-        print(f"DEBUG: Deleted {order_count} orders")
+        
         
         # 6. Delete products (through categories - will cascade to products, subcategories, etc.)
         categories = MainCategory.objects.filter(
@@ -445,7 +465,7 @@ def delete_branch(request, restaurant_id):
         )
         category_count = categories.count()
         categories.delete()
-        print(f"DEBUG: Deleted {category_count} categories (and their products)")
+        
         
         # 7. Delete tables
         tables = TableInfo.objects.filter(
@@ -453,7 +473,7 @@ def delete_branch(request, restaurant_id):
         )
         table_count = tables.count()
         tables.delete()
-        print(f"DEBUG: Deleted {table_count} tables")
+        
         
         # 8. Delete all users (staff) that belong to this branch owner (if dedicated branch owner)
         if is_dedicated_branch_owner and branch_owner:
@@ -461,36 +481,25 @@ def delete_branch(request, restaurant_id):
             staff_count = branch_staff.count()
             if staff_count > 0:
                 staff_names = [f"{u.username} ({u.get_full_name()})" for u in branch_staff[:5]]  # Log first 5
-                print(f"DEBUG: Deleting {staff_count} staff members: {', '.join(staff_names)}")
+                
                 branch_staff.delete()
-                print(f"DEBUG: Deleted {staff_count} staff members")
-        else:
-            print(f"DEBUG: Branch owner is main owner - NOT deleting staff")
         
         # 9. Clear NULLABLE foreign key references before deleting (to bypass PROTECT)
-        print(f"DEBUG: Clearing foreign key references...")
         
         # Only clear branch_owner (don't clear parent_restaurant - violates CHECK constraint)
         # Branches MUST have parent_restaurant until deletion per CHECK constraint
         if restaurant.branch_owner:
             restaurant.branch_owner = None
             restaurant.save(update_fields=['branch_owner'])
-            print(f"DEBUG: Cleared branch_owner reference")
         
         # 10. Now we can safely delete the restaurant (parent_restaurant stays until deletion)
         restaurant.delete()
-        print(f"DEBUG: Deleted restaurant {restaurant_name}")
         
         # 11. Finally delete the branch owner user account ONLY if it's a dedicated branch owner
         if is_dedicated_branch_owner and branch_owner:
             branch_owner_name = branch_owner.get_full_name() or branch_owner.username
             branch_owner_username = branch_owner.username
             branch_owner.delete()
-            print(f"DEBUG: Deleted dedicated branch owner: {branch_owner_name} (username: {branch_owner_username})")
-        else:
-            print(f"DEBUG: Branch owner is main owner - NOT deleting user account")
-        
-        print(f"DEBUG: Successfully deleted restaurant {restaurant_name}")
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': True, 'message': f'Branch "{restaurant_name}" deleted successfully'})
@@ -499,18 +508,18 @@ def delete_branch(request, restaurant_id):
             return redirect('admin_panel:main_owner_dashboard')
             
     except Exception as e:
-        print(f"DEBUG: Error deleting branch: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f'Error deleting branch: {str(e)}', exc_info=True)
         
         error_msg = str(e)
         if 'foreign key' in error_msg.lower() or 'constraint' in error_msg.lower():
             error_msg = "Cannot delete branch because it has related data (orders, tables, etc.). Please remove related data first."
+        else:
+            error_msg = "Error deleting branch. Please try again."
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'error': error_msg})
         else:
-            messages.error(request, f'Error deleting branch: {error_msg}')
+            messages.error(request, error_msg)
             return redirect('admin_panel:main_owner_dashboard')
 
 
@@ -519,17 +528,17 @@ def switch_restaurant(request):
     """Switch current restaurant context"""
     restaurant_id = request.POST.get('restaurant_id') if request.method == 'POST' else request.GET.get('restaurant_id')
     
-    print(f"DEBUG: switch_restaurant called with restaurant_id={restaurant_id}, method={request.method}")
-    print(f"DEBUG: User={request.user}, is_main_owner={request.user.is_main_owner()}")
+    
+    
     
     if restaurant_id:
         try:
             restaurant = Restaurant.objects.get(id=restaurant_id)
-            print(f"DEBUG: Found restaurant={restaurant.name}, main_owner={restaurant.main_owner}, branch_owner={restaurant.branch_owner}")
+            
             
             # Check if user can access this restaurant
             can_access = restaurant.can_user_access(request.user)
-            print(f"DEBUG: can_user_access={can_access}")
+            
             
             if can_access:
                 # Store the OWNER User ID, not Restaurant ID
@@ -545,14 +554,14 @@ def switch_restaurant(request):
                 # Save session to ensure changes are persisted
                 request.session.save()
                 
-                print(f"DEBUG: Session updated - selected_restaurant_id={request.session.get('selected_restaurant_id')}")
-                print(f"DEBUG: view_all_restaurants={request.session.get('view_all_restaurants')}")
+                
+                
                 
                 # Always redirect to main admin dashboard
                 redirect_url_name = 'admin_panel:admin_dashboard'
                 redirect_url_path = '/admin-panel/'
                 
-                print(f"DEBUG: Redirect URL={redirect_url_name}")
+                
                 
                 if request.method == 'POST':
                     return JsonResponse({
@@ -565,19 +574,19 @@ def switch_restaurant(request):
                     messages.success(request, f'Switched to {restaurant.name}')
                     return redirect(redirect_url_name)
             else:
-                print(f"DEBUG: Access denied")
+                
                 if request.method == 'POST':
                     return JsonResponse({'success': False, 'error': 'Access denied'})
                 else:
                     messages.error(request, 'Access denied')
         except Restaurant.DoesNotExist:
-            print(f"DEBUG: Restaurant not found")
+            
             if request.method == 'POST':
                 return JsonResponse({'success': False, 'error': 'Restaurant not found'})
             else:
                 messages.error(request, 'Restaurant not found')
     
-    print(f"DEBUG: Fallback redirect")
+    
     # Always redirect to admin dashboard
     return redirect('admin_panel:admin_dashboard')
 
@@ -598,7 +607,7 @@ def toggle_restaurant_status(request, restaurant_id):
         
         status = 'activated' if restaurant.is_active else 'deactivated'
         
-        print(f"DEBUG: Restaurant {restaurant.name} {status} by {request.user}")
+        
         
         return JsonResponse({
             'success': True,
@@ -607,8 +616,8 @@ def toggle_restaurant_status(request, restaurant_id):
         })
     
     except Exception as e:
-        print(f"DEBUG: Error toggling restaurant status: {str(e)}")
-        return JsonResponse({'success': False, 'error': str(e)})
+        logger.error(f'Error toggling branch status: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Failed to toggle branch status. Please try again.'})
 
 
 @login_required
@@ -622,16 +631,15 @@ def restaurant_selection(request):
     current_restaurant_id = request.session.get('selected_restaurant_id')
     current_restaurant = None
     
-    print(f"DEBUG: restaurant_selection - main_owner={request.user}, restaurant_count={restaurants.count()}")
-    print(f"DEBUG: restaurants found: {[r.name for r in restaurants]}")
-    print(f"DEBUG: current_restaurant_id from session={current_restaurant_id}")
+    
+    
+    
     
     if current_restaurant_id:
         try:
             current_restaurant = Restaurant.objects.get(id=current_restaurant_id)
-            print(f"DEBUG: Found current_restaurant={current_restaurant.name}")
         except Restaurant.DoesNotExist:
-            print(f"DEBUG: Restaurant with id={current_restaurant_id} not found")
+            pass  # Restaurant not found, keep current_restaurant as None
     
     context = {
         'restaurants': restaurants,
@@ -639,7 +647,6 @@ def restaurant_selection(request):
         'show_all_option': True,  # Allow "All Restaurants" view
     }
     
-    print(f"DEBUG: restaurant_selection context = {context}")
     return render(request, 'admin_panel/restaurant_selection.html', context)
 
 
@@ -722,9 +729,8 @@ def upgrade_to_pro(request):
             return JsonResponse({'success': False, 'error': 'Failed to upgrade subscription plan.'})
             
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'success': False, 'error': f'Error upgrading subscription: {str(e)}'})
+        logger.error(f'Error upgrading subscription: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Error upgrading subscription. Please try again.'})
 
 
 @login_required
@@ -763,7 +769,8 @@ def downgrade_to_single(request):
             return JsonResponse({'success': False, 'error': 'Failed to downgrade subscription plan.'})
             
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Error downgrading subscription: {str(e)}'})
+        logger.error(f'Error downgrading subscription: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Error downgrading subscription. Please try again.'})
 
 
 @login_required 
@@ -818,7 +825,8 @@ def setup_main_restaurant(request):
                 return redirect('admin_panel:manage_branches')
                 
         except Exception as e:
-            messages.error(request, f'Error creating restaurant: {str(e)}')
+            logger.error(f'Error creating restaurant: {str(e)}')
+            messages.error(request, 'Error creating restaurant. Please try again.')
             
     context = {
         'subscription_plans': Restaurant.SUBSCRIPTION_PLANS,

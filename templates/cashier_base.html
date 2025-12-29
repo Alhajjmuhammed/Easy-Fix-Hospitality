@@ -214,9 +214,14 @@
                             </a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'accounts:logout' %}">
-                                <i class="fas fa-sign-out-alt"></i> Logout
-                            </a></li>
+                            <li>
+                                <form method="post" action="{% url 'accounts:logout' %}" style="display: inline; width: 100%;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+                                        <i class="fas fa-sign-out-alt"></i> Logout
+                                    </button>
+                                </form>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -270,9 +275,12 @@
                         <a class="mobile-nav-link" href="{% url 'accounts:profile' %}">
                             <i class="fas fa-user me-2"></i>Profile
                         </a>
-                        <a class="mobile-nav-link" href="{% url 'accounts:logout' %}">
-                            <i class="fas fa-sign-out-alt me-2"></i>Logout
-                        </a>
+                        <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="mobile-nav-link" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -391,15 +399,12 @@
                          window.location.hostname === '127.0.0.1';
             
             if (isDev) {
-                console.log('🔧 Professional Cache Killer: Development mode detected');
-                
                 // 1. Clear all possible caches immediately
                 if ('caches' in window) {
                     caches.keys().then(function(names) {
                         for (let name of names) {
                             caches.delete(name);
                         }
-                        console.log('✅ All caches cleared immediately');
                     });
                 }
                 
@@ -409,7 +414,6 @@
                         for(let registration of registrations) {
                             registration.unregister();
                         }
-                        console.log('✅ Service workers unregistered');
                     });
                 }
                 
@@ -422,8 +426,6 @@
                     }
                     return originalFetch(url, options);
                 };
-                
-                console.log('🚀 Development cache killer active - all changes will appear immediately');
             }
         })();
     </script>
@@ -482,7 +484,6 @@
             // Check if products are already loaded by page-specific script
             const productSelect = document.getElementById('product_id');
             if (productSelect && productSelect.children.length > 1) {
-                console.log('Products already loaded by page script');
                 return;
             }
             

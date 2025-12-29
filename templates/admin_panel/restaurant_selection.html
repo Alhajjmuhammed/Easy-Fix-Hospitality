@@ -428,18 +428,11 @@
 {% block extra_js %}
 <script>
 function selectRestaurant(restaurantId, restaurantName) {
-    console.log('DEBUG: selectRestaurant called with restaurantId=' + restaurantId + ', restaurantName=' + restaurantName);
-    
     // Create a safe selector by using attribute selectors instead of onclick text matching
     var buttonSelector = `[onclick*="selectRestaurant(${restaurantId},"] .btn-select`;
     
     // Show loading state
     $(buttonSelector).html('<i class="fas fa-spinner fa-spin"></i> Switching...');
-    
-    console.log('DEBUG: Making AJAX request to switch_restaurant with data:', {
-        'restaurant_id': restaurantId,
-        'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
-    });
     
     $.ajax({
         url: '{% url "admin_panel:switch_restaurant" %}',
@@ -449,7 +442,6 @@ function selectRestaurant(restaurantId, restaurantName) {
             'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
         },
         success: function(data) {
-            console.log('DEBUG: AJAX success response:', data);
             if (data.success) {
                 // Show success message
                 showSuccessMessage(data.message);
@@ -457,21 +449,17 @@ function selectRestaurant(restaurantId, restaurantName) {
                 // Use redirect URL from server response
                 var redirectUrl = data.redirect_url || '/admin-panel/main-owner-dashboard/';
                 
-                console.log('DEBUG: Redirecting to:', redirectUrl);
-                
                 // Redirect after short delay
                 setTimeout(function() {
                     window.location.href = redirectUrl;
                 }, 1000);
             } else {
-                console.log('DEBUG: Server returned error:', data.error);
                 showErrorMessage('Error: ' + data.error);
                 // Reset button using the same safe selector
                 $(buttonSelector).html('<i class="fas fa-arrow-right"></i> Select Location');
             }
         },
         error: function(xhr, status, error) {
-            console.log('DEBUG: AJAX error - xhr:', xhr, 'status:', status, 'error:', error);
             showErrorMessage('An error occurred while switching restaurant.');
             // Reset button using the same safe selector
             $(buttonSelector).html('<i class="fas fa-arrow-right"></i> Select Location');

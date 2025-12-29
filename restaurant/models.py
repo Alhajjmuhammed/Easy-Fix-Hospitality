@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from django.contrib.auth import get_user_model
 from decimal import Decimal
 
@@ -18,8 +18,24 @@ class TableInfo(models.Model):
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tables',
                                   null=True, blank=True, help_text="Restaurant/branch this table belongs to")
     
-    tbl_no = models.CharField(max_length=10)
-    capacity = models.IntegerField(default=4)
+    tbl_no = models.CharField(
+        max_length=10,
+        validators=[
+            RegexValidator(
+                regex=r'^[A-Za-z0-9\-_]+$',
+                message='Table number can only contain letters, numbers, hyphens, and underscores.'
+            )
+        ],
+        help_text="Unique table identifier (e.g., T1, A-01, VIP-1)"
+    )
+    capacity = models.IntegerField(
+        default=4,
+        validators=[
+            MinValueValidator(1, message='Capacity must be at least 1.'),
+            MaxValueValidator(50, message='Capacity cannot exceed 50.')
+        ],
+        help_text="Maximum seating capacity for this table"
+    )
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -66,6 +82,11 @@ class TableInfo(models.Model):
     class Meta:
         verbose_name = "Table Information"
         verbose_name_plural = "Tables Information"
+        indexes = [
+            models.Index(fields=['is_available']),
+            models.Index(fields=['owner']),
+            models.Index(fields=['restaurant']),
+        ]
         constraints = [
             # Ensure either owner or restaurant is set
             models.CheckConstraint(
@@ -105,6 +126,11 @@ class MainCategory(models.Model):
     class Meta:
         verbose_name = "Main Category"
         verbose_name_plural = "Main Categories"
+        indexes = [
+            models.Index(fields=['is_active']),
+            models.Index(fields=['owner']),
+            models.Index(fields=['restaurant']),
+        ]
         # Updated unique constraint to work with both owner and restaurant
         constraints = [
             models.UniqueConstraint(
@@ -184,7 +210,7 @@ class Product(models.Model):
     available_in_stock = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     is_available = models.BooleanField(default=True)
     preparation_time = models.IntegerField(help_text="Time in minutes", default=15)
-    station = models.CharField(max_length=20, choices=[('kitchen', 'Kitchen'), ('bar', 'Bar')], default='kitchen', help_text="Assign to kitchen or bar")
+    station = models.CharField(max_length=20, choices=[('kitchen', 'Kitchen'), ('bar', 'Bar'), ('buffet', 'Buffet'), ('service', 'Service')], default='kitchen', help_text="Assign to kitchen, bar, buffet, or service station")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -292,6 +318,11 @@ class Product(models.Model):
     
     class Meta:
         ordering = ['name']
+        indexes = [
+            models.Index(fields=['is_available']),
+            models.Index(fields=['main_category']),
+            models.Index(fields=['station']),
+        ]
 
 
 class HappyHourPromotion(models.Model):

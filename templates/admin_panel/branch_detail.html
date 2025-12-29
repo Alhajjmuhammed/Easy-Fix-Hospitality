@@ -555,6 +555,8 @@
         </div>
     </div>
 </div>
+{{ chart_labels|json_script:"chart-labels" }}
+{{ chart_data|json_script:"chart-data" }}
 {% endblock %}
 
 {% block extra_js %}
@@ -564,16 +566,19 @@
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
 
 $(document).ready(function() {
-    // Initialize revenue chart
+    // Initialize revenue chart with fallback for missing data
+    const chartLabels = JSON.parse(document.getElementById('chart-labels').textContent || '[]');
+    const chartData = JSON.parse(document.getElementById('chart-data').textContent || '[]');
+    
     const ctx = document.getElementById('revenueChart').getContext('2d');
     const revenueChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: {{ chart_labels|safe }},
+            labels: chartLabels,
             datasets: [
                 {
                     label: 'Daily Revenue',
-                    data: {{ chart_data|safe }},
+                    data: chartData,
                     borderColor: 'rgb(102, 126, 234)',
                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
                     tension: 0.4,

@@ -16,3 +16,4 @@ django-ratelimit==4.1.0      # Rate limiting for views
 django-axes==6.1.1           # Failed login attempt tracking
 django-cors-headers==4.3.1   # CORS headers management
 bleach==6.1.0                # HTML sanitization
+argon2-cffi==23.1.0          # Argon2 password hashing (required by production_settings.py)

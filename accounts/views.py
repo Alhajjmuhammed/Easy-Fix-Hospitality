@@ -6,10 +6,14 @@ from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from decimal import Decimal
 import json
+import logging
 from .forms import UserRegistrationForm, UserLoginForm, OwnerRegistrationForm, CustomerRegistrationForm
 from .models import Role, User
+
+logger = logging.getLogger(__name__)
 
 # Import security decorators
 try:
@@ -38,6 +42,18 @@ def login_view(request):
             
             if user is not None:
                 login(request, user)
+                
+                # Log successful login
+                try:
+                    from .security_utils import log_security_event
+                    log_security_event(
+                        request, 'login', user,
+                        description=f"User '{user.username}' logged in successfully",
+                        extra_data={'role': user.role.name if user.role else 'no_role'}
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to log login event: {e}")
+                
                 messages.success(request, f'Welcome back, {user.first_name or user.username}!')
                 
                 # Role-based redirect
@@ -54,6 +70,17 @@ def login_view(request):
                 else:
                     return redirect('restaurant:menu')
             else:
+                # Log failed login attempt
+                try:
+                    from .security_utils import log_security_event
+                    log_security_event(
+                        request, 'login_failed', None,
+                        description=f"Failed login attempt for username: {username}",
+                        extra_data={'attempted_username': username}
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to log login failure: {e}")
+                
                 # Add error to form instead of messages
                 form.add_error(None, 'Invalid username or password.')
     else:
@@ -61,7 +88,20 @@ def login_view(request):
     
     return render(request, 'accounts/login.html', {'form': form})
 
+@require_POST
 def logout_view(request):
+    """Logout view - requires POST to prevent CSRF logout attacks"""
+    # Log logout event before clearing session
+    try:
+        if request.user.is_authenticated:
+            from .security_utils import log_security_event
+            log_security_event(
+                request, 'logout', request.user,
+                description=f"User '{request.user.username}' logged out"
+            )
+    except Exception as e:
+        logger.warning(f"Failed to log logout event: {e}")
+    
     # Clear cart and session data before logout
     if 'cart' in request.session:
         del request.session['cart']
@@ -316,7 +356,7 @@ def qr_code_access(request, qr_code):
         
     except User.DoesNotExist:
         # Log the QR code that failed for debugging
-        print(f"QR Code Access Failed: '{qr_code}'")
+        logger.warning(f"QR Code Access Failed: '{qr_code}'")
         messages.error(request, f'Invalid QR code. Restaurant not found. (Code: {qr_code})')
         return redirect('accounts:login')
 

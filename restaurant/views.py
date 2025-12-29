@@ -14,6 +14,10 @@ def home(request):
 
 def menu(request):
     """Display menu with cart functionality"""
+    # Initialize logger at the start
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Check if table is selected
     if 'selected_table' not in request.session:
         messages.warning(request, 'Please select your table number first.')
@@ -24,11 +28,13 @@ def menu(request):
     # Get current restaurant for filtering menu
     current_restaurant = None
     
-    # For staff users (customer_care, kitchen, bar, cashier), use their assigned restaurant
+    # For staff users (customer_care, kitchen, bar, buffet, service, cashier), use their assigned restaurant
     if request.user.is_authenticated and (
         request.user.is_customer_care() or 
         request.user.is_kitchen_staff() or 
         request.user.is_bar_staff() or 
+        request.user.is_buffet_staff() or 
+        request.user.is_service_staff() or 
         request.user.is_cashier()
     ):
         # Staff users get their restaurant from User.owner
@@ -74,9 +80,7 @@ def menu(request):
         restaurant_obj = None
         
         # DEBUG LOGGING
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"[MENU DEBUG] current_restaurant: {current_restaurant.username} (ID: {current_restaurant.id})")
+        logger.debug(f"[MENU DEBUG] current_restaurant: {current_restaurant.username} (ID: {current_restaurant.id})")
         
         try:
             # Check if this user has a Restaurant object (PRO plan)
@@ -94,10 +98,10 @@ def menu(request):
             
             # DEBUG LOGGING
             if restaurant_obj:
-                logger.warning(f"[MENU DEBUG] Found restaurant_obj: {restaurant_obj.name} (is_main: {restaurant_obj.is_main_restaurant})")
+                logger.debug(f"[MENU DEBUG] Found restaurant_obj: {restaurant_obj.name} (is_main: {restaurant_obj.is_main_restaurant})")
         except Exception as e:
             # DEBUG LOGGING
-            logger.warning(f"[MENU DEBUG] Exception finding restaurant_obj: {e}")
+            logger.debug(f"[MENU DEBUG] Exception finding restaurant_obj: {e}")
             pass
         
         # Filter categories by BOTH owner field AND restaurant field
@@ -129,11 +133,11 @@ def menu(request):
             ).prefetch_related(subcategories_prefetch, products_prefetch).order_by('name')
             
             # DEBUG LOGGING
-            logger.warning(f"[MENU DEBUG] Categories count: {categories.count()}")
+            logger.debug(f"[MENU DEBUG] Categories count: {categories.count()}")
             for cat in categories[:10]:  # Log first 10
                 cat_owner = cat.owner.username if cat.owner else 'None'
                 cat_restaurant = cat.restaurant.name if cat.restaurant else 'None'
-                logger.warning(f"[MENU DEBUG]   - {cat.name} (owner={cat_owner}, restaurant={cat_restaurant})")
+                logger.debug(f"[MENU DEBUG]   - {cat.name} (owner={cat_owner}, restaurant={cat_restaurant})")
             
             # For branches, show parent restaurant name instead of branch name
             if restaurant_obj.is_main_restaurant:
@@ -165,7 +169,7 @@ def menu(request):
             restaurant_name = current_restaurant.restaurant_name
     else:
         # DEBUG LOGGING
-        logger.warning(f"[MENU DEBUG] current_restaurant is None! User: {request.user}, Session: {request.session.get('selected_restaurant_id')}")
+        logger.debug(f"[MENU DEBUG] current_restaurant is None! User: {request.user}, Session: {request.session.get('selected_restaurant_id')}")
         
         # Fallback: try traditional owner filtering for staff/tied customers
         try:
@@ -179,18 +183,18 @@ def menu(request):
                 restaurant_name = owner_filter.restaurant_name
             else:
                 # NO FILTERING - This is the bug! Redirect to table selection
-                logger.warning(f"[MENU DEBUG] No owner_filter! Redirecting to table selection")
+                logger.debug(f"[MENU DEBUG] No owner_filter! Redirecting to table selection")
                 messages.error(request, 'Please select your restaurant and table first.')
                 return redirect('orders:select_table')
         except Exception as e:
             # DEBUG LOGGING
-            logger.warning(f"[MENU DEBUG] Exception in fallback: {e}")
+            logger.debug(f"[MENU DEBUG] Exception in fallback: {e}")
             messages.error(request, 'Unable to load menu. Please try again.')
             return redirect('orders:select_table')
     
     # Safety check - if we somehow got here without categories
     if 'categories' not in locals():
-        logger.warning(f"[MENU DEBUG] No categories variable defined!")
+        logger.debug(f"[MENU DEBUG] No categories variable defined!")
         messages.error(request, 'Unable to load menu. Please select your table first.')
         return redirect('orders:select_table')
 
@@ -215,11 +219,11 @@ def menu(request):
             cart_total = 0
 
     # FINAL DEBUG: Log what's being passed to template
-    logger.warning(f"[MENU DEBUG] Passing {categories.count()} categories to template:")
+    logger.debug(f"[MENU DEBUG] Passing {categories.count()} categories to template:")
     for cat in categories:
         cat_owner = cat.owner.username if cat.owner else 'None'
         cat_restaurant = cat.restaurant.name if cat.restaurant else 'None'
-        logger.warning(f"[MENU DEBUG]   Template will show: {cat.name} (owner={cat_owner}, restaurant={cat_restaurant})")
+        logger.debug(f"[MENU DEBUG]   Template will show: {cat.name} (owner={cat_owner}, restaurant={cat_restaurant})")
     
     context = {
         'categories': categories,
@@ -528,7 +532,8 @@ def add_staff(request):
             except json.JSONDecodeError:
                 return JsonResponse({'success': False, 'message': 'Invalid JSON data'})
             except Exception as e:
-                return JsonResponse({'success': False, 'message': f'Error creating user: {str(e)}'})
+                logger.error(f"Error creating user: {str(e)}", exc_info=True)
+                return JsonResponse({'success': False, 'message': 'Error creating user. Please try again.'})
         
         # Handle regular form submission
         form = StaffForm(request.POST)
@@ -698,7 +703,10 @@ def manage_promotions(request):
     currently_running = len([p for p in promotions if p.is_currently_active()])
     
     # Pagination
-    per_page = int(request.GET.get('per_page', 5))
+    try:
+        per_page = int(request.GET.get('per_page', 5))
+    except (ValueError, TypeError):
+        per_page = 5
     paginator = Paginator(promotions, per_page)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -998,7 +1006,8 @@ def get_restaurant_products(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f"Error fetching restaurant items: {str(e)}", exc_info=True)
+        return JsonResponse({'success': False, 'message': 'Error fetching restaurant items. Please try again.'})
 
 
 @login_required 

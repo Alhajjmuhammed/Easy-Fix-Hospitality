@@ -145,7 +145,7 @@ class Command(BaseCommand):
             if platform.system().lower() == 'windows':
                 # Windows - try to start redis service or run redis-server
                 try:
-                    subprocess.Popen(['redis-server'], shell=True)
+                    subprocess.Popen(['redis-server'])
                     self.stdout.write('Started Redis server')
                 except FileNotFoundError:
                     self.stdout.write(

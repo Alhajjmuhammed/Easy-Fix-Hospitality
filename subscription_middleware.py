@@ -24,12 +24,14 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
         '/accounts/register/',
         '/accounts/access-blocked/',
         '/system-admin/',
-        '/admin/',
+        '/secure-management-portal/',  # Django admin (obscured URL)
         '/static/',
         '/media/',
         '/service-worker.js',
         '/health-check/',
-        '/manifest.json'
+        '/manifest.json',
+        '/api/auth/',  # Only auth API endpoints exempt
+        '/api/health/',  # Health check API
     ]
     
     def process_request(self, request):
@@ -57,11 +59,11 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
             owner_roles = ['owner', 'main_owner', 'branch_owner']
             
             # Define all staff roles
-            staff_roles = ['customer_care', 'kitchen', 'bar', 'cashier']
+            staff_roles = ['customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']
             
             if role_name in owner_roles or role_name in staff_roles:
                 # Log this for debugging
-                print(f"[SUBSCRIPTION MIDDLEWARE] Checking access for {request.user.username} (role: {role_name})")
+                logger.debug(f"Checking subscription access for {request.user.username} (role: {role_name})")
                 return self._check_subscription_access(request)
                 
         return None
@@ -89,12 +91,12 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
             if role_name == 'owner':
                 # Legacy SINGLE plan owner
                 restaurant_owner = request.user
-                print(f"[SUBSCRIPTION] Owner {request.user.username} - checking own subscription")
+                logger.debug(f"Owner {request.user.username} - checking own subscription")
                 
             elif role_name == 'main_owner':
                 # PRO plan main owner - check their own subscription
                 restaurant_owner = request.user
-                print(f"[SUBSCRIPTION] Main owner {request.user.username} - checking own subscription")
+                logger.debug(f"Main owner {request.user.username} - checking own subscription")
                 
             elif role_name == 'branch_owner':
                 # Branch owner - need to check MAIN owner's subscription (cascade)
@@ -106,13 +108,13 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                 if branch_restaurant and branch_restaurant.parent_restaurant:
                     # Check the main owner's subscription
                     restaurant_owner = branch_restaurant.parent_restaurant.main_owner
-                    print(f"[SUBSCRIPTION] Branch owner {request.user.username} - checking main owner {restaurant_owner.username}'s subscription (cascade)")
+                    logger.debug(f"Branch owner {request.user.username} - checking main owner {restaurant_owner.username}'s subscription (cascade)")
                 else:
                     # Branch owner has no parent - check their own subscription
                     restaurant_owner = request.user
-                    print(f"[SUBSCRIPTION] Branch owner {request.user.username} - no parent, checking own subscription")
+                    logger.debug(f"Branch owner {request.user.username} - no parent, checking own subscription")
                     
-            elif role_name in ['customer_care', 'kitchen', 'bar', 'cashier']:
+            elif role_name in ['customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']:
                 # Staff member - check their owner's subscription
                 if request.user.owner:
                     direct_owner = request.user.owner
@@ -126,16 +128,16 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                         
                         if branch_restaurant and branch_restaurant.parent_restaurant:
                             restaurant_owner = branch_restaurant.parent_restaurant.main_owner
-                            print(f"[SUBSCRIPTION] Staff {request.user.username} of branch owner {direct_owner.username} - checking main owner {restaurant_owner.username}'s subscription (cascade)")
+                            logger.debug(f"Staff {request.user.username} of branch owner {direct_owner.username} - checking main owner {restaurant_owner.username}'s subscription (cascade)")
                         else:
                             restaurant_owner = direct_owner
-                            print(f"[SUBSCRIPTION] Staff {request.user.username} - checking direct owner {direct_owner.username}'s subscription")
+                            logger.debug(f"Staff {request.user.username} - checking direct owner {direct_owner.username}'s subscription")
                     else:
                         # Staff of regular owner or main_owner
                         restaurant_owner = direct_owner
-                        print(f"[SUBSCRIPTION] Staff {request.user.username} - checking owner {restaurant_owner.username}'s subscription")
+                        logger.debug(f"Staff {request.user.username} - checking owner {restaurant_owner.username}'s subscription")
                 else:
-                    print(f"[SUBSCRIPTION] Staff {request.user.username} has NO OWNER!")
+                    logger.warning(f"Staff {request.user.username} has NO OWNER!")
             else:
                 return None
                 
@@ -152,7 +154,7 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                 # Update subscription status automatically to ensure real-time blocking
                 subscription.update_subscription_status()
                 
-                print(f"[SUBSCRIPTION DEBUG] User: {request.user.username}, Checking: {restaurant_owner.username}, Subscription Status: {subscription.subscription_status}, Is Active: {subscription.is_active}")
+                logger.debug(f"User: {request.user.username}, Checking: {restaurant_owner.username}, Status: {subscription.subscription_status}, Active: {subscription.is_active}")
                 
             except RestaurantSubscription.DoesNotExist:
                 # Auto-create a default subscription for existing restaurants
@@ -196,7 +198,7 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                 if restaurant_owner != request.user:
                     if role_name == 'branch_owner':
                         reason += f" (Main restaurant subscription blocked)"
-                    elif role_name in ['customer_care', 'kitchen', 'bar', 'cashier']:
+                    elif role_name in ['customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']:
                         reason += f" (Restaurant owner's subscription blocked)"
                     
                 logger.info(f"Blocking access for {request.user.username}: {reason}")

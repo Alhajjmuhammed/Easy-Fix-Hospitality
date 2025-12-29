@@ -157,6 +157,34 @@
                                 <small class="form-text text-muted">For Bar Order Tickets (BOT)</small>
                             </div>
 
+                            <!-- Buffet Printer -->
+                            <div class="col-md-4 mb-3">
+                                <label for="buffet_printer" class="form-label">
+                                    <i class="fas fa-utensils text-warning"></i> Buffet Printer
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="buffet_printer" 
+                                       name="buffet_printer" 
+                                       value="{{ buffet_printer }}"
+                                       placeholder="Leave blank for auto-detect">
+                                <small class="form-text text-muted">For Buffet Order Tickets (BUFFET)</small>
+                            </div>
+
+                            <!-- Service Printer -->
+                            <div class="col-md-4 mb-3">
+                                <label for="service_printer" class="form-label">
+                                    <i class="fas fa-concierge-bell text-primary"></i> Service Printer
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="service_printer" 
+                                       name="service_printer" 
+                                       value="{{ service_printer }}"
+                                       placeholder="Leave blank for auto-detect">
+                                <small class="form-text text-muted">For Service Order Tickets (SERVICE)</small>
+                            </div>
+
                             <!-- Receipt Printer -->
                             <div class="col-md-4 mb-3">
                                 <label for="receipt_printer" class="form-label">
@@ -200,6 +228,32 @@
                                            {% if auto_print_bot %}checked{% endif %}>
                                     <label class="form-check-label" for="auto_print_bot">
                                         <strong>Auto-print Bar Orders (BOT)</strong>
+                                        <br><small class="text-muted">Automatically print when order is placed</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="auto_print_buffet" 
+                                           name="auto_print_buffet"
+                                           {% if auto_print_buffet %}checked{% endif %}>
+                                    <label class="form-check-label" for="auto_print_buffet">
+                                        <strong>Auto-print Buffet Orders (BUFFET)</strong>
+                                        <br><small class="text-muted">Automatically print when order is placed</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="auto_print_service" 
+                                           name="auto_print_service"
+                                           {% if auto_print_service %}checked{% endif %}>
+                                    <label class="form-check-label" for="auto_print_service">
+                                        <strong>Auto-print Service Orders (SERVICE)</strong>
                                         <br><small class="text-muted">Automatically print when order is placed</small>
                                     </label>
                                 </div>

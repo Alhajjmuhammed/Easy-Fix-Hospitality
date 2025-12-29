@@ -20,7 +20,12 @@ PROJECT_DIR="/var/www/$PROJECT_NAME"
 GITHUB_REPO="https://github.com/Alhajjmuhammed/Easy-Fix-Hospitality.git"
 DB_NAME="restaurant_db"
 DB_USER="restaurant_user"
-DB_PASSWORD="RestaurantSecure2024!"
+# SECURITY: Load DB_PASSWORD from environment variable or prompt
+DB_PASSWORD="${DB_PASSWORD:-}"
+if [ -z "$DB_PASSWORD" ]; then
+    read -sp "Enter database password: " DB_PASSWORD
+    echo
+fi
 SERVER_IP="72.62.51.225"
 
 # Function to print colored output

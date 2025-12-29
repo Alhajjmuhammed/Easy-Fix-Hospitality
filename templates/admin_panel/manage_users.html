@@ -205,7 +205,7 @@
                         </td>
                         <td>{{ user.email }}</td>
                         <td>
-                            <span class="badge role-badge bg-{% if user.is_superuser %}danger{% elif user.is_owner %}warning{% elif user.is_kitchen_staff %}info{% elif user.is_bar_staff %}primary{% elif user.is_customer_care %}success{% elif user.is_cashier %}dark{% else %}secondary{% endif %}">
+                            <span class="badge role-badge bg-{% if user.is_superuser %}danger{% elif user.is_owner %}warning{% elif user.is_kitchen_staff %}info{% elif user.is_bar_staff %}primary{% elif user.is_buffet_staff %}warning{% elif user.is_service_staff %}secondary{% elif user.is_customer_care %}success{% elif user.is_cashier %}dark{% else %}secondary{% endif %}">
                                 {% if user.is_superuser %}
                                     <i class="fas fa-crown me-1"></i>Super Admin
                                 {% elif user.is_owner %}
@@ -214,6 +214,10 @@
                                     <i class="fas fa-utensils me-1"></i>Kitchen Staff
                                 {% elif user.is_bar_staff %}
                                     <i class="fas fa-cocktail me-1"></i>Bar Staff
+                                {% elif user.is_buffet_staff %}
+                                    <i class="fas fa-utensils me-1"></i>Buffet Staff
+                                {% elif user.is_service_staff %}
+                                    <i class="fas fa-concierge-bell me-1"></i>Service Staff
                                 {% elif user.is_customer_care %}
                                     <i class="fas fa-headset me-1"></i>Customer Care
                                 {% elif user.is_cashier %}
@@ -381,6 +385,12 @@
                                         <i class="fas fa-store text-warning fa-lg"></i>
                                     {% elif role.name == 'kitchen' %}
                                         <i class="fas fa-utensils text-info fa-lg"></i>
+                                    {% elif role.name == 'bar' %}
+                                        <i class="fas fa-cocktail text-primary fa-lg"></i>
+                                    {% elif role.name == 'buffet' %}
+                                        <i class="fas fa-utensils text-warning fa-lg"></i>
+                                    {% elif role.name == 'service' %}
+                                        <i class="fas fa-concierge-bell text-secondary fa-lg"></i>
                                     {% elif role.name == 'customer_care' %}
                                         <i class="fas fa-headset text-success fa-lg"></i>
                                     {% elif role.name == 'cashier' %}
@@ -411,6 +421,18 @@
                                     <span class="badge bg-info"><i class="fas fa-utensils me-1"></i>Kitchen</span>
                                     <span class="badge bg-warning"><i class="fas fa-list me-1"></i>Orders</span>
                                     <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>No Admin</span>
+                                {% elif role.name == 'bar' %}
+                                    <span class="badge bg-primary"><i class="fas fa-cocktail me-1"></i>Bar</span>
+                                    <span class="badge bg-warning"><i class="fas fa-list me-1"></i>Orders</span>
+                                    <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>No Admin</span>
+                                {% elif role.name == 'buffet' %}
+                                    <span class="badge bg-warning"><i class="fas fa-utensils me-1"></i>Buffet</span>
+                                    <span class="badge bg-info"><i class="fas fa-list me-1"></i>Orders</span>
+                                    <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>No Admin</span>
+                                {% elif role.name == 'service' %}
+                                    <span class="badge bg-secondary"><i class="fas fa-concierge-bell me-1"></i>Service</span>
+                                    <span class="badge bg-info"><i class="fas fa-list me-1"></i>Orders</span>
+                                    <span class="badge bg-dark"><i class="fas fa-times me-1"></i>No Admin</span>
                                 {% elif role.name == 'customer_care' %}
                                     <span class="badge bg-success"><i class="fas fa-headset me-1"></i>Support</span>
                                     <span class="badge bg-info"><i class="fas fa-comments me-1"></i>Communication</span>

@@ -1,4 +1,5 @@
 from django import template
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from decimal import Decimal
 
@@ -60,7 +61,7 @@ def get_user_currency_info(user, request=None):
                     
                     if restaurant:
                         return restaurant.currency_code, restaurant.get_currency_symbol()
-                except:
+                except Exception:
                     pass
         
         # For owners, check their own currency setting
@@ -118,6 +119,7 @@ def format_price(context, value):
     """
     Format a price with currency symbol based on context.
     Usage in templates: {% format_price price %}
+    Output is escaped to prevent XSS.
     """
     request = context.get('request')
     user = context.get('user')
@@ -125,14 +127,17 @@ def format_price(context, value):
     currency_code, symbol = get_user_currency_info(user, request)
     use_decimals = currency_code not in INTEGER_CURRENCIES
     
+    # Escape symbol to prevent XSS if currency data is manipulated
+    safe_symbol = escape(symbol)
+    
     try:
         amount = float(value) if value else 0.0
         if use_decimals:
-            return f"{symbol}{amount:,.2f}"
+            return mark_safe(f"{safe_symbol}{amount:,.2f}")
         else:
-            return f"{symbol}{amount:,.0f}"
+            return mark_safe(f"{safe_symbol}{amount:,.0f}")
     except (TypeError, ValueError):
-        return f"{symbol}0.00"
+        return mark_safe(f"{safe_symbol}0.00")
 
 
 @register.simple_tag(takes_context=True)
@@ -149,7 +154,7 @@ def get_restaurant_name(context):
     elif user.is_owner() or user.is_main_owner() or user.is_branch_owner():
         # Use get_restaurant_name for all owners to handle branch→main logic
         return user.get_restaurant_name(request)
-    elif user.is_kitchen_staff() or user.is_bar_staff() or user.is_cashier() or user.is_customer_care():
+    elif user.is_kitchen_staff() or user.is_bar_staff() or user.is_buffet_staff() or user.is_service_staff() or user.is_cashier() or user.is_customer_care():
         # For staff members, use the get_restaurant_name method
         return user.get_restaurant_name(request)
     

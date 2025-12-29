@@ -296,15 +296,18 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ selected_products|json_script:"selected-products-data" }}
+{{ selected_main_categories|json_script:"selected-main-categories-data" }}
+{{ selected_sub_categories|json_script:"selected-sub-categories-data" }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const restaurantSelect = document.querySelector('#restaurant');
     
-    // Store initial selections from the promotion
+    // Store initial selections from the promotion (safely parsed from JSON script tags)
     const initialSelections = {
-        products: {{ selected_products|safe }},
-        main_categories: {{ selected_main_categories|safe }},
-        sub_categories: {{ selected_sub_categories|safe }}
+        products: JSON.parse(document.getElementById('selected-products-data').textContent),
+        main_categories: JSON.parse(document.getElementById('selected-main-categories-data').textContent),
+        sub_categories: JSON.parse(document.getElementById('selected-sub-categories-data').textContent)
     };
     
     // Track current selections (start with initial)

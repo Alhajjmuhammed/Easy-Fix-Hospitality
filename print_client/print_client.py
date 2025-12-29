@@ -42,7 +42,7 @@ console_handler = logging.StreamHandler(sys.stdout)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
-    except:
+    except (AttributeError, OSError):
         pass
 
 logging.basicConfig(
@@ -225,10 +225,10 @@ class ThermalPrinter:
                     # But some may need CP850 or UTF-8
                     try:
                         content_bytes = formatted_content.encode('cp437', errors='replace')
-                    except:
+                    except (UnicodeEncodeError, LookupError):
                         try:
                             content_bytes = formatted_content.encode('cp850', errors='replace')
-                        except:
+                        except (UnicodeEncodeError, LookupError):
                             content_bytes = formatted_content.encode('utf-8', errors='replace')
                     
                     # Send to printer

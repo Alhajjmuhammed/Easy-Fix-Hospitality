@@ -316,6 +316,14 @@
                                             <span class="badge bg-primary" style="font-size: 0.7rem;">
                                                 <i class="fas fa-cocktail me-1"></i>Bar
                                             </span>
+                                        {% elif product.station == 'buffet' %}
+                                            <span class="badge bg-warning" style="font-size: 0.7rem;">
+                                                <i class="fas fa-utensils me-1"></i>Buffet
+                                            </span>
+                                        {% elif product.station == 'service' %}
+                                            <span class="badge bg-success" style="font-size: 0.7rem;">
+                                                <i class="fas fa-concierge-bell me-1"></i>Service
+                                            </span>
                                         {% else %}
                                             <span class="badge bg-secondary" style="font-size: 0.7rem;">
                                                 <i class="fas fa-question me-1"></i>N/A
@@ -531,8 +539,10 @@
                                             <select class="form-select" id="productStation" name="station" required>
                                                 <option value="kitchen">🍴 Kitchen</option>
                                                 <option value="bar">🍸 Bar</option>
+                                                <option value="buffet">🍽️ Buffet</option>
+                                                <option value="service">🛎️ Service</option>
                                             </select>
-                                            <div class="form-text">Assign this product to Kitchen or Bar station</div>
+                                            <div class="form-text">Assign this product to Kitchen, Bar, Buffet, or Service station</div>
                                         </div>
                                         <div class="col-md-12">
                                             <div class="form-check">
@@ -1023,7 +1033,7 @@ function updateCategoryTabCounters() {
                             <li>File must be in CSV format (.csv)</li>
                             <li>Required columns: name, price, main_category</li>
                             <li>Optional columns: description, sub_category, available_in_stock, is_available, preparation_time, station</li>
-                            <li>Station field: "kitchen" or "bar" (defaults to "kitchen" if not specified)</li>
+                            <li>Station field: "kitchen", "bar", "buffet", or "service" (defaults to "kitchen" if not specified)</li>
                             <li>Main category must already exist in your system</li>
                             <li><strong>Update Behavior:</strong> Existing products will be updated, new products will be created</li>
                         </ul>
@@ -1095,7 +1105,7 @@ function updateCategoryTabCounters() {
                             <li>Uses first sheet or sheet named "Products"</li>
                             <li>Required columns: name, price, main_category</li>
                             <li>Optional columns: description, sub_category, available_in_stock, is_available, preparation_time, station</li>
-                            <li>Station field: "kitchen" or "bar" (defaults to "kitchen" if not specified)</li>
+                            <li>Station field: "kitchen", "bar", "buffet", or "service" (defaults to "kitchen" if not specified)</li>
                             <li>Main category must already exist in your system</li>
                             <li><strong>Update Behavior:</strong> Existing products will be updated, new products will be created</li>
                         </ul>
@@ -1270,8 +1280,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!e.target.id || (e.target.id !== 'addProductForm' && e.target.id !== 'editProductForm')) {
             if (!isImportForm) {
                 e.preventDefault();
-            } else {
-                console.log('Allowing import form submission:', action);
             }
         }
     });

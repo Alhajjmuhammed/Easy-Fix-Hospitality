@@ -4,7 +4,10 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Count, Q
 from django.utils import timezone
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from accounts.models import User, Role, RestaurantSubscription, SubscriptionLog
 from restaurant.models import MainCategory, SubCategory, Product, TableInfo
 from restaurant.models_restaurant import Restaurant
@@ -12,6 +15,9 @@ from orders.models import Order, OrderItem
 from django.contrib.auth.hashers import make_password
 from datetime import date, timedelta, datetime
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_all_restaurants_for_admin():
     """
@@ -210,7 +216,10 @@ def manage_all_restaurants(request):
     status_filter = request.GET.get('status', '')
     plan_filter = request.GET.get('plan', '')
     subscription_status_filter = request.GET.get('subscription_status', '')
-    per_page = int(request.GET.get('per_page', 10))  # Default to 10, allow customization
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (ValueError, TypeError):
+        per_page = 10
     page = request.GET.get('page', 1)
     
     # Start with all restaurants
@@ -273,7 +282,7 @@ def manage_all_restaurants(request):
     paginator = Paginator(restaurants, per_page)
     try:
         restaurants_page = paginator.page(page)
-    except:
+    except (PageNotAnInteger, EmptyPage):
         restaurants_page = paginator.page(1)
     
     # Add computed fields for template
@@ -298,7 +307,7 @@ def manage_all_restaurants(request):
             restaurant.days_remaining = subscription.days_until_expiration
             restaurant.is_blocked = subscription.subscription_status == 'blocked' or subscription.is_blocked_by_admin
             restaurant.is_in_grace = subscription.is_in_grace_period
-        except:
+        except (AttributeError, ObjectDoesNotExist):
             # No subscription record found
             restaurant.subscription_status = 'unknown'
             restaurant.days_remaining = 0
@@ -371,7 +380,10 @@ def manage_all_users(request):
     status_filter = request.GET.get('status')
     
     # Get pagination parameter
-    per_page = int(request.GET.get('per_page', 20))
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+    except (ValueError, TypeError):
+        per_page = 20
     if per_page not in [5, 10, 15, 20, 25, 30, 50]:
         per_page = 20
     
@@ -615,8 +627,12 @@ def create_restaurant_owner(request):
             if password != confirm_password:
                 errors.append('Passwords do not match.')
             
-            if password and len(password) < 6:
-                errors.append('Password must be at least 6 characters long.')
+            # SECURITY: Validate password strength using Django validators
+            if password:
+                try:
+                    validate_password(password)
+                except DjangoValidationError as e:
+                    errors.extend(e.messages)
             
             # Check for existing username and email
             if username and User.objects.filter(username=username).exists():
@@ -705,16 +721,16 @@ def create_restaurant_owner(request):
             messages.success(request, success_msg)
             
             # Log the creation for system tracking
-            print(f"[SYSTEM ADMIN] New restaurant created: {restaurant_name} ({subscription_plan} plan) by {request.user.username}")
-            print(f"[SYSTEM ADMIN] Subscription created: {subscription_status} from {start_date_obj} to {end_date_obj}")
+            logger.info(f"[SYSTEM ADMIN] New restaurant created: {restaurant_name} ({subscription_plan} plan) by {request.user.username}")
+            logger.info(f"[SYSTEM ADMIN] Subscription created: {subscription_status} from {start_date_obj} to {end_date_obj}")
             
             return redirect('system_admin:manage_restaurants')
             
         except Role.DoesNotExist:
             messages.error(request, 'Owner role not found. Please ensure roles are properly configured.')
         except Exception as e:
-            messages.error(request, f'Error creating restaurant owner: {str(e)}')
-            print(f"[ERROR] Restaurant creation failed: {str(e)}")
+            logger.error(f'Error creating restaurant owner: {str(e)}')
+            messages.error(request, 'Error creating restaurant. Please try again.')
     
     return redirect('system_admin:manage_restaurants')
 
@@ -789,7 +805,8 @@ def get_restaurant_details(request, restaurant_id):
         return JsonResponse(data)
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Error in get_restaurant_details: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'Failed to load restaurant details. Please try again.'}, status=500)
 
 @login_required
 def edit_restaurant(request, restaurant_id):
@@ -862,8 +879,12 @@ def edit_restaurant(request, restaurant_id):
             if password or confirm_password:
                 if password != confirm_password:
                     errors.append('Passwords do not match.')
-                if password and len(password) < 6:
-                    errors.append('Password must be at least 6 characters long.')
+                # SECURITY: Validate password strength using Django validators
+                if password:
+                    try:
+                        validate_password(password)
+                    except DjangoValidationError as e:
+                        errors.extend(e.messages)
             
             # Validate subscription dates
             if subscription_start_date and subscription_end_date:
@@ -975,7 +996,8 @@ def edit_restaurant(request, restaurant_id):
             return JsonResponse({'success': True, 'message': success_msg})
             
         except Exception as e:
-            error_msg = f'Error updating restaurant: {str(e)}'
+            logger.error(f'Error updating restaurant: {str(e)}')
+            error_msg = 'Error updating restaurant. Please try again.'
             messages.error(request, error_msg)
             return JsonResponse({'success': False, 'error': error_msg})
     
@@ -1023,11 +1045,11 @@ def delete_restaurant(request, restaurant_id):
             restaurant.delete()
             
             messages.success(request, success_msg)
-            print(f"[SYSTEM ADMIN] Restaurant deleted: {restaurant_name} (is_main={is_main}) by {request.user.username}")
+            logger.info(f"[SYSTEM ADMIN] Restaurant deleted: {restaurant_name} (is_main={is_main}) by {request.user.username}")
             
         except Exception as e:
-            messages.error(request, f'Error deleting restaurant: {str(e)}')
-            print(f"[ERROR] Restaurant deletion failed: {str(e)}")
+            logger.error(f'Error deleting restaurant: {str(e)}')
+            messages.error(request, 'Error deleting restaurant. Please try again.')
         
         return redirect('system_admin:manage_restaurants')
     
@@ -1035,6 +1057,7 @@ def delete_restaurant(request, restaurant_id):
     return redirect('system_admin:manage_restaurants')
 
 
+@login_required
 def block_restaurant(request, restaurant_id):
     """Block a restaurant's subscription access"""
     if not request.user.is_administrator():
@@ -1074,11 +1097,13 @@ def block_restaurant(request, restaurant_id):
             messages.success(request, f'Restaurant "{restaurant_name}" has been blocked successfully.')
             
         except Exception as e:
-            messages.error(request, f'Error blocking restaurant: {str(e)}')
+            logger.error(f'Error blocking restaurant: {str(e)}')
+            messages.error(request, 'Error blocking restaurant. Please try again.')
     
     return redirect('system_admin:manage_restaurants')
 
 
+@login_required
 def unblock_restaurant(request, restaurant_id):
     """Unblock a restaurant's subscription access"""
     if not request.user.is_administrator():
@@ -1119,11 +1144,13 @@ def unblock_restaurant(request, restaurant_id):
                 messages.warning(request, f'Restaurant "{restaurant_name}" has no subscription to unblock.')
                 
         except Exception as e:
-            messages.error(request, f'Error unblocking restaurant: {str(e)}')
+            logger.error(f'Error unblocking restaurant: {str(e)}')
+            messages.error(request, 'Error unblocking restaurant. Please try again.')
     
     return redirect('system_admin:manage_restaurants')
 
 
+@login_required
 def extend_subscription(request, restaurant_id):
     """Extend a restaurant's subscription"""
     if not request.user.is_administrator():
@@ -1135,7 +1162,10 @@ def extend_subscription(request, restaurant_id):
     
     if request.method == 'POST':
         try:
-            days_to_extend = int(request.POST.get('days', 30))
+            try:
+                days_to_extend = int(request.POST.get('days', 30))
+            except (ValueError, TypeError):
+                days_to_extend = 30
             
             if hasattr(restaurant_owner, 'subscription'):
                 subscription = restaurant_owner.subscription
@@ -1190,7 +1220,8 @@ def extend_subscription(request, restaurant_id):
         except ValueError:
             messages.error(request, 'Invalid number of days specified.')
         except Exception as e:
-            messages.error(request, f'Error extending subscription: {str(e)}')
+            logger.error(f'Error extending subscription: {str(e)}')
+            messages.error(request, 'Error extending subscription. Please try again.')
     
     return redirect('system_admin:manage_restaurants')
 
@@ -1217,7 +1248,10 @@ def manage_categories(request):
             restaurant_filter = None
     
     # Get pagination parameter
-    per_page = int(request.GET.get('per_page', 20))
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+    except (ValueError, TypeError):
+        per_page = 20
     if per_page not in [5, 10, 15, 20, 25, 30, 50]:
         per_page = 20
     
@@ -1300,7 +1334,8 @@ def create_category(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error creating category: {str(e)}'})
+            logger.error(f'Error creating category: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error creating category. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1340,7 +1375,8 @@ def create_subcategory(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error creating sub category: {str(e)}'})
+            logger.error(f'Error creating sub category: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error creating subcategory. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1376,7 +1412,8 @@ def edit_category(request, category_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error updating category: {str(e)}'})
+            logger.error(f'Error updating category: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error updating category. Please try again.'})
     
     # Return category data for editing
     return JsonResponse({
@@ -1417,7 +1454,8 @@ def delete_category(request, category_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error deleting category: {str(e)}'})
+            logger.error(f'Error deleting category: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error deleting category. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1481,7 +1519,8 @@ def edit_subcategory(request, subcategory_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error updating sub category: {str(e)}'})
+            logger.error(f'Error updating sub category: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error updating subcategory. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1514,7 +1553,8 @@ def delete_subcategory(request, subcategory_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error deleting sub category: {str(e)}'})
+            logger.error(f'Error deleting sub category: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error deleting subcategory. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1538,7 +1578,10 @@ def manage_products(request):
     availability_filter = request.GET.get('availability')
     
     # Get pagination parameter
-    per_page = int(request.GET.get('per_page', 20))
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+    except (ValueError, TypeError):
+        per_page = 20
     if per_page not in [5, 10, 15, 20, 25, 30, 50]:
         per_page = 20
     
@@ -1622,6 +1665,10 @@ def create_product(request):
             station = data.get('station', 'kitchen')
             availability = data.get('availability', True)
             
+            # Validate station
+            if station not in ['kitchen', 'bar', 'buffet', 'service']:
+                station = 'kitchen'
+            
             if not main_category_id or not name or not price:
                 return JsonResponse({'success': False, 'message': 'Main category, name, and price are required'})
             
@@ -1662,7 +1709,8 @@ def create_product(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error creating product: {str(e)}'})
+            logger.error(f'Error creating product: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error creating product. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1682,6 +1730,10 @@ def edit_product(request, product_id):
             price = data.get('price')
             station = data.get('station', 'kitchen')
             availability = data.get('availability', True)
+            
+            # Validate station
+            if station not in ['kitchen', 'bar', 'buffet', 'service']:
+                station = 'kitchen'
             
             if not name or not price:
                 return JsonResponse({'success': False, 'message': 'Name and price are required'})
@@ -1712,7 +1764,8 @@ def edit_product(request, product_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error updating product: {str(e)}'})
+            logger.error(f'Error updating product: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error updating product. Please try again.'})
     
     # Return product data for editing
     try:
@@ -1732,7 +1785,8 @@ def edit_product(request, product_id):
             'image_url': product.get_image().url if product.get_image() else None
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error retrieving product data: {str(e)}'})
+        logger.error(f'Error retrieving product data: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error retrieving product data. Please try again.'})
 
 @login_required
 def delete_product(request, product_id):
@@ -1764,7 +1818,8 @@ def delete_product(request, product_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error deleting product: {str(e)}'})
+            logger.error(f'Error deleting product: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error deleting product. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1803,7 +1858,8 @@ def get_subcategories(request, category_id):
         subcategories = category.subcategories.all().values('id', 'name')
         return JsonResponse({'success': True, 'subcategories': list(subcategories)})
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error getting subcategories: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error getting subcategories. Please try again.'})
 
 @login_required
 def get_categories(request, restaurant_id):
@@ -1816,7 +1872,8 @@ def get_categories(request, restaurant_id):
         categories = MainCategory.objects.filter(owner=restaurant_owner).values('id', 'name')
         return JsonResponse({'success': True, 'categories': list(categories)})
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error getting categories: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error getting categories. Please try again.'})
 
 
 # ===== Tables Management =====
@@ -1840,7 +1897,10 @@ def manage_tables(request):
         except (ValueError, TypeError):
             restaurant_filter = None
     availability_filter = request.GET.get('availability')
-    per_page = int(request.GET.get('per_page', 10))  # Default to 10, allow customization
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (ValueError, TypeError):
+        per_page = 10
     page = request.GET.get('page', 1)
     
     # Get total count before any filtering
@@ -1882,7 +1942,7 @@ def manage_tables(request):
     paginator = Paginator(tables, per_page)
     try:
         tables_page = paginator.page(page)
-    except:
+    except (PageNotAnInteger, EmptyPage):
         tables_page = paginator.page(1)
     
     # Filter options
@@ -1951,7 +2011,8 @@ def create_table(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error creating table: {str(e)}'})
+            logger.error(f'Error creating table: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error creating table. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -1997,7 +2058,8 @@ def edit_table(request, table_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error updating table: {str(e)}'})
+            logger.error(f'Error updating table: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error updating table. Please try again.'})
     
     # Return table data for editing
     return JsonResponse({
@@ -2038,7 +2100,8 @@ def delete_table(request, table_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error deleting table: {str(e)}'})
+            logger.error(f'Error deleting table: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error deleting table. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -2091,7 +2154,10 @@ def manage_orders(request):
             restaurant_filter = None
     status_filter = request.GET.get('status')
     payment_status_filter = request.GET.get('payment_status')
-    per_page = int(request.GET.get('per_page', 10))  # Default to 10, allow customization
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (ValueError, TypeError):
+        per_page = 10
     page = request.GET.get('page', 1)
     
     # Get total count before any filtering
@@ -2136,7 +2202,7 @@ def manage_orders(request):
     paginator = Paginator(orders, per_page)
     try:
         orders_page = paginator.page(page)
-    except:
+    except (PageNotAnInteger, EmptyPage):
         orders_page = paginator.page(1)
 
     # Get status choices for filter
@@ -2219,7 +2285,8 @@ def update_order_status(request, order_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error updating order status: {str(e)}'})
+            logger.error(f'Error updating order status: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error updating order status. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -2265,7 +2332,8 @@ def update_payment_status(request, order_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error updating payment status: {str(e)}'})
+            logger.error(f'Error updating payment status: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error updating payment status. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -2299,7 +2367,8 @@ def cancel_order(request, order_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error cancelling order: {str(e)}'})
+            logger.error(f'Error cancelling order: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error cancelling order. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -2422,7 +2491,8 @@ def create_staff(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error creating staff member: {str(e)}'})
+            logger.error(f'Error creating staff member: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error creating staff member. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -2486,7 +2556,8 @@ def edit_staff(request, staff_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error updating staff member: {str(e)}'})
+            logger.error(f'Error updating staff member: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error updating staff member. Please try again.'})
     
     # Return staff data for editing
     return JsonResponse({
@@ -2546,7 +2617,8 @@ def delete_staff(request, staff_id):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Error deleting staff member: {str(e)}'})
+            logger.error(f'Error deleting staff member: {str(e)}')
+            return JsonResponse({'success': False, 'message': 'Error deleting staff member. Please try again.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'})
 
@@ -2630,7 +2702,8 @@ def create_user(request):
             return JsonResponse({'success': True, 'message': 'User created successfully'})
             
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
+            logger.error(f'Error creating user: {str(e)}')
+            return JsonResponse({'success': False, 'error': 'Error creating user. Please try again.'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
@@ -2658,7 +2731,8 @@ def user_details(request, user_id):
         }
         return JsonResponse({'success': True, 'user': user_data})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        logger.error(f'Error getting user details: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Error getting user details. Please try again.'})
 
 @login_required
 def edit_user(request, user_id):
@@ -2710,7 +2784,8 @@ def edit_user(request, user_id):
             return JsonResponse({'success': True, 'message': 'User updated successfully'})
             
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
+            logger.error(f'Error updating user: {str(e)}')
+            return JsonResponse({'success': False, 'error': 'Error updating user. Please try again.'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
@@ -2736,7 +2811,8 @@ def delete_user(request, user_id):
             return JsonResponse({'success': True, 'message': 'User deleted successfully'})
             
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
+            logger.error(f'Error deleting user: {str(e)}')
+            return JsonResponse({'success': False, 'error': 'Error deleting user. Please try again.'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
@@ -2754,7 +2830,8 @@ def get_order_status(request, order_id):
             'order_number': order.order_number
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error getting order status: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error getting order status. Please try again.'})
 
 @login_required  
 def get_payment_status(request, order_id):
@@ -2771,7 +2848,8 @@ def get_payment_status(request, order_id):
             'payment_amount': float(order.payment_amount or 0)
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        logger.error(f'Error getting payment status: {str(e)}')
+        return JsonResponse({'success': False, 'message': 'Error getting payment status. Please try again.'})
 
 
 @login_required
@@ -2849,7 +2927,8 @@ def toggle_restaurant_subscription_plan(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'error': f'Error changing subscription plan: {str(e)}'})
+            logger.error(f'Error changing subscription plan: {str(e)}')
+            return JsonResponse({'success': False, 'error': 'Error changing subscription plan. Please try again.'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method.'})
 
@@ -2878,7 +2957,8 @@ def toggle_restaurant_status(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'error': f'Error changing restaurant status: {str(e)}'})
+            logger.error(f'Error changing restaurant status: {str(e)}')
+            return JsonResponse({'success': False, 'error': 'Error changing restaurant status. Please try again.'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method.'})
 
@@ -2923,7 +3003,8 @@ def delete_restaurant_admin(request):
             })
             
         except Exception as e:
-            return JsonResponse({'success': False, 'error': f'Error deleting restaurant: {str(e)}'})
+            logger.error(f'Error deleting restaurant: {str(e)}')
+            return JsonResponse({'success': False, 'error': 'Error deleting restaurant. Please try again.'})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method.'})
 
@@ -2975,4 +3056,5 @@ def restaurant_details_admin(request, restaurant_id):
         return JsonResponse(data)
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Error getting restaurant details: {str(e)}'})
+        logger.error(f'Error getting restaurant details: {str(e)}')
+        return JsonResponse({'success': False, 'error': 'Error getting restaurant details. Please try again.'})

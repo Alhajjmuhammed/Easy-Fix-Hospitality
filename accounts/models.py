@@ -43,6 +43,8 @@ class Role(models.Model):
         ('customer_care', 'Customer Care'),
         ('kitchen', 'Kitchen'),
         ('bar', 'Bar'),
+        ('buffet', 'Buffet'),
+        ('service', 'Service'),
         ('cashier', 'Cashier'),
         ('customer', 'Customer'),
     ]
@@ -120,12 +122,20 @@ class User(AbstractUser):
                                         help_text="Automatically print Kitchen Order Tickets when order is placed")
     auto_print_bot = models.BooleanField(default=True,
                                         help_text="Automatically print Bar Order Tickets when order is placed")
+    auto_print_buffet = models.BooleanField(default=True, 
+                                        help_text="Automatically print Buffet Order Tickets when order is placed")
+    auto_print_service = models.BooleanField(default=True,
+                                        help_text="Automatically print Service Order Tickets when order is placed")
     
     # Printer configuration for multiple printers (optional)
     kitchen_printer_name = models.CharField(max_length=200, blank=True, null=True,
                                           help_text="Specific printer name for Kitchen Order Tickets (leave blank for auto-detect)")
     bar_printer_name = models.CharField(max_length=200, blank=True, null=True,
                                        help_text="Specific printer name for Bar Order Tickets (leave blank for auto-detect)")
+    buffet_printer_name = models.CharField(max_length=200, blank=True, null=True,
+                                          help_text="Specific printer name for Buffet Order Tickets (leave blank for auto-detect)")
+    service_printer_name = models.CharField(max_length=200, blank=True, null=True,
+                                          help_text="Specific printer name for Service Order Tickets (leave blank for auto-detect)")
     receipt_printer_name = models.CharField(max_length=200, blank=True, null=True,
                                           help_text="Specific printer name for Payment Receipts (leave blank for auto-detect)")
     
@@ -165,6 +175,12 @@ class User(AbstractUser):
     
     def is_bar_staff(self):
         return self.role and self.role.name == 'bar'
+    
+    def is_buffet_staff(self):
+        return self.role and self.role.name == 'buffet'
+    
+    def is_service_staff(self):
+        return self.role and self.role.name == 'service'
     
     def is_cashier(self):
         return self.role and self.role.name == 'cashier'
@@ -220,7 +236,7 @@ class User(AbstractUser):
             if main_restaurant:
                 return main_restaurant.subscription_plan == 'PRO'
             return False
-        except:
+        except Exception:
             return False
     
     def can_access_branch_features(self):
@@ -332,7 +348,7 @@ class User(AbstractUser):
                 elif branch_restaurant and branch_restaurant.main_owner:
                     # Fallback: use main owner's restaurant name
                     return branch_restaurant.main_owner.restaurant_name
-            except:
+            except Exception:
                 pass
         
         # Default: return owner's restaurant name
@@ -400,6 +416,14 @@ class User(AbstractUser):
             if not self.restaurant_qr_code:
                 self.generate_qr_code()
         super().save(*args, **kwargs)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['role'], name='user_role_idx'),
+            models.Index(fields=['owner'], name='user_owner_idx'),
+            models.Index(fields=['is_active_staff'], name='user_active_staff_idx'),
+            models.Index(fields=['role', 'owner'], name='user_role_owner_idx'),
+        ]
 
 
 class RestaurantSubscription(models.Model):
@@ -720,6 +744,111 @@ class RestaurantSubscription(models.Model):
         }
         
         return info
+
+
+class AuditLog(models.Model):
+    """
+    General audit log for security events and data changes.
+    Tracks all significant actions in the system for compliance and debugging.
+    """
+    
+    EVENT_TYPE_CHOICES = [
+        # Authentication events
+        ('login', 'User Login'),
+        ('logout', 'User Logout'),
+        ('failed_login', 'Failed Login Attempt'),
+        ('password_change', 'Password Changed'),
+        ('password_reset', 'Password Reset'),
+        
+        # Authorization events
+        ('permission_denied', 'Permission Denied'),
+        ('unauthorized_access', 'Unauthorized Access Attempt'),
+        
+        # Data change events
+        ('action_create', 'Record Created'),
+        ('action_update', 'Record Updated'),
+        ('action_delete', 'Record Deleted'),
+        
+        # Order events
+        ('order_placed', 'Order Placed'),
+        ('order_cancelled', 'Order Cancelled'),
+        ('order_status_change', 'Order Status Changed'),
+        
+        # Payment events
+        ('payment_processed', 'Payment Processed'),
+        ('payment_voided', 'Payment Voided'),
+        ('refund_issued', 'Refund Issued'),
+        
+        # Staff management
+        ('staff_created', 'Staff Account Created'),
+        ('staff_updated', 'Staff Account Updated'),
+        ('staff_deactivated', 'Staff Account Deactivated'),
+        
+        # Restaurant management
+        ('menu_updated', 'Menu Updated'),
+        ('table_updated', 'Table Configuration Updated'),
+        ('settings_changed', 'Settings Changed'),
+        
+        # Security events
+        ('session_hijack_attempt', 'Session Hijack Attempt'),
+        ('suspicious_activity', 'Suspicious Activity Detected'),
+        ('rate_limit_exceeded', 'Rate Limit Exceeded'),
+        
+        # Other
+        ('other', 'Other Event'),
+    ]
+    
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES, db_index=True)
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='audit_logs'
+    )
+    username = models.CharField(max_length=150, help_text="Username at time of event")
+    description = models.TextField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    
+    # Additional context stored as JSON
+    extra_data = models.JSONField(default=dict, blank=True)
+    
+    # Target object (optional - for tracking what was changed)
+    target_model = models.CharField(max_length=100, blank=True)
+    target_id = models.CharField(max_length=50, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    
+    class Meta:
+        verbose_name = "Audit Log"
+        verbose_name_plural = "Audit Logs"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['event_type', '-created_at']),
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['ip_address', '-created_at']),
+            models.Index(fields=['target_model', 'target_id']),
+        ]
+    
+    def __str__(self):
+        return f"[{self.event_type}] {self.username} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+    
+    @classmethod
+    def log(cls, event_type, user=None, description='', ip_address=None, 
+            user_agent='', extra_data=None, target_model='', target_id=''):
+        """Helper method to create audit log entries"""
+        return cls.objects.create(
+            event_type=event_type,
+            user=user if user and hasattr(user, 'is_authenticated') and user.is_authenticated else None,
+            username=getattr(user, 'username', 'anonymous') if user else 'system',
+            description=description,
+            ip_address=ip_address,
+            user_agent=user_agent or '',
+            extra_data=extra_data or {},
+            target_model=target_model,
+            target_id=str(target_id) if target_id else ''
+        )
 
 
 class SubscriptionLog(models.Model):

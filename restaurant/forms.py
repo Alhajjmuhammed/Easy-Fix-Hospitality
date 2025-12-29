@@ -1,4 +1,6 @@
 from django import forms
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Product, MainCategory, SubCategory, TableInfo, HappyHourPromotion
 from accounts.models import User, Role
 
@@ -92,8 +94,10 @@ class StaffForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Only show staff roles (exclude customer)
-        self.fields['role'].queryset = Role.objects.exclude(name='customer')
+        # SECURITY: Only allow actual staff roles - exclude customer, owner, and admin roles
+        self.fields['role'].queryset = Role.objects.filter(
+            name__in=['customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']
+        )
     
     def clean(self):
         cleaned_data = super().clean()
@@ -102,6 +106,13 @@ class StaffForm(forms.ModelForm):
         
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords don't match.")
+        
+        # SECURITY: Validate password strength using Django validators
+        if password:
+            try:
+                validate_password(password)
+            except DjangoValidationError as e:
+                self.add_error('password', e.messages)
         
         return cleaned_data
 

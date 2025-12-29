@@ -156,6 +156,16 @@ class Restaurant(models.Model):
         help_text="Auto-print Bar Order Tickets"
     )
     
+    auto_print_buffet = models.BooleanField(
+        default=True,
+        help_text="Auto-print Buffet Order Tickets"
+    )
+    
+    auto_print_service = models.BooleanField(
+        default=True,
+        help_text="Auto-print Service Order Tickets"
+    )
+    
     kitchen_printer_name = models.CharField(
         max_length=200,
         blank=True,
@@ -168,6 +178,20 @@ class Restaurant(models.Model):
         blank=True,
         null=True,
         help_text="Bar printer name (blank for auto-detect)"
+    )
+    
+    buffet_printer_name = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Buffet printer name (blank for auto-detect)"
+    )
+    
+    service_printer_name = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Service printer name (blank for auto-detect)"
     )
     
     receipt_printer_name = models.CharField(

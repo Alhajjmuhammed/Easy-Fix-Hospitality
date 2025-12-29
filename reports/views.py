@@ -143,13 +143,19 @@ def dashboard(request):
         if to_date:
             orders = orders.filter(created_at__date__lte=to_date)
     
-    # Apply station filtering (Kitchen/Bar/All)
+    # Apply station filtering (Kitchen/Bar/Buffet/Service/All)
     if station_filter == 'kitchen':
         # Filter orders that have kitchen items
         orders = orders.filter(order_items__product__station='kitchen').distinct()
     elif station_filter == 'bar':
         # Filter orders that have bar items
         orders = orders.filter(order_items__product__station='bar').distinct()
+    elif station_filter == 'buffet':
+        # Filter orders that have buffet items
+        orders = orders.filter(order_items__product__station='buffet').distinct()
+    elif station_filter == 'service':
+        # Filter orders that have service items
+        orders = orders.filter(order_items__product__station='service').distinct()
     # 'all' means no station filter
     
     # Helper functions for station detection
@@ -159,6 +165,12 @@ def dashboard(request):
     
     def has_bar_items(order):
         return any(item.product.station == 'bar' for item in order.order_items.all())
+    
+    def has_buffet_items(order):
+        return any(item.product.station == 'buffet' for item in order.order_items.all())
+    
+    def has_service_items(order):
+        return any(item.product.station == 'service' for item in order.order_items.all())
 
     # Calculate summary data with optimized queries
     total_orders = orders.count()
@@ -169,7 +181,9 @@ def dashboard(request):
     # Calculate station-specific metrics
     kitchen_orders_count = len([o for o in orders if has_kitchen_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'kitchen' else 0)
     bar_orders_count = len([o for o in orders if has_bar_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'bar' else 0)
-    mixed_orders_count = len([o for o in orders if has_kitchen_items(o) and has_bar_items(o)]) if station_filter == 'all' else 0
+    buffet_orders_count = len([o for o in orders if has_buffet_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'buffet' else 0)
+    service_orders_count = len([o for o in orders if has_service_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'service' else 0)
+    mixed_orders_count = len([o for o in orders if sum([has_kitchen_items(o), has_bar_items(o), has_buffet_items(o), has_service_items(o)]) > 1]) if station_filter == 'all' else 0
     
     # Top selling products analysis
     top_products = OrderItem.objects.filter(order__in=orders)\
@@ -428,13 +442,13 @@ def export_csv(request):
         try:
             category_name = MainCategory.objects.get(id=category_id).name
             writer.writerow(['Category Filter:', category_name])
-        except:
+        except (MainCategory.DoesNotExist, ValueError):
             writer.writerow(['Category Filter:', f'Category ID {category_id}'])
     if subcategory_id != 'all':
         try:
             subcategory_name = SubCategory.objects.get(id=subcategory_id).name
             writer.writerow(['Sub Category Filter:', subcategory_name])
-        except:
+        except (SubCategory.DoesNotExist, ValueError):
             writer.writerow(['Sub Category Filter:', f'Sub Category ID {subcategory_id}'])
     writer.writerow([])  # Empty row
     
@@ -552,12 +566,12 @@ def export_csv(request):
     if category_id != 'all':
         try:
             selected_category_name = MainCategory.objects.get(id=category_id).name
-        except:
+        except (MainCategory.DoesNotExist, ValueError):
             pass
     if subcategory_id != 'all':
         try:
             selected_subcategory_name = SubCategory.objects.get(id=subcategory_id).name
-        except:
+        except (SubCategory.DoesNotExist, ValueError):
             pass
     
     for order in orders.order_by('-created_at'):
@@ -830,14 +844,14 @@ def export_pdf(request):
         try:
             category_name = MainCategory.objects.get(id=category_id).name
             report_info.append(['Category Filter:', category_name])
-        except:
+        except (MainCategory.DoesNotExist, ValueError):
             report_info.append(['Category Filter:', f'Category ID {category_id}'])
     
     if subcategory_id != 'all':
         try:
             subcategory_name = SubCategory.objects.get(id=subcategory_id).name
             report_info.append(['Sub Category Filter:', subcategory_name])
-        except:
+        except (SubCategory.DoesNotExist, ValueError):
             report_info.append(['Sub Category Filter:', f'Sub Category ID {subcategory_id}'])
     
     info_table = Table(report_info, colWidths=[2*inch, 4*inch])

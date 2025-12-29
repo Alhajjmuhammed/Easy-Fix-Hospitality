@@ -1,0 +1,863 @@
+{% extends 'base.html' %}
+{% load restaurant_tags %}
+
+{% block title %}Service Dashboard - {{ user.restaurant_name|default:"Restaurant System" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+        border-radius: 10px;
+        margin-SERVICEtom: 2rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin: 0.5rem 0;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        border-left: 5px solid;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    .stat-card.pending { border-left-color: #007bff; }
+    .stat-card.confirmed { border-left-color: #ffc107; }
+    .stat-card.preparing { border-left-color: #17a2b8; }
+    .stat-card.ready { border-left-color: #28a745; }
+    .stat-card.served { border-left-color: #6f42c1; }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .stat-label {
+        font-size: 1rem;
+        margin: 0;
+        opacity: 0.8;
+    }
+    
+    .stat-icon {
+        font-size: 2rem;
+        opacity: 0.7;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        font-weight: 600;
+        padding: 1rem 1.5rem;
+        margin-right: 0.5rem;
+        border-radius: 10px 10px 0 0;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        transform: translateY(-2px);
+    }
+    
+    .nav-tabs .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .order-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        border-left: 5px solid;
+        overflow: hidden;
+    }
+    
+    .order-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    .order-card { border-left-color: #007bff; }
+    .order-card.confirmed { border-left-color: #ffc107; }
+    .order-card.preparing { border-left-color: #17a2b8; }
+    .order-card.ready { border-left-color: #28a745; }
+    .order-card.served { border-left-color: #6f42c1; }
+    
+    .order-header {
+        background: rgba(0, 0, 0, 0.02);
+        padding: 1rem;
+        border-SERVICEtom: 1px solid rgba(0, 0, 0, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .order-number {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #333;
+    }
+    
+    .order-table {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    
+    .order-timer {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    
+    .order-time {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .order-content {
+        padding: 1rem;
+    }
+    
+    .customer-info {
+        margin-SERVICEtom: 1rem;
+    }
+    
+    .order-items {
+        background: rgba(0, 0, 0, 0.02);
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin-SERVICEtom: 1rem;
+    }
+    
+    .item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.3rem 0;
+        border-SERVICEtom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .item:last-child {
+        border-SERVICEtom: none;
+    }
+    
+    .item-name {
+        font-weight: 500;
+        color: #333;
+    }
+    
+    .item-qty {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-weight: bold;
+        font-size: 0.85rem;
+    }
+    
+    .order-actions {
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.02);
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .btn-confirm {
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 0.6rem 1.2rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-confirm:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+        color: white;
+    }
+    
+    .btn-served, .btn-purple {
+        background: linear-gradient(45deg, #6f42c1, #5a2d91);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 0.6rem 1.2rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-served:hover, .btn-purple:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(111, 66, 193, 0.3);
+        color: white;
+    }
+    
+    .no-orders {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+    
+    .no-orders i {
+        font-size: 3rem;
+        margin-SERVICEtom: 1rem;
+        opacity: 0.5;
+    }
+    
+    .refresh-info {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 10px;
+        padding: 1rem;
+        margin-SERVICEtom: 1rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-header {
+            padding: 1rem 0;
+        }
+        
+        .stat-card {
+            margin: 0.25rem 0;
+            padding: 1rem;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+        }
+        
+        .order-header {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .nav-tabs .nav-link {
+            padding: 0.8rem 1rem;
+            font-size: 0.9rem;
+        }
+    }
+
+    /* LIVE indicator animation */
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.4);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+        }
+    }
+
+    .refresh-timer {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 1.5rem;
+        font-size: 0.8rem;
+        z-index: 1000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" data-restaurant-view="true" data-owner-id="{{ request.user.owner.id|default:'default' }}">
+    <!-- Live Indicator -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Service Dashboard</h1>
+        <span class="badge bg-success fs-6 px-3 py-2" style="animation: pulse 2s infinite;">
+            <i class="fas fa-circle text-success me-1" style="font-size: 0.6rem;"></i>LIVE
+        </span>
+    </div>
+
+    <!-- Auto-refresh timer display -->
+    <div class="refresh-timer" id="refreshTimer">
+        Auto-refresh in: <span id="countdown">30</span>s
+    </div>
+
+    <!-- Header Section -->
+    <div class="dashboard-header text-center">
+        <div class="container">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-concierge-bell me-3"></i>
+                Service Dashboard
+            </h1>
+            <p class="lead mb-4">{% get_restaurant_name %} | Service Staff: {{ user.get_full_name }}</p>
+            
+            <!-- Statistics Row -->
+            <div class="row">
+                <div class="col-lg-2 col-md-4 col-sm-6">
+                    <div class="stat-card pending">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stat-number text-primary">{{ pending_count }}</div>
+                                <div class="stat-label text-muted">Pending</div>
+                            </div>
+                            <div class="stat-icon text-primary">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4 col-sm-6">
+                    <div class="stat-card confirmed">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stat-number text-warning">{{ confirmed_count }}</div>
+                                <div class="stat-label text-muted">Confirmed</div>
+                            </div>
+                            <div class="stat-icon text-warning">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4 col-sm-6">
+                    <div class="stat-card preparing">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stat-number text-info">{{ preparing_count }}</div>
+                                <div class="stat-label text-muted">Preparing</div>
+                            </div>
+                            <div class="stat-icon text-info">
+                                <i class="fas fa-utensils"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4 col-sm-6">
+                    <div class="stat-card ready">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stat-number text-success">{{ ready_count }}</div>
+                                <div class="stat-label text-muted">Ready</div>
+                            </div>
+                            <div class="stat-icon text-success">
+                                <i class="fas fa-bell"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4 col-sm-6">
+                    <div class="stat-card served">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="stat-number text-purple">{{ served_count }}</div>
+                                <div class="stat-label text-muted">Served</div>
+                            </div>
+                            <div class="stat-icon text-purple">
+                                <i class="fas fa-check-double"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs" id="orderTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                <i class="fas fa-clock"></i> Pending ({{ pending_count }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="confirmed-tab" data-bs-toggle="tab" data-bs-target="#confirmed" type="button" role="tab">
+                <i class="fas fa-check-circle"></i> Confirmed ({{ confirmed_count }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="preparing-tab" data-bs-toggle="tab" data-bs-target="#preparing" type="button" role="tab">
+                <i class="fas fa-utensils"></i> Preparing ({{ preparing_count }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="ready-tab" data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab">
+                <i class="fas fa-bell"></i> Ready ({{ ready_count }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="served-tab" data-bs-toggle="tab" data-bs-target="#served" type="button" role="tab">
+                <i class="fas fa-check-double"></i> Served ({{ served_count }})
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content mt-3" id="orderTabsContent">
+        <!-- Pending Tab -->
+        <div class="tab-pane fade show active" id="pending" role="tabpanel">
+            {% if pending_orders %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Order #</th>
+                                <th>Table</th>
+                                <th>Customer</th>
+                                <th>Time</th>
+                                <th>Service Items</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in pending_orders %}
+                                <tr>
+                                    <td><strong>#{{ order.order_number }}</strong></td>
+                                    <td><span class="badge bg-primary">{{ order.table_info.tbl_no }}</span></td>
+                                    <td>{{ order.ordered_by }}</td>
+                                    <td>{{ order.created_at|date:"H:i" }}</td>
+                                    <td>
+                                        {% for item in order.order_items.all %}
+                                            {% if item.product.station == 'service' %}
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
+                                            <!-- SERVICE Print Button -->
+                                            <a href="{% url 'orders:print_service' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
+                                                <i class="fas fa-print"></i> Print SERVICE
+                                            </a>
+                                            <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="status" value="confirmed">
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="fas fa-check"></i> Confirm
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-clock fa-3x mb-3"></i>
+                    <p>No pending orders</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Confirmed Tab -->
+        <div class="tab-pane fade" id="confirmed" role="tabpanel">
+            {% if confirmed_orders %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Order #</th>
+                                <th>Table</th>
+                                <th>Customer</th>
+                                <th>Time</th>
+                                <th>Duration</th>
+                                <th>Service Items</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in confirmed_orders %}
+                                <tr>
+                                    <td><strong>#{{ order.order_number }}</strong></td>
+                                    <td><span class="badge bg-warning">{{ order.table_info.tbl_no }}</span></td>
+                                    <td>{{ order.ordered_by }}</td>
+                                    <td>{{ order.created_at|date:"H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-info" id="timer-{{ order.id }}" 
+                                              data-start-time="{{ order.confirmed_at|date:'c' }}">
+                                            Calculating...
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% for item in order.order_items.all %}
+                                            {% if item.product.station == 'service' %}
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
+                                            <!-- SERVICE Print Button -->
+                                            <a href="{% url 'orders:print_service' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
+                                                <i class="fas fa-print"></i> Print SERVICE
+                                            </a>
+                                            <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="status" value="preparing">
+                                                <button type="submit" class="btn btn-primary btn-sm">
+                                                    <i class="fas fa-play"></i> Start Preparing
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-check-circle fa-3x mb-3"></i>
+                    <p>No confirmed orders</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Preparing Tab -->
+        <div class="tab-pane fade" id="preparing" role="tabpanel">
+            {% if preparing_orders %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Order #</th>
+                                <th>Table</th>
+                                <th>Customer</th>
+                                <th>Time</th>
+                                <th>Duration</th>
+                                <th>Service Items</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in preparing_orders %}
+                                <tr>
+                                    <td><strong>#{{ order.order_number }}</strong></td>
+                                    <td><span class="badge bg-info">{{ order.table_info.tbl_no }}</span></td>
+                                    <td>{{ order.ordered_by }}</td>
+                                    <td>{{ order.created_at|date:"H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-warning" id="timer-{{ order.id }}" 
+                                              data-start-time="{{ order.preparing_at|date:'c' }}">
+                                            Calculating...
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% for item in order.order_items.all %}
+                                            {% if item.product.station == 'service' %}
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
+                                            <!-- SERVICE Reprint Button -->
+                                            <a href="{% url 'orders:reprint_service' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
+                                                <i class="fas fa-print"></i> Reprint SERVICE
+                                            </a>
+                                            <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="status" value="ready">
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="fas fa-flag-checkered"></i> Mark Ready
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-utensils fa-3x mb-3"></i>
+                    <p>No orders being prepared</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Ready Tab -->
+        <div class="tab-pane fade" id="ready" role="tabpanel">
+            {% if ready_orders %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Order #</th>
+                                <th>Table</th>
+                                <th>Customer</th>
+                                <th>Time</th>
+                                <th>Duration</th>
+                                <th>Service Items</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in ready_orders %}
+                                <tr class="table-success">
+                                    <td><strong>#{{ order.order_number }}</strong></td>
+                                    <td><span class="badge bg-success">{{ order.table_info.tbl_no }}</span></td>
+                                    <td>{{ order.ordered_by }}</td>
+                                    <td>{{ order.created_at|date:"H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-danger" id="timer-{{ order.id }}" 
+                                              data-start-time="{{ order.ready_at|date:'c' }}">
+                                            Calculating...
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% for item in order.order_items.all %}
+                                            {% if item.product.station == 'service' %}
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
+                                            <!-- SERVICE Reprint Button -->
+                                            <a href="{% url 'orders:reprint_service' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
+                                                <i class="fas fa-print"></i> Reprint SERVICE
+                                            </a>
+                                            <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="status" value="served">
+                                                <button type="submit" class="btn btn-purple btn-sm">
+                                                    <i class="fas fa-check-double"></i> Mark Served
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-bell fa-3x mb-3"></i>
+                    <p>No orders ready for service</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Served Tab -->
+        <div class="tab-pane fade" id="served" role="tabpanel">
+            {% if served_orders %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Order #</th>
+                                <th>Table</th>
+                                <th>Customer</th>
+                                <th>Ordered</th>
+                                <th>Served</th>
+                                <th>Service Items</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in served_orders %}
+                                <tr class="table-light">
+                                    <td><strong>#{{ order.order_number }}</strong></td>
+                                    <td><span class="badge bg-secondary">{{ order.table_info.tbl_no }}</span></td>
+                                    <td>{{ order.ordered_by }}</td>
+                                    <td>{{ order.created_at|date:"H:i" }}</td>
+                                    <td><span class="badge bg-success">{{ order.served_at|date:"H:i" }}</span></td>
+                                    <td>
+                                        {% for item in order.order_items.all %}
+                                            {% if item.product.station == 'service' %}
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-check-double fa-3x mb-3"></i>
+                    <p>No served orders yet today</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto refresh functionality
+document.addEventListener('DOMContentLoaded', function() {
+    var pendingCount = parseInt('{{ pending_count|default:0 }}');
+    var confirmedCount = parseInt('{{ confirmed_count|default:0 }}');
+    
+    if (pendingCount > 0 || confirmedCount > 0) {
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    }
+});
+
+// Countdown timer for auto-refresh
+let countdown = 30;
+const countdownElement = document.getElementById('countdown');
+const refreshTimerElement = document.getElementById('refreshTimer');
+
+function updateCountdown() {
+    if (countdownElement) {
+        countdownElement.textContent = countdown;
+    }
+    if (countdown <= 0) {
+        location.reload();
+    } else {
+        countdown--;
+        setTimeout(updateCountdown, 1000);
+    }
+}
+
+// Start countdown if there are active orders
+var pendingCount = parseInt('{{ pending_count|default:0 }}');
+var confirmedCount = parseInt('{{ confirmed_count|default:0 }}');
+var preparingCount = parseInt('{{ preparing_count|default:0 }}');
+
+if (pendingCount > 0 || confirmedCount > 0 || preparingCount > 0) {
+    updateCountdown();
+} else {
+    if (refreshTimerElement) {
+        refreshTimerElement.style.display = 'none';
+    }
+}
+
+// Order preparation timers
+document.addEventListener('DOMContentLoaded', function() {
+    // Find all timer elements and initialize them
+    var timerElements = document.querySelectorAll('[id^="timer-"]');
+    
+    timerElements.forEach(function(timerElement) {
+        var orderId = timerElement.id.replace('timer-', '');
+        var startTimeStr = timerElement.getAttribute('data-start-time');
+        
+        if (startTimeStr) {
+            var startTime = new Date(startTimeStr);
+            
+            function updateTimer() {
+                var now = new Date();
+                var diff = Math.floor((now - startTime) / 1000);
+                var minutes = Math.floor(diff / 60);
+                var seconds = diff % 60;
+                
+                timerElement.textContent = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+                
+                // Change color based on time
+                if (minutes >= 15) {
+                    timerElement.style.color = '#dc3545'; // Red
+                } else if (minutes >= 10) {
+                    timerElement.style.color = '#fd7e14'; // Orange
+                } else {
+                    timerElement.style.color = '#6c757d'; // Default
+                }
+            }
+            
+            updateTimer();
+            setInterval(updateTimer, 1000);
+        }
+    });
+});
+
+// Enhanced tab switching with URL hash
+document.addEventListener('DOMContentLoaded', function() {
+    // Check for hash in URL and activate corresponding tab
+    if (window.location.hash) {
+        var hash = window.location.hash.substring(1);
+        var tabElement = document.getElementById(hash + '-tab');
+        if (tabElement) {
+            var tab = new bootstrap.Tab(tabElement);
+            tab.show();
+        }
+    }
+    
+    // Update URL hash when tab is clicked
+    var tabElements = document.querySelectorAll('button[data-bs-toggle="tab"]');
+    tabElements.forEach(function(tabElement) {
+        tabElement.addEventListener('shown.bs.tab', function(e) {
+            var targetId = e.target.getAttribute('data-bs-target').substring(1);
+            window.location.hash = targetId;
+        });
+    });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey) {
+        switch(e.key) {
+            case '1':
+                e.preventDefault();
+                var tab1 = document.getElementById('pending-tab');
+                if (tab1) tab1.click();
+                break;
+            case '2':
+                e.preventDefault();
+                var tab2 = document.getElementById('confirmed-tab');
+                if (tab2) tab2.click();
+                break;
+            case '3':
+                e.preventDefault();
+                var tab3 = document.getElementById('preparing-tab');
+                if (tab3) tab3.click();
+                break;
+            case '4':
+                e.preventDefault();
+                var tab4 = document.getElementById('ready-tab');
+                if (tab4) tab4.click();
+                break;
+            case '5':
+                e.preventDefault();
+                var tab5 = document.getElementById('served-tab');
+                if (tab5) tab5.click();
+                break;
+            case 'r':
+                e.preventDefault();
+                location.reload();
+                break;
+        }
+    }
+});
+
+// Auto-focus on active orders
+document.addEventListener('DOMContentLoaded', function() {
+    // Scroll to first pending or confirmed order if exists
+    var firstActiveOrder = document.querySelector('.order-pending, .order-confirmed');
+    if (firstActiveOrder) {
+        firstActiveOrder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+});
+</script>
+{% endblock %}
+

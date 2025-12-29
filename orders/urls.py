@@ -15,6 +15,13 @@ urlpatterns = [
     
     # Bar management
     path('bar/', views.bar_dashboard, name='bar_dashboard'),
+    
+    # Buffet management
+    path('buffet/', views.buffet_dashboard, name='buffet_dashboard'),
+    
+    # Service management
+    path('service/', views.service_dashboard, name='service_dashboard'),
+    
     path('', views.order_list, name='order_list'),
     path('create/', views.create_order, name='create_order'),
     
@@ -51,6 +58,14 @@ urlpatterns = [
     # BOT (Bar Order Ticket) printing
     path('bot/<int:order_id>/', views.print_bot, name='print_bot'),
     path('bot/reprint/<int:order_id>/', views.reprint_bot, name='reprint_bot'),
+    
+    # BUFFET (Buffet Order Ticket) printing
+    path('buffet/<int:order_id>/', views.print_buffet, name='print_buffet'),
+    path('buffet/reprint/<int:order_id>/', views.reprint_buffet, name='reprint_buffet'),
+    
+    # SERVICE (Service Order Ticket) printing
+    path('service/<int:order_id>/', views.print_service, name='print_service'),
+    path('service/reprint/<int:order_id>/', views.reprint_service, name='reprint_service'),
     
     # Customer care management
     path('customer-care/', views.customer_care_dashboard, name='customer_care_dashboard'),

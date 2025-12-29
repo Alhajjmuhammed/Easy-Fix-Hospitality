@@ -69,9 +69,7 @@
             'width=800,height=900,scrollbars=yes,resizable=yes'
         );
         
-        if (kotWindow) {
-            console.log('KOT window opened for Order #{{ order.order_number }}');
-        } else {
+        if (!kotWindow) {
             alert('Please allow pop-ups to automatically print Kitchen Order Ticket (KOT)');
         }
         {% endif %}
@@ -85,9 +83,7 @@
                 'width=800,height=900,scrollbars=yes,resizable=yes'
             );
             
-            if (botWindow) {
-                console.log('BOT window opened for Order #{{ order.order_number }}');
-            } else {
+            if (!botWindow) {
                 alert('Please allow pop-ups to automatically print Bar Order Ticket (BOT)');
             }
         }, 300);

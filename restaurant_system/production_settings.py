@@ -11,8 +11,9 @@ from decouple import config, Csv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
+# SECURITY: Secret key MUST be set via environment variable
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+SECRET_KEY = config('SECRET_KEY')  # No default - MUST be configured
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -85,14 +86,29 @@ TEMPLATES = [
 WSGI_APPLICATION = 'restaurant_system.wsgi.application'
 
 # Database - Use environment variables for production
+# SSL mode enforced for secure database connections
+DB_SSL_MODE = config('DB_SSL_MODE', default='require')  # Options: disable, allow, prefer, require, verify-ca, verify-full
+
+# Warn if SSL is disabled in production
+if DB_SSL_MODE == 'disable' and not DEBUG:
+    import sys
+    sys.stderr.write("⚠️  WARNING: DB_SSL_MODE is disabled. Enable SSL for production database security.\n")
+
 DATABASES = {
     'default': {
         'ENGINE': config('DATABASE_ENGINE', default='django.db.backends.postgresql'),
-        'NAME': config('DB_NAME', default='restaurant_db'),
-        'USER': config('DB_USER', default='restaurant_user'),
-        'PASSWORD': config('DB_PASSWORD', default='password'),
+        'NAME': config('DB_NAME'),  # No default - MUST be configured
+        'USER': config('DB_USER'),  # No default - MUST be configured
+        'PASSWORD': config('DB_PASSWORD'),  # No default - MUST be configured
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
+        'CONN_MAX_AGE': 60,  # Keep database connections alive for 60 seconds
+        'CONN_HEALTH_CHECKS': True,  # Verify connections before use (Django 4.1+)
+        'OPTIONS': {
+            'connect_timeout': 10,
+            'sslmode': DB_SSL_MODE,  # Enforce SSL connection
+        },
+        'ATOMIC_REQUESTS': True,  # Wrap each request in transaction
     }
 }
 
@@ -146,15 +162,21 @@ LOGOUT_REDIRECT_URL = '/'
 # Channels Configuration for WebSockets
 ASGI_APPLICATION = 'restaurant_system.asgi.application'
 
-# Redis configuration for production
+# Redis configuration for production with authentication
+REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
+REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
+REDIS_PASSWORD_CHANNELS = config('REDIS_PASSWORD', default='')
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': [(
-                config('REDIS_HOST', default='127.0.0.1'),
-                config('REDIS_PORT', default=6379, cast=int)
-            )],
+            'hosts': [{
+                'address': (REDIS_HOST, REDIS_PORT),
+                'password': REDIS_PASSWORD_CHANNELS if REDIS_PASSWORD_CHANNELS else None,
+            }],
+            'capacity': 1500,
+            'expiry': 10,
         },
     },
 }
@@ -169,7 +191,8 @@ CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 CROSS_ORIGIN_EMBEDDER_POLICY = 'unsafe-none'  # Allow external CDN resources
 
 # SSL/HTTPS Detection - Read from environment
-USE_HTTPS = config('USE_HTTPS', default=False, cast=bool)
+# Default to True in production - should always use HTTPS
+USE_HTTPS = config('USE_HTTPS', default=True, cast=bool)
 
 # CSRF Settings
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
@@ -177,19 +200,16 @@ CSRF_COOKIE_SECURE = USE_HTTPS  # Automatically set based on HTTPS
 CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cookies in same-site context
 CSRF_COOKIE_NAME = 'csrftoken'  # Default name
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie, not session
+# CSRF Trusted Origins - HTTPS only for production security
 CSRF_TRUSTED_ORIGINS = [
     'https://easyfixsoft.com',
     'https://www.easyfixsoft.com',
-    'http://easyfixsoft.com',
-    'http://www.easyfixsoft.com',
     'https://hospitality.easyfixsoft.com',
-    'http://hospitality.easyfixsoft.com',
     'https://www.hospitality.easyfixsoft.com',
-    'http://www.hospitality.easyfixsoft.com',
-    'http://72.62.51.225',
     'https://72.62.51.225',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
+    # Development origins - remove in strict production
+    # 'http://localhost:8000',
+    # 'http://127.0.0.1:8000',
 ]
 
 # Session Configuration
@@ -199,7 +219,6 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 
 # HTTPS Settings - SSL is configured with nginx reverse proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-# SECURE_SSL_REDIRECT = True  # Let nginx handle SSL redirect
 
 # Logging Configuration
 LOGGING = {
@@ -230,6 +249,16 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'django.security': {
+            'handlers': ['file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'axes': {
+            'handlers': ['file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
         'restaurant': {
             'handlers': ['file', 'console'],
             'level': 'INFO',
@@ -241,19 +270,65 @@ LOGGING = {
 # Create logs directory if it doesn't exist
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
-# Custom Security Headers Middleware Class
+# Custom Security Headers Middleware Class with CSP Enforcement
 class SecurityHeadersMiddleware:
+    """
+    Production security headers middleware.
+    Enforces CSP, security headers, and other protections.
+    """
+    
+    # Content Security Policy directives
+    # Note: 'unsafe-inline' needed for inline scripts/styles until nonce implementation
+    CSP_DIRECTIVES = {
+        'default-src': ["'self'"],
+        'script-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+        'style-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+        'font-src': ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+        'img-src': ["'self'", "data:", "https:", "blob:"],
+        'connect-src': ["'self'", "wss:", "https:"],
+        'frame-ancestors': ["'self'"],
+        'base-uri': ["'self'"],
+        'form-action': ["'self'"],
+        'object-src': ["'none'"],
+        'upgrade-insecure-requests': [],
+    }
+    
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         response = self.get_response(request)
         
-        # Add security headers - Allow CDN resources
+        # Skip CSP for admin pages (they need inline styles/scripts)
+        if request.path.startswith('/secure-management-portal/'):
+            return response
+        
+        # Build CSP header
+        csp_parts = []
+        for directive, sources in self.CSP_DIRECTIVES.items():
+            if sources:
+                csp_parts.append(f"{directive} {' '.join(sources)}")
+            else:
+                csp_parts.append(directive)
+        
+        csp_header = '; '.join(csp_parts)
+        
+        # Add security headers
+        response['Content-Security-Policy'] = csp_header
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['X-Frame-Options'] = 'SAMEORIGIN'
+        response['X-XSS-Protection'] = '1; mode=block'
         response['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
         response['Cross-Origin-Embedder-Policy'] = 'unsafe-none'
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(), payment=()'
+        response['X-DNS-Prefetch-Control'] = 'off'
+        # Prevent search engines from indexing sensitive admin/system pages
+        response['X-Robots-Tag'] = 'noindex, nofollow'
+        
+        # Remove server identification headers
+        if 'Server' in response:
+            del response['Server']
         
         return response
 
@@ -299,30 +374,69 @@ RATELIMIT_USE_CACHE = 'default'
 RATELIMIT_IP_META_KEY = 'HTTP_X_REAL_IP'
 
 # Redis Cache for Production (Required)
+# IMPORTANT: REDIS_PASSWORD should be set in environment for security
+REDIS_PASSWORD = config('REDIS_PASSWORD', default='')
+
+# Only warn about Redis password when running server (not during imports/tests)
+# Check for runserver, gunicorn, daphne, or uvicorn in sys.argv
+import sys
+_is_server_running = any(cmd in sys.argv[0] for cmd in ['manage.py', 'gunicorn', 'daphne', 'uvicorn']) and \
+                     any(arg in sys.argv for arg in ['runserver', 'run', 'gunicorn', 'daphne', 'uvicorn'])
+
+if not REDIS_PASSWORD and not DEBUG and _is_server_running:
+    sys.stderr.write("WARNING: REDIS_PASSWORD not set. Strongly recommended for production security.\n")
+
+# Build Redis URL with password if set
+REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1" if REDIS_PASSWORD else f"redis://{REDIS_HOST}:{REDIS_PORT}/1"
+
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'LOCATION': REDIS_URL,
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'PASSWORD': config('REDIS_PASSWORD', default=''),
             'SOCKET_CONNECT_TIMEOUT': 5,
             'SOCKET_TIMEOUT': 5,
             'RETRY_ON_TIMEOUT': True,
             'MAX_CONNECTIONS': 50,
+            'CONNECTION_POOL_KWARGS': {'max_connections': 50},
+            'IGNORE_EXCEPTIONS': True,  # Graceful degradation if Redis down
         },
         'KEY_PREFIX': 'restaurant',
         'TIMEOUT': 300,
     }
 }
 
+# Use Redis for session storage in production
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+
 # CORS Configuration for Production
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='https://easyfixsoft.com,https://www.easyfixsoft.com',
+    default='https://easyfixsoft.com,https://www.easyfixsoft.com,https://hospitality.easyfixsoft.com,https://www.hospitality.easyfixsoft.com',
     cast=Csv()
 )
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Content Security Policy - Stricter for production
 CSP_DEFAULT_SRC = ["'self'"]
@@ -350,7 +464,8 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
-SECURE_SSL_REDIRECT = False  # Let nginx handle SSL redirect
+# SSL redirect as defense-in-depth (nginx also handles this)
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
 
 # Data Upload Limits
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB (stricter than dev)
@@ -391,5 +506,7 @@ REST_FRAMEWORK = {
 # Set to False for local direct printing (uses win32print directly)
 USE_PRINT_QUEUE = True  # ENABLED for production - uses print queue
 
-print("✅ Production settings loaded successfully")
+import logging
+_logger = logging.getLogger(__name__)
+_logger.info("Production settings loaded successfully")
 # Enhanced Logging for Production
