@@ -1426,15 +1426,9 @@ def _generate_bill_content(order, printed_by=None):
     subtotal = order.get_subtotal()
     discount = order.get_total_discount() if hasattr(order, 'get_total_discount') else Decimal('0')
     
-    # Get tax rate from correct source (Restaurant model first, then User)
-    # Priority 1: Restaurant model (for branches)
-    if hasattr(order.table_info, 'restaurant') and order.table_info.restaurant:
-        tax_rate = order.table_info.restaurant.tax_rate
-    else:
-        # Priority 2: User (owner) model
-        tax_rate = restaurant.tax_rate if hasattr(restaurant, 'tax_rate') else Decimal('0.0800')
-    
-    tax_amount = order.get_tax_amount() if hasattr(order, 'get_tax_amount') else (subtotal * tax_rate)
+    # Get tax from Order model which has correct tax rate logic
+    tax_amount = order.get_tax_amount()
+    tax_percentage = order.tax_rate if hasattr(order, 'tax_rate') else 8.0  # tax_rate property returns percentage
     total = order.get_total() if hasattr(order, 'get_total') else (subtotal - discount + tax_amount)
     
     # Subtotal
@@ -1451,7 +1445,6 @@ def _generate_bill_content(order, printed_by=None):
         lines.append(discount_label + (" " * spacing) + discount_value)
     
     # Tax
-    tax_percentage = float(tax_rate * 100)
     tax_label = f"Tax ({tax_percentage:.1f}%):"
     tax_value = f"{currency_symbol}{float(tax_amount):.2f}"
     spacing = width - len(tax_label) - len(tax_value)
@@ -1897,15 +1890,9 @@ def _generate_receipt_content(payment):
     subtotal = order.get_subtotal()
     discount = order.get_total_discount() if hasattr(order, 'get_total_discount') else Decimal('0')
     
-    # Get tax rate from correct source (Restaurant model first, then User)
-    # Priority 1: Restaurant model (for branches)
-    if hasattr(order.table_info, 'restaurant') and order.table_info.restaurant:
-        tax_rate = order.table_info.restaurant.tax_rate
-    else:
-        # Priority 2: User (owner) model
-        tax_rate = restaurant.tax_rate if hasattr(restaurant, 'tax_rate') else Decimal('0.0800')
-    
-    tax_amount = order.get_tax_amount() if hasattr(order, 'get_tax_amount') else (subtotal * tax_rate)
+    # Get tax from Order model which has correct tax rate logic
+    tax_amount = order.get_tax_amount()
+    tax_percentage = order.tax_rate if hasattr(order, 'tax_rate') else 8.0  # tax_rate property returns percentage
     total = order.get_total() if hasattr(order, 'get_total') else (subtotal - discount + tax_amount)
     
     # Subtotal - right-aligned EXACTLY like HTML
@@ -1922,7 +1909,6 @@ def _generate_receipt_content(payment):
         lines.append(discount_label + (" " * spacing) + discount_value)
     
     # Tax - right-aligned EXACTLY like HTML
-    tax_percentage = float(tax_rate * 100)
     tax_label = f"Tax ({tax_percentage:.1f}%):"
     tax_value = f"{currency_symbol}{float(tax_amount):.2f}"
     spacing = width - len(tax_label) - len(tax_value)
