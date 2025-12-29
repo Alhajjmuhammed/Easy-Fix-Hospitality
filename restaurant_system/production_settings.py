@@ -284,9 +284,9 @@ class SecurityHeadersMiddleware:
     # Note: 'unsafe-inline' needed for inline scripts/styles until nonce implementation
     CSP_DIRECTIVES = {
         'default-src': ["'self'"],
-        'script-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+        'script-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com"],
         'style-src': ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
-        'font-src': ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+        'font-src': ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
         'img-src': ["'self'", "data:", "https:", "blob:"],
         'connect-src': ["'self'", "wss:", "https:"],
         'frame-ancestors': ["'self'"],

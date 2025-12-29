@@ -302,12 +302,12 @@
                                 <option value="{{ current_restaurant.id }}" selected>
                                     {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
                                 </option>
-                                <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
                             {% else %}
                                 <option value="">No Restaurant Available</option>
                             {% endif %}
                         </select>
                         {% if current_restaurant and not view_all_restaurants %}
+                        <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
                         <small class="form-text text-muted">Table will be assigned to: {{ current_restaurant.name }}</small>
                         {% endif %}
                     </div>
@@ -371,11 +371,13 @@
                                 <option value="{{ current_restaurant.id }}" selected>
                                     {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
                                 </option>
-                                <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
                             {% else %}
                                 <option value="">No Restaurant Available</option>
                             {% endif %}
                         </select>
+                        {% if current_restaurant and not view_all_restaurants %}
+                        <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
+                        {% endif %}
                     </div>
                     <div class="form-group">
                         <div class="form-check">
