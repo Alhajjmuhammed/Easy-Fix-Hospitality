@@ -3206,6 +3206,8 @@ def profile(request):
                 restaurant_description = request.POST.get('restaurant_description', '').strip()
                 tax_rate_percentage = request.POST.get('tax_rate_percentage', '').strip()
                 
+                logger.info(f"UPDATE_RESTAURANT: user={request.user.username}, tax_rate_percentage={tax_rate_percentage}")
+                
                 # Validation
                 if not restaurant_name:
                     messages.error(request, "Restaurant name is required.")
@@ -3234,14 +3236,18 @@ def profile(request):
                 request.user.restaurant_description = restaurant_description
                 request.user.tax_rate = tax_rate_decimal
                 
+                logger.info(f"UPDATE_RESTAURANT: Setting user.tax_rate to {tax_rate_decimal}")
+                
                 # ALSO update Restaurant model tax_rate if user has a restaurant
                 from restaurant.models_restaurant import Restaurant
                 user_restaurants = Restaurant.objects.filter(
                     models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
                 )
+                logger.info(f"UPDATE_RESTAURANT: Found {user_restaurants.count()} restaurants for user")
                 for restaurant in user_restaurants:
                     restaurant.tax_rate = tax_rate_decimal
                     restaurant.save()
+                    logger.info(f"UPDATE_RESTAURANT: Updated restaurant {restaurant.name} tax_rate to {tax_rate_decimal}")
                 
                 # Handle auto-print settings (checkboxes)
                 request.user.auto_print_kot = request.POST.get('auto_print_kot') == 'on'
@@ -3252,6 +3258,7 @@ def profile(request):
                     request.user.generate_qr_code()
                 
                 request.user.save()
+                logger.info(f"UPDATE_RESTAURANT: User saved. Final tax_rate={request.user.tax_rate}")
                 messages.success(request, "Restaurant information updated successfully.")
                 
             except Exception as e:

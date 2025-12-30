@@ -120,18 +120,30 @@ class ThermalPrinter:
             if any(keyword in printer_lower for keyword in thermal_keywords):
                 candidates.append(printer)
         
-        # Test each candidate by trying to open it
+        # PRIORITY FIX: Prefer printers with 'S' suffix (TP806S over TP806) - usually the newer/working one
+        # Sort so printers ending in 'S' or with higher numbers come first
+        def printer_priority(name):
+            score = 0
+            if name.endswith('S') or name.endswith('s'):
+                score += 100  # Prioritize printers ending in S
+            if '806s' in name.lower():
+                score += 50
+            return -score  # Negative so higher scores come first
+        
+        candidates.sort(key=printer_priority)
+        
+        # Test each candidate by actually trying to print (not just open)
         for printer in candidates:
-            if self.validate_printer(printer):
-                logger.info(f"Auto-detected usable thermal printer: {printer}")
+            if self._test_printer_actually_works(printer):
+                logger.info(f"Auto-detected working thermal printer: {printer}")
                 return printer
             else:
-                logger.warning(f"Skipping '{printer}' - validation failed (Error 1905 or offline)")
+                logger.warning(f"Skipping '{printer}' - cannot print (Error 1905 or offline)")
         
         # If no thermal printer works, try default
         try:
             default = win32print.GetDefaultPrinter()
-            if self.validate_printer(default):
+            if self._test_printer_actually_works(default):
                 logger.warning(f"No thermal printer available, using default: {default}")
                 return default
         except:
@@ -139,7 +151,7 @@ class ThermalPrinter:
         
         # Last resort - return first printer in list even if not validated
         if printers:
-            logger.error(f"No validated printers found! Returning first available: {printers[0]}")
+            logger.error(f"No working printers found! Returning first available: {printers[0]}")
             return printers[0]
         
         logger.error("No printers found on system!")
@@ -162,6 +174,32 @@ class ThermalPrinter:
             return True
         except Exception as e:
             logger.warning(f"Printer '{printer_name}' is not usable: {str(e)}")
+            return False
+    
+    def _test_printer_actually_works(self, printer_name: str) -> bool:
+        """
+        Test if printer can actually print (not just open)
+        This catches Error 1905 that happens at StartDocPrinter
+        """
+        if not printer_name:
+            return False
+        try:
+            hprinter = win32print.OpenPrinter(printer_name)
+            try:
+                # Try to start a doc - this is where Error 1905 happens for broken printers
+                job_info = ("Test", None, "RAW")
+                job_id = win32print.StartDocPrinter(hprinter, 1, job_info)
+                # Cancel immediately - we just wanted to test if it works
+                win32print.EndDocPrinter(hprinter)
+                return True
+            except Exception as e:
+                # This catches the actual Error 1905
+                if "1905" in str(e):
+                    logger.debug(f"Printer '{printer_name}' failed StartDocPrinter test (Error 1905)")
+                return False
+            finally:
+                win32print.ClosePrinter(hprinter)
+        except Exception as e:
             return False
     
     def format_for_thermal(self, content: str, job_type: str = 'receipt') -> str:
