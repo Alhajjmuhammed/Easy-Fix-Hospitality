@@ -4,3 +4,4 @@
 
 requests>=2.31.0
 pywin32>=306
+colorama>=0.4.6  # For colored diagnostic output
