@@ -107,26 +107,43 @@ class ThermalPrinter:
         logger.info(f"Using printer: {self.printer_name}")
     
     def detect_printer(self) -> str:
-        """Auto-detect thermal printer that is actually usable"""
+        """Auto-detect thermal printer that is actually usable - tries multiple to find working one"""
         printers = [printer[2] for printer in win32print.EnumPrinters(2)]
         
-        # Common thermal printer keywords
-        thermal_keywords = ['thermal', 'pos', 'receipt', 'retsol', 'tp806', 'xprinter', 'epson tm']
+        # Common thermal printer keywords (prioritize by order)
+        thermal_keywords = ['retsol', 'tp806', 'pos', 'receipt', 'thermal', 'xprinter', 'epson tm']
         
+        # Try to find a thermal printer that can actually print
+        candidates = []
         for printer in printers:
             printer_lower = printer.lower()
             if any(keyword in printer_lower for keyword in thermal_keywords):
-                # Validate the printer is actually usable
-                if self.validate_printer(printer):
-                    logger.info(f"Auto-detected usable thermal printer: {printer}")
-                    return printer
-                else:
-                    logger.warning(f"Skipping '{printer}' - appears in list but not usable")
+                candidates.append(printer)
         
-        # Fallback to default printer
-        default = win32print.GetDefaultPrinter()
-        logger.warning(f"No thermal printer detected, using default: {default}")
-        return default
+        # Test each candidate by trying to open it
+        for printer in candidates:
+            if self.validate_printer(printer):
+                logger.info(f"Auto-detected usable thermal printer: {printer}")
+                return printer
+            else:
+                logger.warning(f"Skipping '{printer}' - validation failed (Error 1905 or offline)")
+        
+        # If no thermal printer works, try default
+        try:
+            default = win32print.GetDefaultPrinter()
+            if self.validate_printer(default):
+                logger.warning(f"No thermal printer available, using default: {default}")
+                return default
+        except:
+            pass
+        
+        # Last resort - return first printer in list even if not validated
+        if printers:
+            logger.error(f"No validated printers found! Returning first available: {printers[0]}")
+            return printers[0]
+        
+        logger.error("No printers found on system!")
+        return "No Printer Found"
     
     def get_available_printers(self) -> list:
         """Get list of available printers"""
@@ -394,7 +411,7 @@ class PrintClient:
         return self.printer
     
     def process_job(self, job: Dict[str, Any]) -> bool:
-        """Process a single print job with validation and fallback"""
+        """Process a single print job with validation and automatic fallback"""
         job_id = job.get('id')
         job_type = job.get('job_type', 'receipt')  # kot, bot, or receipt
         content = job.get('content')
@@ -408,17 +425,31 @@ class PrintClient:
         
         # Get the right printer for this job (with validation and fallback)
         printer = self.get_printer_for_job(job)
-        
-        # Double-check the printer is usable before printing
-        if not printer.validate_printer(printer.printer_name):
-            logger.warning(f"Selected printer '{printer.printer_name}' failed validation, trying auto-detect...")
-            # Force auto-detect to find a working printer
-            printer = ThermalPrinter(printer_name=None, auto_detect=True)
-            
         logger.info(f"Printing to: {printer.printer_name}")
         
-        # Print content with job_type for proper ESC/POS formatting
+        # Try printing with configured printer
         success = printer.print_text(content, job_type)
+        
+        # If failed and we used server-specified printer, retry with auto-detect
+        if not success and server_printer and printer.printer_name == server_printer:
+            logger.warning(f"✗ Failed to print on server-configured printer '{server_printer}'")
+            logger.info(f"→ Retrying with auto-detected working printer...")
+            
+            # Get a fresh auto-detected printer (skip the broken one)
+            fallback_printer = ThermalPrinter(printer_name=None, auto_detect=True)
+            
+            # Only retry if we got a different printer
+            if fallback_printer.printer_name != printer.printer_name:
+                logger.info(f"→ Attempting print on: {fallback_printer.printer_name}")
+                success = fallback_printer.print_text(content, job_type)
+                
+                if success:
+                    printer = fallback_printer  # Update for logging
+                    logger.info(f"✓ Fallback successful! Printed on {fallback_printer.printer_name}")
+                else:
+                    logger.error(f"✗ Fallback also failed on {fallback_printer.printer_name}")
+            else:
+                logger.warning(f"→ Auto-detect found same printer, no fallback available")
         
         # Mark result
         if success:
@@ -428,8 +459,9 @@ class PrintClient:
         else:
             error_msg = f"Print error on {printer.printer_name} - Printer may be offline or driver corrupted"
             self.mark_job_failed(job_id, error_msg)
-            logger.error(f"[FAILED] Job #{job_id} failed to print on {printer.printer_name}")
-            logger.error(f"  → Suggestion: Check printer connection, restart printer, or reinstall printer driver")
+            logger.error(f"[FAILED] Job #{job_id} failed to print")
+            logger.error(f"  → Check: Is '{server_printer or printer.printer_name}' powered on and connected?")
+            logger.error(f"  → Try: Remove and re-add the printer in Windows Settings")
             return False
     
     def run(self):
