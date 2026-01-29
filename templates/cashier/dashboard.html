@@ -129,13 +129,48 @@
             </div>
             
             <!-- Filters -->
-            <div class="card mb-4" id="filterCard">
+            <div class="card mb-4" style="border-radius: 0;" id="filterCard">
                 <div class="card-header">
                     <h5 class="mb-0">🔍 Filter Orders</h5>
                 </div>
                 <div class="card-body">
                     <form method="GET" class="row g-3">
                         <div class="col-md-3">
+                            <label for="period" class="form-label">Period</label>
+                            <select name="period" id="period" class="form-select">
+                                <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
+                                <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>This Week</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="staff_role" class="form-label">Filter by Role</label>
+                            <select name="staff_role" id="staff_role" class="form-select">
+                                <option value="all" {% if staff_role == 'all' %}selected{% endif %}>All Roles</option>
+                                <option value="customer_care" {% if staff_role == 'customer_care' %}selected{% endif %}>Customer Care</option>
+                                <option value="cashier" {% if staff_role == 'cashier' %}selected{% endif %}>Cashier</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="staff" class="form-label">Filter by Staff</label>
+                            <select name="staff" id="staff" class="form-select">
+                                <option value="all">All Staff</option>
+                                <optgroup label="Customer Care">
+                                    {% for cc_user in customer_care_users %}
+                                        <option value="{{ cc_user.id }}" {% if staff_filter == cc_user.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ cc_user.get_full_name|default:cc_user.username }}
+                                        </option>
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="Cashiers">
+                                    {% for cashier in cashier_users %}
+                                        <option value="{{ cashier.id }}" {% if staff_filter == cashier.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ cashier.get_full_name|default:cashier.username }}
+                                        </option>
+                                    {% endfor %}
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
                             <label for="table" class="form-label">Table Number</label>
                             <select name="table" id="table" class="form-select">
                                 <option value="">All Tables</option>
@@ -146,7 +181,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label for="status" class="form-label">Payment Status</label>
                             <select name="status" id="status" class="form-select">
                                 <option value="">All Status</option>
@@ -157,7 +192,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-3 d-flex align-items-end">
+                        <div class="col-md-2 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary me-2">Filter</button>
                             <a href="{% url 'cashier:dashboard' %}" class="btn btn-outline-secondary">Clear</a>
                         </div>
@@ -166,7 +201,7 @@
             </div>
             
             <!-- Orders Table -->
-            <div class="card">
+            <div class="card" style="border-radius: 0;">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">📋 Orders</h5>
                     <span class="badge bg-info">{{ orders|length }} order{{ orders|length|pluralize }}</span>

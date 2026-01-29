@@ -27,9 +27,11 @@ urlpatterns = [
     
     # Customer ordering flow
     path('table/', views.select_table, name='select_table'),
+    path('table/choose-action/', views.choose_order_action, name='choose_order_action'),
     path('menu/', views.browse_menu, name='browse_menu'),
     path('cart/', views.view_cart, name='view_cart'),
     path('place-order/', views.place_order, name='place_order'),
+    path('add-to-existing/', views.add_to_existing_order, name='add_to_existing_order'),
     path('confirmation/<int:order_id>/', views.order_confirmation, name='order_confirmation'),
     
     # Cart management (AJAX)
@@ -50,6 +52,7 @@ urlpatterns = [
     path('confirm-order/<int:order_id>/', views.confirm_order, name='confirm_order'),
     path('update-status/<int:order_id>/', views.update_order_status, name='update_order_status'),
     path('cancel-order/<int:order_id>/', views.cancel_order, name='cancel_order'),
+    path('cancel-item/<int:item_id>/', views.cancel_order_item, name='cancel_order_item'),
     
     # KOT (Kitchen Order Ticket) printing
     path('kot/<int:order_id>/', views.print_kot, name='print_kot'),
@@ -73,6 +76,7 @@ urlpatterns = [
     path('customer-care/receipt/<int:payment_id>/', views.customer_care_receipt, name='customer_care_receipt'),
     path('customer-care/reprint/<int:payment_id>/', views.customer_care_reprint_receipt, name='customer_care_reprint_receipt'),
     path('customer-care/receipts/', views.customer_care_receipt_management, name='customer_care_receipt_management'),
+    path('customer-care/reports/', views.customer_care_reports, name='customer_care_reports'),
     
     # Bill Request URLs
     path('request-bill/<int:table_id>/', views.request_bill, name='request_bill'),

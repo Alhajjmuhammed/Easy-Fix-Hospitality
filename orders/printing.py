@@ -1787,6 +1787,445 @@ def _generate_service_content(order):
     return "\n".join(lines)
 
 
+def _generate_kot_content_for_items(order, items_list):
+    """Generate KOT text content for specific items only (for adding to existing orders)"""
+    lines = []
+    width = 48  # 80mm thermal printer - full width utilization
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("KITCHEN ORDER TICKET (KOT)".center(width))
+    lines.append("*** ADDITIONAL ITEMS ***".center(width))
+    lines.append("=" * width)
+    
+    # Restaurant info - use unified function
+    restaurant_name = get_restaurant_display_name(order)
+    
+    lines.append("")
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Show who added the items
+    ordered_by = order.ordered_by
+    if ordered_by:
+        if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+            role = "Waiter"
+        elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+            role = "Cashier"
+        elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+            role = "Customer Care"
+        elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+            role = "Owner"
+        elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+            role = "Customer"
+        else:
+            role = "Staff"
+        
+        full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+        if not full_name:
+            full_name = ordered_by.username
+        
+        lines.append(f"Added by: {full_name} ({role})")
+    
+    lines.append("-" * width)
+    
+    # Kitchen items only from the provided items list
+    lines.append("")
+    lines.append("NEW KITCHEN ITEMS:")
+    lines.append("-" * width)
+    
+    kitchen_items = [item for item in items_list if item.product.station == 'kitchen']
+    
+    for item in kitchen_items:
+        # Item name and quantity - left aligned
+        qty_text = f"{item.quantity}x"
+        lines.append(f"{qty_text:4} {item.product.name}")
+    
+    # Footer
+    lines.append("-" * width)
+    total_items = len(kitchen_items)
+    total_qty = sum(item.quantity for item in kitchen_items)
+    lines.append(f"New Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+    lines.append("-" * width)
+    lines.append("ADDITIONAL ORDER - ADD TO EXISTING".center(width))
+    lines.append("For kitchen preparation only".center(width))
+    lines.append("NOT FOR BILLING".center(width))
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
+
+
+def _generate_bot_content_for_items(order, items_list):
+    """Generate BOT text content for specific items only (for adding to existing orders)"""
+    lines = []
+    width = 48  # 80mm thermal printer - full width utilization
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("BAR ORDER TICKET (BOT)".center(width))
+    lines.append("*** ADDITIONAL ITEMS ***".center(width))
+    lines.append("=" * width)
+    
+    # Restaurant info - use unified function
+    restaurant_name = get_restaurant_display_name(order)
+    
+    lines.append("")
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Show who added the items
+    ordered_by = order.ordered_by
+    if ordered_by:
+        if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+            role = "Waiter"
+        elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+            role = "Cashier"
+        elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+            role = "Customer Care"
+        elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+            role = "Owner"
+        elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+            role = "Customer"
+        else:
+            role = "Staff"
+        
+        full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+        if not full_name:
+            full_name = ordered_by.username
+        
+        lines.append(f"Added by: {full_name} ({role})")
+    
+    lines.append("-" * width)
+    
+    # Bar items only from the provided items list
+    lines.append("")
+    lines.append("NEW BAR ITEMS:")
+    lines.append("-" * width)
+    
+    bar_items = [item for item in items_list if item.product.station == 'bar']
+    
+    for item in bar_items:
+        # Item name and quantity - left aligned
+        qty_text = f"{item.quantity}x"
+        lines.append(f"{qty_text:4} {item.product.name}")
+    
+    # Footer
+    lines.append("-" * width)
+    total_items = len(bar_items)
+    total_qty = sum(item.quantity for item in bar_items)
+    lines.append(f"New Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+    lines.append("-" * width)
+    lines.append("ADDITIONAL ORDER - ADD TO EXISTING".center(width))
+    lines.append("For bar preparation only".center(width))
+    lines.append("NOT FOR BILLING".center(width))
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
+
+
+def _generate_buffet_content_for_items(order, items_list):
+    """Generate BUFFET text content for specific items only (for adding to existing orders)"""
+    lines = []
+    width = 48  # 80mm thermal printer - full width utilization
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("BUFFET ORDER TICKET".center(width))
+    lines.append("*** ADDITIONAL ITEMS ***".center(width))
+    lines.append("=" * width)
+    
+    # Restaurant info - use unified function
+    restaurant_name = get_restaurant_display_name(order)
+    
+    lines.append("")
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Show who added the items
+    ordered_by = order.ordered_by
+    if ordered_by:
+        if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+            role = "Waiter"
+        elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+            role = "Cashier"
+        elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+            role = "Customer Care"
+        elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+            role = "Owner"
+        elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+            role = "Customer"
+        else:
+            role = "Staff"
+        
+        full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+        if not full_name:
+            full_name = ordered_by.username
+        
+        lines.append(f"Added by: {full_name} ({role})")
+    
+    lines.append("-" * width)
+    
+    # Buffet items only from the provided items list
+    lines.append("")
+    lines.append("NEW BUFFET ITEMS:")
+    lines.append("-" * width)
+    
+    buffet_items = [item for item in items_list if item.product.station == 'buffet']
+    
+    for item in buffet_items:
+        # Item name and quantity - left aligned
+        qty_text = f"{item.quantity}x"
+        lines.append(f"{qty_text:4} {item.product.name}")
+    
+    # Footer
+    lines.append("-" * width)
+    total_items = len(buffet_items)
+    total_qty = sum(item.quantity for item in buffet_items)
+    lines.append(f"New Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+    lines.append("-" * width)
+    lines.append("ADDITIONAL ORDER - ADD TO EXISTING".center(width))
+    lines.append("For buffet station only".center(width))
+    lines.append("NOT FOR BILLING".center(width))
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
+
+
+def _generate_service_content_for_items(order, items_list):
+    """Generate SERVICE text content for specific items only (for adding to existing orders)"""
+    lines = []
+    width = 48  # 80mm thermal printer - full width utilization
+    
+    # Header
+    lines.append("=" * width)
+    lines.append("SERVICE ORDER TICKET".center(width))
+    lines.append("*** ADDITIONAL ITEMS ***".center(width))
+    lines.append("=" * width)
+    
+    # Restaurant info - use unified function
+    restaurant_name = get_restaurant_display_name(order)
+    
+    lines.append("")
+    lines.append(f"Restaurant: {restaurant_name}")
+    lines.append(f"Order #: {order.order_number}")
+    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Show who added the items
+    ordered_by = order.ordered_by
+    if ordered_by:
+        if hasattr(ordered_by, 'is_waiter') and ordered_by.is_waiter():
+            role = "Waiter"
+        elif hasattr(ordered_by, 'is_cashier') and ordered_by.is_cashier():
+            role = "Cashier"
+        elif hasattr(ordered_by, 'is_customer_care') and ordered_by.is_customer_care():
+            role = "Customer Care"
+        elif hasattr(ordered_by, 'is_owner') and ordered_by.is_owner():
+            role = "Owner"
+        elif hasattr(ordered_by, 'is_customer') and ordered_by.is_customer():
+            role = "Customer"
+        else:
+            role = "Staff"
+        
+        full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
+        if not full_name:
+            full_name = ordered_by.username
+        
+        lines.append(f"Added by: {full_name} ({role})")
+    
+    lines.append("-" * width)
+    
+    # Service items only from the provided items list
+    lines.append("")
+    lines.append("NEW SERVICE ITEMS:")
+    lines.append("-" * width)
+    
+    service_items = [item for item in items_list if item.product.station == 'service']
+    
+    for item in service_items:
+        # Item name and quantity - left aligned
+        qty_text = f"{item.quantity}x"
+        lines.append(f"{qty_text:4} {item.product.name}")
+    
+    # Footer
+    lines.append("-" * width)
+    total_items = len(service_items)
+    total_qty = sum(item.quantity for item in service_items)
+    lines.append(f"New Items: {total_items:>2}  |  Total Qty: {total_qty:>2}")
+    lines.append("-" * width)
+    lines.append("ADDITIONAL ORDER - ADD TO EXISTING".center(width))
+    lines.append("For service station only".center(width))
+    lines.append("NOT FOR BILLING".center(width))
+    lines.append("=" * width)
+    
+    return "\n".join(lines)
+
+
+def auto_print_new_items(order, new_items):
+    """
+    Print only newly added items to an existing order
+    Supports both local printing (direct) and remote printing (queue)
+    Each restaurant/branch uses its own independent printer settings.
+    
+    Args:
+        order: Order instance
+        new_items: List of OrderItem instances (only the newly added items)
+    
+    Returns:
+        dict: Status of print operations
+    """
+    from django.conf import settings
+    import sys
+    import logging
+    
+    # Get Django logger
+    logger = logging.getLogger('orders.printing')
+    
+    logger.info(f"🖨️ AUTO_PRINT_NEW_ITEMS for Order #{order.order_number} ({len(new_items)} new items)")
+    
+    result = {
+        'kot_printed': False,
+        'bot_printed': False,
+        'buffet_printed': False,
+        'service_printed': False,
+        'errors': []
+    }
+    
+    try:
+        # Get printer settings for this specific restaurant/branch
+        print_settings = get_restaurant_print_settings(order)
+        
+        logger.debug(f"Print settings from {print_settings['source']}: {print_settings['name']}")
+        
+        # Check restaurant auto-print settings (check all station types)
+        any_auto_print = (
+            print_settings['auto_print_kot'] or 
+            print_settings['auto_print_bot'] or 
+            print_settings.get('auto_print_buffet', False) or 
+            print_settings.get('auto_print_service', False)
+        )
+        if not any_auto_print:
+            logger.warning(f"Auto-print disabled for {print_settings['name']}")
+            return result
+        
+        # Check for items by station in NEW items only
+        has_kitchen_items = any(item.product.station == 'kitchen' for item in new_items)
+        has_bar_items = any(item.product.station == 'bar' for item in new_items)
+        has_buffet_items = any(item.product.station == 'buffet' for item in new_items)
+        has_service_items = any(item.product.station == 'service' for item in new_items)
+        
+        # Determine print mode
+        use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
+        
+        # Get the owner for queue-based printing (PrintJob requires User)
+        owner = print_settings['owner']
+        
+        if use_queue:
+            # Queue-based printing for hosted deployment
+            if has_kitchen_items and print_settings['auto_print_kot']:
+                content = _generate_kot_content_for_items(order, new_items)
+                printer_name = print_settings['kitchen_printer_name']
+                job = create_print_job(owner, 'kot', content, order=order, printer_name=printer_name)
+                result['kot_printed'] = True
+                logger.info(f"Queued additional KOT print job #{job.id} for Order #{order.order_number}")
+            
+            if has_bar_items and print_settings['auto_print_bot']:
+                content = _generate_bot_content_for_items(order, new_items)
+                printer_name = print_settings['bar_printer_name']
+                job = create_print_job(owner, 'bot', content, order=order, printer_name=printer_name)
+                result['bot_printed'] = True
+                logger.info(f"Queued additional BOT print job #{job.id} for Order #{order.order_number}")
+            
+            if has_buffet_items and print_settings.get('auto_print_buffet', False):
+                content = _generate_buffet_content_for_items(order, new_items)
+                printer_name = print_settings.get('buffet_printer_name')
+                job = create_print_job(owner, 'buffet', content, order=order, printer_name=printer_name)
+                result['buffet_printed'] = True
+                logger.info(f"Queued additional BUFFET print job #{job.id} for Order #{order.order_number}")
+            
+            if has_service_items and print_settings.get('auto_print_service', False):
+                content = _generate_service_content_for_items(order, new_items)
+                printer_name = print_settings.get('service_printer_name')
+                job = create_print_job(owner, 'service', content, order=order, printer_name=printer_name)
+                result['service_printed'] = True
+                logger.info(f"Queued additional SERVICE print job #{job.id} for Order #{order.order_number}")
+        
+        else:
+            # Direct Windows printing (local deployment)
+            if not WINDOWS_PRINTING_AVAILABLE:
+                logger.warning("Windows printing not available - skipping direct print")
+                return result
+            
+            if has_kitchen_items and print_settings['auto_print_kot']:
+                content = _generate_kot_content_for_items(order, new_items)
+                printer_name = print_settings['kitchen_printer_name']
+                
+                # Use ThermalPrinter class for direct printing with ESC/POS formatting
+                printer = ThermalPrinter(printer_name)
+                thermal_content = printer._format_for_thermal(content, "KOT")
+                success = printer.print_text(thermal_content, job_name=f"Additional-KOT-{order.order_number}")
+                if success:
+                    result['kot_printed'] = True
+                    logger.info(f"Printed additional KOT for Order #{order.order_number}")
+                else:
+                    result['errors'].append('KOT print failed')
+            
+            if has_bar_items and print_settings['auto_print_bot']:
+                content = _generate_bot_content_for_items(order, new_items)
+                printer_name = print_settings['bar_printer_name']
+                
+                # Use ThermalPrinter class for direct printing with ESC/POS formatting
+                printer = ThermalPrinter(printer_name)
+                thermal_content = printer._format_for_thermal(content, "BOT")
+                success = printer.print_text(thermal_content, job_name=f"Additional-BOT-{order.order_number}")
+                if success:
+                    result['bot_printed'] = True
+                    logger.info(f"Printed additional BOT for Order #{order.order_number}")
+                else:
+                    result['errors'].append('BOT print failed')
+            
+            if has_buffet_items and print_settings.get('auto_print_buffet', False):
+                content = _generate_buffet_content_for_items(order, new_items)
+                printer_name = print_settings.get('buffet_printer_name')
+                
+                # Use ThermalPrinter class for direct printing with ESC/POS formatting
+                printer = ThermalPrinter(printer_name)
+                thermal_content = printer._format_for_thermal(content, "BUFFET")
+                success = printer.print_text(thermal_content, job_name=f"Additional-BUFFET-{order.order_number}")
+                if success:
+                    result['buffet_printed'] = True
+                    logger.info(f"Printed additional BUFFET for Order #{order.order_number}")
+                else:
+                    result['errors'].append('BUFFET print failed')
+            
+            if has_service_items and print_settings.get('auto_print_service', False):
+                content = _generate_service_content_for_items(order, new_items)
+                printer_name = print_settings.get('service_printer_name')
+                
+                # Use ThermalPrinter class for direct printing with ESC/POS formatting
+                printer = ThermalPrinter(printer_name)
+                thermal_content = printer._format_for_thermal(content, "SERVICE")
+                success = printer.print_text(thermal_content, job_name=f"Additional-SERVICE-{order.order_number}")
+                if success:
+                    result['service_printed'] = True
+                    logger.info(f"Printed additional SERVICE for Order #{order.order_number}")
+                else:
+                    result['errors'].append('SERVICE print failed')
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in auto_print_new_items: {str(e)}")
+        result['errors'].append(str(e))
+        return result
+
+
 def _generate_receipt_content(payment):
     """Generate receipt text content for payment - optimized for thermal printer"""
     from decimal import Decimal

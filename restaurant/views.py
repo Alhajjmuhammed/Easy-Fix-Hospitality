@@ -225,6 +225,15 @@ def menu(request):
         cat_restaurant = cat.restaurant.name if cat.restaurant else 'None'
         logger.debug(f"[MENU DEBUG]   Template will show: {cat.name} (owner={cat_owner}, restaurant={cat_restaurant})")
     
+    # Determine base template based on user role
+    if request.user.is_authenticated:
+        if request.user.is_cashier() or request.user.is_customer_care():
+            base_template = 'cashier_base.html'
+        else:
+            base_template = 'base.html'
+    else:
+        base_template = 'base.html'
+    
     context = {
         'categories': categories,
         'table_number': table_number,
@@ -233,6 +242,7 @@ def menu(request):
         'cart_total': cart_total,
         'restaurant_name': restaurant_name,
         'current_restaurant': current_restaurant,
+        'base_template': base_template,
     }
 
     return render(request, 'restaurant/menu.html', context)
