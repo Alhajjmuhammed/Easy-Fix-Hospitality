@@ -563,3 +563,102 @@ def access_blocked_view(request):
     }
     
     return render(request, 'accounts/access_blocked.html', context)
+
+
+def menu_qr_access(request, menu_qr_code):
+    """
+    Handle view-only menu QR code access
+    - No login required
+    - Cannot add to cart or place orders
+    - Just displays menu for viewing
+    - Customer must call staff to place order
+    """
+    try:
+        # Clean the QR code
+        menu_qr_code = menu_qr_code.strip().rstrip('/')
+        
+        # Find restaurant by menu QR code
+        from restaurant.models_restaurant import Restaurant
+        from restaurant.models import MainCategory
+        
+        try:
+            restaurant_obj = Restaurant.objects.get(menu_qr_code=menu_qr_code)
+        except Restaurant.DoesNotExist:
+            logger.warning(f"Menu QR Code Access Failed: '{menu_qr_code}'")
+            messages.error(request, f'Invalid menu QR code. Restaurant not found.')
+            return redirect('accounts:login')
+        
+        # Get the associated user (main_owner or branch_owner)
+        user_restaurant = restaurant_obj.main_owner if restaurant_obj.is_main_restaurant else restaurant_obj.branch_owner
+        
+        # Check if restaurant is active
+        if not user_restaurant or not user_restaurant.is_active:
+            messages.error(request, 'This restaurant is currently unavailable.')
+            return redirect('accounts:login')
+        
+        # Check subscription status
+        from accounts.models import RestaurantSubscription
+        subscription_owner = user_restaurant
+        if not restaurant_obj.is_main_restaurant:
+            subscription_owner = restaurant_obj.main_owner
+        
+        try:
+            subscription = RestaurantSubscription.objects.get(restaurant_owner=subscription_owner)
+            if not subscription.is_active:
+                from django.utils import timezone
+                display_name = restaurant_obj.name
+                if not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+                    display_name = restaurant_obj.parent_restaurant.name
+                
+                return render(request, 'accounts/restaurant_unavailable.html', {
+                    'restaurant': user_restaurant,
+                    'restaurant_obj': restaurant_obj,
+                    'qr_code': menu_qr_code,
+                    'reason': "This restaurant is temporarily unavailable.",
+                    'subscription_status': subscription.subscription_status,
+                    'current_time': timezone.now(),
+                    'display_name': display_name
+                })
+        except RestaurantSubscription.DoesNotExist:
+            messages.error(request, 'This restaurant is temporarily unavailable.')
+            return redirect('accounts:login')
+        
+        # Get active categories and products for this restaurant
+        categories = MainCategory.objects.filter(
+            is_active=True,
+            restaurant=restaurant_obj
+        ).prefetch_related('subcategories__products').order_by('name')
+        
+        # If no categories found, try legacy owner field
+        if not categories.exists():
+            categories = MainCategory.objects.filter(
+                is_active=True,
+                owner=user_restaurant,
+                restaurant__isnull=True
+            ).prefetch_related('subcategories__products').order_by('name')
+        
+        # Get display name
+        display_name = restaurant_obj.name
+        if not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+            display_name = restaurant_obj.parent_restaurant.name
+        
+        # Get currency symbol
+        currency_symbol = Restaurant.CURRENCY_SYMBOLS.get(restaurant_obj.currency_code, '$')
+        
+        # Render view-only menu template
+        context = {
+            'restaurant': user_restaurant,
+            'restaurant_obj': restaurant_obj,
+            'display_name': display_name,
+            'categories': categories,
+            'menu_qr_code': menu_qr_code,
+            'currency_symbol': currency_symbol,
+            'is_view_only': True,  # Flag to indicate this is view-only mode
+        }
+        
+        return render(request, 'restaurant/menu_view_only.html', context)
+        
+    except Exception as e:
+        logger.error(f"Error in menu QR access: {str(e)}")
+        messages.error(request, 'An error occurred while accessing the menu.')
+        return redirect('accounts:login')

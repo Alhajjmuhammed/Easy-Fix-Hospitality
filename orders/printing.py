@@ -684,7 +684,7 @@ class ThermalPrinter:
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
         lines.append(f"Table: {order.table_info.tbl_no}")
-        lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+        lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
         ordered_by = order.ordered_by
@@ -757,7 +757,7 @@ class ThermalPrinter:
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
         lines.append(f"Table: {order.table_info.tbl_no}")
-        lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+        lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
         ordered_by = order.ordered_by
@@ -830,7 +830,7 @@ class ThermalPrinter:
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
         lines.append(f"Table: {order.table_info.tbl_no}")
-        lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+        lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
         ordered_by = order.ordered_by
@@ -903,7 +903,7 @@ class ThermalPrinter:
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
         lines.append(f"Table: {order.table_info.tbl_no}")
-        lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+        lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
         ordered_by = order.ordered_by
@@ -1359,8 +1359,8 @@ def _generate_bill_content(order, printed_by=None):
     
     # Order details
     lines.append(f"Order: {order.order_number}")
-    lines.append(f"Date: {timezone.now().strftime('%b %d, %Y')}")
-    lines.append(f"Time: {timezone.now().strftime('%H:%M')}")
+    lines.append(f"Date: {timezone.localtime(timezone.now()).strftime('%b %d, %Y')}")
+    lines.append(f"Time: {timezone.localtime(timezone.now()).strftime('%H:%M')}")
     lines.append(f"Table: {order.table_info.tbl_no or 'Takeaway'}")
     
     # Ordered by (person who created the order)
@@ -1508,7 +1508,7 @@ def _generate_kot_content(order):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
     ordered_by = order.ordered_by
@@ -1582,7 +1582,7 @@ def _generate_bot_content(order):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
     ordered_by = order.ordered_by
@@ -1656,7 +1656,7 @@ def _generate_buffet_content(order):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
     ordered_by = order.ordered_by
@@ -1730,7 +1730,7 @@ def _generate_service_content(order):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
     ordered_by = order.ordered_by
@@ -1805,7 +1805,7 @@ def _generate_kot_content_for_items(order, items_list):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
     ordered_by = order.ordered_by
@@ -1875,7 +1875,7 @@ def _generate_bot_content_for_items(order, items_list):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
     ordered_by = order.ordered_by
@@ -1945,7 +1945,7 @@ def _generate_buffet_content_for_items(order, items_list):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
     ordered_by = order.ordered_by
@@ -2015,7 +2015,7 @@ def _generate_service_content_for_items(order, items_list):
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
     lines.append(f"Table: {order.table_info.tbl_no}")
-    lines.append(f"Time: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
     ordered_by = order.ordered_by
@@ -2284,8 +2284,8 @@ def _generate_receipt_content(payment):
     # NO blank line after receipt number
     # Order details - left-aligned EXACTLY like HTML
     lines.append(f"Order: {order.order_number}")
-    lines.append(f"Date: {payment.created_at.strftime('%b %d, %Y')}")
-    lines.append(f"Time: {payment.created_at.strftime('%H:%M')}")
+    lines.append(f"Date: {timezone.localtime(timezone.now()).strftime('%b %d, %Y')}")
+    lines.append(f"Time: {timezone.localtime(timezone.now()).strftime('%H:%M')}")
     lines.append(f"Table: {order.table_info.tbl_no or 'Takeaway'}")
     
     # Processed by (with role) - exactly like HTML

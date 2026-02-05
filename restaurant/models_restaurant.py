@@ -40,6 +40,13 @@ class Restaurant(models.Model):
         help_text="Description of this restaurant/branch"
     )
     
+    logo = models.ImageField(
+        upload_to='restaurant_logos/',
+        null=True,
+        blank=True,
+        help_text="Restaurant logo (displayed on menu QR view)"
+    )
+    
     address = models.TextField(
         help_text="Full address of this restaurant/branch"
     )
@@ -90,7 +97,15 @@ class Restaurant(models.Model):
     qr_code = models.CharField(
         max_length=50,
         unique=True,
-        help_text="Unique QR code for customer access"
+        help_text="Unique QR code for customer ordering (login required)"
+    )
+    
+    menu_qr_code = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Unique QR code for view-only menu (no login, no ordering)"
     )
     
     # Financial Settings
@@ -199,6 +214,21 @@ class Restaurant(models.Model):
         blank=True,
         null=True,
         help_text="Receipt printer name (blank for auto-detect)"
+    )
+    
+    # WiFi Settings for customers
+    wifi_ssid = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="WiFi network name (SSID) for customers"
+    )
+    
+    wifi_password = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="WiFi password for customers"
     )
     
     # Status and Settings

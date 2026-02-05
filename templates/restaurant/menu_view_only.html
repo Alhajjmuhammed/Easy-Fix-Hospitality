@@ -1,0 +1,742 @@
+{% extends 'base.html' %}
+{% load restaurant_tags %}
+
+{% block title %}Menu - {{ display_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Hide the default navigation */
+    .navbar {
+        display: none !important;
+    }
+
+    body {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding-top: 0 !important;
+        min-height: 100vh;
+    }
+
+    /* Custom header matching dashboard style */
+    .menu-header {
+        display: none !important;
+    }
+    
+    .view-only-banner {
+        background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+        color: white;
+        padding: 1rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0;
+        margin: 0;
+        width: 100%;
+    }
+
+    .view-only-banner i {
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+        opacity: 0.9;
+    }
+
+    .view-only-banner strong {
+        font-size: 1.05rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .product-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: none;
+        border-radius: 0;
+        overflow: hidden;
+        margin-bottom: 0;
+        background: white;
+        position: relative;
+        border-bottom: 1px solid #eee;
+    }
+
+    .product-card:last-child {
+        border-bottom: none;
+    }
+
+    .product-card:hover {
+        box-shadow: none;
+        background: #f8f9fa;
+    }
+
+    /* List Item Layout */
+    .product-list-item {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        gap: 0.75rem;
+    }
+
+    .product-list-image {
+        width: 45px;
+        height: 45px;
+        border-radius: 8px;
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+
+    .product-list-placeholder {
+        width: 45px;
+        height: 45px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .product-list-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .product-list-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .product-list-description {
+        color: #6c757d;
+        font-size: 0.75rem;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .product-list-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.15rem;
+        flex-shrink: 0;
+    }
+
+    .product-list-price {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+
+    .product-list-status {
+        font-size: 0.6rem;
+        font-weight: 600;
+        padding: 0.15rem 0.4rem;
+        border-radius: 10px;
+        text-transform: uppercase;
+    }
+
+    .product-list-status.available {
+        background: rgba(39, 174, 96, 0.15);
+        color: #27ae60;
+    }
+
+    .product-list-status.unavailable {
+        background: rgba(231, 76, 60, 0.15);
+        color: #e74c3c;
+    }
+
+    .products-list {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .product-image {
+        height: 220px;
+        width: 100%;
+        object-fit: cover;
+    }
+
+    .no-image-placeholder {
+        height: 220px;
+        width: 100%;
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3.5rem;
+        opacity: 0.8;
+    }
+
+    .category-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .category-header {
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        color: white;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 2px 8px rgba(44, 62, 80, 0.15);
+        border: none;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .category-header::before {
+        display: none;
+    }
+
+    .category-header h2 {
+        font-weight: 600;
+        font-size: 1.1rem;
+        letter-spacing: 0;
+        margin-bottom: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .category-header p {
+        opacity: 0.9;
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .product-details {
+        padding: 1.5rem;
+    }
+
+    .product-name {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 0.75rem;
+        line-height: 1.3;
+    }
+
+    .product-description {
+        color: #5a6c7d;
+        font-size: 0.95rem;
+        margin-bottom: 1.25rem;
+        line-height: 1.7;
+        min-height: 3.4rem;
+    }
+
+    .product-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 1rem;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .product-price {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #2c3e50;
+        letter-spacing: -0.5px;
+    }
+
+    .availability-badge {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        padding: 0.5rem 1rem;
+        border-radius: 24px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(10px);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        z-index: 2;
+    }
+
+    .available {
+        background: rgba(39, 174, 96, 0.95);
+        color: white;
+    }
+
+    .unavailable {
+        background: rgba(231, 76, 60, 0.95);
+        color: white;
+    }
+
+    .prep-time-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: linear-gradient(135deg, #ecf0f1 0%, #d5dbdb 100%);
+        color: #2c3e50;
+        padding: 0.5rem 1rem;
+        border-radius: 24px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    /* WiFi Information Styles */
+    .wifi-info-section {
+        margin-top: 1.5rem;
+    }
+
+    .wifi-card {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .wifi-icon {
+        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .wifi-icon i {
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .wifi-details {
+        flex: 1;
+    }
+
+    .wifi-label {
+        font-weight: 700;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+        color: white;
+    }
+
+    .wifi-credentials {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .wifi-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .wifi-key {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.8);
+        min-width: 70px;
+    }
+
+    .wifi-value {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #ffffff;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 0.25rem 0.6rem;
+        border-radius: 6px;
+    }
+
+    .copy-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        padding: 0.3rem 0.5rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.8rem;
+    }
+
+    .copy-btn:hover {
+        background: rgba(255, 255, 255, 0.35);
+        transform: scale(1.05);
+    }
+
+    .copy-btn.copied {
+        background: #27ae60;
+    }
+
+    @media (max-width: 576px) {
+        .wifi-card {
+            flex-direction: column;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .wifi-item {
+            justify-content: center;
+        }
+    }
+
+    .restaurant-info-card {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        border-radius: 0;
+        padding: 2.5rem;
+        margin: 0 auto;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: none;
+        max-width: 100%;
+        color: white;
+        text-align: center;
+        width: 100%;
+    }
+
+    .restaurant-info-card h1 {
+        color: white;
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+        letter-spacing: -1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .restaurant-info-card h1 i {
+        font-size: 2.25rem;
+    }
+
+    .restaurant-logo {
+        max-height: 120px;
+        max-width: 200px;
+        margin-bottom: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .restaurant-info-card .location {
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        font-weight: 500;
+    }
+
+    .restaurant-info-card .location i {
+        font-size: 1.2rem;
+    }
+
+    .restaurant-info-card .description {
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 1.05rem;
+        line-height: 1.7;
+    }
+
+    .call-staff-info {
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        border: 2px solid #34495e;
+        border-left: 6px solid #2c3e50;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2.5rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(44, 62, 80, 0.1);
+    }
+
+    .call-staff-info h5 {
+        color: #2c3e50;
+        font-weight: 800;
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .call-staff-info p {
+        color: #5a6c7d;
+        margin-bottom: 0;
+        font-size: 1.05rem;
+        line-height: 1.6;
+    }
+
+    .call-staff-info i {
+        color: #34495e;
+    }
+
+    .footer-cta {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: white;
+        padding: 2.5rem;
+        border-radius: 20px;
+        text-align: center;
+        margin-top: 3rem;
+        box-shadow: 0 8px 24px rgba(44, 62, 80, 0.2);
+    }
+
+    .footer-cta h4 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+    }
+
+    .footer-cta p {
+        font-size: 1.1rem;
+        opacity: 0.95;
+        margin-bottom: 0;
+    }
+
+    .footer-cta i {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .product-list-item {
+            padding: 0.4rem 0.5rem;
+        }
+
+        .product-list-image,
+        .product-list-placeholder {
+            width: 40px;
+            height: 40px;
+        }
+
+        .product-list-name {
+            font-size: 0.85rem;
+        }
+
+        .product-list-description {
+            font-size: 0.7rem;
+        }
+
+        .product-list-price {
+            font-size: 0.85rem;
+        }
+        
+        .menu-header .brand-name {
+            font-size: 1.4rem;
+        }
+
+        .restaurant-info-card {
+            padding: 1.75rem;
+            margin: 1.5rem auto;
+        }
+
+        .restaurant-info-card h1 {
+            font-size: 1.85rem;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+
+        .category-header {
+            padding: 1.5rem 1.25rem;
+        }
+
+        .product-image, .no-image-placeholder {
+            height: 180px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Restaurant Header Info -->
+<div class="restaurant-info-card">
+    {% if restaurant_obj.logo %}
+        <img src="{{ restaurant_obj.logo.url }}" alt="Restaurant Logo" class="restaurant-logo">
+    {% endif %}
+    <h1>
+        <i class="fas fa-utensils"></i> {{ display_name }}
+    </h1>
+    {% if restaurant.restaurant_description %}
+    <p class="description">{{ restaurant.restaurant_description }}</p>
+    {% endif %}
+    
+    <!-- WiFi Information -->
+    {% if restaurant_obj.wifi_ssid %}
+    <div class="wifi-info-section mt-3">
+        <div class="wifi-card">
+            <div class="wifi-icon">
+                <i class="fas fa-wifi"></i>
+            </div>
+            <div class="wifi-details">
+                <div class="wifi-label">Free WiFi Available</div>
+                <div class="wifi-credentials">
+                    <div class="wifi-item">
+                        <span class="wifi-key">Network:</span>
+                        <span class="wifi-value" id="wifi-ssid">{{ restaurant_obj.wifi_ssid }}</span>
+                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_ssid }}', this)" title="Copy network name">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    {% if restaurant_obj.wifi_password %}
+                    <div class="wifi-item">
+                        <span class="wifi-key">Password:</span>
+                        <span class="wifi-value" id="wifi-password">{{ restaurant_obj.wifi_password }}</span>
+                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_password }}', this)" title="Copy password">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- View-Only Banner -->
+<div class="view-only-banner">
+    <div class="container">
+        <i class="fas fa-eye"></i>
+        <strong>Menu View Only</strong> - Please call our staff to place your order
+    </div>
+</div>
+
+<div class="container my-4">
+    <!-- Call Staff Info -->
+    <div class="call-staff-info">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle fa-2x me-3"></i>
+            <div>
+                <h5 class="mb-1">How to Order</h5>
+                <p>Browse our menu below and call our staff to place your order. We're happy to assist you!</p>
+            </div>
+        </div>
+    </div>
+
+    {% if categories %}
+        {% for category in categories %}
+        <div class="category-section" id="category-{{ category.id }}">
+            <!-- Category Header -->
+            <div class="category-header">
+                <h2 class="mb-0">
+                    {% if category.image %}
+                        <img src="{{ category.image.url }}" alt="{{ category.name }}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 50%; margin-right: 10px;">
+                    {% endif %}
+                    {{ category.name }}
+                </h2>
+                {% if category.description %}
+                <p class="mb-0 mt-2 opacity-90">{{ category.description }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Products List -->
+            <div class="products-list">
+                {% for subcategory in category.subcategories.all %}
+                    {% if subcategory.is_active %}
+                        {% for product in subcategory.products.all %}
+                            {% if product.is_available or not product.is_available %}
+                            <div class="card product-card">
+                                <div class="product-list-item">
+                                    <!-- Product Image -->
+                                    {% if product.main_category.image %}
+                                        <img src="{{ product.main_category.image.url }}" class="product-list-image" alt="{{ product.name }}">
+                                    {% else %}
+                                        <div class="product-list-placeholder">
+                                            <i class="fas fa-utensils"></i>
+                                        </div>
+                                    {% endif %}
+
+                                    <!-- Product Info -->
+                                    <div class="product-list-info">
+                                        <h5 class="product-list-name">{{ product.name }}</h5>
+                                        {% if product.description %}
+                                        <p class="product-list-description">{{ product.description }}</p>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Price & Status -->
+                                    <div class="product-list-right">
+                                        <span class="product-list-price">{{ currency_symbol }}{{ product.price|floatformat:2 }}</span>
+                                        <span class="product-list-status {% if product.is_available %}available{% else %}unavailable{% endif %}">
+                                            {% if product.is_available %}Available{% else %}Unavailable{% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-utensils fa-4x text-muted mb-3"></i>
+            <h3 class="text-muted">No Menu Available</h3>
+            <p class="text-muted">Please contact the restaurant staff for menu information.</p>
+        </div>
+    {% endif %}
+
+    <!-- Footer Call to Action -->
+    <div class="footer-cta">
+        <i class="fas fa-concierge-bell"></i>
+        <h4>Ready to Order?</h4>
+        <p>Please call our staff to place your order. We look forward to serving you!</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Smooth scroll to category sections
+document.querySelectorAll('a[href^="#category-"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+});
+
+// Copy to clipboard function for WiFi credentials
+function copyToClipboard(text, button) {
+    navigator.clipboard.writeText(text).then(function() {
+        // Success - show feedback
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        button.classList.add('copied');
+        
+        setTimeout(function() {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(function(err) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        button.classList.add('copied');
+        
+        setTimeout(function() {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

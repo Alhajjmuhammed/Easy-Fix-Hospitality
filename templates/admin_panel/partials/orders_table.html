@@ -5,6 +5,9 @@
         <table class="table table-hover">
             <thead class="table-dark">
                 <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" class="form-check-input select-all-orders" title="Select All">
+                    </th>
                     <th style="width: 50px;">SN</th>
                     <th>Order</th>
                     <th>Table</th>
@@ -19,6 +22,9 @@
             <tbody>
                 {% for order in orders %}
                 <tr>
+                    <td>
+                        <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-order-number="{{ order.order_number }}">
+                    </td>
                     <td>{{ forloop.counter }}</td>
                     <td>
                         <strong>#{{ order.order_number }}</strong>

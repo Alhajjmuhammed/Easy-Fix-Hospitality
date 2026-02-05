@@ -233,6 +233,25 @@
         </div>
     </div>
 
+    <!-- Bulk Actions Bar (Hidden by default, shown when orders are selected) -->
+    <div class="row mb-3" id="bulkActionsBar" style="display: none;">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-body py-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-check-square text-primary"></i>
+                        <span id="selectedOrdersCount" class="fw-bold text-primary">0</span> order(s) selected
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-danger" id="bulkDeleteOrdersBtn">
+                            <i class="fas fa-trash"></i> Delete Selected
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Status Tabs -->
     <div class="row">
         <div class="col-12">
@@ -610,6 +629,134 @@ $(document).ready(function() {
             $('.alert').fadeOut();
         }, 5000);
     }
+
+    // ====== Bulk Selection & Delete Handlers ======
+    
+    // Handle "Select All" checkbox
+    $('.select-all-orders').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        // Find all order checkboxes in the current tab
+        $(this).closest('.tab-pane').find('.order-checkbox').prop('checked', isChecked);
+        updateBulkActionsBar();
+    });
+    
+    // Handle individual order checkbox
+    $(document).on('change', '.order-checkbox', function() {
+        updateSelectAllCheckbox();
+        updateBulkActionsBar();
+    });
+    
+    // Update "Select All" checkbox state
+    function updateSelectAllCheckbox() {
+        $('.tab-pane').each(function() {
+            const $tabPane = $(this);
+            const totalCheckboxes = $tabPane.find('.order-checkbox').length;
+            const checkedCheckboxes = $tabPane.find('.order-checkbox:checked').length;
+            const selectAllCheckbox = $tabPane.find('.select-all-orders');
+            
+            if (totalCheckboxes === 0) {
+                selectAllCheckbox.prop('checked', false);
+                selectAllCheckbox.prop('indeterminate', false);
+            } else if (checkedCheckboxes === 0) {
+                selectAllCheckbox.prop('checked', false);
+                selectAllCheckbox.prop('indeterminate', false);
+            } else if (checkedCheckboxes === totalCheckboxes) {
+                selectAllCheckbox.prop('checked', true);
+                selectAllCheckbox.prop('indeterminate', false);
+            } else {
+                selectAllCheckbox.prop('checked', false);
+                selectAllCheckbox.prop('indeterminate', true);
+            }
+        });
+    }
+    
+    // Update bulk actions bar visibility
+    function updateBulkActionsBar() {
+        const selectedOrders = $('.order-checkbox:checked').length;
+        
+        if (selectedOrders > 0) {
+            $('#bulkActionsBar').slideDown();
+            $('#selectedOrdersCount').text(selectedOrders);
+        } else {
+            $('#bulkActionsBar').slideUp();
+            $('#selectedOrdersCount').text('0');
+        }
+    }
+    
+    // Handle bulk delete button click
+    $('#bulkDeleteOrdersBtn').on('click', function() {
+        const selectedOrders = $('.order-checkbox:checked');
+        
+        if (selectedOrders.length === 0) {
+            showAlert('warning', 'Please select at least one order to delete.');
+            return;
+        }
+        
+        // Get order numbers for confirmation message
+        const orderNumbers = [];
+        selectedOrders.each(function() {
+            orderNumbers.push($(this).data('order-number'));
+        });
+        
+        const confirmMessage = `Are you sure you want to delete ${selectedOrders.length} order(s)?\n\n` +
+                             `Orders: ${orderNumbers.slice(0, 5).join(', ')}${orderNumbers.length > 5 ? '...' : ''}`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        // Collect order IDs
+        const orderIds = [];
+        selectedOrders.each(function() {
+            orderIds.push(parseInt($(this).val()));
+        });
+        
+        // Send bulk delete request
+        $.ajax({
+            url: '{% url "admin_panel:bulk_delete_orders" %}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                order_ids: orderIds
+            }),
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    showAlert('success', response.message);
+                    
+                    // Uncheck all checkboxes
+                    $('.order-checkbox').prop('checked', false);
+                    $('.select-all-orders').prop('checked', false);
+                    updateBulkActionsBar();
+                    
+                    // Reload page after short delay
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert('danger', response.error || 'Failed to delete selected orders.');
+                }
+            },
+            error: function(xhr) {
+                let errorMessage = 'An error occurred while deleting orders.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMessage = xhr.responseJSON.error;
+                }
+                showAlert('danger', errorMessage);
+            }
+        });
+    });
+    
+    // Reset checkboxes when switching tabs
+    $('button[data-bs-toggle="pill"]').on('shown.bs.tab', function() {
+        updateSelectAllCheckbox();
+        updateBulkActionsBar();
+    });
+    
+    // Initialize on page load
+    updateBulkActionsBar();
 });
 </script>
 

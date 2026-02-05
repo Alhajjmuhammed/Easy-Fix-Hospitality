@@ -15,6 +15,7 @@ urlpatterns = [
     
     # Bar management
     path('bar/', views.bar_dashboard, name='bar_dashboard'),
+    path('bar/reports/', views.bar_reports, name='bar_reports'),
     
     # Buffet management
     path('buffet/', views.buffet_dashboard, name='buffet_dashboard'),
@@ -48,6 +49,7 @@ urlpatterns = [
     
     # Kitchen management
     path('kitchen/', views.kitchen_dashboard, name='kitchen_dashboard'),
+    path('kitchen/reports/', views.kitchen_reports, name='kitchen_reports'),
     path('kitchen/order/<int:order_id>/', views.kitchen_order_detail, name='kitchen_order_detail'),
     path('confirm-order/<int:order_id>/', views.confirm_order, name='confirm_order'),
     path('update-status/<int:order_id>/', views.update_order_status, name='update_order_status'),

@@ -1115,6 +1115,235 @@ def service_dashboard(request):
     return render(request, 'orders/service_dashboard.html', context)
 
 @login_required
+def kitchen_reports(request):
+    """Kitchen staff daily and weekly reports"""
+    if not request.user.is_kitchen_staff():
+        messages.error(request, 'Access denied. Kitchen staff privileges required.')
+        return redirect('restaurant:home')
+    
+    try:
+        owner_filter = get_owner_filter(request.user)
+    except PermissionDenied:
+        messages.error(request, 'You are not associated with any restaurant.')
+        return redirect('restaurant:home')
+    
+    # Get date range filter
+    period = request.GET.get('period', 'today')
+    from datetime import timedelta
+    
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    if period == 'today':
+        start_date = today_start
+        end_date = today_start + timedelta(days=1)
+        period_label = 'Today'
+    elif period == 'weekly':
+        week_start = today_start - timedelta(days=today_start.weekday())
+        start_date = week_start
+        end_date = today_start + timedelta(days=1)
+        period_label = 'This Week'
+    elif period == 'monthly':
+        month_start = today_start.replace(day=1)
+        start_date = month_start
+        end_date = today_start + timedelta(days=1)
+        period_label = 'This Month'
+    else:
+        start_date = today_start
+        end_date = today_start + timedelta(days=1)
+        period_label = 'Today'
+    
+    # Get all orders with kitchen items in the period
+    base_queryset = Order.objects.filter(
+        created_at__gte=start_date,
+        created_at__lt=end_date
+    ).select_related('table_info', 'ordered_by').prefetch_related('order_items__product')
+    
+    if owner_filter:
+        base_queryset = base_queryset.filter(table_info__owner=owner_filter)
+    
+    # Filter orders that have kitchen items
+    def has_kitchen_items(order):
+        return any(item.product.station == 'kitchen' for item in order.order_items.all())
+    
+    orders_with_kitchen_items = [order for order in base_queryset if has_kitchen_items(order)]
+    
+    # Calculate statistics
+    total_orders = len(orders_with_kitchen_items)
+    
+    status_counts = {
+        'pending': len([o for o in orders_with_kitchen_items if o.status == 'pending']),
+        'confirmed': len([o for o in orders_with_kitchen_items if o.status == 'confirmed']),
+        'preparing': len([o for o in orders_with_kitchen_items if o.status == 'preparing']),
+        'ready': len([o for o in orders_with_kitchen_items if o.status == 'ready']),
+        'served': len([o for o in orders_with_kitchen_items if o.status == 'served']),
+        'cancelled': len([o for o in orders_with_kitchen_items if o.status == 'cancelled']),
+    }
+    
+    # Calculate total kitchen items prepared
+    total_items = 0
+    items_by_product = {}
+    
+    for order in orders_with_kitchen_items:
+        for item in order.order_items.all():
+            if item.product.station == 'kitchen':
+                total_items += item.quantity
+                product_name = item.product.name
+                if product_name in items_by_product:
+                    items_by_product[product_name]['quantity'] += item.quantity
+                    items_by_product[product_name]['orders'] += 1
+                else:
+                    items_by_product[product_name] = {
+                        'quantity': item.quantity,
+                        'orders': 1,
+                        'product': item.product
+                    }
+    
+    # Sort items by quantity (most popular first)
+    popular_items = sorted(items_by_product.items(), key=lambda x: x[1]['quantity'], reverse=True)[:10]
+    
+    # Calculate average preparation time (served orders only)
+    served_orders = [o for o in orders_with_kitchen_items if o.status == 'served']
+    if served_orders:
+        total_prep_time = sum(
+            (o.updated_at - o.created_at).total_seconds() / 60  # minutes
+            for o in served_orders
+        )
+        avg_prep_time = total_prep_time / len(served_orders)
+    else:
+        avg_prep_time = 0
+    
+    # Get currency symbol
+    currency_symbol = request.user.get_currency_symbol()
+    
+    context = {
+        'period': period,
+        'period_label': period_label,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_orders': total_orders,
+        'status_counts': status_counts,
+        'total_items': total_items,
+        'popular_items': popular_items,
+        'avg_prep_time': round(avg_prep_time, 1),
+        'orders': orders_with_kitchen_items,
+        'currency_symbol': currency_symbol,
+    }
+    
+    return render(request, 'orders/kitchen_reports.html', context)
+
+@login_required
+def bar_reports(request):
+    """Bar staff daily and weekly reports"""
+    if not request.user.is_bar_staff():
+        messages.error(request, 'Access denied. Bar staff privileges required.')
+        return redirect('restaurant:home')
+    
+    try:
+        owner_filter = get_owner_filter(request.user)
+    except PermissionDenied:
+        messages.error(request, 'You are not associated with any restaurant.')
+        return redirect('restaurant:home')
+    
+    # Get date range filter
+    period = request.GET.get('period', 'today')
+    from datetime import timedelta
+    
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    if period == 'today':
+        start_date = today_start
+        end_date = today_start + timedelta(days=1)
+        period_label = 'Today'
+    elif period == 'weekly':
+        week_start = today_start - timedelta(days=today_start.weekday())
+        start_date = week_start
+        end_date = today_start + timedelta(days=1)
+        period_label = 'This Week'
+    else:
+        start_date = today_start
+        end_date = today_start + timedelta(days=1)
+        period_label = 'Today'
+    
+    # Get all orders with bar items in the period
+    base_queryset = Order.objects.filter(
+        created_at__gte=start_date,
+        created_at__lt=end_date
+    ).select_related('table_info', 'ordered_by').prefetch_related('order_items__product')
+    
+    if owner_filter:
+        base_queryset = base_queryset.filter(table_info__owner=owner_filter)
+    
+    # Filter orders that have bar items
+    def has_bar_items(order):
+        return any(item.product.station == 'bar' for item in order.order_items.all())
+    
+    orders_with_bar_items = [order for order in base_queryset if has_bar_items(order)]
+    
+    # Calculate statistics
+    total_orders = len(orders_with_bar_items)
+    
+    status_counts = {
+        'pending': len([o for o in orders_with_bar_items if o.status == 'pending']),
+        'confirmed': len([o for o in orders_with_bar_items if o.status == 'confirmed']),
+        'preparing': len([o for o in orders_with_bar_items if o.status == 'preparing']),
+        'ready': len([o for o in orders_with_bar_items if o.status == 'ready']),
+        'served': len([o for o in orders_with_bar_items if o.status == 'served']),
+        'cancelled': len([o for o in orders_with_bar_items if o.status == 'cancelled']),
+    }
+    
+    # Calculate total bar items prepared
+    total_items = 0
+    items_by_product = {}
+    
+    for order in orders_with_bar_items:
+        for item in order.order_items.all():
+            if item.product.station == 'bar':
+                total_items += item.quantity
+                product_name = item.product.name
+                if product_name in items_by_product:
+                    items_by_product[product_name]['quantity'] += item.quantity
+                    items_by_product[product_name]['orders'] += 1
+                else:
+                    items_by_product[product_name] = {
+                        'quantity': item.quantity,
+                        'orders': 1,
+                        'product': item.product
+                    }
+    
+    # Sort items by quantity (most popular drinks first)
+    popular_items = sorted(items_by_product.items(), key=lambda x: x[1]['quantity'], reverse=True)[:10]
+    
+    # Calculate average preparation time (served orders only)
+    served_orders = [o for o in orders_with_bar_items if o.status == 'served']
+    if served_orders:
+        total_prep_time = sum(
+            (o.updated_at - o.created_at).total_seconds() / 60  # minutes
+            for o in served_orders
+        )
+        avg_prep_time = total_prep_time / len(served_orders)
+    else:
+        avg_prep_time = 0
+    
+    # Get currency symbol
+    currency_symbol = request.user.get_currency_symbol()
+    
+    context = {
+        'period': period,
+        'period_label': period_label,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_orders': total_orders,
+        'status_counts': status_counts,
+        'total_items': total_items,
+        'popular_items': popular_items,
+        'avg_prep_time': round(avg_prep_time, 1),
+        'orders': orders_with_bar_items,
+        'currency_symbol': currency_symbol,
+    }
+    
+    return render(request, 'orders/bar_reports.html', context)
+
+@login_required
 @require_POST
 def confirm_order(request, order_id):
     """Kitchen staff confirms a pending order"""

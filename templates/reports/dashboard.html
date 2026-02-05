@@ -15,7 +15,15 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL REVENUE</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ total_revenue|floatformat:0 }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted mt-1">
+                                <i class="fas fa-plus-circle"></i> Tax ({{ tax_rate_percentage|floatformat:1 }}%): {% currency_symbol %}{{ total_tax|floatformat:2 }}
+                            </div>
+                            <div class="text-xs font-weight-bold text-success mt-1">
+                                <i class="fas fa-calculator"></i> With Tax: {% currency_symbol %}{{ total_revenue_with_tax|floatformat:2 }}
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-dollar-sign fa-2x text-primary" style="opacity: 0.3;"></i>
@@ -66,7 +74,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">AVG ORDER VALUE</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ avg_order_value|floatformat:0 }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ avg_order_value|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs font-weight-bold text-success mt-1">
+                                <i class="fas fa-calculator"></i> With Tax: {% currency_symbol %}{{ avg_order_value_with_tax|floatformat:2 }}
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-chart-line fa-2x text-warning" style="opacity: 0.3;"></i>
@@ -88,7 +101,11 @@
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PAID ORDERS</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ paid_orders_count }}</div>
-                            <div class="text-xs text-muted">Revenue: {% currency_symbol %}{{ paid_revenue|floatformat:0 }}</div>
+                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ paid_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ paid_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-success">Total: {% currency_symbol %}{{ paid_revenue_with_tax|floatformat:2 }}</div>
+                            {% endif %}
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-check-circle fa-2x text-success" style="opacity: 0.3;"></i>
@@ -106,7 +123,11 @@
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">UNPAID ORDERS</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ unpaid_orders_count }}</div>
-                            <div class="text-xs text-muted">Revenue: {% currency_symbol %}{{ unpaid_revenue|floatformat:0 }}</div>
+                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ unpaid_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ unpaid_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-danger">Total: {% currency_symbol %}{{ unpaid_revenue_with_tax|floatformat:2 }}</div>
+                            {% endif %}
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-times-circle fa-2x text-danger" style="opacity: 0.3;"></i>
@@ -124,7 +145,11 @@
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PARTIAL PAYMENTS</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ partial_orders_count }}</div>
-                            <div class="text-xs text-muted">Revenue: {% currency_symbol %}{{ partial_revenue|floatformat:0 }}</div>
+                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ partial_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ partial_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-warning">Total: {% currency_symbol %}{{ partial_revenue_with_tax|floatformat:2 }}</div>
+                            {% endif %}
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-exclamation-circle fa-2x text-warning" style="opacity: 0.3;"></i>

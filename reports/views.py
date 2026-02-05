@@ -194,18 +194,48 @@ def dashboard(request):
     total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
     
+    # Calculate tax amounts for all orders
+    from decimal import Decimal
+    total_tax = Decimal('0.00')
+    for order in orders:
+        total_tax += order.get_tax_amount()
+    total_revenue_with_tax = total_revenue + total_tax
+    avg_order_value_with_tax = (total_revenue_with_tax / total_orders) if total_orders > 0 else 0
+    
+    # Get tax rate for display (from first order or user setting)
+    tax_rate_percentage = 0
+    if orders.exists():
+        first_order = orders.first()
+        tax_rate_percentage = first_order.tax_rate
+    elif target_restaurant and hasattr(target_restaurant, 'tax_rate'):
+        tax_rate_percentage = float(target_restaurant.tax_rate * 100)
+    elif request.user.tax_rate:
+        tax_rate_percentage = float(request.user.tax_rate * 100)
+    
     # Calculate payment status counts and revenues
     paid_orders = orders.filter(payment_status='paid')
     paid_orders_count = paid_orders.count()
     paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    paid_tax = Decimal('0.00')
+    for order in paid_orders:
+        paid_tax += order.get_tax_amount()
+    paid_revenue_with_tax = paid_revenue + paid_tax
     
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
     unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    unpaid_tax = Decimal('0.00')
+    for order in unpaid_orders:
+        unpaid_tax += order.get_tax_amount()
+    unpaid_revenue_with_tax = unpaid_revenue + unpaid_tax
     
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
     partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    partial_tax = Decimal('0.00')
+    for order in partial_orders:
+        partial_tax += order.get_tax_amount()
+    partial_revenue_with_tax = partial_revenue + partial_tax
     
     # Calculate station-specific metrics
     kitchen_orders_count = len([o for o in orders if has_kitchen_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'kitchen' else 0)
@@ -318,8 +348,12 @@ def dashboard(request):
     context = {
         'total_orders': total_orders,
         'total_revenue': total_revenue,
+        'total_revenue_with_tax': total_revenue_with_tax,
+        'total_tax': total_tax,
+        'tax_rate_percentage': tax_rate_percentage,
         'total_items': total_items,
         'avg_order_value': avg_order_value,
+        'avg_order_value_with_tax': avg_order_value_with_tax,
         'page_obj': page_obj,
         'orders': page_obj,
         'payment_status': payment_status,
@@ -335,10 +369,16 @@ def dashboard(request):
         'staff_users': staff_users,  # NEW: Staff users list
         'paid_orders_count': paid_orders_count,
         'paid_revenue': paid_revenue,
+        'paid_revenue_with_tax': paid_revenue_with_tax,
+        'paid_tax': paid_tax,
         'unpaid_orders_count': unpaid_orders_count,
         'unpaid_revenue': unpaid_revenue,
+        'unpaid_revenue_with_tax': unpaid_revenue_with_tax,
+        'unpaid_tax': unpaid_tax,
         'partial_orders_count': partial_orders_count,
         'partial_revenue': partial_revenue,
+        'partial_revenue_with_tax': partial_revenue_with_tax,
+        'partial_tax': partial_tax,
         'kitchen_orders_count': kitchen_orders_count,
         'bar_orders_count': bar_orders_count,
         'buffet_orders_count': buffet_orders_count,
