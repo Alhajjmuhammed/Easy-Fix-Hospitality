@@ -1,11 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Count, Q, Prefetch
+from django.db import models
+from django.db.models import Count, Q, Prefetch, Sum, Avg, F
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from .models import MainCategory, SubCategory, Product, TableInfo, HappyHourPromotion, Restaurant
-from .forms import ProductForm, MainCategoryForm, SubCategoryForm, TableForm, StaffForm, HappyHourPromotionForm
+from django.utils import timezone
+from decimal import Decimal
+from datetime import timedelta
+from .models import MainCategory, SubCategory, Product, TableInfo, HappyHourPromotion, Restaurant, Event
+from .forms import ProductForm, MainCategoryForm, SubCategoryForm, TableForm, StaffForm, HappyHourPromotionForm, EventForm
 from orders.models import Order
 from accounts.models import User, Role
 
@@ -1086,3 +1090,815 @@ def promotion_preview(request, promotion_id):
     }
     
     return render(request, 'restaurant/promotion_preview.html', context)
+
+
+# ============================================================================
+# EVENT MANAGEMENT VIEWS
+# ============================================================================
+
+from .models import Event
+from .forms import EventForm
+from django.db.models import Sum, Count, Avg
+from datetime import datetime, timedelta
+
+
+@login_required
+def manage_events(request):
+    """List all events for the restaurant owner"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, 'Access denied. Owner privileges required.')
+        return redirect('restaurant:home')
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    # Get restaurant for currency
+    from .models_restaurant import Restaurant
+    from django.db.models import Q as DBQ
+    restaurant = Restaurant.objects.filter(
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+    ).first()
+    currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
+    
+    # Get filter parameters
+    status_filter = request.GET.get('status', '')
+    event_type_filter = request.GET.get('event_type', '')
+    date_filter = request.GET.get('date_filter', 'all')
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset
+    events = Event.objects.filter(owner=owner_filter)
+    
+    # Apply filters
+    if status_filter:
+        events = events.filter(status=status_filter)
+    
+    if event_type_filter:
+        events = events.filter(event_type=event_type_filter)
+    
+    if search_query:
+        events = events.filter(
+            Q(title__icontains=search_query) |
+            Q(contact_name__icontains=search_query) |
+            Q(contact_phone__icontains=search_query)
+        )
+    
+    # Date filters
+    today = timezone.now().date()
+    if date_filter == 'today':
+        events = events.filter(event_date=today)
+    elif date_filter == 'week':
+        week_end = today + timedelta(days=7)
+        events = events.filter(event_date__gte=today, event_date__lte=week_end)
+    elif date_filter == 'month':
+        month_end = today + timedelta(days=30)
+        events = events.filter(event_date__gte=today, event_date__lte=month_end)
+    elif date_filter == 'upcoming':
+        events = events.filter(event_date__gte=today).exclude(status__in=['completed', 'cancelled'])
+    elif date_filter == 'past':
+        events = events.filter(event_date__lt=today)
+    
+    # Calculate summary statistics
+    all_events = Event.objects.filter(owner=owner_filter)
+    
+    # Fully paid events - total amount from completed payments
+    fully_paid_events = all_events.filter(payment_status='fully_paid')
+    paid_amount = fully_paid_events.aggregate(total=Sum('amount_paid'))['total'] or 0
+    
+    # Unpaid events - total balance due
+    unpaid_events_list = all_events.filter(payment_status='unpaid').exclude(status='cancelled')
+    unpaid_amount = sum(event.price_per_pax * event.total_pax for event in unpaid_events_list)
+    
+    # Total revenue: sum of paid + unpaid (total potential revenue)
+    total_revenue = paid_amount + unpaid_amount
+    
+    # Pending payments: sum of balance due for events not fully paid or cancelled
+    from django.db.models import F
+    pending_events = all_events.exclude(payment_status='fully_paid').exclude(status='cancelled')
+    pending_payments = sum((event.price_per_pax * event.total_pax) - event.amount_paid 
+                          for event in pending_events)
+    
+    summary = {
+        'total_events': all_events.count(),
+        'upcoming_events': all_events.filter(event_date__gte=today).exclude(status__in=['completed', 'cancelled']).count(),
+        'total_revenue': total_revenue,
+        'pending_payments': pending_payments,
+        'paid_events': fully_paid_events.count(),
+        'paid_amount': paid_amount,
+        'unpaid_events': unpaid_events_list.count(),
+        'unpaid_amount': unpaid_amount,
+        'today_events': all_events.filter(event_date=today).count(),
+    }
+    
+    # Pagination
+    paginator = Paginator(events.order_by('-event_date', '-start_time'), 10)
+    page_number = request.GET.get('page')
+    events_page = paginator.get_page(page_number)
+    
+    context = {
+        'events': events_page,
+        'summary': summary,
+        'status_filter': status_filter,
+        'event_type_filter': event_type_filter,
+        'date_filter': date_filter,
+        'search_query': search_query,
+        'event_types': Event.EVENT_TYPE_CHOICES,
+        'status_choices': Event.EVENT_STATUS_CHOICES,
+        'currency_symbol': currency_symbol,
+    }
+    
+    return render(request, 'restaurant/manage_events.html', context)
+
+
+@login_required
+def add_event(request):
+    """Add a new event"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, 'Access denied. Owner privileges required.')
+        return redirect('restaurant:home')
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    # Get restaurant for currency
+    from .models_restaurant import Restaurant
+    from django.db.models import Q as DBQ
+    restaurant = Restaurant.objects.filter(
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+    ).first()
+    currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
+    
+    if request.method == 'POST':
+        form = EventForm(request.POST)
+        if form.is_valid():
+            event = form.save(commit=False)
+            event.owner = owner_filter
+            event.created_by = request.user
+            event.save()
+            messages.success(request, f'Event "{event.title}" created successfully!')
+            return redirect('restaurant:manage_events')
+    else:
+        form = EventForm()
+    
+    context = {
+        'form': form,
+        'action': 'Add',
+        'currency_symbol': currency_symbol,
+    }
+    
+    return render(request, 'restaurant/event_form.html', context)
+
+
+@login_required
+def edit_event(request, event_id):
+    """Edit an existing event"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, 'Access denied. Owner privileges required.')
+        return redirect('restaurant:home')
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    event = get_object_or_404(Event, id=event_id, owner=owner_filter)
+    
+    # Get restaurant for currency
+    from .models_restaurant import Restaurant
+    from django.db.models import Q as DBQ
+    restaurant = Restaurant.objects.filter(
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+    ).first()
+    currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
+    
+    if request.method == 'POST':
+        form = EventForm(request.POST, instance=event)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Event "{event.title}" updated successfully!')
+            return redirect('restaurant:manage_events')
+    else:
+        form = EventForm(instance=event)
+    
+    context = {
+        'form': form,
+        'event': event,
+        'action': 'Edit',
+        'currency_symbol': currency_symbol,
+    }
+    
+    return render(request, 'restaurant/event_form.html', context)
+
+
+@login_required
+def view_event(request, event_id):
+    """View event details"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, 'Access denied. Owner privileges required.')
+        return redirect('restaurant:home')
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    event = get_object_or_404(Event, id=event_id, owner=owner_filter)
+    
+    # Get restaurant for currency
+    from .models_restaurant import Restaurant
+    from django.db.models import Q as DBQ
+    restaurant = Restaurant.objects.filter(
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+    ).first()
+    currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
+    
+    context = {
+        'event': event,
+        'currency_symbol': currency_symbol,
+    }
+    
+    return render(request, 'restaurant/event_detail.html', context)
+
+
+@login_required
+def delete_event(request, event_id):
+    """Delete an event"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'success': False, 'message': 'Access denied.'})
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    try:
+        event = Event.objects.get(id=event_id, owner=owner_filter)
+        title = event.title
+        event.delete()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'Event "{title}" deleted successfully!'
+            })
+        
+        messages.success(request, f'Event "{title}" deleted successfully!')
+        return redirect('restaurant:manage_events')
+    except Event.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'Event not found.'})
+        messages.error(request, 'Event not found.')
+        return redirect('restaurant:manage_events')
+
+
+@login_required
+def update_event_status(request, event_id):
+    """Update event status via AJAX"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'success': False, 'message': 'Access denied.'})
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request method.'})
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    try:
+        event = Event.objects.get(id=event_id, owner=owner_filter)
+        
+        import json
+        data = json.loads(request.body)
+        new_status = data.get('status')
+        
+        if new_status and new_status in dict(Event.EVENT_STATUS_CHOICES):
+            event.status = new_status
+            event.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Event status updated to {event.get_status_display()}!',
+                'status': event.status,
+                'status_display': event.get_status_display(),
+                'status_color': event.get_status_color()
+            })
+        else:
+            return JsonResponse({'success': False, 'message': 'Invalid status.'})
+    except Event.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Event not found.'})
+
+
+@login_required
+def event_reports(request):
+    """Event reports and analytics"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        messages.error(request, 'Access denied. Owner privileges required.')
+        return redirect('restaurant:home')
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    # Get restaurant for currency
+    from .models_restaurant import Restaurant
+    from django.db.models import Q as DBQ
+    restaurant = Restaurant.objects.filter(
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+    ).first()
+    currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
+    
+    # Date range filter
+    period = request.GET.get('period', 'month')
+    today = timezone.now().date()
+    
+    if period == 'week':
+        start_date = today - timedelta(days=7)
+    elif period == 'month':
+        start_date = today - timedelta(days=30)
+    elif period == 'quarter':
+        start_date = today - timedelta(days=90)
+    elif period == 'year':
+        start_date = today - timedelta(days=365)
+    else:
+        start_date = today - timedelta(days=30)
+    
+    # Get events in period
+    events = Event.objects.filter(
+        owner=owner_filter,
+        event_date__gte=start_date,
+        event_date__lte=today
+    )
+    
+    # Calculate statistics
+    completed_events = events.filter(status='completed')
+    
+    # Fully paid events - total amount from completed payments
+    fully_paid_events = events.filter(payment_status='fully_paid')
+    paid_amount = fully_paid_events.aggregate(total=Sum('amount_paid'))['total'] or 0
+    
+    # Unpaid events - total balance due
+    unpaid_events_list = events.filter(payment_status='unpaid').exclude(status='cancelled')
+    unpaid_amount = sum(event.price_per_pax * event.total_pax for event in unpaid_events_list)
+    
+    stats = {
+        'total_events': events.count(),
+        'completed_events': completed_events.count(),
+        'cancelled_events': events.filter(status='cancelled').count(),
+        'total_pax': events.aggregate(total=Sum('total_pax'))['total'] or 0,
+        'average_pax': events.aggregate(avg=Avg('total_pax'))['avg'] or 0,
+        'total_revenue': completed_events.aggregate(total=Sum('amount_paid'))['total'] or 0,
+        'total_expected': events.exclude(status='cancelled').aggregate(
+            total=Sum(F('total_pax') * F('price_per_pax'))
+        )['total'] or 0,
+        'pending_payments': events.exclude(payment_status='fully_paid').exclude(status='cancelled').count(),
+        'paid_events_count': fully_paid_events.count(),
+        'paid_amount': paid_amount,
+        'unpaid_events_count': unpaid_events_list.count(),
+        'unpaid_amount': unpaid_amount,
+    }
+    
+    # Events by type
+    events_by_type = events.values('event_type').annotate(
+        count=Count('id'),
+        total_pax=Sum('total_pax'),
+        revenue=Sum('amount_paid')
+    ).order_by('-count')
+    
+    # Events by status
+    events_by_status = events.values('status').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    # Upcoming events
+    upcoming_events = Event.objects.filter(
+        owner=owner_filter,
+        event_date__gte=today
+    ).exclude(status__in=['completed', 'cancelled']).order_by('event_date')[:5]
+    
+    # Recent completed events
+    recent_completed = Event.objects.filter(
+        owner=owner_filter,
+        status='completed'
+    ).order_by('-event_date')[:5]
+    
+    # Check if this is an embedded request
+    embed = request.GET.get('embed', '0') == '1'
+    
+    context = {
+        'stats': stats,
+        'events_by_type': events_by_type,
+        'events_by_status': events_by_status,
+        'upcoming_events': upcoming_events,
+        'recent_completed': recent_completed,
+        'period': period,
+        'start_date': start_date,
+        'end_date': today,
+        'event_types': dict(Event.EVENT_TYPE_CHOICES),
+        'status_choices': dict(Event.EVENT_STATUS_CHOICES),
+        'embed': embed,
+        'currency_symbol': currency_symbol,
+    }
+    
+    # Use a simpler template for embedded mode
+    template = 'restaurant/event_reports_embed.html' if embed else 'restaurant/event_reports.html'
+    return render(request, template, context)
+
+
+@login_required
+def record_event_payment(request, event_id):
+    """Record a payment for an event"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'success': False, 'message': 'Access denied.'})
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request method.'})
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    try:
+        event = Event.objects.get(id=event_id, owner=owner_filter)
+        
+        import json
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {str(e)}")
+            return JsonResponse({'success': False, 'message': 'Invalid JSON data.'})
+            
+        payment_amount = Decimal(str(data.get('amount', 0)))
+        is_deposit = data.get('is_deposit', False)
+        
+        logger.info(f"Recording payment: Event {event_id}, Amount {payment_amount}, Is Deposit {is_deposit}")
+        
+        if payment_amount <= 0:
+            return JsonResponse({'success': False, 'message': 'Invalid payment amount.'})
+        
+        # Update payment amounts
+        event.amount_paid += payment_amount
+        
+        if is_deposit and event.deposit_amount == 0:
+            event.deposit_amount = payment_amount
+        
+        event.save()  # This will auto-update payment_status
+        
+        logger.info(f"Payment recorded successfully: Event {event_id}, New total {event.amount_paid}, Status {event.payment_status}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Payment of {payment_amount} recorded successfully!',
+            'amount_paid': str(event.amount_paid),
+            'balance_due': str(event.balance_due),
+            'payment_status': event.payment_status,
+            'payment_status_display': event.get_payment_status_display(),
+            'payment_status_color': event.get_payment_status_color()
+        })
+    except Event.DoesNotExist:
+        logger.error(f"Event {event_id} not found")
+        return JsonResponse({'success': False, 'message': 'Event not found.'})
+    except (ValueError, TypeError) as e:
+        logger.error(f"Payment error: {str(e)}")
+        return JsonResponse({'success': False, 'message': f'Invalid payment amount: {str(e)}'})
+    except Exception as e:
+        logger.error(f"Unexpected error recording payment: {str(e)}")
+        return JsonResponse({'success': False, 'message': f'Error: {str(e)}'})
+
+
+@login_required
+def approve_event_payment(request, event_id):
+    """Approve/confirm an event payment"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request method'})
+    
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    try:
+        event = Event.objects.get(id=event_id, owner=owner_filter)
+        
+        # Check if there's amount to approve (payment_status should be deposit_paid or partially_paid)
+        if event.amount_paid > 0:
+            # If amount paid equals total amount, mark as fully paid
+            if event.amount_paid >= event.total_amount:
+                event.payment_status = 'fully_paid'
+            else:
+                event.payment_status = 'partially_paid'
+            
+            event.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Payment approved successfully!',
+                'payment_status': event.payment_status,
+                'payment_status_display': event.get_payment_status_display()
+            })
+        else:
+            return JsonResponse({'success': False, 'message': 'No payment recorded for this event.'})
+    
+    except Event.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Event not found.'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Error approving payment: {str(e)}'})
+
+
+@login_required
+def export_events_csv(request):
+    """Export events to CSV"""
+    import csv
+    from django.http import HttpResponse
+    
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return HttpResponse('Access denied', status=403)
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    # Get restaurant for currency
+    from .models_restaurant import Restaurant
+    from django.db.models import Q as DBQ
+    restaurant = Restaurant.objects.filter(
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+    ).first()
+    currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
+    
+    # Get filter parameters
+    status_filter = request.GET.get('status', '')
+    event_type_filter = request.GET.get('event_type', '')
+    date_filter = request.GET.get('date_filter', 'all')
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset
+    events = Event.objects.filter(owner=owner_filter)
+    
+    # Apply filters
+    if status_filter:
+        events = events.filter(status=status_filter)
+    
+    if event_type_filter:
+        events = events.filter(event_type=event_type_filter)
+    
+    if search_query:
+        events = events.filter(
+            Q(title__icontains=search_query) |
+            Q(contact_name__icontains=search_query) |
+            Q(contact_phone__icontains=search_query)
+        )
+    
+    # Date filters
+    today = timezone.now().date()
+    if date_filter == 'today':
+        events = events.filter(event_date=today)
+    elif date_filter == 'week':
+        week_end = today + timedelta(days=7)
+        events = events.filter(event_date__gte=today, event_date__lte=week_end)
+    elif date_filter == 'month':
+        month_end = today + timedelta(days=30)
+        events = events.filter(event_date__gte=today, event_date__lte=month_end)
+    elif date_filter == 'upcoming':
+        events = events.filter(event_date__gte=today).exclude(status__in=['completed', 'cancelled'])
+    elif date_filter == 'past':
+        events = events.filter(event_date__lt=today)
+    
+    events = events.order_by('-event_date', '-start_time')
+    
+    # Calculate summary statistics
+    all_filtered_events = events
+    fully_paid = all_filtered_events.filter(payment_status='fully_paid')
+    unpaid_only = all_filtered_events.filter(payment_status='unpaid').exclude(status='cancelled')
+    
+    paid_amount = fully_paid.aggregate(total=Sum('amount_paid'))['total'] or 0
+    unpaid_amount = sum(event.price_per_pax * event.total_pax for event in unpaid_only)
+    
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="events_export_{today.strftime("%Y%m%d")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'Event Date', 'Start Time', 'End Time', 'Event Title', 'Event Type',
+        'Total PAX', 'Price per PAX', 'Total Amount', 'Amount Paid', 'Balance Due',
+        'Contact Name', 'Contact Phone', 'Contact Email', 'Status', 'Payment Status',
+        'Description', 'Created At'
+    ])
+    
+    for event in events:
+        writer.writerow([
+            event.event_date.strftime('%Y-%m-%d'),
+            event.start_time.strftime('%H:%M') if event.start_time else '',
+            event.end_time.strftime('%H:%M') if event.end_time else '',
+            event.title,
+            event.get_event_type_display(),
+            event.total_pax,
+            f'{currency_symbol}{event.price_per_pax}',
+            f'{currency_symbol}{event.total_amount}',
+            f'{currency_symbol}{event.amount_paid}',
+            f'{currency_symbol}{event.balance_due}',
+            event.contact_name,
+            event.contact_phone,
+            event.contact_email or '',
+            event.get_status_display(),
+            event.get_payment_status_display(),
+            event.description or '',
+            event.created_at.strftime('%Y-%m-%d %H:%M')
+        ])
+    
+    # Add summary rows
+    writer.writerow([])  # Empty row
+    writer.writerow(['SUMMARY'])
+    writer.writerow(['Total Events:', events.count()])
+    writer.writerow(['Fully Paid Events:', fully_paid.count(), f'{currency_symbol}{paid_amount:.2f}'])
+    writer.writerow(['Unpaid Events:', unpaid_only.count(), f'{currency_symbol}{unpaid_amount:.2f}'])
+    writer.writerow(['Total Revenue (Paid + Unpaid):', '', f'{currency_symbol}{(paid_amount + unpaid_amount):.2f}'])
+    
+    return response
+
+
+@login_required
+def export_events_pdf(request):
+    """Export events to PDF"""
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from io import BytesIO
+    
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        return HttpResponse('Access denied', status=403)
+    
+    from accounts.models import get_owner_filter
+    owner_filter = get_owner_filter(request.user)
+    
+    # Get restaurant for currency and name
+    from .models_restaurant import Restaurant
+    from django.db.models import Q as DBQ
+    restaurant = Restaurant.objects.filter(
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+    ).first()
+    currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
+    restaurant_name = restaurant.name if restaurant else 'Restaurant'
+    
+    # Get filter parameters
+    status_filter = request.GET.get('status', '')
+    event_type_filter = request.GET.get('event_type', '')
+    date_filter = request.GET.get('date_filter', 'all')
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset
+    events = Event.objects.filter(owner=owner_filter)
+    
+    # Apply filters
+    if status_filter:
+        events = events.filter(status=status_filter)
+    
+    if event_type_filter:
+        events = events.filter(event_type=event_type_filter)
+    
+    if search_query:
+        events = events.filter(
+            Q(title__icontains=search_query) |
+            Q(contact_name__icontains=search_query) |
+            Q(contact_phone__icontains=search_query)
+        )
+    
+    # Date filters
+    today = timezone.now().date()
+    if date_filter == 'today':
+        events = events.filter(event_date=today)
+    elif date_filter == 'week':
+        week_end = today + timedelta(days=7)
+        events = events.filter(event_date__gte=today, event_date__lte=week_end)
+    elif date_filter == 'month':
+        month_end = today + timedelta(days=30)
+        events = events.filter(event_date__gte=today, event_date__lte=month_end)
+    elif date_filter == 'upcoming':
+        events = events.filter(event_date__gte=today).exclude(status__in=['completed', 'cancelled'])
+    elif date_filter == 'past':
+        events = events.filter(event_date__lt=today)
+    
+    events = events.order_by('-event_date', '-start_time')
+    
+    # Calculate summary statistics
+    all_filtered_events = events
+    fully_paid = all_filtered_events.filter(payment_status='fully_paid')
+    unpaid_only = all_filtered_events.filter(payment_status='unpaid').exclude(status='cancelled')
+    
+    paid_amount = fully_paid.aggregate(total=Sum('amount_paid'))['total'] or 0
+    unpaid_amount = sum(event.price_per_pax * event.total_pax for event in unpaid_only)
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), topMargin=0.5*inch, bottomMargin=0.5*inch)
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=12,
+        alignment=1  # Center
+    )
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=20,
+        alignment=1,
+        textColor=colors.gray
+    )
+    
+    # Title
+    elements.append(Paragraph(f"{restaurant_name} - Events Report", title_style))
+    
+    # Filter info
+    filter_info = f"Generated on: {today.strftime('%B %d, %Y')}"
+    if date_filter != 'all':
+        filter_info += f" | Period: {date_filter.title()}"
+    if status_filter:
+        filter_info += f" | Status: {status_filter.title()}"
+    if event_type_filter:
+        filter_info += f" | Type: {event_type_filter.replace('_', ' ').title()}"
+    elements.append(Paragraph(filter_info, subtitle_style))
+    
+    # Table data
+    table_data = [['Date', 'Event', 'Type', 'PAX', 'Total', 'Paid', 'Balance', 'Contact', 'Status']]
+    
+    total_revenue = 0
+    total_paid = 0
+    total_pax = 0
+    
+    for event in events:
+        table_data.append([
+            event.event_date.strftime('%m/%d/%Y'),
+            event.title[:25] + '...' if len(event.title) > 25 else event.title,
+            event.get_event_type_display()[:12],
+            str(event.total_pax),
+            f'{currency_symbol}{event.total_amount:.2f}',
+            f'{currency_symbol}{event.amount_paid:.2f}',
+            f'{currency_symbol}{event.balance_due:.2f}',
+            event.contact_name[:15] + '...' if len(event.contact_name) > 15 else event.contact_name,
+            event.get_status_display()
+        ])
+        total_revenue += event.total_amount
+        total_paid += event.amount_paid
+        total_pax += event.total_pax
+    
+    # Add totals row
+    if events:
+        table_data.append([
+            'TOTAL', '', '', str(total_pax),
+            f'{currency_symbol}{total_revenue:.2f}',
+            f'{currency_symbol}{total_paid:.2f}',
+            f'{currency_symbol}{total_revenue - total_paid:.2f}',
+            '', ''
+        ])
+    
+    # Create table
+    if len(table_data) > 1:
+        table = Table(table_data, colWidths=[0.9*inch, 1.8*inch, 1*inch, 0.5*inch, 0.9*inch, 0.9*inch, 0.9*inch, 1.2*inch, 0.9*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -2), colors.white),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f8f9fc')]),
+            # Total row styling
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8eaf6')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ]))
+        elements.append(table)
+    else:
+        elements.append(Paragraph("No events found matching the criteria.", styles['Normal']))
+    
+    # Summary
+    elements.append(Spacer(1, 0.3*inch))
+    summary_text = f"Total Events: {events.count()} | Total PAX: {total_pax} | Total Revenue: {currency_symbol}{total_revenue:.2f} | Collected: {currency_symbol}{total_paid:.2f}"
+    elements.append(Paragraph(summary_text, subtitle_style))
+    
+    # Add Paid/Unpaid breakdown
+    elements.append(Spacer(1, 0.15*inch))
+    breakdown_style = ParagraphStyle(
+        'Breakdown',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,
+        textColor=colors.HexColor('#1e3a5f')
+    )
+    breakdown_text = f"<b>Fully Paid:</b> {fully_paid.count()} events ({currency_symbol}{paid_amount:.2f}) | <b>Unpaid:</b> {unpaid_only.count()} events ({currency_symbol}{unpaid_amount:.2f})"
+    elements.append(Paragraph(breakdown_text, breakdown_style))
+    
+    doc.build(elements)
+    
+    # Return response
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="events_report_{today.strftime("%Y%m%d")}.pdf"'
+    
+    return response
+
+

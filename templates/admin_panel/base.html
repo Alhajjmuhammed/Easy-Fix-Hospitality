@@ -540,6 +540,10 @@
                         <i class="fas fa-clock text-warning"></i>
                         <span>Happy Hour</span>
                     </a>
+                    <a class="nav-link {% if request.resolver_match.namespace == 'restaurant' and 'event' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'restaurant:manage_events' %}" data-tooltip="Events">
+                        <i class="fas fa-calendar-alt text-info"></i>
+                        <span>Event Menu</span>
+                    </a>
                     {% endif %}
                 </div>
 

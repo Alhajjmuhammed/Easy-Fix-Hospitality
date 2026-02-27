@@ -1,0 +1,272 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}{{ action }} Event - Event Menu{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .form-section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .form-section-title i {
+        color: #6366f1;
+    }
+    .price-preview {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    .price-preview .total-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .price-preview .total-value {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    .required-label::after {
+        content: ' *';
+        color: #ef4444;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{% url 'restaurant:manage_events' %}">Events</a></li>
+                    <li class="breadcrumb-item active">{{ action }} Event</li>
+                </ol>
+            </nav>
+            <h2 class="mb-0">
+                <i class="fas fa-{% if action == 'Add' %}plus{% else %}edit{% endif %} text-primary me-2"></i>
+                {{ action }} Event
+            </h2>
+        </div>
+        <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Events
+        </a>
+    </div>
+
+    <form method="post" id="eventForm">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Event Details -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-info-circle"></i>
+                        Event Details
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label required-label">Event Title</label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                            <div class="text-danger small">{{ form.title.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label required-label">Event Type</label>
+                            {{ form.event_type }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            {{ form.description }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date & Time -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-calendar"></i>
+                        Date & Time
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label required-label">Event Date</label>
+                            {{ form.event_date }}
+                            {% if form.event_date.errors %}
+                            <div class="text-danger small">{{ form.event_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label required-label">Start Time</label>
+                            {{ form.start_time }}
+                            {% if form.start_time.errors %}
+                            <div class="text-danger small">{{ form.start_time.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">End Time</label>
+                            {{ form.end_time }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAX & Pricing -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-users"></i>
+                        Guests & Pricing
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label required-label">Total PAX (Number of Guests)</label>
+                            {{ form.total_pax }}
+                            {% if form.total_pax.errors %}
+                            <div class="text-danger small">{{ form.total_pax.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label required-label">Price per PAX</label>
+                            <div class="input-group">
+                                <span class="input-group-text">{{ currency_symbol }}</span>
+                                {{ form.price_per_pax }}
+                            </div>
+                            {% if form.price_per_pax.errors %}
+                            <div class="text-danger small">{{ form.price_per_pax.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label required-label">Contact Name</label>
+                            {{ form.contact_name }}
+                            {% if form.contact_name.errors %}
+                            <div class="text-danger small">{{ form.contact_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label required-label">Contact Phone</label>
+                            {{ form.contact_phone }}
+                            {% if form.contact_phone.errors %}
+                            <div class="text-danger small">{{ form.contact_phone.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Price Preview -->
+                <div class="price-preview mb-4">
+                    <div class="total-label">Estimated Total</div>
+                    <div class="total-value" id="totalPreview">{{ currency_symbol }}0.00</div>
+                    <div class="mt-2 small">
+                        <span id="paxPreview">0</span> guests × {{ currency_symbol }}<span id="pricePreview">0.00</span>
+                    </div>
+                </div>
+
+                <!-- Payment Summary (Edit mode) -->
+                {% if event %}
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <i class="fas fa-receipt"></i>
+                        Payment Summary
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Amount:</span>
+                        <strong>{{ currency_symbol }}{{ event.total_amount|floatformat:2 }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Amount Paid:</span>
+                        <span class="text-success">{{ currency_symbol }}{{ event.amount_paid|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Balance Due:</span>
+                        <span class="{% if event.balance_due > 0 %}text-danger{% else %}text-success{% endif %}">
+                            {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}
+                        </span>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        <span class="badge bg-{{ event.get_payment_status_color }} fs-6">
+                            {{ event.get_payment_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Submit Buttons -->
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save me-2"></i>
+                        {% if action == 'Add' %}Create Event{% else %}Save Changes{% endif %}
+                    </button>
+                    <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Errors -->
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger mt-3">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            {% for error in form.non_field_errors %}
+            {{ error }}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paxInput = document.querySelector('[name="total_pax"]');
+    const priceInput = document.querySelector('[name="price_per_pax"]');
+    const totalPreview = document.getElementById('totalPreview');
+    const paxPreview = document.getElementById('paxPreview');
+    const pricePreviewEl = document.getElementById('pricePreview');
+    const currencySymbol = '{{ currency_symbol|escapejs }}';
+
+    function updateTotal() {
+        const pax = parseInt(paxInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const total = pax * price;
+        
+        totalPreview.textContent = currencySymbol + total.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        paxPreview.textContent = pax;
+        pricePreviewEl.textContent = price.toFixed(2);
+    }
+
+    if (paxInput && priceInput) {
+        paxInput.addEventListener('input', updateTotal);
+        priceInput.addEventListener('input', updateTotal);
+        updateTotal(); // Initial calculation
+    }
+});
+</script>
+{% endblock %}

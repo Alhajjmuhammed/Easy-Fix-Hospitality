@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .models import Product, MainCategory, SubCategory, TableInfo, HappyHourPromotion
+from .models import Product, MainCategory, SubCategory, TableInfo, HappyHourPromotion, Event
 from accounts.models import User, Role
 
 class ProductForm(forms.ModelForm):
@@ -210,3 +210,80 @@ class HappyHourPromotionForm(forms.ModelForm):
             self.save_m2m()
         
         return promotion
+
+
+class EventForm(forms.ModelForm):
+    """Form for creating and editing events"""
+    
+    class Meta:
+        model = Event
+        fields = [
+            'title', 'event_type', 'description', 'event_date', 'start_time', 'end_time',
+            'total_pax', 'price_per_pax', 'contact_name', 'contact_phone'
+        ]
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g., Smith Wedding Reception'
+            }),
+            'event_type': forms.Select(attrs={'class': 'form-select'}),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Additional event details...'
+            }),
+            'event_date': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'start_time': forms.TimeInput(attrs={
+                'class': 'form-control',
+                'type': 'time'
+            }),
+            'end_time': forms.TimeInput(attrs={
+                'class': 'form-control',
+                'type': 'time'
+            }),
+            'total_pax': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'placeholder': 'Number of guests'
+            }),
+            'price_per_pax': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': 'Price per person'
+            }),
+            'contact_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Client name'
+            }),
+            'contact_phone': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Phone number'
+            }),
+        }
+        labels = {
+            'title': 'Event Title',
+            'event_type': 'Event Type',
+            'description': 'Description',
+            'event_date': 'Event Date',
+            'start_time': 'Start Time',
+            'end_time': 'End Time',
+            'total_pax': 'Total PAX (Guests)',
+            'price_per_pax': 'Price per PAX',
+            'contact_name': 'Contact Name',
+            'contact_phone': 'Contact Phone',
+        }
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        
+        # Validate end time is after start time (if provided)
+        if start_time and end_time and end_time <= start_time:
+            raise forms.ValidationError("End time must be after start time.")
+        
+        return cleaned_data

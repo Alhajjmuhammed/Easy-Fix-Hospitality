@@ -72,3 +72,9 @@ bleach==6.1.0                # HTML sanitization
 # Password Hashing (Argon2 - Most Secure)
 # -----------------------------------------------------------------------------
 argon2-cffi==23.1.0
+
+# -----------------------------------------------------------------------------
+# SSL/TLS Libraries (Required for Daphne/Twisted WebSockets)
+# -----------------------------------------------------------------------------
+cryptography>=46.0.0         # Modern cryptography library
+pyOpenSSL>=25.0.0            # Python OpenSSL wrapper
