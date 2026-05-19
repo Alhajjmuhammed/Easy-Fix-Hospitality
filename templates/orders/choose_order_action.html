@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Table {{ table.tbl_no }} - Order Options{% endblock %}
+
+{% block extra_css %}
+<style>
+    .order-action-container {
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+    }
+    
+    .table-status-card {
+        background: #2c5282;
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .table-number {
+        font-size: 3rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    
+    .table-info {
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+    
+    .action-card {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 20px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        border: 3px solid transparent;
+    }
+    
+    .action-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(44, 82, 130, 0.15);
+        border-color: #2c5282;
+    }
+    
+    .action-card.selected {
+        border-color: #2c5282;
+        background: #f0f4f8;
+    }
+    
+    .action-icon {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        color: #2c5282;
+    }
+    
+    .action-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: #2d3748;
+    }
+    
+    .action-description {
+        color: #718096;
+        margin-bottom: 15px;
+    }
+    
+    .order-list {
+        background: #f7fafc;
+        border-radius: 10px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+    
+    .order-item {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .order-item:hover {
+        background: #edf2f7;
+    }
+    
+    .order-item.selected {
+        background: #2c5282;
+        color: white;
+    }
+    
+    .order-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+    }
+    
+    .badge-unpaid {
+        background: #fed7d7;
+        color: #c53030;
+    }
+    
+    .badge-partial {
+        background: #feebc8;
+        color: #c05621;
+    }
+    
+    .btn-action {
+        padding: 15px 40px;
+        font-size: 1.1rem;
+        border-radius: 10px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary-custom {
+        background: #2c5282;
+        border: none;
+        color: white;
+    }
+    
+    .btn-primary-custom:hover {
+        background: #1e3a5f;
+        color: white;
+    }
+    
+    .alert-info-custom {
+        background: #e6fffa;
+        border-left: 4px solid #38b2ac;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container order-action-container">
+    <!-- Table Status Card -->
+    <div class="table-status-card">
+        <div class="table-number">
+            <i class="fas fa-utensils"></i> Table {{ table.tbl_no }}
+        </div>
+        <div class="table-info">
+            <i class="fas fa-info-circle"></i> Currently Occupied
+            <br>
+            <strong>{{ total_orders }}</strong> Active Order{{ total_orders|pluralize }}
+        </div>
+    </div>
+
+    {% if other_orders_count > 0 %}
+    <div class="alert-info-custom">
+        <i class="fas fa-users"></i> <strong>{{ other_orders_count }}</strong> other customer{{ other_orders_count|pluralize }} 
+        {{ other_orders_count|pluralize:"is,are" }} also dining at this table
+    </div>
+    {% endif %}
+
+    <form method="post" id="orderActionForm">
+        {% csrf_token %}
+        
+        <div class="row g-4">
+            {% if has_customer_orders %}
+            <!-- Option 1: Add to Existing Order -->
+            <div class="col-md-6">
+                <div class="action-card h-100" onclick="submitAction('add')">
+                    <div class="text-center">
+                        <div class="action-icon">
+                            <i class="fas fa-plus-circle"></i>
+                        </div>
+                        <div class="action-title">
+                            Add to Existing Order
+                        </div>
+                        <div class="action-description">
+                            Same customer adding more items
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Option 2: Create New Order -->
+            <div class="col-md-6">
+                <div class="action-card h-100" onclick="submitAction('new')">
+                    <div class="text-center">
+                        <div class="action-icon">
+                            <i class="fas fa-file-invoice"></i>
+                        </div>
+                        <div class="action-title">
+                            Create New Order
+                        </div>
+                        <div class="action-description">
+                            Different customer at this table
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" name="action" id="selectedAction">
+    </form>
+
+    <div class="text-center mt-3">
+        <a href="{% url 'orders:select_table' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Choose Different Table
+        </a>
+    </div>
+</div>
+
+<script>
+function submitAction(action) {
+    document.getElementById('selectedAction').value = action;
+    document.getElementById('orderActionForm').submit();
+}
+</script>
+{% endblock %}

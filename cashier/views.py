@@ -28,12 +28,44 @@ def cashier_dashboard(request):
     
     owner = get_owner_filter(request.user)
     
-    # Get table filter from request
+    # Get filters from request
     table_filter = request.GET.get('table', '')
     status_filter = request.GET.get('status', '')
+    period = request.GET.get('period', 'today')
+    staff_filter = request.GET.get('staff', 'all')  # Changed from customer_care_filter
+    staff_role = request.GET.get('staff_role', 'all')  # New: filter by role
     
-    # Base queryset for orders
-    orders = Order.objects.filter(table_info__owner=owner)
+    # Base queryset for orders with period filter
+    from datetime import timedelta
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    if period == 'today':
+        orders = Order.objects.filter(
+            table_info__owner=owner,
+            created_at__gte=today_start,
+            created_at__lt=today_start + timedelta(days=1)
+        )
+    elif period == 'weekly':
+        week_start = today_start - timedelta(days=today_start.weekday())
+        orders = Order.objects.filter(
+            table_info__owner=owner,
+            created_at__gte=week_start
+        )
+    else:
+        orders = Order.objects.filter(
+            table_info__owner=owner,
+            created_at__gte=today_start,
+            created_at__lt=today_start + timedelta(days=1)
+        )
+    
+    # Apply staff filter (by specific user)
+    if staff_filter != 'all':
+        orders = orders.filter(ordered_by_id=staff_filter)
+    # Apply staff role filter (by role type)
+    elif staff_role == 'customer_care':
+        orders = orders.filter(ordered_by__role__name='customer_care')
+    elif staff_role == 'cashier':
+        orders = orders.filter(ordered_by__role__name='cashier')
     
     # Apply filters
     if table_filter:
@@ -51,6 +83,30 @@ def cashier_dashboard(request):
     # Get all tables for dropdown
     tables = TableInfo.objects.filter(owner=owner).order_by('tbl_no')
     
+    # Get customer care users for filter
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+    User = get_user_model()
+    
+    customer_care_users = User.objects.filter(role__name='customer_care')
+    if hasattr(owner, 'branch_owner'):
+        customer_care_users = customer_care_users.filter(branch_owner=owner)
+    elif hasattr(owner, 'owner'):
+        customer_care_users = customer_care_users.filter(owner=owner)
+    else:
+        customer_care_users = customer_care_users.filter(Q(owner=owner) | Q(branch_owner=owner))
+    customer_care_users = customer_care_users.order_by('first_name', 'username')
+    
+    # Get cashier users for filter
+    cashier_users = User.objects.filter(role__name='cashier')
+    if hasattr(owner, 'branch_owner'):
+        cashier_users = cashier_users.filter(branch_owner=owner)
+    elif hasattr(owner, 'owner'):
+        cashier_users = cashier_users.filter(owner=owner)
+    else:
+        cashier_users = cashier_users.filter(Q(owner=owner) | Q(branch_owner=owner))
+    cashier_users = cashier_users.order_by('first_name', 'username')
+    
     # Get products for waste recording modal
     waste_products = Product.objects.filter(main_category__owner=owner).order_by('name')
     
@@ -67,11 +123,50 @@ def cashier_dashboard(request):
         'tables': tables,
         'table_filter': table_filter,
         'status_filter': status_filter,
+        'period': period,
+        'staff_filter': staff_filter,
+        'staff_role': staff_role,
+        'customer_care_users': customer_care_users,
+        'cashier_users': cashier_users,
         'payment_status_choices': Order.PAYMENT_STATUS_CHOICES,
         'waste_products': waste_products,
     }
     
     return render(request, 'cashier/dashboard.html', context)
+
+
+@login_required
+def my_orders(request):
+    """Cashier's own orders - orders they created"""
+    if not request.user.is_cashier():
+        messages.error(request, "Access denied. Cashier role required.")
+        return redirect('accounts:profile')
+    
+    owner = get_owner_filter(request.user)
+    
+    # Get only orders created by this cashier
+    orders = Order.objects.filter(
+        table_info__owner=owner,
+        ordered_by=request.user
+    ).select_related('table_info', 'ordered_by').prefetch_related(
+        Prefetch('order_items', queryset=OrderItem.objects.select_related('product')),
+        'payments'
+    ).order_by('-created_at')
+    
+    # Calculate payment summaries
+    for order in orders:
+        total_paid = order.payments.filter(is_voided=False).aggregate(
+            total=Sum('amount'))['total'] or Decimal('0.00')
+        order.total_paid = total_paid
+        order.balance_due = order.total_amount - total_paid
+        order.is_fully_paid = order.balance_due <= Decimal('0.00')
+    
+    context = {
+        'orders': orders,
+        'payment_status_choices': Order.PAYMENT_STATUS_CHOICES,
+    }
+    
+    return render(request, 'cashier/my_orders.html', context)
 
 
 @login_required
@@ -572,3 +667,333 @@ def print_bill(request, order_id):
     except Exception as e:
         logger.error(f'Error printing bill: {str(e)}')
         return JsonResponse({'error': 'Error printing bill. Please try again.'}, status=400)
+
+
+@login_required
+def cashier_reports(request):
+    """Cashier Reports - showing only orders they processed payments for"""
+    if not request.user.is_cashier():
+        messages.error(request, "Access denied. Cashier role required.")
+        return redirect('accounts:profile')
+    
+    from django.utils import timezone
+    from django.db.models import Sum, Count, Q
+    from datetime import datetime, timedelta
+    from django.http import HttpResponse
+    import csv
+    
+    owner = get_owner_filter(request.user)
+    
+    # Get filter parameters
+    period = request.GET.get('period', 'today')
+    payment_status = request.GET.get('payment_status', 'all')
+    category_id = request.GET.get('category_id', 'all')
+    subcategory_id = request.GET.get('subcategory_id', 'all')
+    station_filter = request.GET.get('station_filter', 'all')
+    staff_filter = request.GET.get('staff', 'all')  # Changed from customer_care_filter
+    staff_role = request.GET.get('staff_role', 'all')  # New: filter by role
+    export_format = request.GET.get('export')
+    
+    # Base queryset - cashier sees ALL orders from their restaurant
+    orders = Order.objects.filter(table_info__owner=owner)
+    
+    # Apply staff filter (by specific user)
+    if staff_filter != 'all':
+        orders = orders.filter(ordered_by_id=staff_filter)
+    # Apply staff role filter (by role type)
+    elif staff_role == 'customer_care':
+        orders = orders.filter(ordered_by__role__name='customer_care')
+    elif staff_role == 'cashier':
+        orders = orders.filter(ordered_by__role__name='cashier')
+    
+    # Apply period filter (only today and weekly)
+    today = timezone.now().date()
+    if period == 'today':
+        orders = orders.filter(created_at__date=today)
+    elif period == 'weekly':
+        week_start = today - timedelta(days=today.weekday())
+        orders = orders.filter(created_at__date__gte=week_start)
+    
+    # Apply payment status filter
+    if payment_status != 'all':
+        orders = orders.filter(payment_status=payment_status)
+    
+    # Apply category/subcategory/station filters using IDs approach
+    order_ids = list(orders.values_list('id', flat=True))
+    
+    if category_id != 'all':
+        filtered_items = OrderItem.objects.filter(
+            order_id__in=order_ids,
+            product__main_category_id=category_id
+        ).values_list('order_id', flat=True).distinct()
+        order_ids = list(set(order_ids) & set(filtered_items))
+    
+    if subcategory_id != 'all':
+        filtered_items = OrderItem.objects.filter(
+            order_id__in=order_ids,
+            product__sub_category_id=subcategory_id
+        ).values_list('order_id', flat=True).distinct()
+        order_ids = list(set(order_ids) & set(filtered_items))
+    
+    if station_filter != 'all':
+        filtered_items = OrderItem.objects.filter(
+            order_id__in=order_ids,
+            product__station=station_filter
+        ).values_list('order_id', flat=True).distinct()
+        order_ids = list(set(order_ids) & set(filtered_items))
+    
+    # Rebuild orders queryset with filtered IDs
+    orders = Order.objects.filter(id__in=order_ids).select_related(
+        'table_info', 'ordered_by'
+    ).prefetch_related(
+        'order_items__product__main_category',
+        'order_items__product__sub_category',
+        'payments'
+    ).order_by('-created_at')
+    
+    # Calculate statistics
+    total_revenue = Decimal('0.00')
+    paid_amount = Decimal('0.00')
+    unpaid_amount = Decimal('0.00')
+    total_orders = orders.count()
+    total_items = 0
+    
+    for order in orders:
+        # Count all revenue from order
+        total_revenue += order.total_amount
+        total_items += order.order_items.count()
+        
+        # Calculate paid and unpaid amounts
+        if order.payment_status == 'paid':
+            paid_amount += order.total_amount
+        elif order.payment_status == 'unpaid':
+            unpaid_amount += order.total_amount
+        elif order.payment_status == 'partial':
+            # For partial payments, calculate what's been paid
+            total_paid = order.payments.filter(is_voided=False).aggregate(
+                total=Sum('amount'))['total'] or Decimal('0.00')
+            paid_amount += total_paid
+            unpaid_amount += (order.total_amount - total_paid)
+    
+    # Handle CSV export
+    if export_format == 'csv':
+        # Get currency symbol
+        currency_symbol = request.user.get_currency_symbol()
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="cashier_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow(['Order #', 'Date', 'Time', 'Table', 'Items', 'Categories', 'Stations', 'Ordered By', 'Paid By', 'Total Amount', 'Payment Status'])
+        
+        for order in orders:
+            items_list = ', '.join([f"{item.quantity}x {item.product.name}" for item in order.order_items.all()])
+            categories = ', '.join(set([item.product.main_category.name for item in order.order_items.all() if item.product.main_category]))
+            stations = ', '.join(set([item.product.get_station_display() for item in order.order_items.all()]))
+            
+            # Get paid by information
+            paid_by_list = []
+            for payment in order.payments.filter(is_voided=False):
+                name = payment.processed_by.get_full_name() or payment.processed_by.username
+                if payment.processed_by.is_cashier():
+                    paid_by_list.append(f"{name}-cs")
+                elif payment.processed_by.is_customer_care():
+                    paid_by_list.append(f"{name}-cc")
+                else:
+                    paid_by_list.append(f"{name}-staff")
+            paid_by = ', '.join(paid_by_list) if paid_by_list else '-'
+            
+            writer.writerow([
+                order.order_number,
+                order.created_at.strftime('%Y-%m-%d'),
+                order.created_at.strftime('%H:%M:%S'),
+                order.table_info.tbl_no,
+                items_list,
+                categories,
+                stations,
+                order.ordered_by.get_full_name() or order.ordered_by.username,
+                paid_by,
+                f'{currency_symbol}{order.total_amount:.2f}',
+                order.get_payment_status_display()
+            ])
+        
+        return response
+    
+    # Handle PDF export
+    if export_format == 'pdf':
+        # Get currency symbol
+        currency_symbol = request.user.get_currency_symbol()
+        
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from io import BytesIO
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=0.5*inch, bottomMargin=0.5*inch)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#2c5282'),
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        elements.append(Paragraph(f"Restaurant Sales Report - {owner.restaurant_name}", title_style))
+        
+        # Summary statistics - 2 rows
+        summary_data = [
+            ['Total Amount', 'Paid Amount', 'Unpaid Amount'],
+            [f'{currency_symbol}{total_revenue:.2f}', f'{currency_symbol}{paid_amount:.2f}', f'{currency_symbol}{unpaid_amount:.2f}'],
+            ['Total Orders', 'Items Sold', ''],
+            [str(total_orders), str(total_items), '']
+        ]
+        summary_table = Table(summary_data, colWidths=[2.5*inch, 2.5*inch, 2.5*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#2c5282')),
+            ('TEXTCOLOR', (0, 2), (-1, 2), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 2), (-1, 2), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('BACKGROUND', (0, 1), (-1, 1), colors.white),
+            ('BACKGROUND', (0, 3), (-1, 3), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Orders table
+        table_data = [['Order #', 'Date & Time', 'Table', 'Items', 'Category', 'Station', 'Ordered By', 'Paid By', 'Total', 'Payment']]
+        
+        for order in orders:
+            items_str = ', '.join([f"{item.quantity}x {item.product.name[:15]}" for item in order.order_items.all()[:3]])
+            if order.order_items.count() > 3:
+                items_str += '...'
+            
+            categories = ', '.join(set([item.product.main_category.name[:15] for item in order.order_items.all() if item.product.main_category]))
+            stations = ', '.join(set([item.product.get_station_display()[:10] for item in order.order_items.all()]))
+            
+            # Get paid by information
+            paid_by_list = []
+            for payment in order.payments.filter(is_voided=False):
+                name = (payment.processed_by.get_full_name() or payment.processed_by.username)[:10]
+                if payment.processed_by.is_cashier():
+                    paid_by_list.append(f"{name}-cs")
+                elif payment.processed_by.is_customer_care():
+                    paid_by_list.append(f"{name}-cc")
+                else:
+                    paid_by_list.append(f"{name}-st")
+            paid_by = ', '.join(paid_by_list)[:20] if paid_by_list else '-'
+            
+            table_data.append([
+                order.order_number[:15],
+                order.created_at.strftime('%Y-%m-%d %H:%M'),
+                order.table_info.tbl_no,
+                items_str[:30],
+                categories[:20],
+                stations[:15],
+                (order.ordered_by.get_full_name() or order.ordered_by.username)[:15],
+                paid_by,
+                f'{currency_symbol}{order.total_amount:.2f}',
+                order.get_payment_status_display()
+            ])
+        
+        orders_table = Table(table_data, colWidths=[0.9*inch, 1.1*inch, 0.5*inch, 1.5*inch, 0.9*inch, 0.8*inch, 0.9*inch, 0.9*inch, 0.7*inch, 0.7*inch])
+        orders_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(orders_table)
+        
+        doc.build(elements)
+        pdf = buffer.getvalue()
+        buffer.close()
+        
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="cashier_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.pdf"'
+        response.write(pdf)
+        return response
+    
+    # Get categories and subcategories for filters
+    from restaurant.models import MainCategory, SubCategory
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    categories = MainCategory.objects.filter(owner=owner).order_by('name')
+    subcategories = SubCategory.objects.filter(main_category__owner=owner).order_by('name')
+    
+    # Get customer care users for filter
+    customer_care_users = User.objects.filter(
+        role__name='customer_care'
+    )
+    # Filter by owner assignment
+    if hasattr(owner, 'branch_owner'):
+        customer_care_users = customer_care_users.filter(branch_owner=owner)
+    elif hasattr(owner, 'owner'):
+        customer_care_users = customer_care_users.filter(owner=owner)
+    else:
+        customer_care_users = customer_care_users.filter(Q(owner=owner) | Q(branch_owner=owner))
+    
+    customer_care_users = customer_care_users.order_by('first_name', 'username')
+    
+    # Get cashier users for filter
+    cashier_users = User.objects.filter(role__name='cashier')
+    if hasattr(owner, 'branch_owner'):
+        cashier_users = cashier_users.filter(branch_owner=owner)
+    elif hasattr(owner, 'owner'):
+        cashier_users = cashier_users.filter(owner=owner)
+    else:
+        cashier_users = cashier_users.filter(Q(owner=owner) | Q(branch_owner=owner))
+    cashier_users = cashier_users.order_by('first_name', 'username')
+    
+    # Station choices
+    station_choices = [
+        ('kitchen', 'Kitchen'),
+        ('bar', 'Bar'),
+        ('buffet', 'Buffet'),
+        ('service', 'Service')
+    ]
+    
+    context = {
+        'orders': orders,
+        'total_revenue': total_revenue,
+        'paid_amount': paid_amount,
+        'unpaid_amount': unpaid_amount,
+        'total_orders': total_orders,
+        'total_items': total_items,
+        'categories': categories,
+        'subcategories': subcategories,
+        'station_choices': station_choices,
+        'customer_care_users': customer_care_users,
+        'cashier_users': cashier_users,
+        'filters': {
+            'period': period,
+            'payment_status': payment_status,
+            'category_id': category_id,
+            'subcategory_id': subcategory_id,
+            'station_filter': station_filter,
+            'staff': staff_filter,
+            'staff_role': staff_role,
+        }
+    }
+    
+    return render(request, 'cashier/reports.html', context)

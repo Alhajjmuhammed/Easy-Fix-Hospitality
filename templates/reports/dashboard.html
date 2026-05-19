@@ -15,7 +15,15 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL REVENUE</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ total_revenue|floatformat:0 }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted mt-1">
+                                <i class="fas fa-plus-circle"></i> Tax ({{ tax_rate_percentage|floatformat:1 }}%): {% currency_symbol %}{{ total_tax|floatformat:2 }}
+                            </div>
+                            <div class="text-xs font-weight-bold text-success mt-1">
+                                <i class="fas fa-calculator"></i> With Tax: {% currency_symbol %}{{ total_revenue_with_tax|floatformat:2 }}
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-dollar-sign fa-2x text-primary" style="opacity: 0.3;"></i>
@@ -66,7 +74,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">AVG ORDER VALUE</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ avg_order_value|floatformat:0 }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{% currency_symbol %}{{ avg_order_value|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs font-weight-bold text-success mt-1">
+                                <i class="fas fa-calculator"></i> With Tax: {% currency_symbol %}{{ avg_order_value_with_tax|floatformat:2 }}
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-chart-line fa-2x text-warning" style="opacity: 0.3;"></i>
@@ -76,6 +89,77 @@
             </div>
         </div>
     </div>
+
+    <!-- Payment Status Cards (when showing all payment statuses) -->
+    {% if payment_status == 'all' %}
+    <div class="row mb-4">
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PAID ORDERS</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{{ paid_orders_count }}</div>
+                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ paid_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ paid_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-success">Total: {% currency_symbol %}{{ paid_revenue_with_tax|floatformat:2 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-success" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">UNPAID ORDERS</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{{ unpaid_orders_count }}</div>
+                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ unpaid_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ unpaid_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-danger">Total: {% currency_symbol %}{{ unpaid_revenue_with_tax|floatformat:2 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-times-circle fa-2x text-danger" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PARTIAL PAYMENTS</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{{ partial_orders_count }}</div>
+                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ partial_revenue|floatformat:2 }}</div>
+                            {% if tax_rate_percentage > 0 %}
+                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ partial_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-warning">Total: {% currency_symbol %}{{ partial_revenue_with_tax|floatformat:2 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-circle fa-2x text-warning" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Station Breakdown Cards (when showing all stations) -->
     {% if station_filter == 'all' %}
@@ -276,6 +360,42 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
+                    <label for="staff_filter" class="form-label font-weight-bold">Staff Member</label>
+                    <select class="form-control" id="staff_filter" name="staff_filter" onchange="this.form.submit()">
+                        <option value="all" {% if staff_filter == 'all' %}selected{% endif %}>All Staff</option>
+                        {% for staff in staff_users %}
+                            <option value="{{ staff.id }}" {% if staff_filter == staff.id|stringformat:"s" %}selected{% endif %}>
+                                {{ staff.first_name }} {{ staff.last_name }} ({{ staff.role.get_name_display }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-lg-2 col-md-4">
+                    <label for="product_id" class="form-label font-weight-bold">Product</label>
+                    <select class="form-control" id="product_id" name="product_id" onchange="this.form.submit()">
+                        <option value="all" {% if selected_product == 'all' or not selected_product %}selected{% endif %}>All Products</option>
+                        {% for product in products %}
+                            <option value="{{ product.id }}" {% if selected_product == product.id|stringformat:"s" %}selected{% endif %}>
+                                {{ product.main_category.name }} &mdash; {{ product.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-lg-2 col-md-4">
+                    <label for="table_id" class="form-label font-weight-bold">Table</label>
+                    <select class="form-control" id="table_id" name="table_id" onchange="this.form.submit()">
+                        <option value="all" {% if selected_table == 'all' or not selected_table %}selected{% endif %}>All Tables</option>
+                        {% for table in tables %}
+                            <option value="{{ table.id }}" {% if selected_table == table.id|stringformat:"s" %}selected{% endif %}>
+                                Table {{ table.tbl_no }}{% if tables|length > 1 and table.restaurant %} ({{ table.restaurant.name }}){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-lg-2 col-md-4">
                     <label for="payment_status" class="form-label font-weight-bold">Payment Status</label>
                     <select class="form-control" id="payment_status" name="payment_status" onchange="this.form.submit()">
                         <option value="all" {% if payment_status == 'all' %}selected{% endif %}>All</option>
@@ -302,10 +422,10 @@
                 </div>
                 
                 <div class="col-lg-12 col-md-12 d-flex align-items-end justify-content-end">
-                    <a href="{% url 'reports:export_csv' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-success me-3">
+                    <a href="{% url 'reports:export_csv' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}&staff_filter={{ staff_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-success me-3">
                         <i class="fas fa-download mr-2"></i>Export CSV
                     </a>
-                    <a href="{% url 'reports:export_pdf' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-danger">
+                    <a href="{% url 'reports:export_pdf' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}&staff_filter={{ staff_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-danger">
                         <i class="fas fa-file-pdf mr-2"></i>Export PDF
                     </a>
                 </div>
@@ -348,6 +468,7 @@
                 <table class="table table-bordered" width="100%" cellspacing="0">
                     <thead class="thead-light">
                         <tr>
+                            <th>SN</th>
                             <th>Order #</th>
                             <th>Date & Time</th>
                             <th>Table</th>
@@ -359,13 +480,15 @@
                             <th>Total Amount</th>
                             <th>Payment</th>
                             <th>Status</th>
-                            <th>Cashier</th>
+                            <th>Order By</th>
+                            <th>Paid By</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for order in page_obj %}
                         <tr>
-                            <td class="font-weight-bold">ORD-{{ order.id|stringformat:"08d" }}</td>
+                            <td>{{ forloop.counter }}</td>
+                            <td class="font-weight-bold">{{ order.order_number }}</td>
                             <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
                             <td class="text-center">
                                 {% if order.table_info %}
@@ -383,18 +506,18 @@
                             </td>
                             <td>
                                 <small>
-                                {% comment %}Filter items based on active filters{% endcomment %}
+                                {% comment %}Filter items based on active filters. Priority: product > subcategory > category > station{% endcomment %}
                                 {% for item in order.order_items.all %}
                                     {% if selected_product and selected_product != 'all' %}
                                         {% if item.product.id|stringformat:"s" == selected_product %}
+                                            {{ item.product.name }} x{{ item.quantity }}
+                                        {% endif %}
+                                    {% elif selected_subcategory and selected_subcategory != 'all' %}
+                                        {% if item.product.sub_category and item.product.sub_category.id|stringformat:"s" == selected_subcategory %}
                                             {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
                                         {% endif %}
                                     {% elif selected_category and selected_category != 'all' %}
                                         {% if item.product.main_category.id|stringformat:"s" == selected_category %}
-                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
-                                        {% endif %}
-                                    {% elif selected_subcategory and selected_subcategory != 'all' %}
-                                        {% if item.product.sub_category and item.product.sub_category.id|stringformat:"s" == selected_subcategory %}
                                             {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
                                         {% endif %}
                                     {% elif station_filter and station_filter != 'all' %}
@@ -411,6 +534,8 @@
                                 <small>
                                 {% if selected_category_name %}
                                     {{ selected_category_name }}
+                                {% elif selected_product and selected_product != 'all' %}
+                                    {% for item in order.order_items.all %}{% if item.product.id|stringformat:"s" == selected_product %}{{ item.product.main_category.name }}{% endif %}{% endfor %}
                                 {% else %}
                                     {% for item in order.order_items.all %}
                                         {{ item.product.main_category.name }}{% if not forloop.last %}, {% endif %}
@@ -422,6 +547,8 @@
                                 <small>
                                 {% if selected_subcategory_name %}
                                     {{ selected_subcategory_name }}
+                                {% elif selected_product and selected_product != 'all' %}
+                                    {% for item in order.order_items.all %}{% if item.product.id|stringformat:"s" == selected_product %}{% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% endif %}{% endfor %}
                                 {% else %}
                                     {% for item in order.order_items.all %}
                                         {% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% if not forloop.last %}, {% endif %}
@@ -461,7 +588,7 @@
                                     {% endwith %}
                                 {% endif %}
                             </td>
-                            <td class="font-weight-bold">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</td>
+                            <td class="font-weight-bold">{% currency_symbol %}{{ order.row_display_total|floatformat:2 }}</td>
                             <td class="text-center">
                                 {% if order.payment_status == 'paid' %}
                                     <span class="badge" style="color: white; background-color: #28a745; font-weight: bold;">Paid</span>
@@ -489,18 +616,30 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if order.confirmed_by %}
-                                    {{ order.confirmed_by.first_name }} {{ order.confirmed_by.last_name }}
-                                {% elif order.ordered_by %}
-                                    <span class="text-muted">{{ order.ordered_by.first_name }} {{ order.ordered_by.last_name }} (Self)</span>
+                                {% if order.ordered_by %}
+                                    {{ order.ordered_by.first_name }} {{ order.ordered_by.last_name }}
+                                    <br><small class="text-muted">({{ order.ordered_by.role.get_name_display }})</small>
                                 {% else %}
-                                    <span class="text-muted">System</span>
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if order.payments.exists %}
+                                    {% for payment in order.payments.all %}
+                                        {% if not payment.is_voided %}
+                                            {{ payment.processed_by.first_name }} {{ payment.processed_by.last_name }}
+                                            <br><small class="text-muted">({{ payment.processed_by.role.get_name_display }})</small>
+                                            {% if not forloop.last %}<br>{% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="12" class="text-center text-muted py-4">
+                            <td colspan="14" class="text-center text-muted py-4">
                                 <i class="fas fa-inbox fa-3x mb-3 text-muted"></i><br>
                                 No orders found for the selected filters
                             </td>
@@ -520,12 +659,12 @@
                     <ul class="pagination mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page=1{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page=1{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-double-left"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-left"></i>
                                 </a>
                             </li>
@@ -538,19 +677,19 @@
                                 </li>
                             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">{{ num }}</a>
+                                    <a class="page-link" href="?page={{ num }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">{{ num }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
                         
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-right"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-double-right"></i>
                                 </a>
                             </li>

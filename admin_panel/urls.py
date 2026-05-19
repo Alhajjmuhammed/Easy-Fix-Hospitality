@@ -80,6 +80,7 @@ urlpatterns = [
     path('orders/add/', views.add_order, name='add_order'),
     path('orders/edit/<int:order_id>/', views.edit_order, name='edit_order'),
     path('orders/delete/<int:order_id>/', views.delete_order, name='delete_order'),
+    path('orders/bulk-delete/', views.bulk_delete_orders, name='bulk_delete_orders'),
     
     # Product Management API
     path('get-subcategories/<int:main_category_id>/', views.get_subcategories, name='get_subcategories'),

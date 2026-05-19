@@ -103,20 +103,54 @@
         }
 
         .sidebar-header {
-            padding: 1.5rem;
+            padding: 1rem;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             text-align: center;
+            position: sticky;
+            top: 0;
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            z-index: 10;
         }
 
         .sidebar-brand {
             color: #fff;
-            font-size: 1.4rem;
+            font-size: 1rem;
             font-weight: 600;
             text-decoration: none;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
+            padding: 0;
+        }
+
+        .sidebar-brand .restaurant-logo {
+            height: 45px;
+            width: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: transparent;
+            padding: 0;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .sidebar-brand i {
+            height: 45px;
+            width: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border-radius: 50%;
+            font-size: 1.4rem;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .sidebar-brand .restaurant-text {
+            text-align: center;
+            line-height: 1.1;
+            font-size: 0.9rem;
         }
 
         .sidebar-nav {
@@ -447,7 +481,11 @@
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <a href="{% url 'admin_panel:admin_dashboard' %}" class="sidebar-brand">
-                    <i class="fas fa-shield-alt"></i>
+                    {% if restaurant_logo %}
+                        <img src="{{ restaurant_logo.url }}" alt="Restaurant Logo" class="restaurant-logo">
+                    {% else %}
+                        <i class="fas fa-shield-alt"></i>
+                    {% endif %}
                     <span class="restaurant-text">
                         {% if user.is_owner %}
                             {{ user.get_restaurant_name }}
@@ -501,6 +539,10 @@
                     <a class="nav-link {% if request.resolver_match.namespace == 'restaurant' and 'promotion' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'restaurant:manage_promotions' %}" data-tooltip="Happy Hour">
                         <i class="fas fa-clock text-warning"></i>
                         <span>Happy Hour</span>
+                    </a>
+                    <a class="nav-link {% if request.resolver_match.namespace == 'restaurant' and 'event' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'restaurant:manage_events' %}" data-tooltip="Events">
+                        <i class="fas fa-calendar-alt text-info"></i>
+                        <span>Event Menu</span>
                     </a>
                     {% endif %}
                 </div>

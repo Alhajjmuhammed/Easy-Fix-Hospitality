@@ -442,3 +442,258 @@ class HappyHourPromotion(models.Model):
         ordering = ['-created_at']
         verbose_name = "Happy Hour Promotion"
         verbose_name_plural = "Happy Hour Promotions"
+
+
+class Event(models.Model):
+    """
+    Event/Banquet model for tracking special events with fixed price per person (PAX).
+    Available for all subscription plans: SINGLE, Branch, and PRO.
+    """
+    
+    EVENT_TYPE_CHOICES = [
+        ('wedding', 'Wedding'),
+        ('corporate', 'Corporate Event'),
+        ('birthday', 'Birthday Party'),
+        ('anniversary', 'Anniversary'),
+        ('graduation', 'Graduation'),
+        ('conference', 'Conference'),
+        ('seminar', 'Seminar'),
+        ('cocktail', 'Cocktail Party'),
+        ('buffet', 'Buffet Event'),
+        ('private_dining', 'Private Dining'),
+        ('holiday', 'Holiday Event'),
+        ('other', 'Other'),
+    ]
+    
+    EVENT_STATUS_CHOICES = [
+        ('inquiry', 'Inquiry'),
+        ('pending', 'Pending Confirmation'),
+        ('confirmed', 'Confirmed'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    PAYMENT_STATUS_CHOICES = [
+        ('unpaid', 'Unpaid'),
+        ('deposit_paid', 'Deposit Paid'),
+        ('partially_paid', 'Partially Paid'),
+        ('fully_paid', 'Fully Paid'),
+        ('refunded', 'Refunded'),
+    ]
+    
+    # Owner/Restaurant relationship
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='events',
+        limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']},
+        help_text="Restaurant owner managing this event"
+    )
+    
+    # Event Details
+    title = models.CharField(
+        max_length=200,
+        help_text="Event title (e.g., 'Smith Wedding Reception')"
+    )
+    
+    event_type = models.CharField(
+        max_length=20,
+        choices=EVENT_TYPE_CHOICES,
+        default='other',
+        help_text="Type of event"
+    )
+    
+    description = models.TextField(
+        blank=True,
+        help_text="Additional details about the event"
+    )
+    
+    # Date and Time
+    event_date = models.DateField(
+        help_text="Date of the event"
+    )
+    
+    start_time = models.TimeField(
+        help_text="Event start time"
+    )
+    
+    end_time = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Event end time (optional)"
+    )
+    
+    # PAX and Pricing
+    total_pax = models.PositiveIntegerField(
+        help_text="Total number of guests/persons"
+    )
+    
+    price_per_pax = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Price per person"
+    )
+    
+    # Contact Information
+    contact_name = models.CharField(
+        max_length=100,
+        help_text="Client/organizer name"
+    )
+    
+    contact_phone = models.CharField(
+        max_length=20,
+        help_text="Client phone number"
+    )
+    
+    contact_email = models.EmailField(
+        blank=True,
+        help_text="Client email address (optional)"
+    )
+    
+    # Payment Tracking
+    deposit_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text="Deposit amount received"
+    )
+    
+    amount_paid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text="Total amount paid so far"
+    )
+    
+    # Status
+    status = models.CharField(
+        max_length=20,
+        choices=EVENT_STATUS_CHOICES,
+        default='inquiry',
+        help_text="Current status of the event"
+    )
+    
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default='unpaid',
+        help_text="Payment status"
+    )
+    
+    # Additional Notes
+    special_requirements = models.TextField(
+        blank=True,
+        help_text="Dietary requirements, setup instructions, etc."
+    )
+    
+    internal_notes = models.TextField(
+        blank=True,
+        help_text="Internal notes (not visible to client)"
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='events_created',
+        help_text="User who created this event"
+    )
+    
+    class Meta:
+        ordering = ['-event_date', '-start_time']
+        verbose_name = "Event"
+        verbose_name_plural = "Events"
+        indexes = [
+            models.Index(fields=['event_date']),
+            models.Index(fields=['status']),
+            models.Index(fields=['owner', 'event_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} - {self.event_date} ({self.total_pax} PAX)"
+    
+    @property
+    def total_amount(self):
+        """Calculate total event cost"""
+        return self.total_pax * self.price_per_pax
+    
+    @property
+    def balance_due(self):
+        """Calculate remaining balance"""
+        return self.total_amount - self.amount_paid
+    
+    @property
+    def deposit_percentage(self):
+        """Calculate deposit as percentage of total"""
+        if self.total_amount > 0:
+            return (self.deposit_amount / self.total_amount) * 100
+        return Decimal('0.00')
+    
+    @property
+    def payment_percentage(self):
+        """Calculate payment progress as percentage"""
+        if self.total_amount > 0:
+            return (self.amount_paid / self.total_amount) * 100
+        return Decimal('0.00')
+    
+    @property
+    def is_upcoming(self):
+        """Check if event is upcoming"""
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.event_date >= today and self.status not in ['completed', 'cancelled']
+    
+    @property
+    def is_today(self):
+        """Check if event is today"""
+        from django.utils import timezone
+        return self.event_date == timezone.now().date()
+    
+    @property
+    def is_past(self):
+        """Check if event date has passed"""
+        from django.utils import timezone
+        return self.event_date < timezone.now().date()
+    
+    def get_status_color(self):
+        """Get Bootstrap color class for status"""
+        colors = {
+            'inquiry': 'secondary',
+            'pending': 'warning',
+            'confirmed': 'info',
+            'in_progress': 'primary',
+            'completed': 'success',
+            'cancelled': 'danger',
+        }
+        return colors.get(self.status, 'secondary')
+    
+    def get_payment_status_color(self):
+        """Get Bootstrap color class for payment status"""
+        colors = {
+            'unpaid': 'danger',
+            'deposit_paid': 'warning',
+            'partially_paid': 'info',
+            'fully_paid': 'success',
+            'refunded': 'secondary',
+        }
+        return colors.get(self.payment_status, 'secondary')
+    
+    def update_payment_status(self):
+        """Auto-update payment status based on amounts"""
+        if self.amount_paid <= 0:
+            self.payment_status = 'unpaid'
+        elif self.amount_paid >= self.total_amount:
+            self.payment_status = 'fully_paid'
+        elif self.amount_paid == self.deposit_amount and self.deposit_amount > 0:
+            self.payment_status = 'deposit_paid'
+        else:
+            self.payment_status = 'partially_paid'
+    
+    def save(self, *args, **kwargs):
+        # Auto-update payment status
+        self.update_payment_status()
+        super().save(*args, **kwargs)

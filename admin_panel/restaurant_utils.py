@@ -164,11 +164,22 @@ def get_restaurant_context(user, session_restaurant_id=None, request=None):
     else:
         context_name = "Restaurant System"
     
+    # Get restaurant logo
+    restaurant_logo = None
+    if current_restaurant and current_restaurant.logo:
+        restaurant_logo = current_restaurant.logo
+    elif not view_all_restaurants and accessible_restaurants.exists():
+        # If no current restaurant but user has restaurants, get first one with logo
+        first_restaurant_with_logo = accessible_restaurants.exclude(logo__isnull=True).exclude(logo__exact='').first()
+        if first_restaurant_with_logo:
+            restaurant_logo = first_restaurant_with_logo.logo
+    
     return {
         'current_restaurant': current_restaurant,
         'accessible_restaurants': accessible_restaurants,
         'view_all_restaurants': view_all_restaurants,
         'restaurant_name': context_name,
+        'restaurant_logo': restaurant_logo,
         'can_manage_branches': user.can_access_branch_features(),
         'can_switch_restaurants': len(accessible_restaurants) > 1 or user.is_main_owner(),
     }

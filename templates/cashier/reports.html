@@ -1,0 +1,287 @@
+{% extends 'cashier_base.html' %}
+{% load static %}
+{% load restaurant_tags %}
+
+{% block title %}Cashier Reports - {{ request.user.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-0" style="color: #2c5282;">
+                <i class="bi bi-graph-up"></i> Restaurant Sales Report
+            </h2>
+            <p class="text-muted">View all orders from your restaurant</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color: #2c5282; border: none; border-radius: 0;">
+                <div class="card-body">
+                    <h6 class="card-title mb-2">
+                        <i class="bi bi-currency-dollar"></i> Total Amount
+                    </h6>
+                    <h3 class="mb-0">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color: #28a745; border: none; border-radius: 0;">
+                <div class="card-body">
+                    <h6 class="card-title mb-2">
+                        <i class="bi bi-check-circle"></i> Paid Amount
+                    </h6>
+                    <h3 class="mb-0">{% currency_symbol %}{{ paid_amount|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color: #dc3545; border: none; border-radius: 0;">
+                <div class="card-body">
+                    <h6 class="card-title mb-2">
+                        <i class="bi bi-exclamation-circle"></i> Unpaid Amount
+                    </h6>
+                    <h3 class="mb-0">{% currency_symbol %}{{ unpaid_amount|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white" style="background-color: #2c5282; border: none; border-radius: 0;">
+                <div class="card-body">
+                    <h6 class="card-title mb-2">
+                        <i class="bi bi-receipt"></i> Total Orders
+                    </h6>
+                    <h3 class="mb-0">{{ total_orders }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="card mb-4" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 0;">
+        <div class="card-header" style="background-color: #2c5282; color: white;">
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filter Reports</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" action="{% url 'cashier:cashier_reports' %}">
+                <div class="row g-3">
+                    <!-- Period Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Period</label>
+                        <select name="period" class="form-select">
+                            <option value="today" {% if filters.period == 'today' %}selected{% endif %}>Today</option>
+                            <option value="weekly" {% if filters.period == 'weekly' %}selected{% endif %}>This Week</option>
+                        </select>
+                    </div>
+
+                    <!-- Category Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Category</label>
+                        <select name="category_id" class="form-select">
+                            <option value="all">All Categories</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if filters.category_id == category.id|stringformat:"s" %}selected{% endif %}>
+                                {{ category.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Sub Category Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Sub Category</label>
+                        <select name="subcategory_id" class="form-select">
+                            <option value="all">All Sub Categories</option>
+                            {% for subcategory in subcategories %}
+                            <option value="{{ subcategory.id }}" {% if filters.subcategory_id == subcategory.id|stringformat:"s" %}selected{% endif %}>
+                                {{ subcategory.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Station Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Station</label>
+                        <select name="station_filter" class="form-select">
+                            <option value="all">All Stations</option>
+                            {% for value, label in station_choices %}
+                            <option value="{{ value }}" {% if filters.station_filter == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Payment Status Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Payment Status</label>
+                        <select name="payment_status" class="form-select">
+                            <option value="all">All Status</option>
+                            <option value="paid" {% if filters.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                            <option value="partial" {% if filters.payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                            <option value="unpaid" {% if filters.payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                        </select>
+                    </div>
+
+                    <!-- Staff Role Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Filter by Role</label>
+                        <select name="staff_role" class="form-select">
+                            <option value="all" {% if filters.staff_role == 'all' %}selected{% endif %}>All Roles</option>
+                            <option value="customer_care" {% if filters.staff_role == 'customer_care' %}selected{% endif %}>Customer Care</option>
+                            <option value="cashier" {% if filters.staff_role == 'cashier' %}selected{% endif %}>Cashier</option>
+                        </select>
+                    </div>
+
+                    <!-- Staff Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Filter by Staff</label>
+                        <select name="staff" class="form-select">
+                            <option value="all">All Staff</option>
+                            <optgroup label="Customer Care">
+                                {% for cc_user in customer_care_users %}
+                                <option value="{{ cc_user.id }}" {% if filters.staff == cc_user.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ cc_user.get_full_name|default:cc_user.username }}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Cashiers">
+                                {% for cashier in cashier_users %}
+                                <option value="{{ cashier.id }}" {% if filters.staff == cashier.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ cashier.get_full_name|default:cashier.username }}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- Filter Button -->
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn w-100" style="background-color: #2c5282; color: white;">
+                            <i class="bi bi-search"></i> Apply Filters
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Export Buttons -->
+    <div class="card mb-4" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 0;">
+        <div class="card-body">
+            <div class="d-flex gap-2">
+                <a href="{% url 'cashier:cashier_reports' %}?export=csv&period={{ filters.period }}&payment_status={{ filters.payment_status }}&category_id={{ filters.category_id }}&subcategory_id={{ filters.subcategory_id }}&station_filter={{ filters.station_filter }}&customer_care={{ filters.customer_care }}" 
+                   class="btn btn-success">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+                </a>
+                <a href="{% url 'cashier:cashier_reports' %}?export=pdf&period={{ filters.period }}&payment_status={{ filters.payment_status }}&category_id={{ filters.category_id }}&subcategory_id={{ filters.subcategory_id }}&station_filter={{ filters.station_filter }}&customer_care={{ filters.customer_care }}" 
+                   class="btn btn-danger">
+                    <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="card" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 0;">
+        <div class="card-header" style="background-color: #2c5282; color: white;">
+            <h5 class="mb-0"><i class="bi bi-table"></i> Order Details</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if orders %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th>SN</th>
+                            <th>Order #</th>
+                            <th>Date & Time</th>
+                            <th>Table</th>
+                            <th>Items</th>
+                            <th>Category</th>
+                            <th>SubCategory</th>
+                            <th>Station</th>
+                            <th>Ordered By</th>
+                            <th>Paid By</th>
+                            <th>Total Amount</th>
+                            <th>Payment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td><strong>{{ order.order_number }}</strong></td>
+                            <td>
+                                {{ order.created_at|date:"Y-m-d" }}<br>
+                                <small class="text-muted">{{ order.created_at|time:"H:i:s" }}</small>
+                            </td>
+                            <td>{{ order.table_info.tbl_no }}</td>
+                            <td>
+                                {% for item in order.order_items.all %}
+                                    {{ item.quantity }}x {{ item.product.name }}{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for item in order.order_items.all %}
+                                    {% if item.product.main_category %}
+                                        {{ item.product.main_category.name }}{% if not forloop.last %}, {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for item in order.order_items.all %}
+                                    {% if item.product.sub_category %}
+                                        {{ item.product.sub_category.name }}{% if not forloop.last %}, {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for item in order.order_items.all %}
+                                    {{ item.product.get_station_display }}{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <strong>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</strong>
+                            </td>
+                            <td>
+                                {% for payment in order.payments.all %}
+                                    {% if not payment.is_voided %}
+                                        {{ payment.processed_by.get_full_name|default:payment.processed_by.username }}-{% if payment.processed_by.is_cashier %}cs{% elif payment.processed_by.is_customer_care %}cc{% else %}staff{% endif %}{% if not forloop.last %}, {% endif %}
+                                    {% endif %}
+                                {% empty %}
+                                    <span class="text-muted">-</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <strong style="color: #2c5282;">
+                                    {% currency_symbol %}{{ order.total_amount|floatformat:2 }}
+                                </strong>
+                            </td>
+                            <td>
+                                {% if order.payment_status == 'paid' %}
+                                <span class="badge bg-success">Paid</span>
+                                {% elif order.payment_status == 'partial' %}
+                                <span class="badge bg-warning">Partial</span>
+                                {% else %}
+                                <span class="badge bg-danger">Unpaid</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                <p class="text-muted mt-3">No orders found for the selected filters.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

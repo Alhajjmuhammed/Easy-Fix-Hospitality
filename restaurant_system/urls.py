@@ -37,6 +37,9 @@ except ImportError:
     def rate_limited_view(request, exception=None):
         return render(request, 'accounts/rate_limited.html', {'retry_after': 60}, status=429)
 
+# Import view functions
+from accounts.views import qr_code_access, menu_qr_access
+
 @require_GET
 def service_worker(request):
     """Serve the service worker with proper headers"""
@@ -59,8 +62,9 @@ urlpatterns = [
     path('health-check/', health_check, name='health_check'),
     # Security endpoints
     path('rate-limited/', rate_limited_view, name='rate_limited'),
-    # QR Code access - short URL for restaurant access
-    path('r/<str:qr_code>/', qr_code_access, name='qr_code_access'),
+    # QR Code access - short URLs for restaurant access
+    path('r/<str:qr_code>/', qr_code_access, name='qr_code_access'),  # Ordering QR (login required)
+    path('menu-view/<str:menu_qr_code>/', menu_qr_access, name='menu_qr_access'),  # View-only menu QR (no login)
     path('secure-management-portal/', admin.site.urls),  # Obscured admin URL for security
     path('admin-panel/', include('admin_panel.urls')),
     path('system-admin/', include('system_admin.urls')),

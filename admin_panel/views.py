@@ -3129,6 +3129,104 @@ def delete_order(request, order_id):
 
 
 @login_required
+@require_POST
+def bulk_delete_orders(request):
+    """Bulk delete multiple orders"""
+    if not (request.user.is_administrator() or request.user.is_owner() or 
+            request.user.is_main_owner() or request.user.is_branch_owner()):
+        return JsonResponse({'success': False, 'error': 'Access denied. Administrator or Owner privileges required.'})
+    
+    try:
+        # Parse JSON data
+        data = json.loads(request.body)
+        order_ids = data.get('order_ids', [])
+        
+        if not order_ids:
+            return JsonResponse({'success': False, 'error': 'No orders selected for deletion.'})
+        
+        if len(order_ids) > 50:  # Limit bulk operations
+            return JsonResponse({'success': False, 'error': 'Cannot delete more than 50 orders at once.'})
+        
+        # Get restaurant context for proper filtering
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context['current_restaurant']
+        view_all_restaurants = restaurant_context['view_all_restaurants']
+        
+        # Build query for orders to delete with proper restaurant filtering
+        if current_restaurant and not view_all_restaurants:
+            # Filter by specific selected restaurant
+            if current_restaurant.is_main_restaurant:
+                # Main restaurant: orders from tables assigned to it OR owned by main owner
+                orders_to_delete = Order.objects.filter(
+                    id__in=order_ids
+                ).filter(
+                    Q(table_info__restaurant=current_restaurant) |
+                    Q(table_info__owner=current_restaurant.main_owner, table_info__restaurant__isnull=True)
+                )
+            else:
+                # Branch restaurant: only orders from tables specifically assigned to this branch
+                orders_to_delete = Order.objects.filter(
+                    id__in=order_ids
+                ).filter(
+                    Q(table_info__restaurant=current_restaurant) |
+                    Q(table_info__owner=current_restaurant.branch_owner, table_info__restaurant__isnull=True)
+                )
+        elif request.user.is_administrator():
+            # Administrator sees all orders
+            orders_to_delete = Order.objects.filter(id__in=order_ids)
+        else:
+            # Get orders from all accessible restaurants
+            accessible_restaurants = restaurant_context['accessible_restaurants']
+            
+            if accessible_restaurants.exists():
+                order_query = Q()
+                for restaurant in accessible_restaurants:
+                    order_query |= (
+                        Q(table_info__restaurant=restaurant) |
+                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
+                        Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True)
+                    )
+                orders_to_delete = Order.objects.filter(id__in=order_ids).filter(order_query)
+            else:
+                orders_to_delete = Order.objects.none()
+        
+        # Check if all requested orders exist and are accessible
+        found_count = orders_to_delete.count()
+        if found_count != len(order_ids):
+            return JsonResponse({
+                'success': False, 
+                'error': f'Some orders could not be found or you do not have permission to delete them. Found {found_count} out of {len(order_ids)} orders.'
+            })
+        
+        # Get order numbers for logging
+        order_numbers = list(orders_to_delete.values_list('order_number', flat=True))
+        
+        # Perform bulk deletion
+        deleted_count, deleted_details = orders_to_delete.delete()
+        
+        # Log the deletion
+        if hasattr(request.user, 'get_full_name'):
+            user_name = request.user.get_full_name() or request.user.username
+        else:
+            user_name = request.user.username
+            
+        logger.info(f"Bulk delete performed by {user_name}: {deleted_count} orders deleted - {', '.join(order_numbers[:5])}")
+        
+        return JsonResponse({
+            'success': True,
+            'deleted_count': deleted_count,
+            'message': f'Successfully deleted {deleted_count} order(s).'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data.'})
+    except Exception as e:
+        logger.error(f"Error in bulk delete orders: {str(e)}")
+        return JsonResponse({'success': False, 'error': 'An error occurred while deleting orders.'})
+
+
+@login_required
 def profile(request):
     """User profile view - accessible by all admin panel users"""
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_kitchen_staff() or request.user.is_customer_care()):
@@ -3253,6 +3351,36 @@ def profile(request):
                 request.user.auto_print_kot = request.POST.get('auto_print_kot') == 'on'
                 request.user.auto_print_bot = request.POST.get('auto_print_bot') == 'on'
                 
+                # Handle WiFi settings
+                wifi_ssid = request.POST.get('wifi_ssid', '').strip()
+                wifi_password = request.POST.get('wifi_password', '').strip()
+                
+                # Update WiFi settings for all restaurants
+                for restaurant in user_restaurants:
+                    restaurant.wifi_ssid = wifi_ssid if wifi_ssid else None
+                    restaurant.wifi_password = wifi_password if wifi_password else None
+                    restaurant.save()
+                
+                # Handle logo upload
+                if 'restaurant_logo' in request.FILES:
+                    logo_file = request.FILES['restaurant_logo']
+                    # Validate file type
+                    allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+                    if logo_file.content_type not in allowed_types:
+                        messages.error(request, "Please upload a valid image file (JPEG, PNG, GIF, or WebP).")
+                        return redirect('admin_panel:profile')
+                    # Validate file size (max 5MB)
+                    if logo_file.size > 5 * 1024 * 1024:
+                        messages.error(request, "Logo file must be less than 5MB.")
+                        return redirect('admin_panel:profile')
+                    
+                    # Update all restaurants for this user
+                    for restaurant in user_restaurants:
+                        if restaurant.logo:
+                            restaurant.logo.delete()  # Delete old logo
+                        restaurant.logo = logo_file
+                        restaurant.save()
+                
                 # Generate QR code if it doesn't exist
                 if not request.user.restaurant_qr_code:
                     request.user.generate_qr_code()
@@ -3318,6 +3446,22 @@ def profile(request):
         'user': request.user,
     }
     
+    # Get restaurant logo and WiFi settings if user is owner
+    if request.user.is_owner():
+        from restaurant.models_restaurant import Restaurant
+        try:
+            restaurant = Restaurant.objects.filter(
+                models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
+            ).first()
+            if restaurant:
+                if restaurant.logo:
+                    context['restaurant_logo'] = restaurant.logo
+                # Add WiFi settings to context
+                context['wifi_ssid'] = restaurant.wifi_ssid or ''
+                context['wifi_password'] = restaurant.wifi_password or ''
+        except:
+            pass
+    
     return render(request, 'admin_panel/profile.html', context)
 
 @login_required
@@ -3365,16 +3509,32 @@ def manage_qr_code(request):
         messages.error(request, "No restaurant found. Please contact administrator.")
         return redirect('admin_panel:admin_dashboard')
     
-    # Generate the full QR URL using helper function
+    # Auto-generate menu QR code if not exists
+    if not current_restaurant.menu_qr_code:
+        import uuid
+        current_restaurant.menu_qr_code = f"MENU-{uuid.uuid4().hex[:12].upper()}"
+        current_restaurant.save()
+    
+    # Generate the full QR URLs using helper function
     qr_url = get_production_qr_url(request, current_restaurant.qr_code)
+    
+    # Generate menu QR URL
+    host = request.get_host()
+    if 'localhost' in host or '127.0.0.1' in host:
+        menu_qr_url = f'http://{host}/menu-view/{current_restaurant.menu_qr_code}/'
+    else:
+        menu_qr_url = f'https://hospitality.easyfixsoft.com/menu-view/{current_restaurant.menu_qr_code}/'
     
     context = {
         'user': request.user,
         'qr_code': current_restaurant.qr_code,
         'qr_url': qr_url,
+        'menu_qr_code': current_restaurant.menu_qr_code,
+        'menu_qr_url': menu_qr_url,
         'restaurant_name': current_restaurant.name,
         'current_restaurant': current_restaurant,
         'is_branch': not current_restaurant.is_main_restaurant,
+        'restaurant_logo': current_restaurant.logo if current_restaurant.logo else None,
     }
     
     return render(request, 'admin_panel/manage_qr_code.html', context)
@@ -3423,6 +3583,9 @@ def generate_qr_image(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
         return HttpResponse("Access denied", status=403)
     
+    # Check if generating menu QR or ordering QR
+    qr_type = request.GET.get('type', 'order')  # Default to ordering QR
+    
     # Get current restaurant context
     current_restaurant = None
     selected_restaurant_id = request.session.get('selected_restaurant_id')
@@ -3444,14 +3607,29 @@ def generate_qr_image(request):
     if not current_restaurant:
         return HttpResponse("No restaurant found", status=404)
     
-    # Ensure QR code exists
-    if not current_restaurant.qr_code:
-        import uuid
-        current_restaurant.qr_code = f"REST-{uuid.uuid4().hex[:12].upper()}"
-        current_restaurant.save()
-    
-    # Generate the full QR URL using helper function
-    qr_url = get_production_qr_url(request, current_restaurant.qr_code)
+    # Generate appropriate QR code based on type
+    if qr_type == 'menu':
+        # Menu QR Code - view only
+        if not current_restaurant.menu_qr_code:
+            import uuid
+            current_restaurant.menu_qr_code = f"MENU-{uuid.uuid4().hex[:12].upper()}"
+            current_restaurant.save()
+        
+        # Generate menu QR URL
+        host = request.get_host()
+        if 'localhost' in host or '127.0.0.1' in host:
+            qr_url = f'http://{host}/menu-view/{current_restaurant.menu_qr_code}/'
+        else:
+            qr_url = f'https://hospitality.easyfixsoft.com/menu-view/{current_restaurant.menu_qr_code}/'
+    else:
+        # Ordering QR Code - default
+        if not current_restaurant.qr_code:
+            import uuid
+            current_restaurant.qr_code = f"REST-{uuid.uuid4().hex[:12].upper()}"
+            current_restaurant.save()
+        
+        # Generate ordering QR URL
+        qr_url = get_production_qr_url(request, current_restaurant.qr_code)
     
     # Create QR code
     qr = qrcode.QRCode(
@@ -4451,6 +4629,7 @@ def printer_settings(request):
         'auto_print_bot': auto_print_bot,
         'auto_print_buffet': auto_print_buffet,
         'auto_print_service': auto_print_service,
+        'restaurant_logo': current_restaurant.logo if current_restaurant and current_restaurant.logo else None,
     }
     
     # Get or create API token for print client

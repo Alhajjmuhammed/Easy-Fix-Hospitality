@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Select Order - Table {{ table.tbl_no }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .order-selection-container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 15px;
+    }
+    
+    .table-header {
+        background: #2c5282;
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    
+    .table-header h3 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    
+    .order-card {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .order-card:hover {
+        border-color: #2c5282;
+        box-shadow: 0 2px 8px rgba(44, 82, 130, 0.15);
+    }
+    
+    .order-card.selected {
+        border-color: #2c5282;
+        background: #f0f4f8;
+    }
+    
+    .order-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    
+    .order-number {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #212529;
+    }
+    
+    .customer-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #495057;
+        font-size: 0.875rem;
+        margin-bottom: 8px;
+    }
+    
+    .customer-name i {
+        color: #2c5282;
+        font-size: 0.875rem;
+    }
+    
+    .order-details {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .order-info-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    
+    .order-info-item i {
+        color: #2c5282;
+        font-size: 0.85rem;
+    }
+    
+    .order-badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .badge-unpaid {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .badge-partial {
+        background: #ffc107;
+        color: #212529;
+    }
+    
+    .btn-continue {
+        background: #2c5282;
+        border: none;
+        color: white;
+        padding: 12px 30px;
+        font-size: 1rem;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: background 0.2s ease;
+    }
+    
+    .btn-continue:hover:not(:disabled) {
+        background: #1e3a5f;
+        color: white;
+    }
+    
+    .btn-continue:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 20px;
+    }
+    
+    .action-buttons .btn {
+        min-width: 150px;
+    }
+    
+    .action-buttons .btn-continue {
+        flex: 0 0 auto;
+    }
+    
+    .action-buttons .btn-outline-secondary {
+        flex: 0 0 auto;
+    }
+    
+    @media (max-width: 576px) {
+        .order-selection-container {
+            padding: 10px;
+        }
+        
+        .table-header {
+            padding: 15px;
+        }
+        
+        .table-header h3 {
+            font-size: 1.25rem;
+        }
+        
+        .order-card {
+            padding: 10px 12px;
+        }
+        
+        .order-number {
+            font-size: 0.9rem;
+        }
+        
+        .order-details {
+            gap: 10px;
+        }
+        
+        .order-info-item {
+            font-size: 0.8rem;
+        }
+        
+        .action-buttons {
+            gap: 8px;
+        }
+        
+        .action-buttons .btn {
+            font-size: 0.9rem;
+            padding: 10px 15px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container order-selection-container">
+    <!-- Table Header -->
+    <div class="table-header">
+        <h3><i class="fas fa-utensils"></i> Table {{ table.tbl_no }}</h3>
+        <p class="mb-0">Select which order to add items to</p>
+    </div>
+
+    <form method="post" id="orderSelectionForm">
+        {% csrf_token %}
+        <input type="hidden" name="order_id" id="selectedOrderId">
+        
+        <!-- Order List -->
+        <div class="mb-4">
+            {% for order in customer_orders %}
+            <div class="order-card" onclick="selectOrder({{ order.id }})">
+                <div class="order-header">
+                    <div class="order-number">
+                        <i class="fas fa-receipt"></i> #{{ order.order_number }}
+                    </div>
+                    <div>
+                        <span class="order-badge {% if order.payment_status == 'unpaid' %}badge-unpaid{% elif order.payment_status == 'partial' %}badge-partial{% endif %}">
+                            {{ order.get_payment_status_display }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="customer-name">
+                    <i class="fas fa-user-circle"></i>
+                    <strong>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</strong>
+                </div>
+                
+                <div class="order-details">
+                    <div class="order-info-item">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span>{{ order.order_items.count }} item{{ order.order_items.count|pluralize }}</span>
+                    </div>
+                    <div class="order-info-item">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>${{ order.total_amount }}</span>
+                    </div>
+                    <div class="order-info-item">
+                        <i class="fas fa-clock"></i>
+                        <span>{{ order.created_at|timesince }} ago</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <a href="{% url 'orders:choose_order_action' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <button type="submit" class="btn btn-continue" id="continueBtn" disabled>
+                <i class="fas fa-arrow-right"></i> Continue to Menu
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+let selectedOrderId = null;
+
+function selectOrder(orderId) {
+    selectedOrderId = orderId;
+    document.getElementById('selectedOrderId').value = orderId;
+    
+    // Update UI
+    document.querySelectorAll('.order-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    event.currentTarget.classList.add('selected');
+    
+    // Enable continue button
+    document.getElementById('continueBtn').disabled = false;
+}
+
+// Form validation
+document.getElementById('orderSelectionForm').addEventListener('submit', function(e) {
+    if (!selectedOrderId) {
+        e.preventDefault();
+        alert('Please select an order');
+    } else {
+        // Store order ID in session for adding items
+        sessionStorage.setItem('add_to_order_id', selectedOrderId);
+    }
+});
+</script>
+{% endblock %}

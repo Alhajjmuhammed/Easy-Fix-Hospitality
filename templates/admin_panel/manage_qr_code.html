@@ -5,19 +5,33 @@
 {% block extra_css %}
 <style>
     .qr-container {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 15px;
         padding: 2rem;
         color: white;
         text-align: center;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .qr-container-ordering {
+        background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+    }
+    
+    .qr-container-menu {
+        background: linear-gradient(135deg, #16a085 0%, #1abc9c 100%);
     }
     
     .qr-code-display {
         background: white;
         border-radius: 15px;
         padding: 2rem;
-        margin: 2rem 0;
+        margin: 1.5rem 0;
         box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     .qr-info-card {
@@ -25,7 +39,7 @@
         backdrop-filter: blur(10px);
         border-radius: 10px;
         padding: 1.5rem;
-        margin: 1rem 0;
+        margin-top: auto;
         border: 1px solid rgba(255,255,255,0.2);
     }
     
@@ -50,6 +64,20 @@
         margin: 0 auto;
         color: #6c757d;
     }
+    
+    .qr-card-wrapper {
+        height: 100%;
+    }
+    
+    .row.equal-height {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    
+    .row.equal-height > [class*='col-'] {
+        display: flex;
+        flex-direction: column;
+    }
 </style>
 {% endblock %}
 
@@ -59,66 +87,37 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2><i class="bi bi-qr-code"></i> QR Code Management</h2>
-            <p class="text-muted mb-0">Manage your restaurant's QR code for customer access</p>
+            <p class="text-muted mb-0">Manage your restaurant's QR codes for customer access</p>
         </div>
         <a href="{% url 'admin_panel:admin_dashboard' %}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Back to Dashboard
         </a>
     </div>
 
-    <div class="row">
-        <!-- QR Code Display -->
-        <div class="col-lg-8">
-            <div class="qr-container">
-                <h3><i class="bi bi-shop"></i> {{ restaurant_name }}</h3>
-                <p class="mb-4">Customer QR Code Access</p>
+    <div class="row equal-height">
+        <!-- QR Code 1: Ordering (Existing) -->
+        <div class="col-lg-6 mb-4">
+            <div class="qr-container qr-container-ordering">
+                <h3><i class="bi bi-cart-check"></i> Ordering QR Code</h3>
+                <p class="mb-0">Customer Self-Service (Login Required)</p>
                 
                 <!-- QR Code Visual -->
                 <div class="qr-code-display">
                     <div class="text-center">
-                        <img src="{% url 'admin_panel:generate_qr_image' %}?v={{ qr_code }}&t={% now 'U' %}" alt="Restaurant QR Code" class="img-fluid mb-3" style="max-width: 200px; max-height: 200px;">
-                        <h4 class="text-dark">QR Code</h4>
-                        <p class="text-muted">{{ qr_code }}</p>
-                        <small class="text-muted">Scan this code to access the restaurant</small>
+                        <img src="{% url 'admin_panel:generate_qr_image' %}?v={{ qr_code }}&t={% now 'U' %}" alt="Ordering QR Code" class="img-fluid mb-3" style="max-width: 200px; max-height: 200px;">
+                        <h4 class="text-dark">Ordering QR</h4>
+                        <p class="text-muted mb-1">{{ qr_code }}</p>
+                        <small class="text-muted">Scan to login and place orders</small>
                     </div>
                 </div>
 
-                <!-- QR Code Info -->
+                <!-- Details -->
                 <div class="qr-info-card">
-                    <div class="row text-center">
-                        <div class="col-md-4">
-                            <i class="bi bi-link-45deg display-6 mb-2"></i>
-                            <h6>Short URL</h6>
-                            <small>/r/{{ qr_code }}/</small>
-                        </div>
-                        <div class="col-md-4">
-                            <i class="bi bi-phone display-6 mb-2"></i>
-                            <h6>Mobile Friendly</h6>
-                            <small>Works on all devices</small>
-                        </div>
-                        <div class="col-md-4">
-                            <i class="bi bi-shield-check display-6 mb-2"></i>
-                            <h6>Secure</h6>
-                            <small>Restaurant specific</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- QR Code Management -->
-        <div class="col-lg-4">
-            <!-- QR Code Details -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> QR Code Details</h5>
-                </div>
-                <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label"><strong>QR Code ID:</strong></label>
                         <div class="input-group">
-                            <input type="text" class="form-control" value="{{ qr_code }}" readonly id="qrCodeId">
-                            <button class="btn btn-outline-secondary copy-btn" type="button" onclick="copyToClipboard('qrCodeId')">
+                            <input type="text" class="form-control" value="{{ qr_code }}" readonly id="orderQrCode">
+                            <button class="btn btn-outline-light copy-btn" type="button" onclick="copyToClipboard('orderQrCode')">
                                 <i class="bi bi-clipboard"></i>
                             </button>
                         </div>
@@ -127,82 +126,87 @@
                     <div class="mb-3">
                         <label class="form-label"><strong>Full URL:</strong></label>
                         <div class="input-group">
-                            <input type="text" class="form-control" value="{{ qr_url }}" readonly id="fullUrl">
-                            <button class="btn btn-outline-secondary copy-btn" type="button" onclick="copyToClipboard('fullUrl')">
+                            <input type="text" class="form-control" value="{{ qr_url }}" readonly id="orderUrl">
+                            <button class="btn btn-outline-light copy-btn" type="button" onclick="copyToClipboard('orderUrl')">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-light" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print Ordering QR
+                        </button>
+                        <form method="post" action="{% url 'admin_panel:regenerate_qr_code' %}" class="mt-2">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-warning w-100" 
+                                    onclick="return confirm('Regenerate ordering QR code? The old one will stop working.')">
+                                <i class="bi bi-arrow-repeat"></i> Regenerate
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code 2: Menu View Only (NEW) -->
+        <div class="col-lg-6 mb-4">
+            <div class="qr-container qr-container-menu">
+                <h3><i class="bi bi-eye"></i> Menu View QR Code</h3>
+                <p class="mb-0">View-Only Menu (No Login, No Ordering)</p>
+                
+                <!-- QR Code Visual -->
+                <div class="qr-code-display">
+                    <div class="text-center">
+                        {% if menu_qr_code %}
+                        <img src="{% url 'admin_panel:generate_qr_image' %}?type=menu&v={{ menu_qr_code }}&t={% now 'U' %}" alt="Menu View QR Code" class="img-fluid mb-3" style="max-width: 200px; max-height: 200px;">
+                        <h4 class="text-dark">Menu View QR</h4>
+                        <p class="text-muted mb-1">{{ menu_qr_code }}</p>
+                        <small class="text-muted">Scan to view menu only (no ordering)</small>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> Menu QR not yet generated
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Details -->
+                <div class="qr-info-card">
+                    {% if menu_qr_code %}
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Menu QR Code ID:</strong></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" value="{{ menu_qr_code }}" readonly id="menuQrCode">
+                            <button class="btn btn-outline-light copy-btn" type="button" onclick="copyToClipboard('menuQrCode')">
                                 <i class="bi bi-clipboard"></i>
                             </button>
                         </div>
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label"><strong>Restaurant:</strong></label>
-                        <p class="form-control-plaintext">{{ restaurant_name }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-tools"></i> Actions</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <!-- Copy URL Button -->
-                        <button class="btn btn-primary copy-btn" onclick="copyToClipboard('fullUrl')">
-                            <i class="bi bi-clipboard-check"></i> Copy QR URL
-                        </button>
-                        
-                        <!-- Refresh QR Image Button -->
-                        <button class="btn btn-secondary" onclick="refreshQRImage()">
-                            <i class="bi bi-arrow-clockwise"></i> Refresh QR Image
-                        </button>
-                        
-                        <!-- Share Button -->
-                        <button class="btn btn-success" onclick="shareQRCode()">
-                            <i class="bi bi-share"></i> Share QR Code
-                        </button>
-                        
-                        <!-- Print Instructions -->
-                        <button class="btn btn-info" onclick="window.print()">
-                            <i class="bi bi-printer"></i> Print QR Code
-                        </button>
-                        
-                        <!-- Regenerate Button -->
-                        <form method="post" action="{% url 'admin_panel:regenerate_qr_code' %}" class="mt-3">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-warning w-100" 
-                                    onclick="return confirm('Are you sure you want to regenerate the QR code? The old one will stop working.')">
-                                <i class="bi bi-arrow-repeat"></i> Regenerate QR Code
+                        <label class="form-label"><strong>Full URL:</strong></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" value="{{ menu_qr_url }}" readonly id="menuUrl">
+                            <button class="btn btn-outline-light copy-btn" type="button" onclick="copyToClipboard('menuUrl')">
+                                <i class="bi bi-clipboard"></i>
                             </button>
-                        </form>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- Usage Instructions -->
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-lightbulb"></i> How to Use</h5>
-                </div>
-                <div class="card-body">
-                    <ol class="small">
-                        <li><strong>Print QR Code:</strong> Place on tables, menus, or receipts</li>
-                        <li><strong>Share URL:</strong> Send to customers via social media</li>
-                        <li><strong>Customer Scans:</strong> Automatically selects your restaurant</li>
-                        <li><strong>Direct Ordering:</strong> Customer goes straight to table selection</li>
-                    </ol>
-                    
-                    <div class="alert alert-info mt-3">
-                        <small><i class="bi bi-info-circle"></i> 
-                        <strong>Tip:</strong> Put QR codes on every table so customers can easily access your menu!</small>
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-light" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print Menu QR
+                        </button>
                     </div>
+                    {% else %}
+                    <p class="text-center mb-0">Menu QR code will be auto-generated</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-
 <script>
 function copyToClipboard(elementId) {
     const element = document.getElementById(elementId);
@@ -214,55 +218,14 @@ function copyToClipboard(elementId) {
         const originalContent = btn.innerHTML;
         btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
         btn.classList.add('btn-success');
-        btn.classList.remove('btn-outline-secondary', 'btn-primary');
+        btn.classList.remove('btn-outline-light');
         
         setTimeout(() => {
             btn.innerHTML = originalContent;
             btn.classList.remove('btn-success');
-            btn.classList.add(elementId === 'fullUrl' ? 'btn-primary' : 'btn-outline-secondary');
+            btn.classList.add('btn-outline-light');
         }, 2000);
     });
-}
-
-function refreshQRImage() {
-    // Find the QR code image element
-    const qrImage = document.querySelector('.qr-code-display img');
-    if (qrImage) {
-        // Force refresh by adding a new timestamp
-        const baseUrl = qrImage.src.split('?')[0];
-        const newTimestamp = new Date().getTime();
-        qrImage.src = `${baseUrl}?v={{ qr_code }}&t=${newTimestamp}`;
-        
-        // Show success message
-        const btn = event.target;
-        const originalContent = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-check"></i> Refreshed!';
-        btn.classList.add('btn-success');
-        btn.classList.remove('btn-secondary');
-        
-        setTimeout(() => {
-            btn.innerHTML = originalContent;
-            btn.classList.remove('btn-success');
-            btn.classList.add('btn-secondary');
-        }, 2000);
-    }
-}
-
-function shareQRCode() {
-    const url = '{{ qr_url }}';
-    const text = 'Order from {{ restaurant_name }}! Scan the QR code or visit: ';
-    
-    if (navigator.share) {
-        navigator.share({
-            title: '{{ restaurant_name }} - Order Now',
-            text: text,
-            url: url
-        });
-    } else {
-        // Fallback for browsers that don't support Web Share API
-        copyToClipboard('fullUrl');
-        alert('QR code URL copied to clipboard! You can now share it.');
-    }
 }
 
 // Print styles
@@ -281,16 +244,12 @@ window.addEventListener('afterprint', function() {
         max-width: none !important;
     }
     
-    .col-lg-4 {
-        display: none !important;
-    }
-    
     .qr-container {
         break-inside: avoid;
         page-break-inside: avoid;
     }
     
-    .btn, .alert, nav, .card-header {
+    .btn, .alert, nav {
         display: none !important;
     }
 }

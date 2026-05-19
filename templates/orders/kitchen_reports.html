@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Kitchen Reports - {{ period_label }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stat-card.success {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    .stat-card.warning {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .stat-card.info {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .stat-card h3 {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0;
+    }
+    .stat-card p {
+        margin: 5px 0 0 0;
+        opacity: 0.9;
+    }
+    .chart-container {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .popular-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    .popular-item:last-child {
+        border-bottom: none;
+    }
+    .item-rank {
+        background: #667eea;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 15px;
+    }
+    .period-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .period-tab {
+        padding: 10px 20px;
+        border-radius: 5px;
+        text-decoration: none;
+        color: #333;
+        background: #f0f0f0;
+        transition: all 0.3s;
+    }
+    .period-tab.active {
+        background: #667eea;
+        color: white;
+    }
+    .period-tab:hover {
+        background: #764ba2;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-bar-chart-fill"></i> Kitchen Performance Report</h2>
+                    <p class="text-muted">{{ period_label }} Performance Metrics</p>
+                </div>
+                <a href="{% url 'orders:kitchen_dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Period Selector -->
+    <div class="period-tabs">
+        <a href="?period=today" class="period-tab {% if period == 'today' %}active{% endif %}">
+            <i class="bi bi-calendar-day"></i> Today
+        </a>
+        <a href="?period=weekly" class="period-tab {% if period == 'weekly' %}active{% endif %}">
+            <i class="bi bi-calendar-week"></i> This Week
+        </a>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <h3>{{ total_orders }}</h3>
+                <p><i class="bi bi-receipt"></i> Total Orders</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card success">
+                <h3>{{ total_items }}</h3>
+                <p><i class="bi bi-basket"></i> Items Prepared</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card warning">
+                <h3>{{ status_counts.served }}</h3>
+                <p><i class="bi bi-check-circle"></i> Completed Orders</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card info">
+                <h3>{{ avg_prep_time }} min</h3>
+                <p><i class="bi bi-clock"></i> Avg. Prep Time</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Order Status Breakdown -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h5><i class="bi bi-pie-chart"></i> Order Status Breakdown</h5>
+                <hr>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="bi bi-circle-fill text-warning"></i> Pending</span>
+                        <strong>{{ status_counts.pending }}</strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar bg-warning" role="progressbar" 
+                             style="width: {% if total_orders > 0 %}{{ status_counts.pending|floatformat:0|add:"0"|default:0|floatformat:0 }}{% else %}0{% endif %}%">
+                            {{ status_counts.pending }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="bi bi-circle-fill text-primary"></i> Confirmed</span>
+                        <strong>{{ status_counts.confirmed }}</strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar bg-primary" role="progressbar" 
+                             style="width: {% if total_orders > 0 %}{{ status_counts.confirmed|floatformat:0|add:"0"|default:0|floatformat:0 }}{% else %}0{% endif %}%">
+                            {{ status_counts.confirmed }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="bi bi-circle-fill text-info"></i> Preparing</span>
+                        <strong>{{ status_counts.preparing }}</strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar bg-info" role="progressbar" 
+                             style="width: {% if total_orders > 0 %}{{ status_counts.preparing|floatformat:0|add:"0"|default:0|floatformat:0 }}{% else %}0{% endif %}%">
+                            {{ status_counts.preparing }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="bi bi-circle-fill text-success"></i> Served</span>
+                        <strong>{{ status_counts.served }}</strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {% if total_orders > 0 %}{{ status_counts.served|floatformat:0|add:"0"|default:0|floatformat:0 }}{% else %}0{% endif %}%">
+                            {{ status_counts.served }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="bi bi-circle-fill text-danger"></i> Cancelled</span>
+                        <strong>{{ status_counts.cancelled }}</strong>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-danger" role="progressbar" 
+                             style="width: {% if total_orders > 0 %}{{ status_counts.cancelled|floatformat:0|add:"0"|default:0|floatformat:0 }}{% else %}0{% endif %}%">
+                            {{ status_counts.cancelled }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 10 Popular Items -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h5><i class="bi bi-trophy"></i> Top 10 Most Prepared Items</h5>
+                <hr>
+                {% if popular_items %}
+                    {% for item_name, item_data in popular_items %}
+                    <div class="popular-item">
+                        <div class="d-flex align-items-center">
+                            <div class="item-rank">{{ forloop.counter }}</div>
+                            <div>
+                                <strong>{{ item_name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ item_data.orders }} order{{ item_data.orders|pluralize }}</small>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="mb-0">{{ item_data.quantity }}x</h5>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-center text-muted py-4">No items prepared in this period.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders Table -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="chart-container">
+                <h5><i class="bi bi-list-ul"></i> Recent Kitchen Orders ({{ period_label }})</h5>
+                <hr>
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Table</th>
+                                <th>Kitchen Items</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                                <th>Ordered By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders|slice:":20" %}
+                            <tr>
+                                <td><strong>{{ order.order_number }}</strong></td>
+                                <td>{{ order.table_info.tbl_no }}</td>
+                                <td>
+                                    {% for item in order.order_items.all %}
+                                        {% if item.product.station == 'kitchen' %}
+                                            <span class="badge bg-secondary">{{ item.quantity }}x {{ item.product.name }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% if order.status == 'pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% elif order.status == 'confirmed' %}
+                                        <span class="badge bg-primary">Confirmed</span>
+                                    {% elif order.status == 'preparing' %}
+                                        <span class="badge bg-info">Preparing</span>
+                                    {% elif order.status == 'ready' %}
+                                        <span class="badge bg-success">Ready</span>
+                                    {% elif order.status == 'served' %}
+                                        <span class="badge bg-success">Served</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">{{ order.get_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ order.created_at|date:"H:i" }}</td>
+                                <td>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-4">No orders found for this period.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

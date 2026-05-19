@@ -1,0 +1,378 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}Event Reports - Analytics{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-header {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+    }
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.5rem;
+    }
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.85rem;
+    }
+    .report-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .report-card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .report-card-title i {
+        color: #6366f1;
+    }
+    .type-bar {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .type-bar:last-child {
+        border-bottom: none;
+    }
+    .type-name {
+        flex: 1;
+        font-weight: 500;
+    }
+    .type-stats {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+    }
+    .type-stat {
+        text-align: right;
+    }
+    .type-stat-value {
+        font-weight: 600;
+    }
+    .type-stat-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    .progress-thin {
+        height: 6px;
+        border-radius: 3px;
+    }
+    .event-mini-card {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        background: #f9fafb;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+    .event-mini-card:last-child {
+        margin-bottom: 0;
+    }
+    .event-mini-date {
+        width: 45px;
+        height: 45px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0.75rem;
+    }
+    .event-mini-date .day {
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .event-mini-date .month {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+    }
+    .event-mini-info {
+        flex: 1;
+    }
+    .event-mini-title {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    .event-mini-meta {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    .event-mini-amount {
+        font-weight: 600;
+        color: #10b981;
+    }
+    .period-selector .btn {
+        border-radius: 20px;
+        padding: 0.5rem 1.25rem;
+    }
+    .period-selector .btn.active {
+        background: white;
+        color: #1e3a5f;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Report Header -->
+    <div class="report-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i>Event Reports</h2>
+                <p class="mb-0 opacity-75">
+                    Analytics for {{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}
+                </p>
+            </div>
+            <div class="period-selector btn-group">
+                <a href="?period=week" class="btn btn-outline-light {% if period == 'week' %}active{% endif %}">Week</a>
+                <a href="?period=month" class="btn btn-outline-light {% if period == 'month' %}active{% endif %}">Month</a>
+                <a href="?period=quarter" class="btn btn-outline-light {% if period == 'quarter' %}active{% endif %}">Quarter</a>
+                <a href="?period=year" class="btn btn-outline-light {% if period == 'year' %}active{% endif %}">Year</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-value text-primary">{{ stats.total_events }}</div>
+                <div class="stat-label">Total Events</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-value text-success">{{ stats.completed_events }}</div>
+                <div class="stat-label">Completed</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-icon bg-info bg-opacity-10 text-info">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-value text-info">{{ stats.total_pax|floatformat:0 }}</div>
+                <div class="stat-label">Total Guests</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="fas fa-user-friends"></i>
+                </div>
+                <div class="stat-value text-warning">{{ stats.average_pax|floatformat:0 }}</div>
+                <div class="stat-label">Avg PAX/Event</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+                <div class="stat-icon" style="background: rgba(255,255,255,0.2); color: white;">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-value">{{ currency_symbol }}{{ stats.paid_amount|floatformat:0 }}</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Fully Paid ({{ stats.paid_events_count }})</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white;">
+                <div class="stat-icon" style="background: rgba(255,255,255,0.2); color: white;">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <div class="stat-value">{{ currency_symbol }}{{ stats.unpaid_amount|floatformat:0 }}</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Unpaid Due ({{ stats.unpaid_events_count }})</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white;">
+                <div class="stat-icon" style="background: rgba(255,255,255,0.2); color: white;">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stat-value">{{ currency_symbol }}{{ stats.total_revenue|floatformat:0 }}</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Revenue Collected</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                <div class="stat-icon" style="background: rgba(255,255,255,0.2); color: white;">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <div class="stat-value">{{ stats.pending_payments }}</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Pending Payments</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <!-- Events by Type -->
+            <div class="report-card">
+                <div class="report-card-title">
+                    <i class="fas fa-tags"></i>
+                    Events by Type
+                </div>
+                {% if events_by_type %}
+                {% for item in events_by_type %}
+                <div class="type-bar">
+                    <span class="type-name">{{ event_types|default_if_none:item.event_type }}</span>
+                    <div class="type-stats">
+                        <div class="type-stat">
+                            <div class="type-stat-value">{{ item.count }}</div>
+                            <div class="type-stat-label">Events</div>
+                        </div>
+                        <div class="type-stat">
+                            <div class="type-stat-value">{{ item.total_pax|default:0 }}</div>
+                            <div class="type-stat-label">PAX</div>
+                        </div>
+                        <div class="type-stat">
+                            <div class="type-stat-value text-success">{{ currency_symbol }}{{ item.revenue|default:0|floatformat:0 }}</div>
+                            <div class="type-stat-label">Revenue</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-3">No data available</p>
+                {% endif %}
+            </div>
+
+            <!-- Events by Status -->
+            <div class="report-card">
+                <div class="report-card-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Events by Status
+                </div>
+                {% if events_by_status %}
+                {% for item in events_by_status %}
+                <div class="d-flex align-items-center justify-content-between py-2">
+                    <span class="badge bg-{{ status_colors|default:'secondary' }}">
+                        {{ status_choices|default_if_none:item.status }}
+                    </span>
+                    <span class="fw-bold">{{ item.count }}</span>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-3">No data available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- Upcoming Events -->
+            <div class="report-card">
+                <div class="report-card-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    Upcoming Events
+                </div>
+                {% if upcoming_events %}
+                {% for event in upcoming_events %}
+                <div class="event-mini-card">
+                    <div class="event-mini-date">
+                        <span class="day">{{ event.event_date|date:"d" }}</span>
+                        <span class="month">{{ event.event_date|date:"M" }}</span>
+                    </div>
+                    <div class="event-mini-info">
+                        <div class="event-mini-title">{{ event.title }}</div>
+                        <div class="event-mini-meta">
+                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX
+                            <span class="ms-2 badge bg-{{ event.get_status_color }} badge-sm">{{ event.get_status_display }}</span>
+                        </div>
+                    </div>
+                    <div class="event-mini-amount">{{ currency_symbol }}{{ event.total_amount|floatformat:0 }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-3">No upcoming events</p>
+                {% endif %}
+                <a href="{% url 'restaurant:manage_events' %}?date_filter=upcoming" class="btn btn-outline-primary btn-sm w-100 mt-3">
+                    View All Upcoming Events
+                </a>
+            </div>
+
+            <!-- Recently Completed -->
+            <div class="report-card">
+                <div class="report-card-title">
+                    <i class="fas fa-check-circle text-success"></i>
+                    Recently Completed
+                </div>
+                {% if recent_completed %}
+                {% for event in recent_completed %}
+                <div class="event-mini-card">
+                    <div class="event-mini-date" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <span class="day">{{ event.event_date|date:"d" }}</span>
+                        <span class="month">{{ event.event_date|date:"M" }}</span>
+                    </div>
+                    <div class="event-mini-info">
+                        <div class="event-mini-title">{{ event.title }}</div>
+                        <div class="event-mini-meta">
+                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX
+                            <span class="ms-2">{{ event.get_event_type_display }}</span>
+                        </div>
+                    </div>
+                    <div class="event-mini-amount">{{ currency_symbol }}{{ event.amount_paid|floatformat:0 }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center py-3">No completed events</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center mt-4">
+        <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Events
+        </a>
+    </div>
+</div>
+{% endblock %}

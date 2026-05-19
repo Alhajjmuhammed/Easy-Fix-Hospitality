@@ -1,10 +1,26 @@
-﻿{% extends 'base.html' %}
+﻿{% extends base_template %}
 {% load restaurant_tags %}
 
 {% block title %}Menu - {{ restaurant_name|default:"Restaurant" }}{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* Search Dropdown Styles */
+    #searchResultsDropdown {
+        background: #ffffff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+        border: 1px solid rgba(0,0,0,0.1) !important;
+    }
+    
+    #searchResultsDropdown .search-result-item {
+        background: #ffffff !important;
+    }
+    
+    #searchResultsDropdown .search-result-item:hover {
+        background: #f0f7ff !important;
+    }
+
     .product-card {
         transition: all 0.3s ease;
         height: 480px; /* Increased height a bit more */
@@ -591,7 +607,7 @@
         margin-bottom: 1.5rem;
         box-shadow: 0 4px 15px rgba(73, 80, 87, 0.3);
         position: relative;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .menu-header::before {
@@ -603,11 +619,17 @@
         bottom: 0;
         background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="headerGrain" width="50" height="50" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="white" opacity="0.1"/><circle cx="40" cy="40" r="0.5" fill="white" opacity="0.05"/></pattern></defs><rect width="100" height="100" fill="url(%23headerGrain)"/></svg>');
         pointer-events: none;
+        border-radius: 10px;
     }
 
     .menu-header-content {
         position: relative;
         z-index: 1;
+    }
+    
+    .search-container {
+        position: relative;
+        z-index: 1060;
     }
 
     .category-info-badge {
@@ -1025,7 +1047,29 @@
         <h2 class="mb-2">
             <i class="bi bi-menu-button-wide"></i> {{ restaurant_name|default:"Restaurant" }} Menu
         </h2>
-        <p class="mb-3">Table {{ table_number }} â€¢ Discover our amazing culinary creations</p>
+        <p class="mb-3">Table {{ table_number }} &bull; Discover our amazing culinary creations</p>
+        
+        <!-- Search Bar -->
+        <div class="search-container mb-3" style="position: relative; z-index: 1060;">
+            <div class="input-group" style="max-width: 400px; margin: 0 auto;">
+                <span class="input-group-text bg-white" style="border-radius: 25px 0 0 25px; border-right: none;">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text" 
+                       class="form-control" 
+                       id="menuSearch" 
+                       placeholder="Search for categories or products..."
+                       style="box-shadow: none; border-radius: 0 25px 25px 0; border-left: none;"
+                       autocomplete="off">
+                <button class="btn btn-outline-secondary" type="button" id="clearSearch" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: transparent; z-index: 10;">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <!-- Search Results Dropdown -->
+            <div id="searchResultsDropdown" style="display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); width: 420px; max-width: 92vw; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.35); max-height: 320px; overflow-y: auto; z-index: 9999; margin-top: 10px;">
+            </div>
+        </div>
+        
         <div class="d-flex gap-2 justify-content-center flex-wrap">
             <a href="{% url 'orders:view_cart' %}" class="btn btn-light rounded-pill px-3 py-2" id="viewCartBtn">
                 <i class="bi bi-cart3"></i> View Cart (<span id="cartCount">{{ cart_count|default:0 }}</span>)
@@ -1374,7 +1418,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     
                                     productsHtml += `
                                         <div class="col-md-4 mb-3">
-                                            <div class="card">
+                                            <div class="card product-search-card" data-product-id="${product.id}">
                                                 <div class="card-body">
                                                     <h6 class="card-title">${product.name}</h6>
                                                     <p class="card-text">${product.description}</p>
@@ -1640,6 +1684,218 @@ function showAlert(message, type) {
         }
     }, 4000);
 }
+
+// Enhanced Search Functionality with Products
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('menuSearch');
+    const clearButton = document.getElementById('clearSearch');
+    const searchDropdown = document.getElementById('searchResultsDropdown');
+    
+    // Build search index from categories data
+    let searchIndex = [];
+    
+    function buildSearchIndex() {
+        searchIndex = [];
+        
+        {% if categories %}
+        {% for category in categories %}
+            // Add category
+            searchIndex.push({
+                type: 'category',
+                id: {{ category.id }},
+                name: '{{ category.name|escapejs }}',
+                categoryName: '{{ category.name|escapejs }}'
+            });
+            
+            // Add products from subcategories
+            {% for subcategory in category.subcategories.all %}
+                {% for product in subcategory.products.all %}
+                    {% if product.is_available %}
+                    searchIndex.push({
+                        type: 'product',
+                        id: {{ product.id }},
+                        name: '{{ product.name|escapejs }}',
+                        price: '{{ product.price }}',
+                        categoryId: {{ category.id }},
+                        categoryName: '{{ category.name|escapejs }}',
+                        subcategoryName: '{{ subcategory.name|escapejs }}',
+                        stock: {{ product.available_in_stock }}
+                    });
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+        {% endfor %}
+        {% endif %}
+        
+        console.log('🔍 Search index built:', searchIndex.length, 'items');
+    }
+    
+    buildSearchIndex();
+    
+    if (searchInput) {
+        let searchTimeout;
+        
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            if (query.length > 0) {
+                clearButton.style.display = 'block';
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => performSearch(query), 300);
+            } else {
+                clearButton.style.display = 'none';
+                searchDropdown.style.display = 'none';
+            }
+        });
+        
+        clearButton.addEventListener('click', function() {
+            searchInput.value = '';
+            clearButton.style.display = 'none';
+            searchDropdown.style.display = 'none';
+            searchInput.focus();
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+                searchDropdown.style.display = 'none';
+            }
+        });
+    }
+    
+    function performSearch(query) {
+        const searchTerm = query.toLowerCase().trim();
+        console.log('🔍 Searching for:', query);
+        
+        // Search in index
+        const results = searchIndex.filter(item => {
+            return item.name.toLowerCase().includes(searchTerm);
+        });
+        
+        console.log('📊 Found', results.length, 'results');
+        
+        if (results.length > 0) {
+            displaySearchResults(results, query);
+        } else {
+            displayNoResults(query);
+        }
+    }
+    
+    function displaySearchResults(results, query) {
+        let html = '<div style="padding: 8px 0;">';
+        
+        // Limit to 10 results
+        const limitedResults = results.slice(0, 10);
+        
+        limitedResults.forEach((item, index) => {
+            const isLast = index === limitedResults.length - 1;
+            if (item.type === 'category') {
+                html += `
+                    <div class="search-result-item" onclick="openCategoryFromSearch(${item.id})" style="padding: 14px 16px; cursor: pointer; ${!isLast ? 'border-bottom: 1px solid #eee;' : ''} transition: all 0.2s ease; background: white;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background='white'">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #e9ecef, #dee2e6); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <i class="bi bi-folder-fill" style="font-size: 1.1rem; color: #6c757d;"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${item.name}</div>
+                                <small style="color: #6c757d; font-size: 0.8rem;">Category</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (item.type === 'product') {
+                html += `
+                    <div class="search-result-item" onclick="openProductFromSearch(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.categoryId}, '${item.subcategoryName.replace(/'/g, "\\'")}')" style="padding: 14px 16px; cursor: pointer; ${!isLast ? 'border-bottom: 1px solid #eee;' : ''} transition: all 0.2s ease; background: white;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background='white'">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #e3f2fd, #bbdefb); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="bi bi-basket-fill" style="font-size: 1.1rem; color: #1976d2;"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${item.name}</div>
+                                    <small style="color: #6c757d; font-size: 0.8rem;">in ${item.categoryName}</small>
+                                </div>
+                            </div>
+                            <div style="text-align: right; min-width: 70px;">
+                                <div style="font-weight: 700; color: #1976d2; font-size: 1rem;">£${item.price}</div>
+                                <small style="color: #2e7d32; font-size: 0.75rem; font-weight: 500;">✓ In stock</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        if (results.length > 10) {
+            html += `<div style="padding: 12px 16px; text-align: center; color: #6c757d; font-size: 0.85rem; background: #f8f9fa; border-top: 1px solid #eee;">Showing first 10 of ${results.length} results</div>`;
+        }
+        
+        html += '</div>';
+        searchDropdown.innerHTML = html;
+        searchDropdown.style.display = 'block';
+    }
+    
+    function displayNoResults(query) {
+        searchDropdown.innerHTML = `
+            <div style="padding: 30px; text-align: center; color: #6c757d; background: white;">
+                <i class="bi bi-search" style="font-size: 2rem; opacity: 0.5;"></i>
+                <p class="mt-2 mb-0">No results found for "${query}"</p>
+                <small>Try searching for different items</small>
+            </div>
+        `;
+        searchDropdown.style.display = 'block';
+    }
+    
+    // Global functions for clicking search results
+    window.openCategoryFromSearch = function(categoryId) {
+        const categoryCard = document.querySelector(`.category-card[data-category-id="${categoryId}"]`);
+        if (categoryCard) {
+            categoryCard.click();
+            searchDropdown.style.display = 'none';
+            searchInput.value = '';
+            clearButton.style.display = 'none';
+        }
+    };
+    
+    window.openProductFromSearch = function(productId, productName, categoryId, subcategoryName) {
+        console.log('Opening product:', productId, productName, 'in subcategory:', subcategoryName);
+        // Open the category modal first, then scroll to product
+        const categoryCard = document.querySelector(`.category-card[data-category-id="${categoryId}"]`);
+        if (categoryCard) {
+            categoryCard.click();
+            // Wait for modal to open, then find and click the right subcategory tab, then scroll to product
+            setTimeout(() => {
+                // Find the subcategory tab button that contains the subcategory name
+                const tabButtons = document.querySelectorAll('#subcategoryTabs .nav-link');
+                tabButtons.forEach(btn => {
+                    if (btn.textContent.trim().includes(subcategoryName)) {
+                        btn.click();
+                    }
+                });
+                
+                // Wait a bit more for the tab content to load, then find the product
+                setTimeout(() => {
+                    const productCard = document.querySelector(`.product-search-card[data-product-id="${productId}"]`);
+                    if (productCard) {
+                        productCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Highlight the product briefly
+                        productCard.style.border = '3px solid #0d6efd';
+                        productCard.style.boxShadow = '0 0 15px rgba(13, 110, 253, 0.5)';
+                        setTimeout(() => {
+                            productCard.style.border = '';
+                            productCard.style.boxShadow = '';
+                        }, 3000);
+                    } else {
+                        console.log('Product card not found with id:', productId);
+                    }
+                }, 300);
+            }, 600);
+            searchDropdown.style.display = 'none';
+            searchInput.value = '';
+            clearButton.style.display = 'none';
+        }
+    };
+});
 
 // Unregister any service workers to prevent auto-reload
 if ('serviceWorker' in navigator) {

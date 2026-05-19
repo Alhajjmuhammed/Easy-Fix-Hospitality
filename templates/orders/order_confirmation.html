@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends base_template %}
 {% load restaurant_tags %}
 
 {% block title %}Order Confirmed - Restaurant System{% endblock %}
@@ -28,7 +28,10 @@
                 </div>
                 
                 <div class="d-grid gap-2">
-                    <a href="{% url 'orders:my_orders' %}" class="btn btn-primary">
+                    <a href="{% url 'orders:select_table' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-arrow-left-circle"></i> Back to Tables
+                    </a>
+                    <a href="{% url 'orders:my_orders' %}" class="btn btn-outline-primary">
                         <i class="bi bi-list-ul"></i> View My Orders
                     </a>
                     {% if has_kitchen_items %}
@@ -41,9 +44,6 @@
                             <i class="bi bi-printer"></i> Print Bar Order Ticket (BOT)
                         </a>
                     {% endif %}
-                    <a href="{% url 'orders:select_table' %}" class="btn btn-outline-primary">
-                        <i class="bi bi-plus-circle"></i> Place Another Order
-                    </a>
                 </div>
                 
                 <div class="mt-4">
@@ -57,8 +57,13 @@
     </div>
 </div>
 
-{% if should_print_kot or should_print_bot %}
 <script>
+    // Auto-redirect to table selection after 2 seconds
+    setTimeout(function() {
+        window.location.href = "{% url 'orders:select_table' %}";
+    }, 2000);
+    
+    {% if should_print_kot or should_print_bot %}
     // Auto-open KOT and/or BOT in new windows when order is placed
     window.addEventListener('load', function() {
         {% if should_print_kot %}
@@ -89,6 +94,6 @@
         }, 300);
         {% endif %}
     });
+    {% endif %}
 </script>
-{% endif %}
 {% endblock %}

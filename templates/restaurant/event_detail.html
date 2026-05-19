@@ -1,0 +1,357 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}{{ event.title }} - Event Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .event-header {
+        background: linear-gradient(135deg, #3d5a80 0%, #293241 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+    .detail-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-left: 3px solid #3d5a80;
+    }
+    .detail-card-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #3d5a80;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.75rem;
+    }
+    .info-item {
+        padding: 0.5rem 0;
+    }
+    .info-label {
+        color: #6b7280;
+        font-size: 0.8rem;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    .info-value {
+        font-weight: 500;
+        color: #1f2937;
+        font-size: 0.95rem;
+    }
+    .price-card {
+        background: linear-gradient(135deg, #3d5a80 0%, #293241 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+    }
+    .price-card .main-price {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+    }
+    .payment-progress {
+        height: 6px;
+        border-radius: 3px;
+        overflow: hidden;
+        background: rgba(255,255,255,0.3);
+        margin: 0.5rem 0;
+    }
+    .payment-progress-bar {
+        height: 100%;
+        background: white;
+        transition: width 0.3s ease;
+    }
+    .status-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+    }
+    .status-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Event Header -->
+    <div class="event-header">
+        <div>
+            <h3 class="mb-1"><i class="fas fa-tag me-2"></i>{{ event.title }}</h3>
+            <div class="d-flex flex-wrap gap-3 align-items-center" style="font-size: 1rem;">
+                <span><i class="fas fa-calendar me-1"></i>{{ event.event_date|date:"M d, Y" }}</span>
+                <span><i class="fas fa-clock me-1"></i>{{ event.start_time|time:"H:i" }}{% if event.end_time %} - {{ event.end_time|time:"H:i" }}{% endif %}</span>
+                <span><i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX</span>
+                <span><i class="fas fa-shapes me-1"></i>{{ event.get_event_type_display }}</span>
+                <span class="badge bg-{{ event.get_status_color }} px-3 py-2">{{ event.get_status_display }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-7">
+            <!-- Contact & Event Info Combined -->
+            <div class="detail-card">
+                <div class="detail-card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Event Information
+                </div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Contact Name</span>
+                        <span class="info-value">{{ event.contact_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Phone</span>
+                        <span class="info-value"><i class="fas fa-phone me-1 text-primary"></i>{{ event.contact_phone }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Email</span>
+                        <span class="info-value">
+                            {% if event.contact_email %}
+                            <i class="fas fa-envelope me-1 text-primary"></i>{{ event.contact_email }}
+                            {% else %}
+                            <span class="text-muted">Not provided</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Created</span>
+                        <span class="info-value">{{ event.created_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                </div>
+                {% if event.description %}
+                <hr class="my-2">
+                <div>
+                    <span class="info-label">Description</span>
+                    <p class="mb-0 mt-1">{{ event.description }}</p>
+                </div>
+                {% endif %}
+                {% if event.special_requirements %}
+                <hr class="my-2">
+                <div>
+                    <span class="info-label">Special Requirements</span>
+                    <p class="mb-0 mt-1">{{ event.special_requirements }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Update Status -->
+            <div class="detail-card">
+                <div class="detail-card-title">
+                    <i class="fas fa-tasks"></i>
+                    Change Status
+                </div>
+                <div class="status-actions">
+                    {% for value, label in event.EVENT_STATUS_CHOICES %}
+                    <button class="btn btn-sm {% if event.status == value %}btn-primary{% else %}btn-outline-secondary{% endif %} status-btn"
+                            onclick="updateStatus('{{ value }}')"
+                            {% if event.status == value %}disabled{% endif %}>
+                        {{ label }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <!-- Price Summary -->
+            <div class="price-card">
+                <div class="small opacity-75">Total Value</div>
+                <div class="main-price">{{ currency_symbol }}{{ event.total_amount|floatformat:2 }}</div>
+                <div class="small">{{ event.total_pax }} PAX × {{ currency_symbol }}{{ event.price_per_pax|floatformat:2 }}</div>
+                <div class="payment-progress mt-2">
+                    <div class="payment-progress-bar" style="width: {{ event.payment_percentage }}%"></div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small>{{ event.payment_percentage|floatformat:0 }}% Paid</small>
+                    <span class="badge bg-{{ event.get_payment_status_color }}">
+                        {% if event.payment_status == 'fully_paid' %}Paid{% elif event.payment_status == 'partially_paid' %}Partial{% elif event.payment_status == 'deposit_paid' %}Deposit{% else %}{{ event.get_payment_status_display }}{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Payment Details -->
+            <div class="detail-card">
+                <div class="detail-card-title">
+                    <i class="fas fa-credit-card"></i>
+                    Payment Details
+                </div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Paid</span>
+                        <span class="info-value text-success fw-bold">{{ currency_symbol }}{{ event.amount_paid|floatformat:2 }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Balance</span>
+                        <span class="info-value {% if event.balance_due > 0 %}text-danger{% else %}text-success{% endif %} fw-bold">
+                            {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Deposit</span>
+                        <span class="info-value">{{ currency_symbol }}{{ event.deposit_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Created</span>
+                        <span class="info-value">{{ event.created_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+                {% if event.balance_due > 0 %}
+                <button class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                    <i class="fas fa-plus me-1"></i>Record Payment
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- Actions -->
+            <div class="detail-card">
+                <div class="detail-card-title">
+                    <i class="fas fa-tools"></i>
+                    Actions
+                </div>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'restaurant:edit_event' event.id %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-edit me-1"></i>Edit Event
+                    </a>
+                    <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete()">
+                        <i class="fas fa-trash me-1"></i>Delete Event
+                    </button>
+                    <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>Back
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-dollar-sign text-success me-2"></i>Record Payment
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text">{{ currency_symbol }}</span>
+                        <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0.01" 
+                               max="{{ event.balance_due }}" placeholder="0.00">
+                    </div>
+                    <div class="form-text">Balance due: {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}</div>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="isDeposit">
+                    <label class="form-check-label" for="isDeposit">
+                        This is a deposit payment
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="recordPayment()">
+                    <i class="fas fa-check me-1"></i>Record Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>Delete Event
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>{{ event.title }}</strong>?</p>
+                <p class="text-muted small mb-0">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="{% url 'restaurant:delete_event' event.id %}" class="btn btn-danger">
+                    <i class="fas fa-trash me-1"></i>Delete
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateStatus(newStatus) {
+    fetch('{% url "restaurant:update_event_status" event.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ status: newStatus })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Error updating status');
+        }
+    })
+    .catch(() => alert('Error updating status'));
+}
+
+function recordPayment() {
+    const amount = document.getElementById('paymentAmount').value;
+    const isDeposit = document.getElementById('isDeposit').checked;
+    
+    if (!amount || parseFloat(amount) <= 0) {
+        alert('Please enter a valid payment amount');
+        return;
+    }
+    
+    fetch('{% url "restaurant:record_event_payment" event.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ amount: amount, is_deposit: isDeposit })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Error recording payment');
+        }
+    })
+    .catch(() => alert('Error recording payment'));
+}
+
+function confirmDelete() {
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}

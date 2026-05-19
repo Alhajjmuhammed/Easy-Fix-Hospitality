@@ -173,18 +173,43 @@
                 <a class="text-decoration-none text-dark me-3" href="{% url 'restaurant:home' %}" title="Restaurant Home Page">
                     <i class="fas fa-home me-1"></i>Home
                 </a>
-                <a class="text-decoration-none text-dark me-3" href="{% url 'restaurant:menu' %}" title="View Restaurant Menu">
+                <a class="text-decoration-none text-dark me-3" href="{% url 'orders:select_table' %}" title="Select Table & View Menu">
                     <i class="fas fa-utensils me-1"></i>Menu
                 </a>
+                {% if user.is_cashier %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'cashier:dashboard' %}" title="Cashier Dashboard">
                     <i class="fas fa-tachometer-alt me-1"></i>Cashier Dashboard
                 </a>
+                {% elif user.is_customer_care %}
+                <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_dashboard' %}" title="Customer Care Dashboard">
+                    <i class="fas fa-headset me-1"></i>Customer Care Dashboard
+                </a>
+                <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_payments' %}" title="Process Payments">
+                    <i class="fas fa-cash-register me-1"></i>Process Payments
+                </a>
+                {% endif %}
+                {% if user.is_cashier %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'cashier:receipt_management' %}" title="Manage Receipts">
                     <i class="fas fa-receipt me-1"></i>Manage Receipts
                 </a>
+                {% endif %}
+                {% if user.is_cashier %}
+                <a class="text-decoration-none text-dark me-3" href="{% url 'cashier:cashier_reports' %}" title="My Sales Reports">
+                    <i class="fas fa-chart-bar me-1"></i>My Reports
+                </a>
+                <a class="text-decoration-none text-dark me-3" href="{% url 'cashier:my_orders' %}" title="My Orders">
+                    <i class="fas fa-list-ul me-1"></i>My Orders
+                </a>
+                {% elif user.is_customer_care %}
+                <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_reports' %}" title="My Sales Reports">
+                    <i class="fas fa-chart-bar me-1"></i>My Reports
+                </a>
+                {% endif %}
+                {% if user.is_cashier %}
                 <a class="text-decoration-none text-dark me-3" href="#" data-bs-toggle="modal" data-bs-target="#recordWasteModal" title="Record Waste">
                     <i class="fas fa-trash-alt me-1"></i>Record Waste
                 </a>
+                {% endif %}
                 
                 <div class="ms-auto d-flex align-items-center">
                     <div class="dropdown">
@@ -249,24 +274,44 @@
                         <a class="mobile-nav-link" href="{% url 'restaurant:home' %}">
                             <i class="fas fa-home me-2"></i>Home
                         </a>
-                        <a class="mobile-nav-link" href="{% url 'restaurant:menu' %}">
+                        <a class="mobile-nav-link" href="{% url 'orders:select_table' %}">
                             <i class="fas fa-utensils me-2"></i>Menu
                         </a>
+                        {% if user.is_cashier %}
                         <a class="mobile-nav-link active" href="{% url 'cashier:dashboard' %}">
-                            <i class="fas fa-cash-register me-2"></i>Cashier / Payments
+                            <i class="fas fa-cash-register me-2"></i>Cashier Dashboard
                         </a>
+                        {% elif user.is_customer_care %}
+                        <a class="mobile-nav-link active" href="{% url 'orders:customer_care_dashboard' %}">
+                            <i class="fas fa-headset me-2"></i>Customer Care Dashboard
+                        </a>
+                        <a class="mobile-nav-link" href="{% url 'orders:customer_care_payments' %}">
+                            <i class="fas fa-cash-register me-2"></i>Process Payments
+                        </a>
+                        {% endif %}
+                        {% if user.is_cashier %}
                         <a class="mobile-nav-link" href="{% url 'cashier:receipt_management' %}">
                             <i class="fas fa-receipt me-2"></i>Manage Receipts
                         </a>
+                        {% endif %}
+                        {% if user.is_cashier %}
+                        <a class="mobile-nav-link" href="{% url 'cashier:cashier_reports' %}">
+                            <i class="fas fa-chart-bar me-2"></i>My Reports
+                        </a>
+                        <a class="mobile-nav-link" href="{% url 'cashier:my_orders' %}">
+                            <i class="fas fa-list-ul me-2"></i>My Orders
+                        </a>
+                        {% elif user.is_customer_care %}
+                        <a class="mobile-nav-link" href="{% url 'orders:customer_care_reports' %}">
+                            <i class="fas fa-chart-bar me-2"></i>My Reports
+                        </a>
+                        {% endif %}
+                        {% if user.is_cashier %}
                         <a class="mobile-nav-link" href="#" data-bs-toggle="modal" data-bs-target="#recordWasteModal">
                             <i class="fas fa-trash-alt me-2"></i>Record Waste
                         </a>
-                        <hr class="my-2">
-                        {% if user.is_customer_care %}
-                        <a class="mobile-nav-link" href="{% url 'orders:customer_care_dashboard' %}">
-                            <i class="fas fa-headset me-2"></i>Customer Care Dashboard
-                        </a>
                         {% endif %}
+                        <hr class="my-2">
                         {% if user.is_owner %}
                         <a class="mobile-nav-link" href="{% url 'admin_panel:admin_dashboard' %}">
                             <i class="fas fa-tachometer-alt me-2"></i>Owner Dashboard

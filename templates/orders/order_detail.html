@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends base_template %}
 {% load restaurant_tags %}
 
 {% block title %}Order #{{ order.order_number }} - Track Your Order{% endblock %}
@@ -307,11 +307,16 @@
                                 <th class="text-center">Qty</th>
                                 <th class="text-end">Price</th>
                                 <th class="text-end">Total</th>
+                                {% if user.is_customer_care or user.is_cashier or user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_kitchen_staff %}
+                                    {% if order.payment_status != 'paid' and order.status != 'cancelled' %}
+                                    <th class="text-center">Action</th>
+                                    {% endif %}
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for item in order.order_items.all %}
-                            <tr>
+                            <tr id="item-row-{{ item.id }}">
                                 <td>
                                     <strong>{{ item.product.name }}</strong>
                                     {% if item.special_notes %}
@@ -321,6 +326,15 @@
                                 <td class="text-center">{{ item.quantity }}</td>
                                 <td class="text-end">{% currency_symbol %}{{ item.unit_price }}</td>
                                 <td class="text-end"><strong>{% currency_symbol %}{{ item.get_subtotal }}</strong></td>
+                                {% if user.is_customer_care or user.is_cashier or user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_kitchen_staff %}
+                                    {% if order.payment_status != 'paid' and order.status != 'cancelled' and order.order_items.count > 1 %}
+                                    <td class="text-center">
+                                        <button class="btn btn-danger btn-sm" onclick="cancelItem('{{ item.id }}', '{{ item.product.name }}', {{ item.quantity }})">
+                                            <i class="bi bi-x-circle"></i> Cancel
+                                        </button>
+                                    </td>
+                                    {% endif %}
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -449,4 +463,54 @@
     </div>
 </div>
 </div> <!-- End customer-tracking wrapper -->
+
+<script>
+function cancelItem(itemId, itemName, quantity) {
+    if (!confirm(`Are you sure you want to cancel ${quantity}x ${itemName}?`)) {
+        return;
+    }
+
+    fetch(`/orders/cancel-item/${itemId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the item row from the table
+            const row = document.getElementById(`item-row-${itemId}`);
+            if (row) {
+                row.remove();
+            }
+
+            // Update the totals
+            if (data.new_total !== undefined) {
+                // Update total amount in the summary table
+                const totalElements = document.querySelectorAll('td strong, th strong');
+                totalElements.forEach(el => {
+                    if (el.textContent.includes('{% currency_symbol %}')) {
+                        el.innerHTML = '{% currency_symbol %}' + data.new_total.toFixed(2);
+                    }
+                });
+            }
+
+            // Show success message
+            alert(`✓ Item cancelled successfully! Stock has been restored.`);
+
+            // Reload the page to refresh all data
+            location.reload();
+        } else {
+            alert(`✗ Error: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('✗ Failed to cancel item. Please try again.');
+    });
+}
+</script>
+
 {% endblock %}

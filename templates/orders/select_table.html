@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends base_template %}
 
 {% block title %}Select Table - {{ restaurant_name }}{% endblock %}
 
@@ -38,13 +38,14 @@
     .table-card.occupied {
         background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
         border-color: #dc3545;
-        cursor: not-allowed;
-        opacity: 0.7;
+        cursor: pointer;
+        opacity: 0.85;
     }
     
     .table-card.occupied:hover {
-        transform: none;
-        box-shadow: none;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(220,53,69,0.15);
+        border-color: #c82333;
     }
     
     .table-number {
@@ -134,7 +135,7 @@
                         {% for table in available_tables %}
                             <div class="col-3 col-md-4 col-lg-3 col-xl-2">
                                 <div class="table-card {% if table.is_truly_available %}available{% else %}occupied{% endif %}" 
-                                     {% if table.is_truly_available %}onclick="selectTable({{ table.id }}, '{{ table.tbl_no }}')"{% endif %}>
+                                     onclick="selectTable({{ table.id }}, '{{ table.tbl_no }}', {{ table.is_truly_available|yesno:'true,false' }})">
                                     <div class="text-center">
                                         <div class="table-icon">
                                             <i class="bi bi-table"></i>
@@ -215,15 +216,63 @@
                     <i class="bi bi-table display-1 text-primary"></i>
                 </div>
                 <h4>Table <span id="confirmTableNumber"></span></h4>
-                <p class="text-muted">You've selected this table for your order. Continue to browse the menu?</p>
+                
+                <!-- Available table message -->
+                <p class="text-muted" id="availableMessage" style="display: none;">
+                    You've selected this table for your order. Continue to browse the menu?
+                </p>
+                
+                <!-- Occupied table options -->
+                <div id="occupiedOptions" style="display: none;">
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle"></i> This table is currently occupied
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="card h-100 border-2" style="cursor: pointer;" onclick="selectAction('add')">
+                                <div class="card-body text-center p-4">
+                                    <div class="mb-3">
+                                        <i class="bi bi-plus-circle display-4 text-success"></i>
+                                    </div>
+                                    <h5 class="card-title">Add to Existing Order</h5>
+                                    <p class="card-text text-muted small">Same customer adding more items</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100 border-2" style="cursor: pointer;" onclick="selectAction('new')">
+                                <div class="card-body text-center p-4">
+                                    <div class="mb-3">
+                                        <i class="bi bi-file-earmark-plus display-4 text-primary"></i>
+                                    </div>
+                                    <h5 class="card-title">Create New Order</h5>
+                                    <p class="card-text text-muted small">Different customer at this table</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <input type="hidden" id="selectedAction">
             </div>
             <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-arrow-left"></i> Go Back
-                </button>
-                <button type="button" class="btn btn-primary" onclick="confirmSelection()">
-                    <i class="bi bi-arrow-right-circle"></i> Continue to Menu
-                </button>
+                <!-- Buttons for available tables -->
+                <div id="availableButtons" style="display: none;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-arrow-left"></i> Go Back
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="confirmSelection()">
+                        <i class="bi bi-arrow-right-circle"></i> Continue
+                    </button>
+                </div>
+                
+                <!-- Button for occupied tables -->
+                <div id="occupiedButtons" style="display: none;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x"></i> Cancel
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -234,16 +283,54 @@
 <script>
 let selectedTable = null;
 let confirmationModal;
+let isTableAvailable = true;
 
 document.addEventListener('DOMContentLoaded', function() {
     confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
 });
 
-function selectTable(tableId, tableNumber) {
+function selectTable(tableId, tableNumber, isAvailable) {
     selectedTable = {id: tableId, number: tableNumber};
+    isTableAvailable = isAvailable;
+    
     document.getElementById('selectedTableId').value = tableId;
     document.getElementById('confirmTableNumber').textContent = tableNumber;
+    document.getElementById('selectedAction').value = '';
+    
+    if (isAvailable) {
+        // Available table - show simple confirmation
+        document.getElementById('availableMessage').style.display = 'block';
+        document.getElementById('occupiedOptions').style.display = 'none';
+        document.getElementById('availableButtons').style.display = 'block';
+        document.getElementById('occupiedButtons').style.display = 'none';
+    } else {
+        // Occupied table - show action options
+        document.getElementById('availableMessage').style.display = 'none';
+        document.getElementById('occupiedOptions').style.display = 'block';
+        document.getElementById('availableButtons').style.display = 'none';
+        document.getElementById('occupiedButtons').style.display = 'block';
+    }
+    
     confirmationModal.show();
+}
+
+function selectAction(action) {
+    document.getElementById('selectedAction').value = action;
+    
+    // Add action to form
+    const form = document.getElementById('tableSelectionForm');
+    let actionInput = form.querySelector('input[name="action"]');
+    if (!actionInput) {
+        actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        form.appendChild(actionInput);
+    }
+    actionInput.value = action;
+    
+    // Submit form
+    confirmationModal.hide();
+    form.submit();
 }
 
 function confirmSelection() {
@@ -254,7 +341,7 @@ function confirmSelection() {
 
 // Add visual feedback for selected table
 document.addEventListener('click', function(e) {
-    if (e.target.closest('.table-card.available')) {
+    if (e.target.closest('.table-card')) {
         // Remove previous selection
         document.querySelectorAll('.table-card').forEach(card => {
             card.classList.remove('border-primary', 'border-3');

@@ -209,15 +209,29 @@
                                 </ul>
                             </li>
                         {% elif user.is_cashier %}
-                            <!-- Cashiers should use cashier_base.html template, but allow access to restaurant pages -->
+                            <!-- Cashiers should use cashier_base.html template, but allow access to restaurant and ordering pages -->
                             <script>
                                 if (window.location.pathname !== '/cashier/' && 
                                     !window.location.pathname.startsWith('/cashier/') &&
                                     !window.location.pathname.startsWith('/restaurant/') &&
+                                    !window.location.pathname.startsWith('/orders/') &&
                                     !window.location.pathname.startsWith('/accounts/profile') &&
                                     !window.location.pathname.startsWith('/accounts/logout') &&
                                     !window.location.pathname.includes('cashier-record')) {
                                     window.location.href = '{% url "cashier:dashboard" %}';
+                                }
+                            </script>
+                        {% elif user.is_customer_care %}
+                            <!-- Customer care should use cashier_base.html template, but allow access to restaurant and ordering pages -->
+                            <script>
+                                if (window.location.pathname !== '/orders/customer-care/' && 
+                                    !window.location.pathname.startsWith('/orders/customer-care') &&
+                                    !window.location.pathname.startsWith('/cashier/') &&
+                                    !window.location.pathname.startsWith('/restaurant/') &&
+                                    !window.location.pathname.startsWith('/orders/') &&
+                                    !window.location.pathname.startsWith('/accounts/profile') &&
+                                    !window.location.pathname.startsWith('/accounts/logout')) {
+                                    window.location.href = '{% url "orders:customer_care_dashboard" %}';
                                 }
                             </script>
                         {% elif user.is_admin %}
@@ -286,6 +300,11 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:customer_care_receipt_management' %}">
                                     <i class="bi bi-receipt"></i> Receipts
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'orders:customer_care_reports' %}">
+                                    <i class="bi bi-graph-up"></i> Reports
                                 </a>
                             </li>
                         {% elif user.is_cashier %}

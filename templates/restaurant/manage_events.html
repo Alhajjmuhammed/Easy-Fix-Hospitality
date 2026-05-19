@@ -1,0 +1,748 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}Event Menu - Manage Events{% endblock %}
+
+{% block content %}
+<!-- Success Message Popup -->
+<div id="paymentSuccessAlert" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999999; min-width: 500px; background: #198754; color: white; font-size: 20px; font-weight: bold; border-radius: 10px; padding: 25px 35px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); display: none; text-align: center;">
+    <i class="fas fa-check-circle" style="font-size: 28px; margin-right: 15px;"></i>
+    <span id="paymentSuccessMessage"></span>
+</div>
+
+<div class="container-fluid">
+    
+    <!-- Summary Cards Row 1 -->
+    <div class="row mb-4">
+        <div class="col-xl-2 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL EVENTS</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{{ summary.total_events }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-check fa-2x text-primary" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-2 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">UPCOMING EVENTS</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{{ summary.upcoming_events }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-info" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-2 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL REVENUE</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ currency_symbol }}{{ summary.total_revenue|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-success" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PAID ({{ summary.paid_events }})</div>
+                            <div class="h5 mb-0 font-weight-bold text-success">{{ currency_symbol }}{{ summary.paid_amount|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-success" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">UNPAID ({{ summary.unpaid_events }})</div>
+                            <div class="h5 mb-0 font-weight-bold text-danger">{{ currency_symbol }}{{ summary.unpaid_amount|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-circle fa-2x text-danger" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius: 8px; position: relative; border: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TODAY'S EVENTS</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{{ summary.today_events }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-day fa-2x text-warning" style="opacity: 0.3;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Filters -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter mr-2"></i>Event Filters
+            </h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3" id="eventFilterForm">
+                <div class="col-lg-2 col-md-4">
+                    <label for="search" class="form-label font-weight-bold">Search</label>
+                    <input type="text" class="form-control" id="search" name="search" placeholder="Event title, contact..." value="{{ search_query }}">
+                </div>
+                
+                <div class="col-lg-2 col-md-4">
+                    <label for="status" class="form-label font-weight-bold">Status</label>
+                    <select class="form-control" id="status" name="status" onchange="this.form.submit()">
+                        <option value="">All Status</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-lg-2 col-md-4">
+                    <label for="event_type" class="form-label font-weight-bold">Event Type</label>
+                    <select class="form-control" id="event_type" name="event_type" onchange="this.form.submit()">
+                        <option value="">All Types</option>
+                        {% for value, label in event_types %}
+                        <option value="{{ value }}" {% if event_type_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-lg-2 col-md-4">
+                    <label for="date_filter" class="form-label font-weight-bold">Period</label>
+                    <select class="form-control" id="date_filter" name="date_filter" onchange="this.form.submit()">
+                        <option value="all" {% if date_filter == 'all' %}selected{% endif %}>All Time</option>
+                        <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Today</option>
+                        <option value="week" {% if date_filter == 'week' %}selected{% endif %}>This Week</option>
+                        <option value="month" {% if date_filter == 'month' %}selected{% endif %}>This Month</option>
+                        <option value="upcoming" {% if date_filter == 'upcoming' %}selected{% endif %}>Upcoming</option>
+                        <option value="past" {% if date_filter == 'past' %}selected{% endif %}>Past</option>
+                    </select>
+                </div>
+                
+                <div class="col-lg-2 col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    <a href="{% url 'restaurant:manage_events' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                </div>
+                
+                <div class="col-lg-2 col-md-4 d-flex align-items-end justify-content-end gap-2">
+                    <a href="{% url 'restaurant:export_events_csv' %}?status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}" class="btn btn-outline-success" title="Export CSV">
+                        <i class="fas fa-file-csv"></i> CSV
+                    </a>
+                    <a href="{% url 'restaurant:export_events_pdf' %}?status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}" class="btn btn-outline-danger" title="Export PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Events Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-calendar-alt mr-2"></i>Events List
+                <span class="badge bg-primary ms-2">{{ events.paginator.count }} event{{ events.paginator.count|pluralize }}</span>
+            </h6>
+            <a href="{% url 'restaurant:add_event' %}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus"></i> New Event
+            </a>
+        </div>
+        <div class="card-body">
+            {% if events %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="eventsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Event</th>
+                            <th>Type</th>
+                            <th>PAX</th>
+                            <th>Total</th>
+                            <th>Contact</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                        <tr>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <strong>{{ event.event_date|date:"M d, Y" }}</strong>
+                                    <small class="text-muted">{{ event.start_time|time:"H:i" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ event.title }}</strong>
+                                {% if event.is_today %}
+                                <span class="badge bg-danger ms-1">TODAY</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ event.get_event_type_display }}
+                            </td>
+                            <td>
+                                <i class="fas fa-users text-primary me-1"></i>{{ event.total_pax }}
+                            </td>
+                            <td>
+                                <strong class="text-success">{{ currency_symbol }}{{ event.total_amount|floatformat:2 }}</strong>
+                                <br><small class="text-muted">{{ currency_symbol }}{{ event.price_per_pax }}/pax</small>
+                            </td>
+                            <td>
+                                <div>{{ event.contact_name }}</div>
+                                <small class="text-muted"><i class="fas fa-phone me-1"></i>{{ event.contact_phone }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ event.get_status_color }}">{{ event.get_status_display }}</span>
+                            </td>
+                            <td>
+                                {% if event.payment_status == 'fully_paid' %}
+                                    <span class="badge bg-success">Paid</span>
+                                {% elif event.payment_status == 'partially_paid' %}
+                                    <span class="badge bg-warning">Partial</span>
+                                {% elif event.payment_status == 'deposit_paid' %}
+                                    <span class="badge bg-info">Deposit</span>
+                                {% elif event.payment_status == 'refunded' %}
+                                    <span class="badge bg-secondary">Refunded</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Unpaid</span>
+                                {% endif %}
+                                {% if event.balance_due > 0 %}
+                                <br><small class="text-danger">Due: {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'restaurant:view_event' event.id %}" class="btn btn-outline-primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'restaurant:edit_event' event.id %}" class="btn btn-outline-warning" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button class="btn btn-outline-danger" title="Delete" onclick="confirmDelete({{ event.id }}, '{{ event.title|escapejs }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% if event.payment_status in 'deposit_paid,partially_paid' and event.status != 'cancelled' %}
+                                    <button class="btn btn-info" title="Approve Payment" onclick="approvePayment({{ event.id }}, '{{ event.title|escapejs }}')">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% if event.payment_status != 'fully_paid' and event.status != 'cancelled' %}
+                                    <button class="btn btn-success" title="Record Payment" onclick="openPaymentModal({{ event.id }}, '{{ event.title|escapejs }}', {{ event.total_amount }}, {{ event.amount_paid }}, {{ event.balance_due }}, '{{ currency_symbol }}')">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if events.has_other_pages %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if events.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ events.previous_page_number }}&status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="page-item disabled">
+                        <span class="page-link">Page {{ events.number }} of {{ events.paginator.num_pages }}</span>
+                    </li>
+                    
+                    {% if events.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ events.next_page_number }}&status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <!-- Empty State -->
+            <div class="text-center py-5">
+                <i class="fas fa-calendar-plus fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No Events Found</h4>
+                <p class="text-muted mb-4">
+                    {% if search_query or status_filter or event_type_filter or date_filter != 'all' %}
+                    No events match your current filters. Try adjusting your search criteria.
+                    {% else %}
+                    Start managing your banquets, parties, and special events.
+                    {% endif %}
+                </p>
+                <a href="{% url 'restaurant:add_event' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus me-2"></i>Create Your First Event
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>Delete Event
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="deleteEventName"></strong>?</p>
+                <p class="text-muted small mb-0">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-money-bill-wave text-success me-2"></i>Record Payment
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="mb-3" id="paymentEventTitle"></h6>
+                
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <div class="text-muted small">Total Amount</div>
+                        <div class="h5" id="paymentTotalAmount"></div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small">Already Paid</div>
+                        <div class="h5 text-success" id="paymentAmountPaid"></div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning mb-3">
+                    <strong>Balance Due: <span id="paymentBalanceDue"></span></strong>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="paymentAmount" class="form-label font-weight-bold">Payment Amount <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text" id="paymentCurrencySymbol"></span>
+                        <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0.01" placeholder="0.00" required>
+                    </div>
+                    <small class="text-muted">Amount is pre-filled with full balance. Change it for partial payment.</small>
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="isDepositPayment">
+                    <label class="form-check-label" for="isDepositPayment">
+                        This is a deposit payment
+                    </label>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="paymentNotes" class="form-label">Notes (Optional)</label>
+                    <textarea class="form-control" id="paymentNotes" rows="2" placeholder="Payment method, reference number, etc."></textarea>
+                </div>
+                
+                <div id="paymentErrorMsg" class="alert alert-danger d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmPaymentBtn">
+                    <i class="fas fa-check me-1"></i>Record Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let deleteEventId = null;
+let paymentEventId = null;
+
+// Function to get CSRF token from cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Page loaded - checking for success message');
+    
+    // Check for success message from payment
+    const successMsg = sessionStorage.getItem('paymentSuccess');
+    if (successMsg) {
+        console.log('Found success message:', successMsg);
+        sessionStorage.removeItem('paymentSuccess');
+        
+        const successAlert = document.getElementById('paymentSuccessAlert');
+        const successMessage = document.getElementById('paymentSuccessMessage');
+        
+        if (successAlert && successMessage) {
+            successMessage.textContent = successMsg;
+            successAlert.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                successAlert.style.display = 'none';
+            }, 5000);
+        }
+    }
+    
+    // Clean up any modal backdrops that might be stuck
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(backdrop => backdrop.remove());
+    
+    // Remove modal-open class from body if it exists
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+    
+    // Add event listener to cleanup modal on hide
+    const paymentModal = document.getElementById('paymentModal');
+    if (paymentModal) {
+        paymentModal.addEventListener('hidden.bs.modal', function () {
+            // Reset form and button state when modal is fully hidden
+            const btn = document.getElementById('confirmPaymentBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Record Payment';
+            }
+            
+            // Clear form with null checks
+            const amountField = document.getElementById('paymentAmount');
+            const notesField = document.getElementById('paymentNotes');
+            const depositCheckbox = document.getElementById('isDepositPayment');
+            const errorMsg = document.getElementById('paymentErrorMsg');
+            
+            if (amountField) amountField.value = '';
+            if (notesField) notesField.value = '';
+            if (depositCheckbox) depositCheckbox.checked = false;
+            if (errorMsg) errorMsg.classList.add('d-none');
+            
+            // Reset event ID
+            paymentEventId = null;
+        });
+    }
+    
+    console.log('Event management page initialized');
+});
+
+function confirmDelete(eventId, eventName) {
+    deleteEventId = eventId;
+    document.getElementById('deleteEventName').textContent = eventName;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+function openPaymentModal(eventId, eventTitle, totalAmount, amountPaid, balanceDue, currencySymbol) {
+    // Get all elements first with null checks
+    const titleEl = document.getElementById('paymentEventTitle');
+    const totalEl = document.getElementById('paymentTotalAmount');
+    const paidEl = document.getElementById('paymentAmountPaid');
+    const balanceEl = document.getElementById('paymentBalanceDue');
+    const symbolEl = document.getElementById('paymentCurrencySymbol');
+    const amountField = document.getElementById('paymentAmount');
+    const notesField = document.getElementById('paymentNotes');
+    const depositCheckbox = document.getElementById('isDepositPayment');
+    const errorMsg = document.getElementById('paymentErrorMsg');
+    const btn = document.getElementById('confirmPaymentBtn');
+    const modalElement = document.getElementById('paymentModal');
+    
+    // Check if essential elements exist
+    if (!modalElement || !titleEl || !amountField) {
+        console.error('Payment modal elements not found');
+        return;
+    }
+    
+    // Set values
+    paymentEventId = eventId;
+    titleEl.textContent = eventTitle;
+    if (totalEl) totalEl.textContent = currencySymbol + totalAmount.toFixed(2);
+    if (paidEl) paidEl.textContent = currencySymbol + amountPaid.toFixed(2);
+    if (balanceEl) balanceEl.textContent = currencySymbol + balanceDue.toFixed(2);
+    if (symbolEl) symbolEl.textContent = currencySymbol;
+    
+    // Pre-fill with full balance due
+    amountField.value = balanceDue.toFixed(2);
+    amountField.max = balanceDue.toFixed(2);
+    amountField.min = '0.01';
+    
+    if (notesField) notesField.value = '';
+    if (depositCheckbox) depositCheckbox.checked = false;
+    if (errorMsg) errorMsg.classList.add('d-none');
+    
+    // Reset button state
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>Record Payment';
+    }
+    
+    // Use getOrCreateInstance to avoid creating multiple modal instances
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    modal.show();
+}
+
+function approvePayment(eventId, eventTitle) {
+    if (confirm(`Approve payment for "${eventTitle}"?`)) {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+        
+        const csrftoken = getCookie('csrftoken');
+        fetch(`/restaurant/events/${eventId}/approve-payment/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Save success message to show after reload
+                sessionStorage.setItem('paymentSuccess', data.message);
+                
+                // Reload page immediately
+                location.reload();
+            } else {
+                alert(data.message || 'Error approving payment');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check"></i> Approve';
+                }
+            }
+        })
+        .catch(() => {
+            alert('Error approving payment');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check"></i> Approve';
+            }
+        });
+    }
+}
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+    if (deleteEventId) {
+        const csrftoken = getCookie('csrftoken');
+        fetch(`/restaurant/events/${deleteEventId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Error deleting event');
+            }
+        })
+        .catch(() => {
+            alert('Error deleting event');
+        });
+    }
+});
+
+document.getElementById('confirmPaymentBtn').addEventListener('click', function() {
+    const amountField = document.getElementById('paymentAmount');
+    const depositCheckbox = document.getElementById('isDepositPayment');
+    const notesField = document.getElementById('paymentNotes');
+    const errorMsg = document.getElementById('paymentErrorMsg');
+    
+    if (!amountField) {
+        console.error('Payment form elements not found');
+        return;
+    }
+    
+    const amount = parseFloat(amountField.value);
+    const isDeposit = depositCheckbox ? depositCheckbox.checked : false;
+    const notes = notesField ? notesField.value : '';
+    
+    console.log('Payment button clicked');
+    console.log('Amount:', amount);
+    console.log('Event ID:', paymentEventId);
+    
+    // Validation
+    if (!amount || amount <= 0) {
+        if (errorMsg) {
+            errorMsg.textContent = 'Please enter a valid payment amount';
+            errorMsg.classList.remove('d-none');
+        }
+        return;
+    }
+    
+    if (!paymentEventId) {
+        if (errorMsg) {
+            errorMsg.textContent = 'Error: No event selected';
+            errorMsg.classList.remove('d-none');
+        }
+        return;
+    }
+    
+    // Show loading state
+    const btn = document.getElementById('confirmPaymentBtn');
+    if (!btn) {
+        console.error('Payment button not found');
+        return;
+    }
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+    
+    const url = `/restaurant/events/${paymentEventId}/record-payment/`;
+    console.log('Posting to:', url);
+    
+    const csrftoken = getCookie('csrftoken');
+    console.log('CSRF Token:', csrftoken ? 'Found' : 'Not found');
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            amount: amount,
+            is_deposit: isDeposit,
+            notes: notes
+        })
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            console.error('HTTP error:', response.status, response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        console.log('data.success:', data.success);
+        console.log('data.message:', data.message);
+        
+        if (data.success) {
+            // Save success message to show after reload
+            sessionStorage.setItem('paymentSuccess', data.message);
+            
+            // Close modal
+            const modalElement = document.getElementById('paymentModal');
+            if (modalElement) {
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) modal.hide();
+            }
+            
+            // Reload page immediately
+            location.reload();
+        } else {
+            const errorMsg = document.getElementById('paymentErrorMsg');
+            const btn = document.getElementById('confirmPaymentBtn');
+            
+            if (errorMsg) {
+                errorMsg.textContent = data.message || 'Error recording payment';
+                errorMsg.classList.remove('d-none');
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Payment error:', error);
+        const errorMsg = document.getElementById('paymentErrorMsg');
+        const btn = document.getElementById('confirmPaymentBtn');
+        
+        if (errorMsg) {
+            errorMsg.textContent = 'Error recording payment. Please try again.';
+            errorMsg.classList.remove('d-none');
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+});
+</script>
+{% endblock %}

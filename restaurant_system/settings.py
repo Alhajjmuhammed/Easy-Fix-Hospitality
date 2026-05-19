@@ -438,6 +438,6 @@ REST_FRAMEWORK = {
 # ============================================================================
 # Set to True for hosted/remote printing (uses print queue + print client)
 # Set to False for local direct printing (uses win32print directly)
-USE_PRINT_QUEUE = False  # DISABLED for local development - direct printing
+USE_PRINT_QUEUE = True  # ENABLED for print client - creates PrintJob records
 
 sys.stderr.write("Info: Security configuration loaded\n")

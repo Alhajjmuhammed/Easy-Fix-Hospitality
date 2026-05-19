@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from orders.models import Order, OrderItem
 from cashier.models import Payment
 from restaurant.models import MainCategory, SubCategory
-from accounts.models import get_owner_filter
+from accounts.models import get_owner_filter, User
 from django.db.models import Sum, Count
 from datetime import datetime, timedelta
 from django.utils import timezone
@@ -25,10 +25,11 @@ def dashboard(request):
     """Advanced sales reports dashboard with kitchen/bar filtering"""
     
     if not (request.user.is_administrator() or request.user.is_owner() or 
-            request.user.is_main_owner() or request.user.is_branch_owner()):
+            request.user.is_main_owner() or request.user.is_branch_owner() or 
+            request.user.is_customer_care()):
         from django.shortcuts import redirect
         from django.contrib import messages
-        messages.error(request, "Access denied. Owner privileges required.")
+        messages.error(request, "Access denied. Owner or Customer Care role required.")
         return redirect('restaurant:home')
     
     # Import restaurant context utilities
@@ -49,6 +50,7 @@ def dashboard(request):
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Kitchen/Bar filtering
     product_id = request.GET.get('product_id', 'all')
     table_id = request.GET.get('table_id', 'all')
+    staff_filter = request.GET.get('staff_filter', 'all')  # NEW: Staff member filtering
     restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if no period is being used)
@@ -112,6 +114,12 @@ def dashboard(request):
         else:
             orders = Order.objects.none()
     
+    # Customer care sees only their own orders
+    if request.user.is_customer_care() and not (request.user.is_owner() or 
+                                                  request.user.is_main_owner() or 
+                                                  request.user.is_branch_owner()):
+        orders = orders.filter(ordered_by=request.user)
+    
     # Apply period filter
     today = timezone.now().date()
     if period == 'today':
@@ -165,14 +173,22 @@ def dashboard(request):
         orders = orders.filter(order_items__product__station='service').distinct()
     # 'all' means no station filter
     
+    # Apply staff filtering (filter by who created the order)
+    if staff_filter != 'all':
+        try:
+            staff_id = int(staff_filter)
+            orders = orders.filter(ordered_by_id=staff_id)
+        except (ValueError, TypeError):
+            pass  # Invalid staff_filter, ignore
+
     # Apply product filter (only orders containing this specific product)
     if product_id != 'all':
         orders = orders.filter(order_items__product_id=product_id).distinct()
-    
+
     # Apply table filter (only orders from this specific table)
     if table_id != 'all':
         orders = orders.filter(table_info_id=table_id)
-    
+
     # Helper functions for station detection
     # Helper functions for station analysis
     def has_kitchen_items(order):
@@ -189,9 +205,92 @@ def dashboard(request):
 
     # Calculate summary data with optimized queries
     total_orders = orders.count()
-    total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
+    _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
+    if _item_filter_active:
+        _stats_items = OrderItem.objects.filter(order__in=orders)
+        if category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        if subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        if station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
+        if product_id != 'all':
+            _stats_items = _stats_items.filter(product_id=product_id)
+        total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
+        total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
+    else:
+        _stats_items = None
+        total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
+    
+    from decimal import Decimal
+
+    # Get tax rate for display (must come before any tax calculation)
+    tax_rate_percentage = 0
+    if orders.exists():
+        first_order = orders.first()
+        tax_rate_percentage = first_order.tax_rate
+    elif target_restaurant and hasattr(target_restaurant, 'tax_rate'):
+        tax_rate_percentage = float(target_restaurant.tax_rate * 100)
+    elif request.user.tax_rate:
+        tax_rate_percentage = float(request.user.tax_rate * 100)
+    _tax_rate_decimal = Decimal(str(tax_rate_percentage)) / Decimal('100')
+
+    # Calculate tax on the correct revenue base.
+    # When a filter is active, tax must be on filtered items revenue only —
+    # calling order.get_tax_amount() would use the full order subtotal and give wrong figures.
+    if _item_filter_active:
+        total_tax = (Decimal(str(total_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        total_tax = Decimal('0.00')
+        for order in orders:
+            total_tax += order.get_tax_amount()
+    total_revenue_with_tax = total_revenue + total_tax
+    avg_order_value_with_tax = (total_revenue_with_tax / total_orders) if total_orders > 0 else 0
+    
+    # Calculate payment status counts and revenues
+    paid_orders = orders.filter(payment_status='paid')
+    paid_orders_count = paid_orders.count()
+    if _item_filter_active and _stats_items is not None:
+        paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
+    else:
+        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active:
+        paid_tax = (Decimal(str(paid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        paid_tax = Decimal('0.00')
+        for order in paid_orders:
+            paid_tax += order.get_tax_amount()
+    paid_revenue_with_tax = paid_revenue + paid_tax
+
+    unpaid_orders = orders.filter(payment_status='unpaid')
+    unpaid_orders_count = unpaid_orders.count()
+    if _item_filter_active and _stats_items is not None:
+        unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
+    else:
+        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active:
+        unpaid_tax = (Decimal(str(unpaid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        unpaid_tax = Decimal('0.00')
+        for order in unpaid_orders:
+            unpaid_tax += order.get_tax_amount()
+    unpaid_revenue_with_tax = unpaid_revenue + unpaid_tax
+
+    partial_orders = orders.filter(payment_status='partial')
+    partial_orders_count = partial_orders.count()
+    if _item_filter_active and _stats_items is not None:
+        partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
+    else:
+        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active:
+        partial_tax = (Decimal(str(partial_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        partial_tax = Decimal('0.00')
+        for order in partial_orders:
+            partial_tax += order.get_tax_amount()
+    partial_revenue_with_tax = partial_revenue + partial_tax
     
     # Calculate station-specific metrics
     kitchen_orders_count = len([o for o in orders if has_kitchen_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'kitchen' else 0)
@@ -200,13 +299,67 @@ def dashboard(request):
     service_orders_count = len([o for o in orders if has_service_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'service' else 0)
     mixed_orders_count = len([o for o in orders if sum([has_kitchen_items(o), has_bar_items(o), has_buffet_items(o), has_service_items(o)]) > 1]) if station_filter == 'all' else 0
     
+    # Top selling products analysis (moved after categories are defined — see below)
+    
+    # Get staff users for filtering - only those who can create orders
+    # Get all staff from the current restaurant context
+    if target_restaurant:
+        # Get staff for specific restaurant
+        if target_restaurant.is_main_restaurant:
+            staff_users = User.objects.filter(
+                Q(owner=target_restaurant.main_owner) |
+                Q(id=target_restaurant.main_owner_id)
+            ).filter(
+                role__name__in=['customer_care', 'cashier']
+            ).distinct().order_by('first_name', 'last_name')
+        else:
+            staff_users = User.objects.filter(
+                Q(owner=target_restaurant.branch_owner) |
+                Q(id=target_restaurant.branch_owner_id)
+            ).filter(
+                role__name__in=['customer_care', 'cashier']
+            ).distinct().order_by('first_name', 'last_name')
+    elif request.user.is_administrator():
+        # Admin sees all staff
+        staff_users = User.objects.filter(
+            role__name__in=['customer_care', 'cashier']
+        ).order_by('first_name', 'last_name')
+    else:
+        # Get staff from accessible restaurants
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        staff_query = Q()
+        for restaurant in accessible_restaurants:
+            if restaurant.main_owner:
+                staff_query |= Q(owner=restaurant.main_owner) | Q(id=restaurant.main_owner_id)
+            if restaurant.branch_owner:
+                staff_query |= Q(owner=restaurant.branch_owner) | Q(id=restaurant.branch_owner_id)
+        staff_users = User.objects.filter(staff_query).filter(
+            role__name__in=['customer_care', 'cashier']
+        ).distinct().order_by('first_name', 'last_name')
+    
     # Get orders for table with pagination
-    orders_list = orders.order_by('-created_at')
+    orders_list = orders.prefetch_related('payments__processed_by').order_by('-created_at')
     
     # Pagination
     page_number = request.GET.get('page', 1)
     paginator = Paginator(orders_list, 10)  # Show 10 orders per page
     page_obj = paginator.get_page(page_number)
+
+    # Attach per-order display total for the template rows.
+    # When a filter is active the row must show only filtered-item revenue,
+    # not order.total_amount (which is the full-order subtotal).
+    if _item_filter_active and _stats_items is not None:
+        _filtered_totals_map = {}
+        for _si in _stats_items:
+            _filtered_totals_map[_si.order_id] = (
+                _filtered_totals_map.get(_si.order_id, Decimal('0.00'))
+                + _si.quantity * _si.unit_price
+            )
+        for _o in page_obj:
+            _o.row_display_total = _filtered_totals_map.get(_o.id, Decimal('0.00'))
+    else:
+        for _o in page_obj:
+            _o.row_display_total = _o.total_amount
     
     # Get categories and subcategories for the current restaurant context
     if target_restaurant:
@@ -237,13 +390,37 @@ def dashboard(request):
             categories = MainCategory.objects.none()
     
     subcategories = SubCategory.objects.filter(main_category__in=categories)
-    
-    # Top selling products analysis — scoped to this restaurant's own product catalogue
+
+    # Build products dropdown scoped to current category/subcategory selection
+    from restaurant.models import Product as ProductModel, TableInfo as TableInfoModel
+    products_qs = ProductModel.objects.filter(
+        main_category__in=categories, is_available=True
+    ).select_related('main_category', 'sub_category').order_by('main_category__name', 'name')
+    if subcategory_id != 'all':
+        products_qs = products_qs.filter(sub_category_id=subcategory_id)
+    elif category_id != 'all':
+        products_qs = products_qs.filter(main_category_id=category_id)
+
+    # Build tables dropdown scoped to current restaurant context
+    if target_restaurant:
+        tables_qs = TableInfoModel.objects.filter(restaurant=target_restaurant).order_by('tbl_no')
+    elif request.user.is_administrator():
+        tables_qs = TableInfoModel.objects.all().select_related('restaurant').order_by('tbl_no')
+    else:
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        if accessible_restaurants.exists():
+            tables_qs = TableInfoModel.objects.filter(
+                restaurant__in=accessible_restaurants
+            ).select_related('restaurant').order_by('tbl_no')
+        else:
+            tables_qs = TableInfoModel.objects.none()
+
+    # SECURITY: scope top products to this restaurant's own categories only
     top_products = OrderItem.objects.filter(order__in=orders, product__main_category__in=categories)\
         .values('product__name', 'product__station')\
         .annotate(total_quantity=Sum('quantity'), total_revenue=Sum('unit_price'))\
         .order_by('-total_quantity')[:5]
-    
+
     # Filter subcategories by selected category if applicable
     if category_id != 'all':
         subcategories = subcategories.filter(main_category_id=category_id)
@@ -276,13 +453,14 @@ def dashboard(request):
     # SECURITY: validate against restaurant-scoped querysets
     selected_category_name = None
     selected_subcategory_name = None
+    # SECURITY: validate against restaurant-scoped querysets — prevents cross-tenant name leakage
     if category_id != 'all':
         _cat = categories.filter(id=category_id).first()
         selected_category_name = _cat.name if _cat else None
     if subcategory_id != 'all':
         _subcat = subcategories.filter(id=subcategory_id).first()
         selected_subcategory_name = _subcat.name if _subcat else None
-    
+
     # Resolve selected product and table display names
     # SECURITY: validate against restaurant-scoped querysets — prevents cross-tenant name leakage
     selected_product_name = None
@@ -305,35 +483,19 @@ def dashboard(request):
                 table_id = 'all'
         except (ValueError, Exception):
             table_id = 'all'
-    
-    # Product-level stats when a specific product is filtered
-    product_stats = None
-    if product_id != 'all':
-        from django.db.models import ExpressionWrapper, DecimalField, F
-        product_stats = OrderItem.objects.filter(
-            order__in=orders, product_id=product_id
-        ).aggregate(
-            qty_sold=Sum('quantity'),
-            total_revenue=Sum(
-                ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField())
-            ),
-        )
-        if product_stats.get('qty_sold'):
-            from decimal import Decimal
-            product_stats['avg_price'] = (
-                product_stats['total_revenue'] / Decimal(str(product_stats['qty_sold']))
-            )
-        else:
-            product_stats['avg_price'] = 0
-    
+
     # Today's date for template defaults
     today_str = timezone.now().date().strftime('%Y-%m-%d')
     
     context = {
         'total_orders': total_orders,
         'total_revenue': total_revenue,
+        'total_revenue_with_tax': total_revenue_with_tax,
+        'total_tax': total_tax,
+        'tax_rate_percentage': tax_rate_percentage,
         'total_items': total_items,
         'avg_order_value': avg_order_value,
+        'avg_order_value_with_tax': avg_order_value_with_tax,
         'page_obj': page_obj,
         'orders': page_obj,
         'payment_status': payment_status,
@@ -345,9 +507,31 @@ def dashboard(request):
         'selected_category_name': selected_category_name,
         'selected_subcategory_name': selected_subcategory_name,
         'station_filter': station_filter,  # NEW: Station filter value
+        'staff_filter': staff_filter,  # NEW: Staff filter value
+        'staff_users': staff_users,  # NEW: Staff users list
+        'paid_orders_count': paid_orders_count,
+        'paid_revenue': paid_revenue,
+        'paid_revenue_with_tax': paid_revenue_with_tax,
+        'paid_tax': paid_tax,
+        'unpaid_orders_count': unpaid_orders_count,
+        'unpaid_revenue': unpaid_revenue,
+        'unpaid_revenue_with_tax': unpaid_revenue_with_tax,
+        'unpaid_tax': unpaid_tax,
+        'partial_orders_count': partial_orders_count,
+        'partial_revenue': partial_revenue,
+        'partial_revenue_with_tax': partial_revenue_with_tax,
+        'partial_tax': partial_tax,
         'kitchen_orders_count': kitchen_orders_count,
         'bar_orders_count': bar_orders_count,
+        'buffet_orders_count': buffet_orders_count,
+        'service_orders_count': service_orders_count,
         'mixed_orders_count': mixed_orders_count,
+        'products': products_qs,
+        'tables': tables_qs,
+        'selected_product': product_id,
+        'selected_table': table_id,
+        'selected_product_name': selected_product_name,
+        'selected_table_name': selected_table_name,
         'top_products': top_products,
         'from_date': from_date,  # Default date values for template
         'to_date': to_date,
@@ -390,6 +574,7 @@ def export_csv(request):
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
     product_id = request.GET.get('product_id', 'all')
     table_id = request.GET.get('table_id', 'all')
+    staff_filter = request.GET.get('staff_filter', 'all')  # NEW: Staff filtering
     restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if custom period)
@@ -447,6 +632,12 @@ def export_csv(request):
         else:
             orders = Order.objects.none()
     
+    # Customer care sees only their own orders
+    if request.user.is_customer_care() and not (request.user.is_owner() or 
+                                                  request.user.is_main_owner() or 
+                                                  request.user.is_branch_owner()):
+        orders = orders.filter(ordered_by=request.user)
+    
     # Apply period filter
     today = timezone.now().date()
     if period == 'today':
@@ -489,6 +680,26 @@ def export_csv(request):
         orders = orders.filter(order_items__product__station='kitchen').distinct()
     elif station_filter == 'bar':
         orders = orders.filter(order_items__product__station='bar').distinct()
+    elif station_filter == 'buffet':
+        orders = orders.filter(order_items__product__station='buffet').distinct()
+    elif station_filter == 'service':
+        orders = orders.filter(order_items__product__station='service').distinct()
+    
+    # Apply staff filtering (filter by who created the order)
+    if staff_filter != 'all':
+        try:
+            staff_id = int(staff_filter)
+            orders = orders.filter(ordered_by_id=staff_id)
+        except (ValueError, TypeError):
+            pass  # Invalid staff_filter, ignore
+
+    # Apply product filter (only orders containing this specific product)
+    if product_id != 'all':
+        orders = orders.filter(order_items__product_id=product_id).distinct()
+
+    # Apply table filter (only orders from this specific table)
+    if table_id != 'all':
+        orders = orders.filter(table_info_id=table_id)
     
     # Apply product filter (only orders containing this specific product)
     if product_id != 'all':
@@ -500,24 +711,49 @@ def export_csv(request):
     
     # Calculate summary data for the export
     total_orders = orders.count()
-    # When an item-level filter is active, compute revenue/items only from matching items
     _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
     if _item_filter_active:
+        # AND-chain all active filters (same logic as dashboard) so combined filters are accurate
         _stats_items = OrderItem.objects.filter(order__in=orders)
+        if category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        if subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        if station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
         if product_id != 'all':
             _stats_items = _stats_items.filter(product_id=product_id)
-        elif category_id != 'all':
-            _stats_items = _stats_items.filter(product__main_category_id=category_id)
-        elif subcategory_id != 'all':
-            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
-        elif station_filter != 'all':
-            _stats_items = _stats_items.filter(product__station=station_filter)
         total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
         total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
     else:
         total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
         total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
+    
+    # Calculate payment status breakdown
+    paid_orders = orders.filter(payment_status='paid')
+    paid_orders_count = paid_orders.count()
+    if _item_filter_active:
+        paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
+    else:
+        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
+    unpaid_orders = orders.filter(payment_status='unpaid')
+    unpaid_orders_count = unpaid_orders.count()
+    if _item_filter_active:
+        unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
+    else:
+        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
+    partial_orders = orders.filter(payment_status='partial')
+    partial_orders_count = partial_orders.count()
+    if _item_filter_active:
+        partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
+    else:
+        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    
+    # Get currency symbol from user settings
+    currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
     
     # Determine the period description for the report
     if from_date and to_date:
@@ -540,9 +776,15 @@ def export_csv(request):
     else:
         period_desc = "All Time"
     
-    # Add station filter to period description
+    # Add filters to period description
     if station_filter != 'all':
         period_desc += f" (Station: {station_filter.title()})"
+    if staff_filter != 'all':
+        try:
+            staff_user = User.objects.get(id=int(staff_filter))
+            period_desc += f" (Staff: {staff_user.first_name} {staff_user.last_name})"
+        except (User.DoesNotExist, ValueError):
+            pass
     
     # Create CSV response
     response = HttpResponse(content_type='text/csv')
@@ -556,23 +798,28 @@ def export_csv(request):
     writer.writerow(['Period:', period_desc])
     writer.writerow(['Payment Status Filter:', payment_status.title()])
     writer.writerow(['Station Filter:', station_filter.title()])
+    if staff_filter != 'all':
+        try:
+            staff_user = User.objects.get(id=int(staff_filter))
+            writer.writerow(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
+        except (User.DoesNotExist, ValueError):
+            pass
     if target_restaurant:
         writer.writerow(['Restaurant:', target_restaurant.name])
     if category_id != 'all':
         # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
         _cat = MainCategory.objects.filter(
-            id=category_id, product__order_items__order__in=orders
+            id=category_id
         ).values('name').first()
         writer.writerow(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     if subcategory_id != 'all':
         _subcat = SubCategory.objects.filter(
-            id=subcategory_id, product__order_items__order__in=orders
+            id=subcategory_id
         ).values('name').first()
         writer.writerow(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
     if product_id != 'all':
         try:
             from restaurant.models import Product as ProductModel
-            # Validate product belongs to the accessible restaurants' catalogues
             if target_restaurant:
                 _valid_cats = MainCategory.objects.filter(
                     Q(restaurant=target_restaurant) |
@@ -587,7 +834,7 @@ def export_csv(request):
                     if _r.branch_owner: _cat_q |= Q(owner=_r.branch_owner, restaurant__isnull=True)
                 _valid_cats = MainCategory.objects.filter(_cat_q)
             else:
-                _valid_cats = None  # Admin: allow any product
+                _valid_cats = None
             _prod = (ProductModel.objects.filter(id=product_id, main_category__in=_valid_cats)
                      if _valid_cats is not None else ProductModel.objects.filter(id=product_id)).first()
             if _prod:
@@ -616,10 +863,16 @@ def export_csv(request):
     
     # Write summary statistics
     writer.writerow(['SUMMARY STATISTICS'])
-    writer.writerow(['Total Revenue:', f'{currency_sym}{total_revenue:,.2f}'])
+    writer.writerow(['Revenue:', f'{currency_symbol}{total_revenue:,.2f}'])
     writer.writerow(['Total Orders:', f'{total_orders:,}'])
     writer.writerow(['Items Sold:', f'{total_items:,}'])
-    writer.writerow(['Revenue:', f'{currency_sym}{total_revenue:,.2f}'])
+    writer.writerow([])  # Empty row
+    
+    # Write payment status breakdown
+    writer.writerow(['PAYMENT STATUS BREAKDOWN'])
+    writer.writerow(['Paid Orders:', f'{paid_orders_count:,}', f'{currency_symbol}{paid_revenue:,.2f}'])
+    writer.writerow(['Unpaid Orders:', f'{unpaid_orders_count:,}', f'{currency_symbol}{unpaid_revenue:,.2f}'])
+    writer.writerow(['Partial Payments:', f'{partial_orders_count:,}', f'{currency_symbol}{partial_revenue:,.2f}'])
     writer.writerow([])  # Empty row
     
     # Branch Performance Analysis (only when viewing all restaurants for PRO plan)
@@ -661,9 +914,9 @@ def export_csv(request):
                     location_label,
                     f'{location_order_count:,}',
                     f'{order_percentage:.1f}%',
-                    f'{currency_sym}{location_revenue:,.2f}',
+                    f'{currency_symbol}{location_revenue:,.2f}',
                     f'{revenue_percentage:.1f}%',
-                    f'{currency_sym}{location_avg:.2f}'
+                    f'{currency_symbol}{location_avg:.2f}'
                 ])
             
             writer.writerow([])  # Empty row
@@ -707,7 +960,7 @@ def export_csv(request):
                             location_label if idx == 0 else '',  # Only show location name on first row
                             product['product__name'],
                             f"{product['total_quantity']:,}",
-                            f"{currency_sym}{product['total_revenue']:,.2f}",
+                            f"{currency_symbol}{product['total_revenue']:,.2f}",
                             f"{product_percentage:.1f}%"
                         ])
                     
@@ -720,38 +973,42 @@ def export_csv(request):
     
     # Write detailed data header
     writer.writerow(['DETAILED SALES DATA'])
-    writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Cashier'])
+    writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Order By', 'Paid By'])
     
     # Get selected category/subcategory names for display
-    # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
+    # SECURITY: anchor to already-scoped orders — prevents cross-tenant name leakage
     selected_category_name = None
     selected_subcategory_name = None
     if category_id != 'all':
         _cat = MainCategory.objects.filter(
-            id=category_id, product__order_items__order__in=orders
+            id=category_id
         ).values('name').first()
         selected_category_name = _cat['name'] if _cat else None
     if subcategory_id != 'all':
         _subcat = SubCategory.objects.filter(
-            id=subcategory_id, product__order_items__order__in=orders
+            id=subcategory_id
         ).values('name').first()
         selected_subcategory_name = _subcat['name'] if _subcat else None
     
     for order in orders.order_by('-created_at'):
         all_items = list(order.order_items.all())
         
-        # Filter items for Items column based on active filter (same logic as web template)
-        # Web uses: if category -> elif subcategory -> elif station -> else all
+        # Filter items for Items column based on active filter.
+        # Priority: product (most specific) > subcategory > category > station
         filtered_items = []
-        if category_id != 'all':
-            # Filter by category
+        if product_id != 'all':
             for item in all_items:
-                if str(item.product.main_category_id) == str(category_id):
+                if str(item.product_id) == str(product_id):
                     filtered_items.append(item)
         elif subcategory_id != 'all':
             # Filter by subcategory
             for item in all_items:
                 if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
+                    filtered_items.append(item)
+        elif category_id != 'all':
+            # Filter by category
+            for item in all_items:
+                if str(item.product.main_category_id) == str(category_id):
                     filtered_items.append(item)
         elif station_filter != 'all':
             # Filter by station
@@ -790,7 +1047,17 @@ def export_csv(request):
         
         table_number = order.table_info.tbl_no if order.table_info else '-'
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
-        cashier_name = f"{order.confirmed_by.first_name} {order.confirmed_by.last_name}" if order.confirmed_by else f"{order.ordered_by.first_name} {order.ordered_by.last_name} (Self)" if order.ordered_by else 'System'
+        
+        # Order By column
+        order_by_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name} ({order.ordered_by.role.get_name_display()})" if order.ordered_by else '-'
+        
+        # Paid By column - get all payments
+        paid_by_names = []
+        if hasattr(order, 'payments'):
+            for payment in order.payments.all():
+                if not payment.is_voided and payment.processed_by:
+                    paid_by_names.append(f"{payment.processed_by.first_name} {payment.processed_by.last_name} ({payment.processed_by.role.get_name_display()})")
+        paid_by_name = ', '.join(paid_by_names) if paid_by_names else '-'
         
         # Get restaurant/branch name for this order
         order_restaurant = order.table_info.restaurant.name if order.table_info and order.table_info.restaurant else 'Legacy'
@@ -798,7 +1065,7 @@ def export_csv(request):
             order_restaurant += ' (Branch)'
         
         writer.writerow([
-            f"ORD-{order.id:08d}",
+            order.order_number,
             customer_name,
             order.created_at.strftime('%Y-%m-%d %H:%M'),
             table_number,
@@ -807,10 +1074,11 @@ def export_csv(request):
             categories_list,
             subcategories_list,
             stations_list,
-            sum(item.quantity * item.unit_price for item in filtered_items),
+            f"{currency_symbol}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
             order.payment_status,
             order.status,
-            cashier_name
+            order_by_name,
+            paid_by_name
         ])
     
     return response
@@ -841,6 +1109,7 @@ def export_pdf(request):
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
     product_id = request.GET.get('product_id', 'all')
     table_id = request.GET.get('table_id', 'all')
+    staff_filter = request.GET.get('staff_filter', 'all')  # NEW: Staff filtering
     restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if custom period)
@@ -898,6 +1167,12 @@ def export_pdf(request):
         else:
             orders = Order.objects.none()
     
+    # Customer care sees only their own orders
+    if request.user.is_customer_care() and not (request.user.is_owner() or 
+                                                  request.user.is_main_owner() or 
+                                                  request.user.is_branch_owner()):
+        orders = orders.filter(ordered_by=request.user)
+    
     # Apply period filter
     today = timezone.now().date()
     if period == 'today':
@@ -940,6 +1215,26 @@ def export_pdf(request):
         orders = orders.filter(order_items__product__station='kitchen').distinct()
     elif station_filter == 'bar':
         orders = orders.filter(order_items__product__station='bar').distinct()
+    elif station_filter == 'buffet':
+        orders = orders.filter(order_items__product__station='buffet').distinct()
+    elif station_filter == 'service':
+        orders = orders.filter(order_items__product__station='service').distinct()
+    
+    # Apply staff filtering (filter by who created the order)
+    if staff_filter != 'all':
+        try:
+            staff_id = int(staff_filter)
+            orders = orders.filter(ordered_by_id=staff_id)
+        except (ValueError, TypeError):
+            pass  # Invalid staff_filter, ignore
+
+    # Apply product filter (only orders containing this specific product)
+    if product_id != 'all':
+        orders = orders.filter(order_items__product_id=product_id).distinct()
+
+    # Apply table filter (only orders from this specific table)
+    if table_id != 'all':
+        orders = orders.filter(table_info_id=table_id)
     
     # Apply product filter (only orders containing this specific product)
     if product_id != 'all':
@@ -951,24 +1246,49 @@ def export_pdf(request):
     
     # Calculate summary data for the export
     total_orders = orders.count()
-    # When an item-level filter is active, compute revenue/items only from matching items
     _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
     if _item_filter_active:
+        # AND-chain all active filters (same logic as dashboard) so combined filters are accurate
         _stats_items = OrderItem.objects.filter(order__in=orders)
+        if category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        if subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        if station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
         if product_id != 'all':
             _stats_items = _stats_items.filter(product_id=product_id)
-        elif category_id != 'all':
-            _stats_items = _stats_items.filter(product__main_category_id=category_id)
-        elif subcategory_id != 'all':
-            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
-        elif station_filter != 'all':
-            _stats_items = _stats_items.filter(product__station=station_filter)
         total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
         total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
     else:
         total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
         total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
+    
+    # Calculate payment status breakdown
+    paid_orders = orders.filter(payment_status='paid')
+    paid_orders_count = paid_orders.count()
+    if _item_filter_active:
+        paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
+    else:
+        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
+    unpaid_orders = orders.filter(payment_status='unpaid')
+    unpaid_orders_count = unpaid_orders.count()
+    if _item_filter_active:
+        unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
+    else:
+        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
+    partial_orders = orders.filter(payment_status='partial')
+    partial_orders_count = partial_orders.count()
+    if _item_filter_active:
+        partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
+    else:
+        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    
+    # Get currency symbol from user settings
+    currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
     
     # Determine the period description for the report
     if from_date and to_date:
@@ -991,9 +1311,15 @@ def export_pdf(request):
     else:
         period_desc = "All Time"
     
-    # Add station filter to period description for PDF
+    # Add filters to period description for PDF
     if station_filter != 'all':
         period_desc += f" (Station: {station_filter.title()})"
+    if staff_filter != 'all':
+        try:
+            staff_user = User.objects.get(id=int(staff_filter))
+            period_desc += f" (Staff: {staff_user.first_name} {staff_user.last_name})"
+        except (User.DoesNotExist, ValueError):
+            pass
     
     # Create PDF response
     response = HttpResponse(content_type='application/pdf')
@@ -1039,25 +1365,31 @@ def export_pdf(request):
         ['Station Filter:', station_filter.title()],
     ]
     
+    if staff_filter != 'all':
+        try:
+            staff_user = User.objects.get(id=int(staff_filter))
+            report_info.append(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
+        except (User.DoesNotExist, ValueError):
+            pass
+    
     if target_restaurant:
         report_info.append(['Restaurant:', target_restaurant.name])
     
     if category_id != 'all':
         # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
         _cat = MainCategory.objects.filter(
-            id=category_id, product__order_items__order__in=orders
+            id=category_id
         ).values('name').first()
         report_info.append(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     
     if subcategory_id != 'all':
         _subcat = SubCategory.objects.filter(
-            id=subcategory_id, product__order_items__order__in=orders
+            id=subcategory_id
         ).values('name').first()
         report_info.append(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
     if product_id != 'all':
         try:
             from restaurant.models import Product as ProductModel
-            # Validate product belongs to the accessible restaurants' catalogues
             if target_restaurant:
                 _valid_cats = MainCategory.objects.filter(
                     Q(restaurant=target_restaurant) |
@@ -1072,7 +1404,7 @@ def export_pdf(request):
                     if _r.branch_owner: _cat_q |= Q(owner=_r.branch_owner, restaurant__isnull=True)
                 _valid_cats = MainCategory.objects.filter(_cat_q)
             else:
-                _valid_cats = None  # Admin: allow any product
+                _valid_cats = None
             _prod = (ProductModel.objects.filter(id=product_id, main_category__in=_valid_cats)
                      if _valid_cats is not None else ProductModel.objects.filter(id=product_id)).first()
             if _prod:
@@ -1117,10 +1449,9 @@ def export_pdf(request):
     elements.append(summary_heading)
     
     summary_data = [
-        ['Total Revenue:', f'{currency_sym}{total_revenue:,.2f}'],
+        ['Revenue:', f'{currency_symbol}{total_revenue:,.2f}'],
         ['Total Orders:', f'{total_orders:,}'],
         ['Items Sold:', f'{total_items:,}'],
-        ['Revenue:', f'{currency_sym}{total_revenue:,.2f}']
     ]
     
     summary_table = Table(summary_data, colWidths=[2*inch, 2*inch])
@@ -1135,6 +1466,30 @@ def export_pdf(request):
     ]))
     
     elements.append(summary_table)
+    elements.append(Spacer(1, 15))
+    
+    # Payment Status Breakdown
+    payment_heading = Paragraph("PAYMENT STATUS BREAKDOWN", heading_style)
+    elements.append(payment_heading)
+    
+    payment_data = [
+        ['Paid Orders:', f'{paid_orders_count:,}', f'{currency_symbol}{paid_revenue:,.2f}'],
+        ['Unpaid Orders:', f'{unpaid_orders_count:,}', f'{currency_symbol}{unpaid_revenue:,.2f}'],
+        ['Partial Payments:', f'{partial_orders_count:,}', f'{currency_symbol}{partial_revenue:,.2f}']
+    ]
+    
+    payment_table = Table(payment_data, colWidths=[2*inch, 1*inch, 2*inch])
+    payment_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.lightgreen),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (1, 0), (2, -1), 'RIGHT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (2, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(payment_table)
     elements.append(Spacer(1, 30))
     
     # Branch Performance Analysis (only for PRO plans with multiple locations when viewing all)
@@ -1177,9 +1532,9 @@ def export_pdf(request):
                     location_label,
                     f'{location_orders:,}',
                     f'{order_percentage:.1f}%',
-                    f'{currency_sym}{location_revenue:,.2f}',
+                    f'{currency_symbol}{location_revenue:,.2f}',
                     f'{revenue_percentage:.1f}%',
-                    f'{currency_sym}{location_avg:.2f}'
+                    f'{currency_symbol}{location_avg:.2f}'
                 ])
             
             branch_table = Table(branch_data, colWidths=[1.5*inch, 0.8*inch, 0.8*inch, 1.2*inch, 0.8*inch, 1*inch])
@@ -1272,25 +1627,29 @@ def export_pdf(request):
     elements.append(detailed_heading)
     
     # Table headers
-    headers = ['Order #', 'Date', 'Customer', 'Location', 'Items', 'Total', 'Payment', 'Status']
+    headers = ['Order #', 'Date', 'Customer', 'Location', 'Items', 'Total', 'Payment', 'Status', 'Order By', 'Paid By']
     data = [headers]
     
     # Table data
     for order in orders.order_by('-created_at'):
         all_items = list(order.order_items.all())
         
-        # Filter items for Items column based on active filter (same logic as web template)
-        # Web uses: if category -> elif subcategory -> elif station -> else all
+        # Filter items for Items column based on active filter.
+        # Priority: product (most specific) > subcategory > category > station
         filtered_items = []
-        if category_id != 'all':
-            # Filter by category
+        if product_id != 'all':
             for item in all_items:
-                if str(item.product.main_category_id) == str(category_id):
+                if str(item.product_id) == str(product_id):
                     filtered_items.append(item)
         elif subcategory_id != 'all':
             # Filter by subcategory
             for item in all_items:
                 if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
+                    filtered_items.append(item)
+        elif category_id != 'all':
+            # Filter by category
+            for item in all_items:
+                if str(item.product.main_category_id) == str(category_id):
                     filtered_items.append(item)
         elif station_filter != 'all':
             # Filter by station
@@ -1305,12 +1664,23 @@ def export_pdf(request):
         else:
             # No filter - show all items
             filtered_items = all_items
-        
+
         items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items][:3])  # Limit items for PDF
         if len(filtered_items) > 3:
             items_list += "..."
         
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in'
+        
+        # Order By column
+        order_by_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else '-'
+        
+        # Paid By column - get first payment processor
+        paid_by_name = '-'
+        if hasattr(order, 'payments'):
+            for payment in order.payments.all():
+                if not payment.is_voided and payment.processed_by:
+                    paid_by_name = f"{payment.processed_by.first_name} {payment.processed_by.last_name}"
+                    break  # Just show first one for PDF space
         
         # Get restaurant/branch name for this order
         order_restaurant = order.table_info.restaurant.name if order.table_info and order.table_info.restaurant else 'Legacy'
@@ -1318,29 +1688,34 @@ def export_pdf(request):
             order_restaurant += ' (Branch)'
         
         data.append([
-            f"ORD-{order.id:08d}",
+            order.order_number,
             order.created_at.strftime('%m/%d/%Y'),
             customer_name[:12],  # Limit length
-            order_restaurant[:15],  # Limit length
-            items_list[:20],  # Limit length
-            f"{currency_sym}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
+            order_restaurant[:12],  # Limit length
+            items_list[:15],  # Limit length
+            f"{currency_symbol}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
             order.payment_status.title(),
-            order.status.title()
+            order.status.title(),
+            order_by_name[:12],  # Limit length
+            paid_by_name[:12]  # Limit length
         ])
     
-    # Create table with adjusted column widths to accommodate Restaurant/Branch column
-    table = Table(data, colWidths=[0.8*inch, 0.7*inch, 0.8*inch, 0.9*inch, 1.5*inch, 0.7*inch, 0.7*inch, 0.7*inch])
+    # Create table with adjusted column widths to accommodate Order By and Paid By columns
+    table = Table(data, colWidths=[0.75*inch, 0.6*inch, 0.65*inch, 0.65*inch, 1.1*inch, 0.6*inch, 0.6*inch, 0.55*inch, 0.65*inch, 0.65*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('WORDWRAP', (0, 0), (-1, -1), True)
     ]))
     
     elements.append(table)
@@ -1354,3 +1729,4 @@ def export_pdf(request):
     response.write(pdf)
     
     return response
+

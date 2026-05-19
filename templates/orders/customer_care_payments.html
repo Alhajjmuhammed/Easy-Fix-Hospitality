@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'cashier_base.html' %}
 {% load static %}
 {% load restaurant_tags %}
 
@@ -91,7 +91,14 @@
         </div>
         <div class="card-body">
             <form method="GET" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label for="period" class="form-label">Period</label>
+                    <select name="period" id="period" class="form-select">
+                        <option value="today" {% if period_filter == 'today' %}selected{% endif %}>Today</option>
+                        <option value="weekly" {% if period_filter == 'weekly' %}selected{% endif %}>This Week</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label for="table" class="form-label">Table Number</label>
                     <select name="table" id="table" class="form-select">
                         <option value="">All Tables</option>
@@ -102,7 +109,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="status" class="form-label">Payment Status</label>
                     <select name="status" id="status" class="form-select">
                         <option value="">All Status</option>
@@ -111,7 +118,7 @@
                         <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
                     </select>
                 </div>
-                <div class="col-md-4 d-flex align-items-end gap-2">
+                <div class="col-md-3 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary flex-grow-1">
                         <i class="bi bi-search"></i> Filter
                     </button>
@@ -139,6 +146,7 @@
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
+                                        <th>SN</th>
                                         <th>Order #</th>
                                         <th>Table</th>
                                         <th>Items</th>
@@ -152,6 +160,7 @@
                                 <tbody>
                                     {% for order in orders %}
                                     <tr class="{% if order.payment_status == 'unpaid' %}table-danger{% elif order.payment_status == 'partial' %}table-warning{% elif order.payment_status == 'paid' %}table-success{% endif %}">
+                                        <td>{{ forloop.counter }}</td>
                                         <td>
                                             <strong>{{ order.order_number }}</strong>
                                             <br>
@@ -197,6 +206,10 @@
                                                 <button class="btn btn-success btn-sm mb-1" 
                                                         onclick="processPayment('{{ order.id }}', '{{ order.order_number }}', {{ order.balance|default:order.total_amount }})">
                                                     <i class="bi bi-cash"></i> Pay
+                                                </button>
+                                                <button class="btn btn-secondary btn-sm mb-1" 
+                                                        onclick="printBill('{{ order.id }}', '{{ order.order_number }}')">
+                                                    <i class="bi bi-receipt"></i> Print Bill
                                                 </button>
                                                 {% endif %}
                                                 <a href="{% url 'orders:order_detail' order.id %}" 
@@ -362,6 +375,34 @@ function submitPayment() {
 
 function generateReceipt(paymentId) {
     window.open(`/orders/customer-care/receipt/${paymentId}/`, '_blank');
+}
+
+function printBill(orderId, orderNumber) {
+    if (!confirm(`Print bill for Order #${orderNumber}?\n\nThe bill will be sent to the receipt printer.`)) {
+        return;
+    }
+    
+    fetch(`/cashier/print-bill/${orderId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+        } else if (data.error) {
+            alert('❌ Error: ' + data.error);
+        } else {
+            alert('❌ ' + (data.message || 'Bill print failed'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ An error occurred while printing the bill');
+    });
 }
 </script>
 {% endblock %}
