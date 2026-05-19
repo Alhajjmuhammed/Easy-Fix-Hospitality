@@ -491,6 +491,8 @@
                                 <small>
                                 {% if selected_category_name %}
                                     {{ selected_category_name }}
+                                {% elif selected_product and selected_product != 'all' %}
+                                    {% for item in order.order_items.all %}{% if item.product.id|stringformat:"s" == selected_product %}{{ item.product.main_category.name }}{% endif %}{% endfor %}
                                 {% else %}
                                     {% for item in order.order_items.all %}
                                         {{ item.product.main_category.name }}{% if not forloop.last %}, {% endif %}
@@ -502,6 +504,8 @@
                                 <small>
                                 {% if selected_subcategory_name %}
                                     {{ selected_subcategory_name }}
+                                {% elif selected_product and selected_product != 'all' %}
+                                    {% for item in order.order_items.all %}{% if item.product.id|stringformat:"s" == selected_product %}{% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% endif %}{% endfor %}
                                 {% else %}
                                     {% for item in order.order_items.all %}
                                         {% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% if not forloop.last %}, {% endif %}
