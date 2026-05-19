@@ -241,6 +241,30 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
+                    <label for="product_id" class="form-label font-weight-bold">Product</label>
+                    <select class="form-control" id="product_id" name="product_id" onchange="this.form.submit()">
+                        <option value="all" {% if selected_product == 'all' or not selected_product %}selected{% endif %}>All Products</option>
+                        {% for product in products %}
+                            <option value="{{ product.id }}" {% if selected_product == product.id|stringformat:"s" %}selected{% endif %}>
+                                {{ product.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-lg-2 col-md-4">
+                    <label for="table_id" class="form-label font-weight-bold">Table</label>
+                    <select class="form-control" id="table_id" name="table_id" onchange="this.form.submit()">
+                        <option value="all" {% if selected_table == 'all' or not selected_table %}selected{% endif %}>All Tables</option>
+                        {% for table in tables %}
+                            <option value="{{ table.id }}" {% if selected_table == table.id|stringformat:"s" %}selected{% endif %}>
+                                Table {{ table.tbl_no }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-lg-2 col-md-4">
                     <label for="station_filter" class="form-label font-weight-bold">Station</label>
                     <select class="form-control" id="station_filter" name="station_filter" onchange="this.form.submit()">
                         <option value="all" {% if station_filter == 'all' %}selected{% endif %}>All Stations</option>
@@ -278,16 +302,35 @@
                 </div>
                 
                 <div class="col-lg-12 col-md-12 d-flex align-items-end justify-content-end">
-                    <a href="{% url 'reports:export_csv' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}" class="btn btn-success me-3">
+                    <a href="{% url 'reports:export_csv' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-success me-3">
                         <i class="fas fa-download mr-2"></i>Export CSV
                     </a>
-                    <a href="{% url 'reports:export_pdf' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}" class="btn btn-danger">
+                    <a href="{% url 'reports:export_pdf' %}?payment_status={{ payment_status }}&station_filter={{ station_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-danger">
                         <i class="fas fa-file-pdf mr-2"></i>Export PDF
                     </a>
                 </div>
             </form>
         </div>
     </div>
+
+    {% if selected_product and selected_product != "all" and product_stats %}
+    <div class="card border-info shadow mb-4">
+        <div class="card-body py-2">
+            <h6 class="card-title text-info mb-2">Product Stats: {{ selected_product_name }}</h6>
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <strong>Units Sold:</strong> {{ product_stats.qty_sold|default:0 }}
+                </div>
+                <div class="col-md-4">
+                    <strong>Revenue:</strong> {% currency_symbol %}{{ product_stats.total_revenue|floatformat:2|default:"0.00" }}
+                </div>
+                <div class="col-md-4">
+                    <strong>Avg Price:</strong> {% currency_symbol %}{{ product_stats.avg_price|floatformat:2|default:"0.00" }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Orders Table -->
     <div class="card shadow mb-4">
@@ -342,7 +385,11 @@
                                 <small>
                                 {% comment %}Filter items based on active filters{% endcomment %}
                                 {% for item in order.order_items.all %}
-                                    {% if selected_category and selected_category != 'all' %}
+                                    {% if selected_product and selected_product != 'all' %}
+                                        {% if item.product.id|stringformat:"s" == selected_product %}
+                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                        {% endif %}
+                                    {% elif selected_category and selected_category != 'all' %}
                                         {% if item.product.main_category.id|stringformat:"s" == selected_category %}
                                             {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
                                         {% endif %}
@@ -473,12 +520,12 @@
                     <ul class="pagination mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page=1{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}">
+                                <a class="page-link" href="?page=1{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-double-left"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-left"></i>
                                 </a>
                             </li>
@@ -491,19 +538,19 @@
                                 </li>
                             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}">{{ num }}</a>
+                                    <a class="page-link" href="?page={{ num }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">{{ num }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
                         
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-right"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-double-right"></i>
                                 </a>
                             </li>

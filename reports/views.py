@@ -47,6 +47,8 @@ def dashboard(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Kitchen/Bar filtering
+    product_id = request.GET.get('product_id', 'all')
+    table_id = request.GET.get('table_id', 'all')
     restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if no period is being used)
@@ -59,6 +61,11 @@ def dashboard(request):
         try:
             from restaurant.models_restaurant import Restaurant
             target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            # SECURITY: validate the requesting user has access to this restaurant (IDOR prevention)
+            if not request.user.is_administrator():
+                accessible_ids = set(restaurant_context['accessible_restaurants'].values_list('id', flat=True))
+                if target_restaurant.id not in accessible_ids:
+                    target_restaurant = current_restaurant  # fall back silently
         except Restaurant.DoesNotExist:
             target_restaurant = None
     elif current_restaurant and not view_all_restaurants:
@@ -158,6 +165,14 @@ def dashboard(request):
         orders = orders.filter(order_items__product__station='service').distinct()
     # 'all' means no station filter
     
+    # Apply product filter (only orders containing this specific product)
+    if product_id != 'all':
+        orders = orders.filter(order_items__product_id=product_id).distinct()
+    
+    # Apply table filter (only orders from this specific table)
+    if table_id != 'all':
+        orders = orders.filter(table_info_id=table_id)
+    
     # Helper functions for station detection
     # Helper functions for station analysis
     def has_kitchen_items(order):
@@ -184,12 +199,6 @@ def dashboard(request):
     buffet_orders_count = len([o for o in orders if has_buffet_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'buffet' else 0)
     service_orders_count = len([o for o in orders if has_service_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'service' else 0)
     mixed_orders_count = len([o for o in orders if sum([has_kitchen_items(o), has_bar_items(o), has_buffet_items(o), has_service_items(o)]) > 1]) if station_filter == 'all' else 0
-    
-    # Top selling products analysis
-    top_products = OrderItem.objects.filter(order__in=orders)\
-        .values('product__name', 'product__station')\
-        .annotate(total_quantity=Sum('quantity'), total_revenue=Sum('unit_price'))\
-        .order_by('-total_quantity')[:5]
     
     # Get orders for table with pagination
     orders_list = orders.order_by('-created_at')
@@ -229,23 +238,93 @@ def dashboard(request):
     
     subcategories = SubCategory.objects.filter(main_category__in=categories)
     
+    # Top selling products analysis — scoped to this restaurant's own product catalogue
+    top_products = OrderItem.objects.filter(order__in=orders, product__main_category__in=categories)\
+        .values('product__name', 'product__station')\
+        .annotate(total_quantity=Sum('quantity'), total_revenue=Sum('unit_price'))\
+        .order_by('-total_quantity')[:5]
+    
     # Filter subcategories by selected category if applicable
     if category_id != 'all':
         subcategories = subcategories.filter(main_category_id=category_id)
     
+    # Build products dropdown scoped to current category/subcategory selection
+    from restaurant.models import Product as ProductModel, TableInfo as TableInfoModel
+    products_qs = ProductModel.objects.filter(
+        main_category__in=categories, is_available=True
+    ).select_related('main_category', 'sub_category').order_by('main_category__name', 'name')
+    if subcategory_id != 'all':
+        products_qs = products_qs.filter(sub_category_id=subcategory_id)
+    elif category_id != 'all':
+        products_qs = products_qs.filter(main_category_id=category_id)
+    
+    # Build tables dropdown scoped to current restaurant context
+    if target_restaurant:
+        tables_qs = TableInfoModel.objects.filter(restaurant=target_restaurant).order_by('tbl_no')
+    elif request.user.is_administrator():
+        tables_qs = TableInfoModel.objects.all().select_related('restaurant').order_by('tbl_no')
+    else:
+        accessible_restaurants = restaurant_context['accessible_restaurants']
+        if accessible_restaurants.exists():
+            tables_qs = TableInfoModel.objects.filter(
+                restaurant__in=accessible_restaurants
+            ).select_related('restaurant').order_by('tbl_no')
+        else:
+            tables_qs = TableInfoModel.objects.none()
+    
     # Get selected category/subcategory names for template display
+    # SECURITY: validate against restaurant-scoped querysets
     selected_category_name = None
     selected_subcategory_name = None
     if category_id != 'all':
-        try:
-            selected_category_name = MainCategory.objects.get(id=category_id).name
-        except MainCategory.DoesNotExist:
-            pass
+        _cat = categories.filter(id=category_id).first()
+        selected_category_name = _cat.name if _cat else None
     if subcategory_id != 'all':
+        _subcat = subcategories.filter(id=subcategory_id).first()
+        selected_subcategory_name = _subcat.name if _subcat else None
+    
+    # Resolve selected product and table display names
+    # SECURITY: validate against restaurant-scoped querysets — prevents cross-tenant name leakage
+    selected_product_name = None
+    selected_table_name = None
+    if product_id != 'all':
         try:
-            selected_subcategory_name = SubCategory.objects.get(id=subcategory_id).name
-        except SubCategory.DoesNotExist:
-            pass
+            _prod = ProductModel.objects.filter(id=product_id, main_category__in=categories).first()
+            if _prod:
+                selected_product_name = _prod.name
+            else:
+                product_id = 'all'
+        except (ValueError, Exception):
+            product_id = 'all'
+    if table_id != 'all':
+        try:
+            _tbl = tables_qs.filter(id=table_id).first()
+            if _tbl:
+                selected_table_name = _tbl.tbl_no
+            else:
+                table_id = 'all'
+        except (ValueError, Exception):
+            table_id = 'all'
+    
+    # Product-level stats when a specific product is filtered
+    product_stats = None
+    if product_id != 'all':
+        from django.db.models import ExpressionWrapper, DecimalField, F
+        product_stats = OrderItem.objects.filter(
+            order__in=orders, product_id=product_id
+        ).aggregate(
+            qty_sold=Sum('quantity'),
+            total_revenue=Sum(
+                ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField())
+            ),
+        )
+        if product_stats.get('qty_sold'):
+            from decimal import Decimal
+            product_stats['avg_price'] = (
+                product_stats['total_revenue'] / Decimal(str(product_stats['qty_sold']))
+            )
+        else:
+            product_stats['avg_price'] = 0
     
     # Today's date for template defaults
     today_str = timezone.now().date().strftime('%Y-%m-%d')
@@ -273,6 +352,13 @@ def dashboard(request):
         'from_date': from_date,  # Default date values for template
         'to_date': to_date,
         'today': today_str,  # Today's date for reference
+        'products': products_qs,
+        'tables': tables_qs,
+        'selected_product': product_id,
+        'selected_table': table_id,
+        'selected_product_name': selected_product_name,
+        'selected_table_name': selected_table_name,
+        'product_stats': product_stats,
         **restaurant_context,  # Include restaurant context for filters
     }
     
@@ -292,12 +378,18 @@ def export_csv(request):
     current_restaurant = restaurant_context['current_restaurant']
     view_all_restaurants = restaurant_context['view_all_restaurants']
     
+    # Get currency symbol for this user/restaurant
+    from accounts.templatetags.restaurant_tags import get_user_currency_info
+    _, currency_sym = get_user_currency_info(request.user, request)
+    
     # Get same filters as dashboard
     payment_status = request.GET.get('payment_status', 'all')
     period = request.GET.get('period', 'today')  # Default to 'today' same as dashboard
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
+    product_id = request.GET.get('product_id', 'all')
+    table_id = request.GET.get('table_id', 'all')
     restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if custom period)
@@ -310,6 +402,11 @@ def export_csv(request):
         try:
             from restaurant.models_restaurant import Restaurant
             target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            # SECURITY: validate the requesting user has access to this restaurant (IDOR prevention)
+            if not request.user.is_administrator():
+                accessible_ids = set(restaurant_context['accessible_restaurants'].values_list('id', flat=True))
+                if target_restaurant.id not in accessible_ids:
+                    target_restaurant = current_restaurant  # fall back silently
         except Restaurant.DoesNotExist:
             target_restaurant = None
     elif current_restaurant and not view_all_restaurants:
@@ -393,10 +490,33 @@ def export_csv(request):
     elif station_filter == 'bar':
         orders = orders.filter(order_items__product__station='bar').distinct()
     
+    # Apply product filter (only orders containing this specific product)
+    if product_id != 'all':
+        orders = orders.filter(order_items__product_id=product_id).distinct()
+    
+    # Apply table filter (only orders from this specific table)
+    if table_id != 'all':
+        orders = orders.filter(table_info_id=table_id)
+    
     # Calculate summary data for the export
     total_orders = orders.count()
-    total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
+    # When an item-level filter is active, compute revenue/items only from matching items
+    _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
+    if _item_filter_active:
+        _stats_items = OrderItem.objects.filter(order__in=orders)
+        if product_id != 'all':
+            _stats_items = _stats_items.filter(product_id=product_id)
+        elif category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        elif subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        elif station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
+        total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
+        total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
+    else:
+        total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
     
     # Determine the period description for the report
@@ -439,25 +559,67 @@ def export_csv(request):
     if target_restaurant:
         writer.writerow(['Restaurant:', target_restaurant.name])
     if category_id != 'all':
-        try:
-            category_name = MainCategory.objects.get(id=category_id).name
-            writer.writerow(['Category Filter:', category_name])
-        except (MainCategory.DoesNotExist, ValueError):
-            writer.writerow(['Category Filter:', f'Category ID {category_id}'])
+        # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
+        _cat = MainCategory.objects.filter(
+            id=category_id, product__order_items__order__in=orders
+        ).values('name').first()
+        writer.writerow(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     if subcategory_id != 'all':
+        _subcat = SubCategory.objects.filter(
+            id=subcategory_id, product__order_items__order__in=orders
+        ).values('name').first()
+        writer.writerow(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
+    if product_id != 'all':
         try:
-            subcategory_name = SubCategory.objects.get(id=subcategory_id).name
-            writer.writerow(['Sub Category Filter:', subcategory_name])
-        except (SubCategory.DoesNotExist, ValueError):
-            writer.writerow(['Sub Category Filter:', f'Sub Category ID {subcategory_id}'])
+            from restaurant.models import Product as ProductModel
+            # Validate product belongs to the accessible restaurants' catalogues
+            if target_restaurant:
+                _valid_cats = MainCategory.objects.filter(
+                    Q(restaurant=target_restaurant) |
+                    Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
+                )
+            elif not request.user.is_administrator():
+                _accessible = restaurant_context['accessible_restaurants']
+                _cat_q = Q()
+                for _r in _accessible:
+                    _cat_q |= Q(restaurant=_r)
+                    if _r.main_owner: _cat_q |= Q(owner=_r.main_owner, restaurant__isnull=True)
+                    if _r.branch_owner: _cat_q |= Q(owner=_r.branch_owner, restaurant__isnull=True)
+                _valid_cats = MainCategory.objects.filter(_cat_q)
+            else:
+                _valid_cats = None  # Admin: allow any product
+            _prod = (ProductModel.objects.filter(id=product_id, main_category__in=_valid_cats)
+                     if _valid_cats is not None else ProductModel.objects.filter(id=product_id)).first()
+            if _prod:
+                writer.writerow(['Product Filter:', _prod.name])
+            else:
+                writer.writerow(['Product Filter:', f'Product ID {product_id}'])
+        except Exception:
+            writer.writerow(['Product Filter:', f'Product ID {product_id}'])
+    if table_id != 'all':
+        try:
+            from restaurant.models import TableInfo as TableInfoModel
+            if target_restaurant:
+                _tbl = TableInfoModel.objects.filter(id=table_id, restaurant=target_restaurant).first()
+            elif not request.user.is_administrator():
+                _accessible = restaurant_context['accessible_restaurants']
+                _tbl = TableInfoModel.objects.filter(id=table_id, restaurant__in=_accessible).first()
+            else:
+                _tbl = TableInfoModel.objects.filter(id=table_id).first()
+            if _tbl:
+                writer.writerow(['Table Filter:', f'Table {_tbl.tbl_no}'])
+            else:
+                writer.writerow(['Table Filter:', f'Table ID {table_id}'])
+        except Exception:
+            writer.writerow(['Table Filter:', f'Table ID {table_id}'])
     writer.writerow([])  # Empty row
     
     # Write summary statistics
     writer.writerow(['SUMMARY STATISTICS'])
-    writer.writerow(['Total Revenue:', f'${total_revenue:,.2f}'])
+    writer.writerow(['Total Revenue:', f'{currency_sym}{total_revenue:,.2f}'])
     writer.writerow(['Total Orders:', f'{total_orders:,}'])
     writer.writerow(['Items Sold:', f'{total_items:,}'])
-    writer.writerow(['Average Order Value:', f'${avg_order_value:,.2f}'])
+    writer.writerow(['Revenue:', f'{currency_sym}{total_revenue:,.2f}'])
     writer.writerow([])  # Empty row
     
     # Branch Performance Analysis (only when viewing all restaurants for PRO plan)
@@ -499,9 +661,9 @@ def export_csv(request):
                     location_label,
                     f'{location_order_count:,}',
                     f'{order_percentage:.1f}%',
-                    f'${location_revenue:,.2f}',
+                    f'{currency_sym}{location_revenue:,.2f}',
                     f'{revenue_percentage:.1f}%',
-                    f'${location_avg:.2f}'
+                    f'{currency_sym}{location_avg:.2f}'
                 ])
             
             writer.writerow([])  # Empty row
@@ -545,7 +707,7 @@ def export_csv(request):
                             location_label if idx == 0 else '',  # Only show location name on first row
                             product['product__name'],
                             f"{product['total_quantity']:,}",
-                            f"${product['total_revenue']:,.2f}",
+                            f"{currency_sym}{product['total_revenue']:,.2f}",
                             f"{product_percentage:.1f}%"
                         ])
                     
@@ -560,19 +722,20 @@ def export_csv(request):
     writer.writerow(['DETAILED SALES DATA'])
     writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Cashier'])
     
-    # Get selected category/subcategory names for display (same as web)
+    # Get selected category/subcategory names for display
+    # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
     selected_category_name = None
     selected_subcategory_name = None
     if category_id != 'all':
-        try:
-            selected_category_name = MainCategory.objects.get(id=category_id).name
-        except (MainCategory.DoesNotExist, ValueError):
-            pass
+        _cat = MainCategory.objects.filter(
+            id=category_id, product__order_items__order__in=orders
+        ).values('name').first()
+        selected_category_name = _cat['name'] if _cat else None
     if subcategory_id != 'all':
-        try:
-            selected_subcategory_name = SubCategory.objects.get(id=subcategory_id).name
-        except (SubCategory.DoesNotExist, ValueError):
-            pass
+        _subcat = SubCategory.objects.filter(
+            id=subcategory_id, product__order_items__order__in=orders
+        ).values('name').first()
+        selected_subcategory_name = _subcat['name'] if _subcat else None
     
     for order in orders.order_by('-created_at'):
         all_items = list(order.order_items.all())
@@ -595,6 +758,11 @@ def export_csv(request):
             for item in all_items:
                 if item.product.station == station_filter:
                     filtered_items.append(item)
+        elif product_id != 'all':
+            # Filter by specific product
+            for item in all_items:
+                if str(item.product_id) == str(product_id):
+                    filtered_items.append(item)
         else:
             # No filter - show all items
             filtered_items = all_items
@@ -602,23 +770,23 @@ def export_csv(request):
         # Items column: shows filtered items
         items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items])
         
-        # Categories column: if filter active show filter name, else show ALL categories from ALL items
+        # Categories column: use filtered_items so product/subcategory/station filters are respected
         if selected_category_name:
             categories_list = selected_category_name
         else:
-            categories_list = ', '.join(set([item.product.main_category.name for item in all_items])) if all_items else ''
+            categories_list = ', '.join(set([item.product.main_category.name for item in filtered_items])) if filtered_items else ''
         
-        # SubCategories column: if filter active show filter name, else show ALL subcategories from ALL items
+        # SubCategories column: use filtered_items so product/subcategory/station filters are respected
         if selected_subcategory_name:
             subcategories_list = selected_subcategory_name
         else:
-            subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in all_items])) if all_items else ''
+            subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in filtered_items])) if filtered_items else ''
         
-        # Stations column: if filter active show filter name, else show ALL stations from ALL items
+        # Stations column: use filtered_items so product/category/subcategory filters are respected
         if station_filter != 'all':
             stations_list = station_filter.title()
         else:
-            stations_list = ', '.join(set([item.product.station.title() for item in all_items])) if all_items else ''
+            stations_list = ', '.join(set([item.product.station.title() for item in filtered_items])) if filtered_items else ''
         
         table_number = order.table_info.tbl_no if order.table_info else '-'
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
@@ -639,7 +807,7 @@ def export_csv(request):
             categories_list,
             subcategories_list,
             stations_list,
-            order.total_amount,
+            sum(item.quantity * item.unit_price for item in filtered_items),
             order.payment_status,
             order.status,
             cashier_name
@@ -661,12 +829,18 @@ def export_pdf(request):
     current_restaurant = restaurant_context['current_restaurant']
     view_all_restaurants = restaurant_context['view_all_restaurants']
     
+    # Get currency symbol for this user/restaurant
+    from accounts.templatetags.restaurant_tags import get_user_currency_info
+    _, currency_sym = get_user_currency_info(request.user, request)
+    
     # Get same filters as dashboard
     payment_status = request.GET.get('payment_status', 'all')
     period = request.GET.get('period', 'today')  # Default to 'today' same as dashboard
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
+    product_id = request.GET.get('product_id', 'all')
+    table_id = request.GET.get('table_id', 'all')
     restaurant_filter = request.GET.get('restaurant', '').strip()
     
     # Get date filters (only use if custom period)
@@ -679,6 +853,11 @@ def export_pdf(request):
         try:
             from restaurant.models_restaurant import Restaurant
             target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            # SECURITY: validate the requesting user has access to this restaurant (IDOR prevention)
+            if not request.user.is_administrator():
+                accessible_ids = set(restaurant_context['accessible_restaurants'].values_list('id', flat=True))
+                if target_restaurant.id not in accessible_ids:
+                    target_restaurant = current_restaurant  # fall back silently
         except Restaurant.DoesNotExist:
             target_restaurant = None
     elif current_restaurant and not view_all_restaurants:
@@ -762,10 +941,33 @@ def export_pdf(request):
     elif station_filter == 'bar':
         orders = orders.filter(order_items__product__station='bar').distinct()
     
+    # Apply product filter (only orders containing this specific product)
+    if product_id != 'all':
+        orders = orders.filter(order_items__product_id=product_id).distinct()
+    
+    # Apply table filter (only orders from this specific table)
+    if table_id != 'all':
+        orders = orders.filter(table_info_id=table_id)
+    
     # Calculate summary data for the export
     total_orders = orders.count()
-    total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
+    # When an item-level filter is active, compute revenue/items only from matching items
+    _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
+    if _item_filter_active:
+        _stats_items = OrderItem.objects.filter(order__in=orders)
+        if product_id != 'all':
+            _stats_items = _stats_items.filter(product_id=product_id)
+        elif category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        elif subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        elif station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
+        total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
+        total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
+    else:
+        total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
     
     # Determine the period description for the report
@@ -841,18 +1043,60 @@ def export_pdf(request):
         report_info.append(['Restaurant:', target_restaurant.name])
     
     if category_id != 'all':
-        try:
-            category_name = MainCategory.objects.get(id=category_id).name
-            report_info.append(['Category Filter:', category_name])
-        except (MainCategory.DoesNotExist, ValueError):
-            report_info.append(['Category Filter:', f'Category ID {category_id}'])
+        # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
+        _cat = MainCategory.objects.filter(
+            id=category_id, product__order_items__order__in=orders
+        ).values('name').first()
+        report_info.append(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     
     if subcategory_id != 'all':
+        _subcat = SubCategory.objects.filter(
+            id=subcategory_id, product__order_items__order__in=orders
+        ).values('name').first()
+        report_info.append(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
+    if product_id != 'all':
         try:
-            subcategory_name = SubCategory.objects.get(id=subcategory_id).name
-            report_info.append(['Sub Category Filter:', subcategory_name])
-        except (SubCategory.DoesNotExist, ValueError):
-            report_info.append(['Sub Category Filter:', f'Sub Category ID {subcategory_id}'])
+            from restaurant.models import Product as ProductModel
+            # Validate product belongs to the accessible restaurants' catalogues
+            if target_restaurant:
+                _valid_cats = MainCategory.objects.filter(
+                    Q(restaurant=target_restaurant) |
+                    Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
+                )
+            elif not request.user.is_administrator():
+                _accessible = restaurant_context['accessible_restaurants']
+                _cat_q = Q()
+                for _r in _accessible:
+                    _cat_q |= Q(restaurant=_r)
+                    if _r.main_owner: _cat_q |= Q(owner=_r.main_owner, restaurant__isnull=True)
+                    if _r.branch_owner: _cat_q |= Q(owner=_r.branch_owner, restaurant__isnull=True)
+                _valid_cats = MainCategory.objects.filter(_cat_q)
+            else:
+                _valid_cats = None  # Admin: allow any product
+            _prod = (ProductModel.objects.filter(id=product_id, main_category__in=_valid_cats)
+                     if _valid_cats is not None else ProductModel.objects.filter(id=product_id)).first()
+            if _prod:
+                report_info.append(['Product Filter:', _prod.name])
+            else:
+                report_info.append(['Product Filter:', f'Product ID {product_id}'])
+        except Exception:
+            report_info.append(['Product Filter:', f'Product ID {product_id}'])
+    if table_id != 'all':
+        try:
+            from restaurant.models import TableInfo as TableInfoModel
+            if target_restaurant:
+                _tbl = TableInfoModel.objects.filter(id=table_id, restaurant=target_restaurant).first()
+            elif not request.user.is_administrator():
+                _accessible = restaurant_context['accessible_restaurants']
+                _tbl = TableInfoModel.objects.filter(id=table_id, restaurant__in=_accessible).first()
+            else:
+                _tbl = TableInfoModel.objects.filter(id=table_id).first()
+            if _tbl:
+                report_info.append(['Table Filter:', f'Table {_tbl.tbl_no}'])
+            else:
+                report_info.append(['Table Filter:', f'Table ID {table_id}'])
+        except Exception:
+            report_info.append(['Table Filter:', f'Table ID {table_id}'])
     
     info_table = Table(report_info, colWidths=[2*inch, 4*inch])
     info_table.setStyle(TableStyle([
@@ -873,10 +1117,10 @@ def export_pdf(request):
     elements.append(summary_heading)
     
     summary_data = [
-        ['Total Revenue:', f'${total_revenue:,.2f}'],
+        ['Total Revenue:', f'{currency_sym}{total_revenue:,.2f}'],
         ['Total Orders:', f'{total_orders:,}'],
         ['Items Sold:', f'{total_items:,}'],
-        ['Average Order Value:', f'${avg_order_value:,.2f}']
+        ['Revenue:', f'{currency_sym}{total_revenue:,.2f}']
     ]
     
     summary_table = Table(summary_data, colWidths=[2*inch, 2*inch])
@@ -933,9 +1177,9 @@ def export_pdf(request):
                     location_label,
                     f'{location_orders:,}',
                     f'{order_percentage:.1f}%',
-                    f'${location_revenue:,.2f}',
+                    f'{currency_sym}{location_revenue:,.2f}',
                     f'{revenue_percentage:.1f}%',
-                    f'${location_avg:.2f}'
+                    f'{currency_sym}{location_avg:.2f}'
                 ])
             
             branch_table = Table(branch_data, colWidths=[1.5*inch, 0.8*inch, 0.8*inch, 1.2*inch, 0.8*inch, 1*inch])
@@ -997,7 +1241,7 @@ def export_pdf(request):
                             location_label if idx == 0 else '',  # Only show location name on first row
                             product['product__name'][:20],  # Limit product name length
                             f"{product['total_quantity']:,}",
-                            f"${product['total_revenue']:,.2f}",
+                            f"{currency_sym}{product['total_revenue']:,.2f}",
                             f"{product_percentage:.1f}%"
                         ])
                     
@@ -1053,6 +1297,11 @@ def export_pdf(request):
             for item in all_items:
                 if item.product.station == station_filter:
                     filtered_items.append(item)
+        elif product_id != 'all':
+            # Filter by specific product
+            for item in all_items:
+                if str(item.product_id) == str(product_id):
+                    filtered_items.append(item)
         else:
             # No filter - show all items
             filtered_items = all_items
@@ -1074,7 +1323,7 @@ def export_pdf(request):
             customer_name[:12],  # Limit length
             order_restaurant[:15],  # Limit length
             items_list[:20],  # Limit length
-            f"${order.total_amount:.2f}",
+            f"{currency_sym}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
             order.payment_status.title(),
             order.status.title()
         ])
