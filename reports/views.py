@@ -689,15 +689,24 @@ def export_csv(request):
     # Calculate payment status breakdown
     paid_orders = orders.filter(payment_status='paid')
     paid_orders_count = paid_orders.count()
-    paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    
+    if _item_filter_active:
+        paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
+    else:
+        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
-    unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    
+    if _item_filter_active:
+        unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
+    else:
+        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
-    partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active:
+        partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
+    else:
+        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     
     # Get currency symbol from user settings
     currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
@@ -1198,15 +1207,24 @@ def export_pdf(request):
     # Calculate payment status breakdown
     paid_orders = orders.filter(payment_status='paid')
     paid_orders_count = paid_orders.count()
-    paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    
+    if _item_filter_active:
+        paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
+    else:
+        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
-    unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    
+    if _item_filter_active:
+        unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
+    else:
+        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
-    partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active:
+        partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
+    else:
+        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     
     # Get currency symbol from user settings
     currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
