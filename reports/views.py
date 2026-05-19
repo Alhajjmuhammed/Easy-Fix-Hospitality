@@ -224,15 +224,9 @@ def dashboard(request):
         total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
     
-    # Calculate tax amounts for all orders
     from decimal import Decimal
-    total_tax = Decimal('0.00')
-    for order in orders:
-        total_tax += order.get_tax_amount()
-    total_revenue_with_tax = total_revenue + total_tax
-    avg_order_value_with_tax = (total_revenue_with_tax / total_orders) if total_orders > 0 else 0
-    
-    # Get tax rate for display (from first order or user setting)
+
+    # Get tax rate for display (must come before any tax calculation)
     tax_rate_percentage = 0
     if orders.exists():
         first_order = orders.first()
@@ -241,6 +235,19 @@ def dashboard(request):
         tax_rate_percentage = float(target_restaurant.tax_rate * 100)
     elif request.user.tax_rate:
         tax_rate_percentage = float(request.user.tax_rate * 100)
+    _tax_rate_decimal = Decimal(str(tax_rate_percentage)) / Decimal('100')
+
+    # Calculate tax on the correct revenue base.
+    # When a filter is active, tax must be on filtered items revenue only —
+    # calling order.get_tax_amount() would use the full order subtotal and give wrong figures.
+    if _item_filter_active:
+        total_tax = (Decimal(str(total_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        total_tax = Decimal('0.00')
+        for order in orders:
+            total_tax += order.get_tax_amount()
+    total_revenue_with_tax = total_revenue + total_tax
+    avg_order_value_with_tax = (total_revenue_with_tax / total_orders) if total_orders > 0 else 0
     
     # Calculate payment status counts and revenues
     paid_orders = orders.filter(payment_status='paid')
@@ -249,31 +256,40 @@ def dashboard(request):
         paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
     else:
         paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    paid_tax = Decimal('0.00')
-    for order in paid_orders:
-        paid_tax += order.get_tax_amount()
+    if _item_filter_active:
+        paid_tax = (Decimal(str(paid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        paid_tax = Decimal('0.00')
+        for order in paid_orders:
+            paid_tax += order.get_tax_amount()
     paid_revenue_with_tax = paid_revenue + paid_tax
-    
+
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
     if _item_filter_active and _stats_items is not None:
         unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
     else:
         unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    unpaid_tax = Decimal('0.00')
-    for order in unpaid_orders:
-        unpaid_tax += order.get_tax_amount()
+    if _item_filter_active:
+        unpaid_tax = (Decimal(str(unpaid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        unpaid_tax = Decimal('0.00')
+        for order in unpaid_orders:
+            unpaid_tax += order.get_tax_amount()
     unpaid_revenue_with_tax = unpaid_revenue + unpaid_tax
-    
+
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
     if _item_filter_active and _stats_items is not None:
         partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
     else:
         partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    partial_tax = Decimal('0.00')
-    for order in partial_orders:
-        partial_tax += order.get_tax_amount()
+    if _item_filter_active:
+        partial_tax = (Decimal(str(partial_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+    else:
+        partial_tax = Decimal('0.00')
+        for order in partial_orders:
+            partial_tax += order.get_tax_amount()
     partial_revenue_with_tax = partial_revenue + partial_tax
     
     # Calculate station-specific metrics
@@ -328,6 +344,22 @@ def dashboard(request):
     page_number = request.GET.get('page', 1)
     paginator = Paginator(orders_list, 10)  # Show 10 orders per page
     page_obj = paginator.get_page(page_number)
+
+    # Attach per-order display total for the template rows.
+    # When a filter is active the row must show only filtered-item revenue,
+    # not order.total_amount (which is the full-order subtotal).
+    if _item_filter_active and _stats_items is not None:
+        _filtered_totals_map = {}
+        for _si in _stats_items:
+            _filtered_totals_map[_si.order_id] = (
+                _filtered_totals_map.get(_si.order_id, Decimal('0.00'))
+                + _si.quantity * _si.unit_price
+            )
+        for _o in page_obj:
+            _o.row_display_total = _filtered_totals_map.get(_o.id, Decimal('0.00'))
+    else:
+        for _o in page_obj:
+            _o.row_display_total = _o.total_amount
     
     # Get categories and subcategories for the current restaurant context
     if target_restaurant:

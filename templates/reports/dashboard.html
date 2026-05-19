@@ -545,7 +545,7 @@
                                     {% endwith %}
                                 {% endif %}
                             </td>
-                            <td class="font-weight-bold">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</td>
+                            <td class="font-weight-bold">{% currency_symbol %}{{ order.row_display_total|floatformat:2 }}</td>
                             <td class="text-center">
                                 {% if order.payment_status == 'paid' %}
                                     <span class="badge" style="color: white; background-color: #28a745; font-weight: bold;">Paid</span>
