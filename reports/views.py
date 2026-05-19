@@ -765,12 +765,12 @@ def export_csv(request):
     if category_id != 'all':
         # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
         _cat = MainCategory.objects.filter(
-            id=category_id, product__order_items__order__in=orders
+            id=category_id, products__order_items__order__in=orders
         ).values('name').first()
         writer.writerow(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     if subcategory_id != 'all':
         _subcat = SubCategory.objects.filter(
-            id=subcategory_id, product__order_items__order__in=orders
+            id=subcategory_id, products__order_items__order__in=orders
         ).values('name').first()
         writer.writerow(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
     if product_id != 'all':
@@ -937,12 +937,12 @@ def export_csv(request):
     selected_subcategory_name = None
     if category_id != 'all':
         _cat = MainCategory.objects.filter(
-            id=category_id, product__order_items__order__in=orders
+            id=category_id, products__order_items__order__in=orders
         ).values('name').first()
         selected_category_name = _cat['name'] if _cat else None
     if subcategory_id != 'all':
         _subcat = SubCategory.objects.filter(
-            id=subcategory_id, product__order_items__order__in=orders
+            id=subcategory_id, products__order_items__order__in=orders
         ).values('name').first()
         selected_subcategory_name = _subcat['name'] if _subcat else None
     
@@ -1317,13 +1317,13 @@ def export_pdf(request):
     if category_id != 'all':
         # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
         _cat = MainCategory.objects.filter(
-            id=category_id, product__order_items__order__in=orders
+            id=category_id, products__order_items__order__in=orders
         ).values('name').first()
         report_info.append(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     
     if subcategory_id != 'all':
         _subcat = SubCategory.objects.filter(
-            id=subcategory_id, product__order_items__order__in=orders
+            id=subcategory_id, products__order_items__order__in=orders
         ).values('name').first()
         report_info.append(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
     if product_id != 'all':
