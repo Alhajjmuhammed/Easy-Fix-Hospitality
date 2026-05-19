@@ -669,15 +669,16 @@ def export_csv(request):
     total_orders = orders.count()
     _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
     if _item_filter_active:
+        # AND-chain all active filters (same logic as dashboard) so combined filters are accurate
         _stats_items = OrderItem.objects.filter(order__in=orders)
+        if category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        if subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        if station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
         if product_id != 'all':
             _stats_items = _stats_items.filter(product_id=product_id)
-        elif category_id != 'all':
-            _stats_items = _stats_items.filter(product__main_category_id=category_id)
-        elif subcategory_id != 'all':
-            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
-        elif station_filter != 'all':
-            _stats_items = _stats_items.filter(product__station=station_filter)
         total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
         total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
     else:
@@ -1177,15 +1178,16 @@ def export_pdf(request):
     total_orders = orders.count()
     _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
     if _item_filter_active:
+        # AND-chain all active filters (same logic as dashboard) so combined filters are accurate
         _stats_items = OrderItem.objects.filter(order__in=orders)
+        if category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        if subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        if station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
         if product_id != 'all':
             _stats_items = _stats_items.filter(product_id=product_id)
-        elif category_id != 'all':
-            _stats_items = _stats_items.filter(product__main_category_id=category_id)
-        elif subcategory_id != 'all':
-            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
-        elif station_filter != 'all':
-            _stats_items = _stats_items.filter(product__station=station_filter)
         total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
         total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
     else:
