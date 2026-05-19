@@ -939,28 +939,27 @@ def export_csv(request):
     for order in orders.order_by('-created_at'):
         all_items = list(order.order_items.all())
         
-        # Filter items for Items column based on active filter (same logic as web template)
-        # Web uses: if category -> elif subcategory -> elif station -> else all
+        # Filter items for Items column based on active filter.
+        # Priority: product (most specific) > subcategory > category > station
         filtered_items = []
-        if category_id != 'all':
-            # Filter by category
+        if product_id != 'all':
             for item in all_items:
-                if str(item.product.main_category_id) == str(category_id):
+                if str(item.product_id) == str(product_id):
                     filtered_items.append(item)
         elif subcategory_id != 'all':
             # Filter by subcategory
             for item in all_items:
                 if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
                     filtered_items.append(item)
+        elif category_id != 'all':
+            # Filter by category
+            for item in all_items:
+                if str(item.product.main_category_id) == str(category_id):
+                    filtered_items.append(item)
         elif station_filter != 'all':
             # Filter by station
             for item in all_items:
                 if item.product.station == station_filter:
-                    filtered_items.append(item)
-        elif product_id != 'all':
-            # Filter by specific product
-            for item in all_items:
-                if str(item.product_id) == str(product_id):
                     filtered_items.append(item)
         else:
             # No filter - show all items
@@ -1554,33 +1553,32 @@ def export_pdf(request):
     for order in orders.order_by('-created_at'):
         all_items = list(order.order_items.all())
         
-        # Filter items for Items column based on active filter (same logic as web template)
-        # Web uses: if category -> elif subcategory -> elif station -> else all
+        # Filter items for Items column based on active filter.
+        # Priority: product (most specific) > subcategory > category > station
         filtered_items = []
-        if category_id != 'all':
-            # Filter by category
+        if product_id != 'all':
             for item in all_items:
-                if str(item.product.main_category_id) == str(category_id):
+                if str(item.product_id) == str(product_id):
                     filtered_items.append(item)
         elif subcategory_id != 'all':
             # Filter by subcategory
             for item in all_items:
                 if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
                     filtered_items.append(item)
+        elif category_id != 'all':
+            # Filter by category
+            for item in all_items:
+                if str(item.product.main_category_id) == str(category_id):
+                    filtered_items.append(item)
         elif station_filter != 'all':
             # Filter by station
             for item in all_items:
                 if item.product.station == station_filter:
                     filtered_items.append(item)
-        elif product_id != 'all':
-            # Filter by specific product
-            for item in all_items:
-                if str(item.product_id) == str(product_id):
-                    filtered_items.append(item)
         else:
             # No filter - show all items
             filtered_items = all_items
-        
+
         items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items][:3])  # Limit items for PDF
         if len(filtered_items) > 3:
             items_list += "..."
