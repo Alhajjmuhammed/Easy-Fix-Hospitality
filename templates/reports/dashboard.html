@@ -477,6 +477,10 @@
                                         {% if item.product.station == station_filter %}
                                             {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
                                         {% endif %}
+                                    {% elif selected_product and selected_product != 'all' %}
+                                        {% if item.product.id|stringformat:"s" == selected_product %}
+                                            {{ item.product.name }} x{{ item.quantity }}
+                                        {% endif %}
                                     {% else %}
                                         {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
                                     {% endif %}

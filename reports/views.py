@@ -205,8 +205,23 @@ def dashboard(request):
 
     # Calculate summary data with optimized queries
     total_orders = orders.count()
-    total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
+    _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
+    if _item_filter_active:
+        _stats_items = OrderItem.objects.filter(order__in=orders)
+        if category_id != 'all':
+            _stats_items = _stats_items.filter(product__main_category_id=category_id)
+        if subcategory_id != 'all':
+            _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
+        if station_filter != 'all':
+            _stats_items = _stats_items.filter(product__station=station_filter)
+        if product_id != 'all':
+            _stats_items = _stats_items.filter(product_id=product_id)
+        total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
+        total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
+    else:
+        _stats_items = None
+        total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
     
     # Calculate tax amounts for all orders
@@ -230,7 +245,10 @@ def dashboard(request):
     # Calculate payment status counts and revenues
     paid_orders = orders.filter(payment_status='paid')
     paid_orders_count = paid_orders.count()
-    paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active and _stats_items is not None:
+        paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
+    else:
+        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     paid_tax = Decimal('0.00')
     for order in paid_orders:
         paid_tax += order.get_tax_amount()
@@ -238,7 +256,10 @@ def dashboard(request):
     
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
-    unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active and _stats_items is not None:
+        unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
+    else:
+        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     unpaid_tax = Decimal('0.00')
     for order in unpaid_orders:
         unpaid_tax += order.get_tax_amount()
@@ -246,7 +267,10 @@ def dashboard(request):
     
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
-    partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    if _item_filter_active and _stats_items is not None:
+        partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
+    else:
+        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     partial_tax = Decimal('0.00')
     for order in partial_orders:
         partial_tax += order.get_tax_amount()
