@@ -193,23 +193,40 @@
                         </select>
                     </div>
 
-                    <!-- Date From -->
+                    <!-- Period Filter -->
+                    <div class="col-12 col-lg-auto">
+                        <label class="form-label"><i class="fas fa-calendar-alt"></i> Period</label>
+                        <div class="d-flex flex-wrap gap-1">
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=today"
+                               class="btn btn-sm {% if period == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Today</a>
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=week"
+                               class="btn btn-sm {% if period == 'week' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Week</a>
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=month"
+                               class="btn btn-sm {% if period == 'month' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Month</a>
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=year"
+                               class="btn btn-sm {% if period == 'year' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Year</a>
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=all"
+                               class="btn btn-sm {% if period == 'all' or not period %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+                        </div>
+                    </div>
+
+                    <!-- Custom Date Range (shown only when period=all) -->
+                    {% if period == 'all' or not period %}
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="dateFrom" class="form-label">
                             <i class="fas fa-calendar-alt"></i> From Date
                         </label>
-                        <input type="date" class="form-control" id="dateFrom" name="date_from" 
+                        <input type="date" class="form-control" id="dateFrom" name="date_from"
                                value="{{ request.GET.date_from }}">
                     </div>
-
-                    <!-- Date To -->
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="dateTo" class="form-label">
                             <i class="fas fa-calendar-check"></i> To Date
                         </label>
-                        <input type="date" class="form-control" id="dateTo" name="date_to" 
+                        <input type="date" class="form-control" id="dateTo" name="date_to"
                                value="{{ request.GET.date_to }}">
                     </div>
+                    {% endif %}
 
                     <!-- Clear Filters Button -->
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-1 d-flex align-items-end">
@@ -298,32 +315,32 @@
             <div class="tab-content" id="orderStatusTabsContent">
                 <!-- Pending Orders Tab -->
                 <div class="tab-pane fade show active" id="pending" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=pending_orders status_name="Pending" %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=pending_orders status_name="Pending" page_param=pending_page_param %}
                 </div>
 
                 <!-- Confirmed Orders Tab -->
                 <div class="tab-pane fade" id="confirmed" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=confirmed_orders status_name="Confirmed" %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=confirmed_orders status_name="Confirmed" page_param=confirmed_page_param %}
                 </div>
 
                 <!-- Preparing Orders Tab -->
                 <div class="tab-pane fade" id="preparing" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=preparing_orders status_name="Preparing" %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=preparing_orders status_name="Preparing" page_param=preparing_page_param %}
                 </div>
 
                 <!-- Ready Orders Tab -->
                 <div class="tab-pane fade" id="ready" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=ready_orders status_name="Ready" %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=ready_orders status_name="Ready" page_param=ready_page_param %}
                 </div>
 
                 <!-- Served Orders Tab -->
                 <div class="tab-pane fade" id="served" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=served_orders status_name="Served" %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=served_orders status_name="Served" page_param=served_page_param %}
                 </div>
 
                 <!-- Cancelled Orders Tab -->
                 <div class="tab-pane fade" id="cancelled" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=cancelled_orders status_name="Cancelled" %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=cancelled_orders status_name="Cancelled" page_param=cancelled_page_param %}
                 </div>
             </div>
         </div>

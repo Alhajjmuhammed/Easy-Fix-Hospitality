@@ -774,7 +774,8 @@ def manage_orders(request):
         payment_status_filter = request.GET.get('payment_status', '').strip()
         date_from = request.GET.get('date_from', '').strip()
         date_to = request.GET.get('date_to', '').strip()
-        
+        period = request.GET.get('period', 'all')
+
         # Determine which restaurant to filter by
         target_restaurant = None
         if restaurant_filter:
@@ -793,25 +794,19 @@ def manage_orders(request):
         if target_restaurant:
             # Filter orders by specific selected restaurant
             if target_restaurant.is_main_restaurant:
-                # Main restaurant: show orders from tables assigned to it OR owned by main owner with no restaurant
                 base_orders = Order.objects.filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True)
                 )
             else:
-                # Branch restaurant: only show orders from tables specifically assigned to this branch
-                # OR created by the branch owner (not main owner)
                 base_orders = Order.objects.filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True)
                 )
         elif request.user.is_administrator():
-            # Administrator sees all orders
             base_orders = Order.objects.all()
         else:
-            # Get orders from all accessible restaurants
             accessible_restaurants = restaurant_context['accessible_restaurants']
-            
             if accessible_restaurants.exists():
                 order_query = Q()
                 for restaurant in accessible_restaurants:
@@ -842,38 +837,48 @@ def manage_orders(request):
         # Apply payment status filter
         if payment_status_filter:
             base_orders = base_orders.filter(payment_status=payment_status_filter)
-        
-        # Apply date range filter
-        if date_from:
-            from datetime import datetime
-            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
-            base_orders = base_orders.filter(created_at__gte=date_from_obj)
-        
-        if date_to:
-            from datetime import datetime, timedelta
-            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
-            # Add one day to include the entire end date
-            date_to_obj = date_to_obj + timedelta(days=1)
-            base_orders = base_orders.filter(created_at__lt=date_to_obj)
-            
+
+        # Apply period filter (takes priority over manual dates when set)
+        from django.utils import timezone as _tz
+        _today = _tz.now().date()
+        if period == 'today':
+            base_orders = base_orders.filter(created_at__date=_today)
+        elif period == 'week':
+            from datetime import timedelta as _td
+            _week_start = _today - _td(days=_today.weekday())
+            base_orders = base_orders.filter(created_at__date__gte=_week_start)
+        elif period == 'month':
+            _month_start = _today.replace(day=1)
+            base_orders = base_orders.filter(created_at__date__gte=_month_start)
+        elif period == 'year':
+            _year_start = _today.replace(month=1, day=1)
+            base_orders = base_orders.filter(created_at__date__gte=_year_start)
+        else:
+            # 'all' — apply manual date range if provided
+            if date_from:
+                from datetime import datetime
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                base_orders = base_orders.filter(created_at__gte=date_from_obj)
+            if date_to:
+                from datetime import datetime, timedelta
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+                date_to_obj = date_to_obj + timedelta(days=1)
+                base_orders = base_orders.filter(created_at__lt=date_to_obj)
+
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
-    # Organize orders by status with counts
-    pending_orders = base_orders.filter(status='pending').order_by('-created_at')
+    # Organize orders by status
+    pending_orders   = base_orders.filter(status='pending').order_by('-created_at')
     confirmed_orders = base_orders.filter(status='confirmed').order_by('-created_at')
     preparing_orders = base_orders.filter(status='preparing').order_by('-created_at')
-    ready_orders = base_orders.filter(status='ready').order_by('-created_at')
-    served_orders = base_orders.filter(status='served').order_by('-created_at')
+    ready_orders     = base_orders.filter(status='ready').order_by('-created_at')
+    served_orders    = base_orders.filter(status='served').order_by('-created_at')
     cancelled_orders = base_orders.filter(status='cancelled').order_by('-created_at')
     
-    # Get counts for tab badges — single GROUP BY query instead of 7 separate COUNTs
-    _counts_qs = (
-        base_orders
-        .values('status')
-        .annotate(count=Count('id'))
-    )
+    # Counts — single GROUP BY query
+    _counts_qs = base_orders.values('status').annotate(count=Count('id'))
     _counts = {row['status']: row['count'] for row in _counts_qs}
     pending_count   = _counts.get('pending', 0)
     confirmed_count = _counts.get('confirmed', 0)
@@ -883,22 +888,39 @@ def manage_orders(request):
     cancelled_count = _counts.get('cancelled', 0)
     total_count     = sum(_counts.values())
 
+    # Paginate each tab separately (25 per page)
+    from django.core.paginator import Paginator
+    _per_page = 25
+    pending_page   = Paginator(pending_orders,   _per_page).get_page(request.GET.get('pending_page',   1))
+    confirmed_page = Paginator(confirmed_orders, _per_page).get_page(request.GET.get('confirmed_page', 1))
+    preparing_page = Paginator(preparing_orders, _per_page).get_page(request.GET.get('preparing_page', 1))
+    ready_page     = Paginator(ready_orders,     _per_page).get_page(request.GET.get('ready_page',     1))
+    served_page    = Paginator(served_orders,    _per_page).get_page(request.GET.get('served_page',    1))
+    cancelled_page = Paginator(cancelled_orders, _per_page).get_page(request.GET.get('cancelled_page', 1))
+
     context = {
-        'pending_orders': pending_orders,
-        'confirmed_orders': confirmed_orders,
-        'preparing_orders': preparing_orders,
-        'ready_orders': ready_orders,
-        'served_orders': served_orders,
-        'cancelled_orders': cancelled_orders,
-        'pending_count': pending_count,
+        'pending_orders':   pending_page,
+        'confirmed_orders': confirmed_page,
+        'preparing_orders': preparing_page,
+        'ready_orders':     ready_page,
+        'served_orders':    served_page,
+        'cancelled_orders': cancelled_page,
+        'pending_page_param':   'pending_page',
+        'confirmed_page_param': 'confirmed_page',
+        'preparing_page_param': 'preparing_page',
+        'ready_page_param':     'ready_page',
+        'served_page_param':    'served_page',
+        'cancelled_page_param': 'cancelled_page',
+        'pending_count':   pending_count,
         'confirmed_count': confirmed_count,
         'preparing_count': preparing_count,
-        'ready_count': ready_count,
-        'served_count': served_count,
+        'ready_count':     ready_count,
+        'served_count':    served_count,
         'cancelled_count': cancelled_count,
-        'total_count': total_count,
+        'total_count':     total_count,
+        'period':          period,
         'restaurant_name': request.user.get_restaurant_name() if not request.user.is_administrator() else "All Restaurants",
-        **restaurant_context,  # Include restaurant context for filters
+        **restaurant_context,
     }
 
     return render(request, 'admin_panel/manage_orders.html', context)
