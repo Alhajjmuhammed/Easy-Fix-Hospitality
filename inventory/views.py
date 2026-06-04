@@ -15,6 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import mm
 
 from accounts.models import get_owner_filter
+from admin_panel.restaurant_utils import get_restaurant_context
 
 from .models import InventoryCategory, InventoryItem, InventoryRecord, InventoryUnit
 
@@ -100,6 +101,8 @@ def dashboard(request):
 
     currency_symbol = _get_currency_symbol(owner, request.user)
 
+    restaurant_context = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'page_obj': page_obj,
         'recent_records': recent_records,
@@ -108,6 +111,7 @@ def dashboard(request):
         'out_of_stock_count': out_of_stock_count,
         'per_page': per_page,
         'currency_symbol': currency_symbol,
+        **restaurant_context,
     }
     return render(request, 'inventory/dashboard.html', context)
 
@@ -278,6 +282,8 @@ def manage_items(request):
 
     currency_symbol = _get_currency_symbol(owner, request.user)
 
+    restaurant_context = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'page_obj': page_obj,
         'total_items': paginator.count,
@@ -288,6 +294,7 @@ def manage_items(request):
         'search': search,
         'category_filter': category_filter,
         'currency_symbol': currency_symbol,
+        **restaurant_context,
     }
     return render(request, 'inventory/items.html', context)
 
@@ -344,11 +351,13 @@ def add_record(request):
             errors.append('Invalid record type.')
 
         if errors:
+            _rc = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
             context = {
                 'items': items_qs,
                 'record_type_choices': InventoryRecord.RECORD_TYPE_CHOICES,
                 'errors': errors,
                 'form_data': request.POST,
+                **_rc,
             }
             return render(request, 'inventory/record.html', context)
 
@@ -367,10 +376,12 @@ def add_record(request):
         )
         return redirect('inventory:history')
 
+    _rc = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
     context = {
         'items': items_qs,
         'record_type_choices': InventoryRecord.RECORD_TYPE_CHOICES,
         'currency_symbol': _get_currency_symbol(owner, request.user),
+        **_rc,
     }
     return render(request, 'inventory/record.html', context)
 
@@ -460,6 +471,8 @@ def history(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    restaurant_context = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'page_obj': page_obj,
         'items': items_qs,
@@ -473,6 +486,7 @@ def history(request):
         'total_spent': total_spent,
         'total_refunds': total_refunds,
         'net_cost': net_cost,
+        **restaurant_context,
     }
     return render(request, 'inventory/history.html', context)
 
@@ -792,8 +806,11 @@ def manage_settings(request):
         count = InventoryItem.objects.filter(owner=item_owner, unit=unit.name).count()
         unit_data.append({'obj': unit, 'in_use': count})
 
+    restaurant_context = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
+
     return render(request, 'inventory/settings.html', {
         'cat_data': cat_data,
         'unit_data': unit_data,
+        **restaurant_context,
     })
 

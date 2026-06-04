@@ -1877,6 +1877,9 @@ def money_flow(request):
         chart_in.append(float(day_orders_revenue + day_event_collected))
         chart_out.append(float(max(0, day_inv_spent - day_inv_refunds)))
 
+    from admin_panel.restaurant_utils import get_restaurant_context as _get_rc
+    _restaurant_context = _get_rc(request.user, request.session.get('current_restaurant_id'), request)
+
     import json
     context = {
         'currency_symbol': currency_symbol,
@@ -1908,6 +1911,7 @@ def money_flow(request):
         'chart_labels': json.dumps(chart_labels),
         'chart_in': json.dumps(chart_in),
         'chart_out': json.dumps(chart_out),
+        **_restaurant_context,
     }
     return render(request, 'reports/money_flow.html', context)
 
