@@ -588,7 +588,7 @@ def place_order(request):
                     # Create order items - verify each product belongs to restaurant
                     total_amount = 0
                     for product_id, item in cart.items():
-                        product = Product.objects.select_for_update().filter(
+                        product = Product.objects.select_for_update(of=('self',)).filter(
                             Q(main_category__owner=current_restaurant) |
                             Q(main_category__restaurant__main_owner=current_restaurant) |
                             Q(main_category__restaurant__branch_owner=current_restaurant),
@@ -3313,7 +3313,7 @@ def handle_add_to_existing_order(request, order_id, cart):
             # Add new items to order
             total_added = Decimal('0.00')
             for product_id, item in cart.items():
-                product = Product.objects.select_for_update().filter(
+                product = Product.objects.select_for_update(of=('self',)).filter(
                     Q(main_category__owner=owner_filter) |
                     Q(main_category__restaurant__main_owner=owner_filter) |
                     Q(main_category__restaurant__branch_owner=owner_filter),
