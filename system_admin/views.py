@@ -109,32 +109,14 @@ def system_dashboard(request):
     
     # Recent activity
     recent_orders = Order.objects.select_related('table_info', 'ordered_by').order_by('-created_at')[:10]
-    recent_users = User.objects.select_related('role').order_by('-created_at')[:10]
-    
-    # Restaurant breakdown - single query with annotated counts (no N+1)
-    restaurant_list = Restaurant.objects.filter(
-        is_main_restaurant=True
-    ).select_related('main_owner', 'main_owner__role').annotate(
-        categories_count=Count('main_owner__main_categories', distinct=True),
-        products_count=Count('main_owner__main_categories__products', distinct=True),
-        tables_count=Count('main_owner__tables', distinct=True),
-        orders_count=Count('main_owner__tables__orders', distinct=True),
-        staff_count=Count('main_owner__owned_users', distinct=True),
-    ).order_by('name')[:10]
+    recent_users = User.objects.select_related('role').order_by('-date_joined')[:10]
 
-    restaurants = [
-        {
-            'owner': restaurant.main_owner,
-            'restaurant': restaurant,
-            'categories': restaurant.categories_count,
-            'products': restaurant.products_count,
-            'tables': restaurant.tables_count,
-            'orders': restaurant.orders_count,
-            'staff': restaurant.staff_count,
-        }
-        for restaurant in restaurant_list
-    ]
-    
+    # Recent restaurants — simple query, no expensive annotations
+    recent_restaurants = User.objects.filter(
+        role__name__in=['owner', 'main_owner'],
+        is_active=True,
+    ).select_related('role').order_by('-date_joined')[:10]
+
     context = {
         'total_restaurants': total_restaurants,
         'total_branches': total_branches,
@@ -146,7 +128,7 @@ def system_dashboard(request):
         'total_orders': total_orders,
         'recent_orders': recent_orders,
         'recent_users': recent_users,
-        'restaurants': restaurants,
+        'recent_restaurants': recent_restaurants,
     }
     
     return render(request, 'system_admin/dashboard.html', context)
