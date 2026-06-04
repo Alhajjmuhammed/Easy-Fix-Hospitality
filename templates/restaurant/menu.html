@@ -548,11 +548,12 @@
         background: #d63384;
         border: none;
         border-radius: 15px;
-        padding: 0.5rem 0.4rem; /* Reduced left/right padding from 1rem to 0.4rem */
+        padding: 0.5rem 0.4rem;
         font-weight: 600;
         transition: all 0.3s ease;
         color: white;
         font-size: 0.85rem;
+        white-space: nowrap;
     }
 
     .add-to-cart-btn:hover {
@@ -643,6 +644,7 @@
 
     .product-info-section {
         padding: 1rem;
+        overflow: hidden;
     }
 
     .product-title {
@@ -1117,7 +1119,7 @@
                                         <div class="stats-section">
                                             <div class="stat-item">
                                                 <i class="bi bi-folder-plus"></i>
-                                                {{ category.subcategories.count }} subcategories
+                                                {{ category.subcategories.all|length }} subcategories
                                             </div>
                                             <div class="stat-item">
                                                 <i class="bi bi-basket"></i>
@@ -1199,10 +1201,10 @@
 
                                         <!-- Products Grid -->
                                         <div class="products-grid">
-                                            <div class="row g-4">
+                                            <div class="row g-3">
                                                 {% for product in subcategory.products.all %}
                                                     {% if product.is_available %}
-                                                        <div class="col-lg-4 col-md-6">
+                                                        <div class="col-12 col-sm-6 col-xl-4">
                                                             <div class="card product-card h-100">
                                                                 <!-- Product Image -->
                                                                 {% if product.main_category.image %}
@@ -1251,9 +1253,9 @@
 
                                                                     <!-- Add to Cart Controls -->
                                                                     {% if product.available_in_stock > 0 %}
-                                                                        <div class="d-flex align-items-center gap-3">
+                                                                        <div class="d-flex flex-column gap-2 w-100">
                                                                             <!-- Quantity Controls -->
-                                                                            <div class="qty-controls">
+                                                                            <div class="qty-controls justify-content-center w-100">
                                                                                 <button class="qty-btn" type="button" data-action="decrease" data-product="{{ product.id }}">
                                                                                     <i class="bi bi-dash"></i>
                                                                                 </button>
@@ -1270,8 +1272,8 @@
                                                                             </div>
 
                                                                             <!-- Add to Cart Button -->
-                                                                            <button class="btn add-to-cart-btn flex-grow-1" data-product="{{ product.id }}">
-                                                                                <i class="bi bi-cart-plus me-2"></i> Add to Cart
+                                                                            <button class="btn add-to-cart-btn w-100" data-product="{{ product.id }}">
+                                                                                <i class="bi bi-cart-plus me-1"></i> Add to Cart
                                                                             </button>
                                                                         </div>
                                                                     {% else %}
@@ -1417,7 +1419,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         `<div class="happy-hour-badge mt-1"><i class="fas fa-fire"></i> ${Math.round(product.discount_percentage)}% OFF</div>` : '';
                                     
                                     productsHtml += `
-                                        <div class="col-md-4 mb-3">
+                                        <div class="col-12 col-sm-6 mb-3">
                                             <div class="card product-search-card" data-product-id="${product.id}">
                                                 <div class="card-body">
                                                     <h6 class="card-title">${product.name}</h6>
@@ -1429,18 +1431,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                                         </div>
                                                         <small class="text-muted">Stock: ${product.stock}</small>
                                                     </div>
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <div class="quantity-controls d-flex align-items-center">
+                                                    <div class="d-flex flex-column gap-2">
+                                                        <div class="d-flex align-items-center justify-content-center gap-1">
                                                             <button class="btn btn-outline-secondary btn-sm" onclick="changeQty('prod${product.id}', -1)">
                                                                 <i class="bi bi-dash"></i>
                                                             </button>
-                                                            <input type="number" id="qty-prod${product.id}" class="form-control mx-2 text-center" 
+                                                            <input type="number" id="qty-prod${product.id}" class="form-control text-center" 
                                                                    value="1" min="1" max="${product.stock}" style="width: 60px;">
                                                             <button class="btn btn-outline-secondary btn-sm" onclick="changeQty('prod${product.id}', 1)">
                                                                 <i class="bi bi-plus"></i>
                                                             </button>
                                                         </div>
-                                                        <button class="btn btn-primary btn-sm" onclick="addToCartDemo('${product.name}', ${product.id})">
+                                                        <button class="btn btn-primary btn-sm w-100" style="white-space:nowrap;" onclick="addToCartDemo('${product.name}', ${product.id})">
                                                             <i class="bi bi-cart-plus me-1"></i>Add to Cart
                                                         </button>
                                                     </div>
@@ -1691,6 +1693,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearButton = document.getElementById('clearSearch');
     const searchDropdown = document.getElementById('searchResultsDropdown');
     
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+    
     // Build search index from categories data
     let searchIndex = [];
     
@@ -1797,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <i class="bi bi-folder-fill" style="font-size: 1.1rem; color: #6c757d;"></i>
                             </div>
                             <div>
-                                <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${item.name}</div>
+                                <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${escapeHtml(item.name)}</div>
                                 <small style="color: #6c757d; font-size: 0.8rem;">Category</small>
                             </div>
                         </div>
@@ -1805,15 +1816,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
             } else if (item.type === 'product') {
                 html += `
-                    <div class="search-result-item" onclick="openProductFromSearch(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.categoryId}, '${item.subcategoryName.replace(/'/g, "\\'")}')" style="padding: 14px 16px; cursor: pointer; ${!isLast ? 'border-bottom: 1px solid #eee;' : ''} transition: all 0.2s ease; background: white;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background='white'">
+                    <div class="search-result-item" data-product-id="${item.id}" data-product-name="${escapeHtml(item.name)}" data-category-id="${item.categoryId}" data-subcategory-name="${escapeHtml(item.subcategoryName)}" onclick="openProductFromSearch(this.dataset.productId, this.dataset.productName, this.dataset.categoryId, this.dataset.subcategoryName)" style="padding: 14px 16px; cursor: pointer; ${!isLast ? 'border-bottom: 1px solid #eee;' : ''} transition: all 0.2s ease; background: white;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background='white'">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #e3f2fd, #bbdefb); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
                                     <i class="bi bi-basket-fill" style="font-size: 1.1rem; color: #1976d2;"></i>
                                 </div>
                                 <div>
-                                    <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${item.name}</div>
-                                    <small style="color: #6c757d; font-size: 0.8rem;">in ${item.categoryName}</small>
+                                    <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${escapeHtml(item.name)}</div>
+                                    <small style="color: #6c757d; font-size: 0.8rem;">in ${escapeHtml(item.categoryName)}</small>
                                 </div>
                             </div>
                             <div style="text-align: right; min-width: 70px;">

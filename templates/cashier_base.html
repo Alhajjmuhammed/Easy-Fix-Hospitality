@@ -78,6 +78,58 @@
             padding-top: 1rem;
         }
 
+        /* ---- Visual polish ---- */
+        .card {
+            border-radius: 10px;
+            border: 1px solid rgba(0,0,0,0.08);
+        }
+        .card-header {
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            border-radius: 8px;
+        }
+        .btn-primary:hover {
+            background-color: #b02a5b;
+            border-color: #b02a5b;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(214, 51, 132, 0.3);
+        }
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            border-radius: 8px;
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(214, 51, 132, 0.15);
+        }
+        .table thead th {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .badge {
+            letter-spacing: 0.3px;
+        }
+        /* Smooth card hover lift */
+        .payment-card, .card.shadow-sm {
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .payment-card:hover, .card.shadow-sm:hover {
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1) !important;
+            transform: translateY(-2px);
+        }
         /* Mobile responsive adjustments */
         @media (max-width: 768px) {
             .navbar {
@@ -146,6 +198,11 @@
             .mobile-nav {
                 display: none !important;
             }
+            /* Prevent nav links from wrapping */
+            .desktop-nav > a {
+                white-space: nowrap;
+                font-size: 0.85rem;
+            }
         }
 
         @media (max-width: 576px) {
@@ -162,17 +219,15 @@
 <body>
     <!-- Navigation -->
     <div class="border-bottom">
-        <div class="container d-flex align-items-center py-3">
+        <div class="container d-flex align-items-center py-2 py-md-3">
             <!-- Restaurant Brand -->
-            <a class="text-decoration-none me-4" href="{% url 'cashier:dashboard' %}">
-                <span class="text-danger fw-bold"><i class="fas fa-utensils me-2"></i>{{ request.user.get_restaurant_name|default:'Restaurant System' }}</span>
-            </a>
+            <span class="text-decoration-none me-3 me-md-4 flex-shrink-0" style="max-width: 180px;">
+                <span class="text-danger fw-bold text-truncate d-block" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;"><i class="fas fa-utensils me-2"></i>{{ request.user.get_restaurant_name|default:'Restaurant System' }}</span>
+            </span>
             
             <!-- Desktop Navigation -->
             <div class="desktop-nav d-flex align-items-center flex-grow-1">
-                <a class="text-decoration-none text-dark me-3" href="{% url 'restaurant:home' %}" title="Restaurant Home Page">
-                    <i class="fas fa-home me-1"></i>Home
-                </a>
+
                 <a class="text-decoration-none text-dark me-3" href="{% url 'orders:select_table' %}" title="Select Table & View Menu">
                     <i class="fas fa-utensils me-1"></i>Menu
                 </a>
@@ -182,10 +237,10 @@
                 </a>
                 {% elif user.is_customer_care %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_dashboard' %}" title="Customer Care Dashboard">
-                    <i class="fas fa-headset me-1"></i>Customer Care Dashboard
+                    <i class="fas fa-headset me-1"></i>CC Dashboard
                 </a>
                 <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_payments' %}" title="Process Payments">
-                    <i class="fas fa-cash-register me-1"></i>Process Payments
+                    <i class="fas fa-cash-register me-1"></i>Payments
                 </a>
                 {% endif %}
                 {% if user.is_cashier %}
@@ -233,7 +288,7 @@
                                 <i class="fas fa-headset"></i> Customer Care Dashboard
                             </a></li>
                             {% endif %}
-                            {% if user.is_owner %}
+                            {% if user.is_owner or user.is_manager %}
                             <li><a class="dropdown-item" href="{% url 'admin_panel:admin_dashboard' %}">
                                 <i class="fas fa-tachometer-alt"></i> Owner Dashboard
                             </a></li>
@@ -271,9 +326,7 @@
             <div class="container">
                 <div class="collapse" id="mobileNavContent">
                     <div class="mobile-nav-content">
-                        <a class="mobile-nav-link" href="{% url 'restaurant:home' %}">
-                            <i class="fas fa-home me-2"></i>Home
-                        </a>
+
                         <a class="mobile-nav-link" href="{% url 'orders:select_table' %}">
                             <i class="fas fa-utensils me-2"></i>Menu
                         </a>
@@ -312,7 +365,7 @@
                         </a>
                         {% endif %}
                         <hr class="my-2">
-                        {% if user.is_owner %}
+                        {% if user.is_owner or user.is_manager %}
                         <a class="mobile-nav-link" href="{% url 'admin_panel:admin_dashboard' %}">
                             <i class="fas fa-tachometer-alt me-2"></i>Owner Dashboard
                         </a>

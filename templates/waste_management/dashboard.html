@@ -97,7 +97,7 @@
         <div class="card-body">
             <form method="get" class="row g-3" id="filterForm">
                 <!-- Restaurant Filter (for PRO/BRANCH users) -->
-                {% if accessible_restaurants.count > 1 %}
+                {% if accessible_restaurants|length > 1 %}
                 <div class="col-lg-2 col-md-4 mb-3">
                     <label for="restaurant_filter" class="form-label font-weight-bold">Restaurant</label>
                     <select class="form-control" id="restaurant_filter" name="restaurant_filter" onchange="this.form.submit()">

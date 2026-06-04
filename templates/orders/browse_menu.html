@@ -6,41 +6,104 @@
 {% block extra_css %}
 <style>
     .product-card {
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
         height: 100%;
+        border-radius: 12px;
+        overflow: hidden;
     }
     
     .product-card:hover {
-        transform: translateY(-5px);
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
     }
     
     .product-image {
-        height: 200px;
+        height: 180px;
         object-fit: cover;
+    }
+
+    @media (max-width: 575.98px) {
+        .product-image {
+            height: 140px;
+        }
     }
     
     .cart-badge {
         position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1000;
+        bottom: 80px;
+        right: 16px;
+        z-index: 1050;
+    }
+
+    @media (min-width: 992px) {
+        .cart-badge {
+            top: 80px;
+            bottom: auto;
+            right: 24px;
+        }
     }
     
     .category-nav {
         position: sticky;
-        top: 0;
+        top: 56px;
         z-index: 100;
         background: white;
         border-bottom: 1px solid #dee2e6;
+    }
+
+    .category-nav .category-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        white-space: nowrap;
+        padding-bottom: 4px;
+    }
+    .category-nav .category-scroll::-webkit-scrollbar {
+        display: none;
+    }
+    .category-nav .category-scroll .btn {
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    /* Add to cart button area */
+    .add-to-cart-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    /* Product grid — 2 columns on mobile, 3 on lg */
+    .products-grid .col {
+        padding: 0.5rem;
+    }
+
+    /* Section headings */
+    .section-heading {
+        font-size: 1.4rem;
+        font-weight: 700;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #dee2e6;
+        margin-bottom: 1.25rem;
+    }
+
+    .subcategory-heading {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #6c757d;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Cart Badge -->
+<!-- Floating Cart Badge (mobile: bottom-right; desktop: top-right) -->
 <div class="cart-badge">
-    <a href="{% url 'orders:view_cart' %}" class="btn btn-primary position-relative">
-        <i class="bi bi-cart3"></i> Cart
+    <a href="{% url 'orders:view_cart' %}" class="btn btn-primary shadow position-relative">
+        <i class="bi bi-cart3"></i> <span class="d-none d-sm-inline">Cart</span>
         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="cart-count">
             {{ cart_count }}
         </span>
@@ -48,21 +111,19 @@
 </div>
 
 <!-- Header -->
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-start align-items-sm-center mb-3 gap-2 flex-wrap">
     <div>
-        <h2><i class="bi bi-menu-button-wide"></i> Menu</h2>
-        <p class="text-muted mb-0">Table {{ table_number }} • Select items to add to your cart</p>
+        <h2 class="mb-1" style="font-size: clamp(1.25rem, 3vw, 1.75rem);"><i class="bi bi-menu-button-wide text-primary"></i> Menu</h2>
+        <p class="text-muted mb-0 small">Table <strong>{{ table_number }}</strong> &mdash; Select items to add to your cart</p>
     </div>
-    <div>
-        <a href="{% url 'orders:select_table' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Change Table
-        </a>
-    </div>
+    <a href="{% url 'orders:select_table' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Change Table
+    </a>
 </div>
 
-<!-- Category Navigation -->
-<div class="category-nav py-3 mb-4">
-    <div class="d-flex flex-wrap gap-2">
+<!-- Category Navigation (horizontal scroll on mobile) -->
+<div class="category-nav py-2 mb-4">
+    <div class="category-scroll d-flex gap-2 px-1">
         {% for category in categories %}
             <a href="#category-{{ category.id }}" class="btn btn-outline-primary btn-sm">
                 {{ category.name }}
@@ -74,51 +135,51 @@
 <!-- Menu Categories -->
 {% for category in categories %}
     <div id="category-{{ category.id }}" class="mb-5">
-        <h3 class="border-bottom pb-2 mb-4">
-            <i class="bi bi-tag"></i> {{ category.name }}
+        <h3 class="section-heading">
+            <i class="bi bi-tag-fill text-primary me-2"></i>{{ category.name }}
         </h3>
         
         {% for subcategory in category.subcategories.all %}
             {% if subcategory.products.all %}
-                <h5 class="text-muted mb-3">{{ subcategory.name }}</h5>
+                <p class="subcategory-heading">{{ subcategory.name }}</p>
                 
-                <div class="row">
+                <div class="row row-cols-2 row-cols-md-2 row-cols-lg-3 g-3 products-grid mb-4">
                     {% for product in subcategory.products.all %}
                         {% if product.is_available %}
-                            <div class="col-md-6 col-lg-4 mb-4">
-                                <div class="card product-card shadow-sm">
+                            <div class="col">
+                                <div class="card product-card shadow-sm h-100">
                                     {% if product.main_category.image %}
                                         <img src="{{ product.main_category.image.url }}" class="card-img-top product-image" alt="{{ product.name }}">
                                     {% else %}
                                         <div class="card-img-top product-image bg-light d-flex align-items-center justify-content-center">
-                                            <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
+                                            <i class="bi bi-image text-muted" style="font-size: 2.5rem;"></i>
                                         </div>
                                     {% endif %}
                                     
-                                    <div class="card-body d-flex flex-column">
-                                        <h6 class="card-title">{{ product.name }}</h6>
-                                        <p class="card-text text-muted small flex-grow-1">{{ product.description|truncatechars:100 }}</p>
+                                    <div class="card-body d-flex flex-column p-3">
+                                        <h6 class="card-title fw-semibold mb-1">{{ product.name }}</h6>
+                                        <p class="card-text text-muted small flex-grow-1 mb-2">{{ product.description|truncatechars:80 }}</p>
                                         
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="h5 text-primary mb-0">{% currency_symbol %}{{ product.price }}</span>
+                                            <span class="fw-bold text-primary" style="font-size: 1.05rem;">{% currency_symbol %}{{ product.price }}</span>
                                             <small class="text-muted">
-                                                <i class="bi bi-clock"></i> {{ product.preparation_time }} min
+                                                <i class="bi bi-clock"></i> {{ product.preparation_time }}m
                                             </small>
                                         </div>
                                         
                                         {% if product.available_in_stock > 0 %}
-                                            <div class="d-flex align-items-center gap-2">
-                                                <div class="input-group input-group-sm" style="width: 100px;">
+                                            <div class="add-to-cart-row">
+                                                <div class="input-group input-group-sm" style="width: 95px; flex-shrink: 0;">
                                                     <button class="btn btn-outline-secondary qty-decrease" type="button" data-product-id="{{ product.id }}">-</button>
-                                                    <input type="number" class="form-control text-center" id="qty-{{ product.id }}" value="1" min="1" max="{{ product.available_in_stock }}">
+                                                    <input type="number" class="form-control text-center" id="qty-{{ product.id }}" value="1" min="1" max="{{ product.available_in_stock }}" style="padding: 0;">
                                                     <button class="btn btn-outline-secondary qty-increase" type="button" data-product-id="{{ product.id }}" data-max="{{ product.available_in_stock }}">+</button>
                                                 </div>
                                                 <button class="btn btn-primary btn-sm flex-grow-1 add-to-cart-btn" data-product-id="{{ product.id }}">
                                                     <i class="bi bi-cart-plus"></i> Add
                                                 </button>
                                             </div>
-                                            <small class="text-success mt-1">
-                                                <i class="bi bi-check-circle"></i> {{ product.available_in_stock }} in stock
+                                            <small class="text-success mt-1 d-block">
+                                                <i class="bi bi-check-circle-fill"></i> {{ product.available_in_stock }} in stock
                                             </small>
                                         {% else %}
                                             <button class="btn btn-secondary btn-sm" disabled>
@@ -142,20 +203,22 @@
     </div>
 {% endfor %}
 
-<!-- Fixed Bottom Cart Summary -->
+<!-- Fixed Bottom Cart Summary (shows when cart has items) -->
 {% if cart_count > 0 %}
-<div class="fixed-bottom bg-white border-top p-3 shadow">
+<div class="fixed-bottom bg-white border-top p-2 p-sm-3 shadow-lg">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <strong>{{ cart_count }} items • {% currency_symbol %}{{ cart_total|floatformat:2 }}</strong>
+                <span class="fw-bold fs-6">{{ cart_count }} item{{ cart_count|pluralize }}</span>
+                <span class="text-muted ms-2">&mdash; {% currency_symbol %}{{ cart_total|floatformat:2 }}</span>
             </div>
-            <a href="{% url 'orders:view_cart' %}" class="btn btn-primary">
+            <a href="{% url 'orders:view_cart' %}" class="btn btn-primary btn-sm px-3">
                 <i class="bi bi-cart-check"></i> View Cart
             </a>
         </div>
     </div>
 </div>
+<div style="height: 70px;"></div>
 {% endif %}
 {% endblock %}
 

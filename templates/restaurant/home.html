@@ -2,55 +2,174 @@
 
 {% block title %}Home - Restaurant System{% endblock %}
 
+{% block extra_css %}
+<style>
+    main.container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* ── HERO ── */
+    .hero {
+        background: linear-gradient(135deg, #fff0f6 0%, #fce4ef 100%);
+        border-bottom: 1px solid #f5c6dc;
+        padding: 5rem 1.5rem;
+        text-align: center;
+    }
+
+    .hero h1 {
+        font-size: clamp(2rem, 5vw, 3.2rem);
+        font-weight: 900;
+        color: #1a1a2e;
+        letter-spacing: -1px;
+        line-height: 1.2;
+        margin-bottom: 1rem;
+    }
+
+    .hero h1 span { color: #d63384; }
+
+    .hero p {
+        font-size: 1.05rem;
+        color: #6c757d;
+        max-width: 480px;
+        margin: 0 auto 2rem;
+        line-height: 1.7;
+    }
+
+    .btn-hero-primary {
+        background: linear-gradient(135deg, #d63384, #b02a6a);
+        color: #fff;
+        border: none;
+        border-radius: 50px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        font-size: 1rem;
+        box-shadow: 0 4px 16px rgba(214,51,132,0.35);
+        transition: transform 0.15s, box-shadow 0.15s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-hero-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 22px rgba(214,51,132,0.45);
+        color: #fff;
+    }
+
+    .btn-hero-outline {
+        background: transparent;
+        color: #d63384;
+        border: 2px solid #d63384;
+        border-radius: 50px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: background 0.15s, color 0.15s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-hero-outline:hover {
+        background: #d63384;
+        color: #fff;
+    }
+
+    /* ── FEATURES ── */
+    .features-section {
+        padding: 4rem 1.5rem;
+        background: #fff;
+        max-width: 960px;
+        margin: 0 auto;
+    }
+
+    .feature-card {
+        border: 1px solid #f0f0f0;
+        border-radius: 18px;
+        padding: 2rem 1.5rem;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 30px rgba(214,51,132,0.1);
+    }
+
+    .feature-icon {
+        width: 56px; height: 56px;
+        border-radius: 14px;
+        background: rgba(214,51,132,0.08);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.5rem;
+        color: #d63384;
+    }
+
+    .feature-card h5 {
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 0.4rem;
+    }
+
+    .feature-card p {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="hero-section text-center py-5 mb-5" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px;">
-    <div class="container">
-        <h1 class="display-4 fw-bold mb-3">Welcome to Our Restaurant</h1>
-        <p class="lead mb-4">Experience the finest dining with our digital ordering system</p>
+
+<!-- Hero -->
+<section class="hero">
+    <h1>Welcome to<br><span>Restaurant System</span></h1>
+    <p>Orders, inventory, reports and money flow — all in one place.</p>
+    <div class="d-flex flex-wrap gap-3 justify-content-center">
         {% if not user.is_authenticated %}
-            <a href="{% url 'accounts:register' %}" class="btn btn-light btn-lg me-3">
-                <i class="bi bi-person-plus"></i> Join Us
+            <a href="{% url 'accounts:register' %}" class="btn-hero-primary">
+                <i class="bi bi-person-plus me-1"></i> Get Started
             </a>
-            <a href="{% url 'accounts:login' %}" class="btn btn-outline-light btn-lg">
-                <i class="bi bi-box-arrow-in-right"></i> Sign In
+            <a href="{% url 'accounts:login' %}" class="btn-hero-outline">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
             </a>
         {% else %}
-            <a href="{% url 'restaurant:menu' %}" class="btn btn-light btn-lg">
-                <i class="bi bi-menu-button-wide"></i> View Menu
+            <a href="{% url 'restaurant:menu' %}" class="btn-hero-primary">
+                <i class="bi bi-menu-button-wide me-1"></i> View Menu
             </a>
         {% endif %}
     </div>
+</section>
+
+<!-- Features -->
+<div class="features-section">
+    <div class="row g-4">
+        <div class="col-12 col-sm-4">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="bi bi-menu-button-wide"></i></div>
+                <h5>Digital Menu</h5>
+                <p>Browse categories, descriptions and prices in real time.</p>
+            </div>
+        </div>
+        <div class="col-12 col-sm-4">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="bi bi-receipt-cutoff"></i></div>
+                <h5>Easy Ordering</h5>
+                <p>Place and track orders from any table instantly.</p>
+            </div>
+        </div>
+        <div class="col-12 col-sm-4">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                <h5>Real-time Reports</h5>
+                <p>Revenue, tax and money flow — always accurate.</p>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="row">
-    <div class="col-md-4 mb-4">
-        <div class="card h-100 text-center">
-            <div class="card-body">
-                <i class="bi bi-menu-button-wide display-4 text-primary mb-3"></i>
-                <h5 class="card-title">Digital Menu</h5>
-                <p class="card-text">Browse our extensive menu with detailed descriptions and prices.</p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4 mb-4">
-        <div class="card h-100 text-center">
-            <div class="card-body">
-                <i class="bi bi-cart-check display-4 text-success mb-3"></i>
-                <h5 class="card-title">Easy Ordering</h5>
-                <p class="card-text">Place orders quickly and efficiently with our streamlined system.</p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4 mb-4">
-        <div class="card h-100 text-center">
-            <div class="card-body">
-                <i class="bi bi-clock-history display-4 text-warning mb-3"></i>
-                <h5 class="card-title">Real-time Updates</h5>
-                <p class="card-text">Track your order status and get real-time updates from our kitchen.</p>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}

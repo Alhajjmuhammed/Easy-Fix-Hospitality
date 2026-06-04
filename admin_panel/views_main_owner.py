@@ -7,7 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, Subquery, OuterRef, Value
 from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator
@@ -38,12 +38,22 @@ def main_owner_dashboard(request):
     base_restaurants = Restaurant.objects.filter(main_owner=request.user)
     
     if selected_restaurant_id and not view_all_restaurants:
-        # Viewing a specific restaurant
+        # Viewing a specific restaurant — session stores User (owner) ID, not Restaurant ID
         try:
-            current_restaurant = base_restaurants.get(id=selected_restaurant_id)
+            selected_user = User.objects.get(id=selected_restaurant_id)
+            if selected_user.is_branch_owner():
+                current_restaurant = base_restaurants.filter(
+                    branch_owner=selected_user, is_main_restaurant=False
+                ).first()
+            else:
+                current_restaurant = base_restaurants.filter(
+                    main_owner=selected_user, is_main_restaurant=True
+                ).first()
+            if not current_restaurant:
+                raise Restaurant.DoesNotExist
             restaurants = [current_restaurant]  # Only show selected restaurant
-        except Restaurant.DoesNotExist:
-            # Invalid restaurant, clear session and show all
+        except (User.DoesNotExist, Restaurant.DoesNotExist):
+            # Invalid session value, clear it and show all
             if 'selected_restaurant_id' in request.session:
                 del request.session['selected_restaurant_id']
             restaurants = base_restaurants.order_by('-is_main_restaurant', 'name')
@@ -54,63 +64,66 @@ def main_owner_dashboard(request):
     # Get main restaurant for context
     main_restaurant = base_restaurants.filter(is_main_restaurant=True).first()
     
+    # Build per-restaurant stats using DB-level annotations — avoids 6 queries per restaurant
+    from django.db.models import Case, When, DecimalField
+    today = timezone.now().date()
+
+    # Annotate directly on the restaurants queryset
+    restaurant_ids = [r.id for r in restaurants]
+    annotated = Restaurant.objects.filter(id__in=restaurant_ids).annotate(
+        orders_count=Count(
+            'tables__orders',
+            filter=Q(tables__orders__isnull=False),
+            distinct=True,
+        ),
+        today_revenue=Sum(
+            'tables__orders__total_amount',
+            filter=Q(tables__orders__created_at__date=today),
+        ),
+        tables_count=Count('tables', distinct=True),
+        products_count=Count('main_categories__products', distinct=True),
+        pending_orders=Count(
+            'tables__orders',
+            filter=Q(tables__orders__status='pending'),
+            distinct=True,
+        ),
+        staff_count=Count('branch_owner__owned_users', distinct=True),
+    ).in_bulk()  # dict keyed by pk for O(1) lookup
+
     # Aggregate statistics
     total_orders = 0
     total_revenue = 0
-    active_branches = 0  # Will count active restaurants
+    active_branches = 0
     total_staff = 0
-    
+
     branch_stats = []
-    
+
     for restaurant in restaurants:
-        # Orders for this restaurant
-        restaurant_orders = Order.objects.filter(
-            Q(table_info__restaurant=restaurant) |
-            Q(table_info__owner=restaurant.branch_owner)
-        )
-        
-        orders_count = restaurant_orders.count()
-        
-        # Revenue calculation
-        today = timezone.now().date()
-        today_revenue = restaurant_orders.filter(
-            created_at__date=today
-        ).aggregate(total=Sum('total_amount'))['total'] or 0
-        
-        # Staff count
-        staff_count = User.objects.filter(owner=restaurant.branch_owner).count()
-        
-        # Tables count
-        tables_count = TableInfo.objects.filter(
-            Q(restaurant=restaurant) | Q(owner=restaurant.branch_owner)
-        ).count()
-        
-        # Products count
-        products_count = Product.objects.filter(
-            Q(main_category__restaurant=restaurant) |
-            Q(main_category__owner=restaurant.branch_owner)
-        ).count()
-        
-        # Pending orders
-        pending_orders = restaurant_orders.filter(status='pending').count()
-        
+        ann = annotated.get(restaurant.id, restaurant)
+        orders_count   = ann.orders_count   or 0
+        today_rev      = ann.today_revenue  or 0
+        staff_count    = ann.staff_count    or 0
+        tables_count   = ann.tables_count   or 0
+        products_count = ann.products_count or 0
+        pending_count  = ann.pending_orders or 0
+
         branch_stat = {
             'restaurant': restaurant,
             'orders_count': orders_count,
-            'today_revenue': today_revenue,
+            'today_revenue': today_rev,
             'staff_count': staff_count,
             'tables_count': tables_count,
             'products_count': products_count,
-            'pending_orders': pending_orders,
-            'is_active': restaurant.is_active,  # Use actual database field
+            'pending_orders': pending_count,
+            'is_active': restaurant.is_active,
         }
         branch_stats.append(branch_stat)
-        
+
         # Add to totals
-        total_orders += orders_count
-        total_revenue += today_revenue
-        total_staff += staff_count
-        if restaurant.is_active:  # Count active restaurants based on database field
+        total_orders  += orders_count
+        total_revenue += today_rev
+        total_staff   += staff_count
+        if restaurant.is_active:
             active_branches += 1
     
     context = {
@@ -142,7 +155,7 @@ def branch_reports(request):
         messages.error(request, 'Branch reports require a PRO subscription. Please upgrade your plan.')
         return redirect('admin_panel:admin_dashboard')
     
-    restaurants = Restaurant.objects.filter(main_owner=request.user).order_by('name')
+    restaurants = Restaurant.objects.filter(main_owner=request.user).select_related('branch_owner').order_by('name')
     
     # Date range filters
     date_from = request.GET.get('date_from')
@@ -186,14 +199,24 @@ def branch_reports(request):
     status_breakdown = orders.values('status').annotate(count=Count('id'))
     
     # Revenue by restaurant
+    # Correlated subquery annotations — 1 SQL statement instead of N round-trips
+    _rev_sq = Subquery(
+        orders.filter(
+            Q(table_info__restaurant=OuterRef('pk')) |
+            Q(table_info__owner=OuterRef('branch_owner'))
+        ).annotate(_g=Value(1)).values('_g').annotate(s=Sum('total_amount')).values('s')[:1]
+    )
+    _cnt_sq = Subquery(
+        orders.filter(
+            Q(table_info__restaurant=OuterRef('pk')) |
+            Q(table_info__owner=OuterRef('branch_owner'))
+        ).annotate(_g=Value(1)).values('_g').annotate(s=Count('id')).values('s')[:1]
+    )
+
     restaurant_revenue = []
-    for restaurant in restaurant_filter:
-        rest_orders = orders.filter(
-            Q(table_info__restaurant=restaurant) | Q(table_info__owner=restaurant.branch_owner)
-        )
-        rest_revenue = rest_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-        rest_count = rest_orders.count()
-        
+    for restaurant in restaurant_filter.annotate(_rest_rev=_rev_sq, _rest_cnt=_cnt_sq):
+        rest_revenue = restaurant._rest_rev or 0
+        rest_count = restaurant._rest_cnt or 0
         restaurant_revenue.append({
             'restaurant': restaurant,
             'revenue': rest_revenue,
@@ -232,7 +255,7 @@ def view_all_orders(request):
         messages.error(request, 'All branch orders view requires a PRO subscription. Please upgrade your plan.')
         return redirect('admin_panel:admin_dashboard')
     
-    restaurants = Restaurant.objects.filter(main_owner=request.user)
+    restaurants = Restaurant.objects.filter(main_owner=request.user).select_related('branch_owner')
     
     # Build query for all orders from owned restaurants
     query = Q()
@@ -243,7 +266,7 @@ def view_all_orders(request):
         else:
             query = restaurant_query
     
-    orders = Order.objects.filter(query).order_by('-created_at')
+    orders = Order.objects.filter(query).select_related('table_info', 'ordered_by').prefetch_related('order_items').order_by('-created_at')
     
     # Filters
     status_filter = request.GET.get('status')
@@ -307,13 +330,15 @@ def branch_detail(request, restaurant_id):
     # Today's stats
     today = timezone.now().date()
     today_orders = orders.filter(created_at__date=today)
-    today_revenue = today_orders.aggregate(total=Sum('total_amount'))['total'] or 0
-    today_order_count = today_orders.count()
+    _today = today_orders.aggregate(total=Sum('total_amount'), count=Count('id'))
+    today_revenue = _today['total'] or 0
+    today_order_count = _today['count'] or 0
     
     # This week's stats
     week_start = timezone.now() - timedelta(days=7)
-    week_orders = orders.filter(created_at__gte=week_start).count()
-    week_revenue = orders.filter(created_at__gte=week_start).aggregate(total=Sum('total_amount'))['total'] or 0
+    _week = orders.filter(created_at__gte=week_start).aggregate(total=Sum('total_amount'), count=Count('id'))
+    week_orders = _week['count'] or 0
+    week_revenue = _week['total'] or 0
     
     # Staff information
     staff = User.objects.filter(owner=restaurant.branch_owner)
@@ -330,10 +355,11 @@ def branch_detail(request, restaurant_id):
     )
     
     # Recent orders
-    recent_orders = orders.order_by('-created_at')[:10]
+    recent_orders = orders.prefetch_related('order_items').order_by('-created_at')[:10]
     
     context = {
         'restaurant': restaurant,
+        'branch': restaurant,          # template uses {{ branch.* }} alias
         'total_orders': total_orders,
         'total_revenue': total_revenue,
         'today_revenue': today_revenue,

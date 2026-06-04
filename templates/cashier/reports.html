@@ -4,6 +4,16 @@
 
 {% block title %}Cashier Reports - {{ request.user.get_full_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+@media (max-width: 575.98px) {
+    .stat-card-h3 { font-size: 1.25rem !important; }
+    .stat-card-body { padding: 0.75rem !important; }
+    .stat-card-body .card-title { font-size: 0.75rem !important; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid mt-4">
     <div class="row mb-4">
@@ -16,44 +26,44 @@
     </div>
 
     <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
+    <div class="row mb-4 g-2">
+        <div class="col-6 col-md-3">
             <div class="card text-white" style="background-color: #2c5282; border: none; border-radius: 0;">
-                <div class="card-body">
+                <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
                         <i class="bi bi-currency-dollar"></i> Total Amount
                     </h6>
-                    <h3 class="mb-0">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</h3>
+                    <h3 class="mb-0 stat-card-h3">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <div class="card text-white" style="background-color: #28a745; border: none; border-radius: 0;">
-                <div class="card-body">
+                <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
                         <i class="bi bi-check-circle"></i> Paid Amount
                     </h6>
-                    <h3 class="mb-0">{% currency_symbol %}{{ paid_amount|floatformat:2 }}</h3>
+                    <h3 class="mb-0 stat-card-h3">{% currency_symbol %}{{ paid_amount|floatformat:2 }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <div class="card text-white" style="background-color: #dc3545; border: none; border-radius: 0;">
-                <div class="card-body">
+                <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
                         <i class="bi bi-exclamation-circle"></i> Unpaid Amount
                     </h6>
-                    <h3 class="mb-0">{% currency_symbol %}{{ unpaid_amount|floatformat:2 }}</h3>
+                    <h3 class="mb-0 stat-card-h3">{% currency_symbol %}{{ unpaid_amount|floatformat:2 }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <div class="card text-white" style="background-color: #2c5282; border: none; border-radius: 0;">
-                <div class="card-body">
+                <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
                         <i class="bi bi-receipt"></i> Total Orders
                     </h6>
-                    <h3 class="mb-0">{{ total_orders }}</h3>
+                    <h3 class="mb-0 stat-card-h3">{{ total_orders }}</h3>
                 </div>
             </div>
         </div>
@@ -68,7 +78,7 @@
             <form method="get" action="{% url 'cashier:cashier_reports' %}">
                 <div class="row g-3">
                     <!-- Period Filter -->
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label fw-bold">Period</label>
                         <select name="period" class="form-select">
                             <option value="today" {% if filters.period == 'today' %}selected{% endif %}>Today</option>
@@ -77,7 +87,7 @@
                     </div>
 
                     <!-- Category Filter -->
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label fw-bold">Category</label>
                         <select name="category_id" class="form-select">
                             <option value="all">All Categories</option>
@@ -90,7 +100,7 @@
                     </div>
 
                     <!-- Sub Category Filter -->
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label fw-bold">Sub Category</label>
                         <select name="subcategory_id" class="form-select">
                             <option value="all">All Sub Categories</option>
@@ -103,7 +113,7 @@
                     </div>
 
                     <!-- Station Filter -->
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label fw-bold">Station</label>
                         <select name="station_filter" class="form-select">
                             <option value="all">All Stations</option>
@@ -116,7 +126,7 @@
                     </div>
 
                     <!-- Payment Status Filter -->
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label fw-bold">Payment Status</label>
                         <select name="payment_status" class="form-select">
                             <option value="all">All Status</option>
@@ -127,7 +137,7 @@
                     </div>
 
                     <!-- Staff Role Filter -->
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label fw-bold">Filter by Role</label>
                         <select name="staff_role" class="form-select">
                             <option value="all" {% if filters.staff_role == 'all' %}selected{% endif %}>All Roles</option>
@@ -137,7 +147,7 @@
                     </div>
 
                     <!-- Staff Filter -->
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label fw-bold">Filter by Staff</label>
                         <select name="staff" class="form-select">
                             <option value="all">All Staff</option>
@@ -159,7 +169,7 @@
                     </div>
 
                     <!-- Filter Button -->
-                    <div class="col-md-3 d-flex align-items-end">
+                    <div class="col-6 col-md-3 d-flex align-items-end">
                         <button type="submit" class="btn w-100" style="background-color: #2c5282; color: white;">
                             <i class="bi bi-search"></i> Apply Filters
                         </button>

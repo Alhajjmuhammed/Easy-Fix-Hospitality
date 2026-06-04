@@ -1,7 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+
+
+def _safe_csv(value):
+    """Prevent CSV formula injection: prefix dangerous leading characters."""
+    s = str(value) if value is not None else ''
+    if s and s[0] in ('=', '+', '-', '@', '|', '%'):
+        return '\t' + s
+    return s
 from django.contrib import messages
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Q, Prefetch, Sum, Avg, F
 from django.http import JsonResponse
 from django.core.paginator import Paginator
@@ -14,6 +22,13 @@ from orders.models import Order
 from accounts.models import User, Role
 
 def home(request):
+    # Owners, managers and admins belong in the admin panel, not the customer-facing home page
+    if request.user.is_authenticated and (
+        request.user.is_owner() or
+        request.user.is_manager() or
+        request.user.is_admin()
+    ):
+        return redirect('admin_panel:admin_dashboard')
     return render(request, 'restaurant/home.html')
 
 def menu(request):
@@ -83,9 +98,6 @@ def menu(request):
         from restaurant.models_restaurant import Restaurant
         restaurant_obj = None
         
-        # DEBUG LOGGING
-        logger.debug(f"[MENU DEBUG] current_restaurant: {current_restaurant.username} (ID: {current_restaurant.id})")
-        
         try:
             # Check if this user has a Restaurant object (PRO plan)
             # Priority: branch_owner first (for branch staff), then main restaurant (for main owner)
@@ -100,12 +112,7 @@ def menu(request):
                     Q(is_main_restaurant=True)
                 ).first()
             
-            # DEBUG LOGGING
-            if restaurant_obj:
-                logger.debug(f"[MENU DEBUG] Found restaurant_obj: {restaurant_obj.name} (is_main: {restaurant_obj.is_main_restaurant})")
         except Exception as e:
-            # DEBUG LOGGING
-            logger.debug(f"[MENU DEBUG] Exception finding restaurant_obj: {e}")
             pass
         
         # Filter categories by BOTH owner field AND restaurant field
@@ -136,13 +143,6 @@ def menu(request):
                 is_active=True
             ).prefetch_related(subcategories_prefetch, products_prefetch).order_by('name')
             
-            # DEBUG LOGGING
-            logger.debug(f"[MENU DEBUG] Categories count: {categories.count()}")
-            for cat in categories[:10]:  # Log first 10
-                cat_owner = cat.owner.username if cat.owner else 'None'
-                cat_restaurant = cat.restaurant.name if cat.restaurant else 'None'
-                logger.debug(f"[MENU DEBUG]   - {cat.name} (owner={cat_owner}, restaurant={cat_restaurant})")
-            
             # For branches, show parent restaurant name instead of branch name
             if restaurant_obj.is_main_restaurant:
                 restaurant_name = restaurant_obj.name
@@ -172,33 +172,27 @@ def menu(request):
             
             restaurant_name = current_restaurant.restaurant_name
     else:
-        # DEBUG LOGGING
-        logger.debug(f"[MENU DEBUG] current_restaurant is None! User: {request.user}, Session: {request.session.get('selected_restaurant_id')}")
-        
         # Fallback: try traditional owner filtering for staff/tied customers
         try:
             from accounts.models import get_owner_filter
             owner_filter = get_owner_filter(request.user)
             if owner_filter:
                 categories = MainCategory.objects.filter(
-                    is_active=True, 
-                    owner=owner_filter
-                ).prefetch_related('subcategories__products').order_by('name')
+                    Q(owner=owner_filter) |
+                    Q(restaurant__main_owner=owner_filter) |
+                    Q(restaurant__branch_owner=owner_filter),
+                    is_active=True,
+                ).distinct().prefetch_related('subcategories__products').order_by('name')
                 restaurant_name = owner_filter.restaurant_name
             else:
-                # NO FILTERING - This is the bug! Redirect to table selection
-                logger.debug(f"[MENU DEBUG] No owner_filter! Redirecting to table selection")
                 messages.error(request, 'Please select your restaurant and table first.')
                 return redirect('orders:select_table')
         except Exception as e:
-            # DEBUG LOGGING
-            logger.debug(f"[MENU DEBUG] Exception in fallback: {e}")
             messages.error(request, 'Unable to load menu. Please try again.')
             return redirect('orders:select_table')
     
     # Safety check - if we somehow got here without categories
     if 'categories' not in locals():
-        logger.debug(f"[MENU DEBUG] No categories variable defined!")
         messages.error(request, 'Unable to load menu. Please select your table first.')
         return redirect('orders:select_table')
 
@@ -222,13 +216,59 @@ def menu(request):
             cart_count = 0
             cart_total = 0
 
-    # FINAL DEBUG: Log what's being passed to template
-    logger.debug(f"[MENU DEBUG] Passing {categories.count()} categories to template:")
-    for cat in categories:
-        cat_owner = cat.owner.username if cat.owner else 'None'
-        cat_restaurant = cat.restaurant.name if cat.restaurant else 'None'
-        logger.debug(f"[MENU DEBUG]   Template will show: {cat.name} (owner={cat_owner}, restaurant={cat_restaurant})")
-    
+    # Pre-compute Happy Hour promotion data for all products (prevents N+1 in template)
+    if current_restaurant and 'categories' in locals():
+        _now = timezone.localtime(timezone.now())
+        _current_day = str(_now.weekday() + 1)
+        _current_time = _now.time()
+
+        # 1 query + 3 prefetch queries instead of N*3 queries per product
+        _all_promos = list(HappyHourPromotion.objects.filter(
+            owner=current_restaurant,
+            is_active=True,
+            days_of_week__contains=_current_day,
+        ).prefetch_related('products', 'main_categories', 'sub_categories')
+         .order_by('-discount_percentage'))
+
+        # Filter to time-active promotions in Python (no extra DB)
+        _active_promos = []
+        for _promo in _all_promos:
+            if _promo.start_time <= _promo.end_time:
+                if _promo.start_time <= _current_time <= _promo.end_time:
+                    _active_promos.append(_promo)
+            else:  # cross-midnight
+                if _current_time >= _promo.start_time or _current_time <= _promo.end_time:
+                    _active_promos.append(_promo)
+
+        # Build product-id → best-promotion lookup (highest discount wins)
+        _promo_by_product = {}
+        _promo_by_maincategory = {}
+        _promo_by_subcategory = {}
+        for _promo in _active_promos:
+            for _p in _promo.products.all():
+                _promo_by_product.setdefault(_p.id, _promo)
+            for _mc in _promo.main_categories.all():
+                _promo_by_maincategory.setdefault(_mc.id, _promo)
+            for _sc in _promo.sub_categories.all():
+                _promo_by_subcategory.setdefault(_sc.id, _promo)
+
+        # Force queryset evaluation and attach cached promotion data to each product
+        categories = list(categories)
+        for _cat in categories:
+            for _subcat in _cat.subcategories.all():
+                for _product in _subcat.products.all():
+                    _promo = (
+                        _promo_by_product.get(_product.id) or
+                        _promo_by_maincategory.get(_product.main_category_id) or
+                        (_promo_by_subcategory.get(_product.sub_category_id) if _product.sub_category_id else None)
+                    )
+                    _product._active_promotion_cache = _promo
+                    if _promo:
+                        _disc = _product.price * (_promo.discount_percentage / Decimal('100'))
+                        _product._calculated_price_cache = max(_product.price - _disc, Decimal('0.01'))
+                    else:
+                        _product._calculated_price_cache = _product.price
+
     # Determine base template based on user role
     if request.user.is_authenticated:
         if request.user.is_cashier() or request.user.is_customer_care():
@@ -253,7 +293,7 @@ def menu(request):
 
 @login_required
 def owner_dashboard(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -264,15 +304,30 @@ def owner_dashboard(request):
         
         # Dashboard statistics - filtered by owner
         if owner_filter:
-            total_products = Product.objects.filter(main_category__owner=owner_filter).count()
-            total_orders = Order.objects.filter(table_info__owner=owner_filter).count()
-            pending_orders = Order.objects.filter(status='pending', table_info__owner=owner_filter).count()
+            total_products = Product.objects.filter(
+                Q(main_category__owner=owner_filter) |
+                Q(main_category__restaurant__main_owner=owner_filter) |
+                Q(main_category__restaurant__branch_owner=owner_filter)
+            ).distinct().count()
+            # Combine order counts — single query with conditional aggregation instead of 2 separate counts
+            _order_counts = Order.objects.filter(
+                Q(table_info__owner=owner_filter) |
+                Q(table_info__restaurant__main_owner=owner_filter) |
+                Q(table_info__restaurant__branch_owner=owner_filter)
+            ).distinct().aggregate(
+                total=Count('id'),
+                pending=Count('id', filter=Q(status='pending')),
+            )
+            total_orders   = _order_counts['total'] or 0
+            pending_orders = _order_counts['pending'] or 0
             total_staff = User.objects.filter(owner=owner_filter).exclude(role__name='customer').count()
             
             # Recent orders - filtered by owner
             recent_orders = Order.objects.filter(
-                table_info__owner=owner_filter
-            ).select_related('table_info', 'ordered_by').order_by('-created_at')[:5]
+                Q(table_info__owner=owner_filter) |
+                Q(table_info__restaurant__main_owner=owner_filter) |
+                Q(table_info__restaurant__branch_owner=owner_filter)
+            ).distinct().select_related('table_info', 'ordered_by').order_by('-created_at')[:5]
         else:
             # Administrator sees all data
             total_products = Product.objects.count()
@@ -285,10 +340,19 @@ def owner_dashboard(request):
         total_products = total_orders = pending_orders = total_staff = 0
         recent_orders = Order.objects.none()
     
-    # Popular products
-    popular_products = Product.objects.annotate(
-        order_count=Count('orderitem')
-    ).order_by('-order_count')[:5]
+    # Popular products — scoped to the owner's products (admin sees all)
+    if owner_filter:
+        popular_products = Product.objects.filter(
+            Q(main_category__owner=owner_filter) |
+            Q(main_category__restaurant__main_owner=owner_filter) |
+            Q(main_category__restaurant__branch_owner=owner_filter)
+        ).distinct().annotate(
+            order_count=Count('orderitem')
+        ).order_by('-order_count')[:5]
+    else:
+        popular_products = Product.objects.annotate(
+            order_count=Count('orderitem')
+        ).order_by('-order_count')[:5]
     
     context = {
         'total_products': total_products,
@@ -302,174 +366,8 @@ def owner_dashboard(request):
     return render(request, 'restaurant/owner_dashboard.html', context)
 
 @login_required
-def manage_products(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    # Get products with owner filtering
-    from accounts.models import get_owner_filter
-    owner_filter = get_owner_filter(request.user)
-    if owner_filter:
-        products = Product.objects.filter(main_category__owner=owner_filter).select_related('main_category', 'sub_category').order_by('-created_at')
-    else:
-        products = Product.objects.select_related('main_category', 'sub_category').order_by('-created_at')
-    
-    return render(request, 'restaurant/manage_products.html', {'products': products})
-
-@login_required
-def add_product(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    # Get owner filter for form
-    from accounts.models import get_owner_filter
-    owner_filter = get_owner_filter(request.user)
-    
-    if request.method == 'POST':
-        form = ProductForm(request.POST, request.FILES, owner=owner_filter)
-        if form.is_valid():
-            product = form.save(commit=False)
-            # Verify the main category belongs to this owner
-            if owner_filter and product.main_category.owner != owner_filter:
-                messages.error(request, 'Access denied. Category not found.')
-                return redirect('restaurant:manage_products')
-            product.save()
-            messages.success(request, 'Product added successfully!')
-            return redirect('restaurant:manage_products')
-    else:
-        form = ProductForm(owner=owner_filter)
-    
-    return render(request, 'restaurant/add_product.html', {'form': form})
-
-@login_required
-def edit_product(request, product_id):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    # Get product with owner filtering
-    from accounts.models import get_owner_filter
-    try:
-        owner_filter = get_owner_filter(request.user)
-        if owner_filter:
-            product = get_object_or_404(Product, id=product_id, main_category__owner=owner_filter)
-        else:
-            product = get_object_or_404(Product, id=product_id)
-    except Exception:
-        messages.error(request, 'Product not found or access denied.')
-        return redirect('restaurant:manage_products')
-    
-    if request.method == 'POST':
-        form = ProductForm(request.POST, request.FILES, instance=product, owner=owner_filter)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Product updated successfully!')
-            return redirect('restaurant:manage_products')
-    else:
-        form = ProductForm(instance=product, owner=owner_filter)
-    
-    return render(request, 'restaurant/edit_product.html', {'form': form, 'product': product})
-
-@login_required
-def delete_product(request, product_id):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    # Get product with owner filtering
-    from accounts.models import get_owner_filter
-    try:
-        owner_filter = get_owner_filter(request.user)
-        if owner_filter:
-            product = get_object_or_404(Product, id=product_id, main_category__owner=owner_filter)
-        else:
-            product = get_object_or_404(Product, id=product_id)
-    except Exception:
-        messages.error(request, 'Product not found or access denied.')
-        return redirect('restaurant:manage_products')
-    
-    if request.method == 'POST':
-        product.delete()
-        messages.success(request, 'Product deleted successfully!')
-        return redirect('restaurant:manage_products')
-    
-    return render(request, 'restaurant/delete_product.html', {'product': product})
-
-@login_required
-def manage_categories(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    # Get categories with owner filtering
-    from accounts.models import get_owner_filter
-    owner_filter = get_owner_filter(request.user)
-    if owner_filter:
-        main_categories = MainCategory.objects.filter(owner=owner_filter).prefetch_related('subcategories').order_by('name')
-    else:
-        main_categories = MainCategory.objects.prefetch_related('subcategories').order_by('name')
-    
-    return render(request, 'restaurant/manage_categories.html', {'main_categories': main_categories})
-
-@login_required
-def add_category(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    if request.method == 'POST':
-        form = MainCategoryForm(request.POST)
-        if form.is_valid():
-            # Set owner before saving
-            from accounts.models import get_owner_filter
-            owner_filter = get_owner_filter(request.user)
-            category = form.save(commit=False)
-            if owner_filter:
-                category.owner = owner_filter
-            category.save()
-            messages.success(request, 'Category added successfully!')
-            return redirect('restaurant:manage_categories')
-    else:
-        form = MainCategoryForm()
-    
-    return render(request, 'restaurant/add_category.html', {'form': form})
-
-@login_required
-def add_subcategory(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    if request.method == 'POST':
-        form = SubCategoryForm(request.POST)
-        if form.is_valid():
-            # Verify the main category belongs to this owner
-            from accounts.models import get_owner_filter
-            owner_filter = get_owner_filter(request.user)
-            subcategory = form.save(commit=False)
-            
-            if owner_filter and subcategory.main_category.owner != owner_filter:
-                messages.error(request, 'Access denied. Category not found.')
-                return redirect('restaurant:manage_categories')
-            
-            subcategory.save()
-            messages.success(request, 'Subcategory added successfully!')
-            return redirect('restaurant:manage_categories')
-    else:
-        form = SubCategoryForm()
-        # Filter main categories by owner
-        from accounts.models import get_owner_filter
-        owner_filter = get_owner_filter(request.user)
-        if owner_filter:
-            form.fields['main_category'].queryset = MainCategory.objects.filter(owner=owner_filter)
-    
-    return render(request, 'restaurant/add_subcategory.html', {'form': form})
-
-@login_required
 def manage_staff(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -484,8 +382,9 @@ def manage_staff(request):
     return render(request, 'restaurant/manage_staff.html', {'staff_members': staff_members})
 
 @login_required
+@transaction.atomic
 def add_staff(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         if request.headers.get('Content-Type') == 'application/json':
             return JsonResponse({'success': False, 'message': 'Access denied. Owner privileges required.'})
         messages.error(request, 'Access denied. Owner privileges required.')
@@ -512,10 +411,15 @@ def add_staff(request):
                 if User.objects.filter(email=data['email']).exists():
                     return JsonResponse({'success': False, 'message': 'Email already exists'})
                 
-                # Validate role (owner can only add kitchen and customer_care)
-                allowed_roles = ['kitchen', 'customer_care']
-                if data['role'] not in allowed_roles:
-                    return JsonResponse({'success': False, 'message': 'Invalid role. Owner can only add Kitchen Staff or Customer Care.'})
+                # Validate role - owners can add staff roles only (not other owners)
+                staff_roles = ['manager', 'kitchen', 'bar', 'cashier', 'buffet', 'service', 'customer_care', 'customer']
+                owner_roles = ['main_owner', 'branch_owner', 'owner', 'administrator']
+                
+                if data['role'] in owner_roles:
+                    return JsonResponse({'success': False, 'message': 'Cannot create owner or administrator roles through this interface. Use Admin Panel.'})
+                
+                if data['role'] not in staff_roles:
+                    return JsonResponse({'success': False, 'message': 'Invalid role. Only staff roles can be added (kitchen, bar, cashier, buffet, service, customer care).'})
                 
                 # Get the role object
                 try:
@@ -562,83 +466,15 @@ def add_staff(request):
             user.save()
             messages.success(request, f'{user.get_full_name()} added as {user.role.get_name_display()}!')
             return redirect('restaurant:manage_staff')
+        else:
+            messages.error(request, 'Invalid form submission. Please use the dashboard form.')
+            return redirect('restaurant:owner_dashboard')
     else:
-        form = StaffForm()
-    
-    return render(request, 'restaurant/add_staff.html', {'form': form})
-
-@login_required
-def view_orders(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    status_filter = request.GET.get('status', 'all')
-    
-    # Get orders with owner filtering
-    from accounts.models import get_owner_filter
-    owner_filter = get_owner_filter(request.user)
-    if owner_filter:
-        orders = Order.objects.filter(table_info__owner=owner_filter).select_related('table_info', 'ordered_by', 'confirmed_by').order_by('-created_at')
-    else:
-        orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').order_by('-created_at')
-    
-    if status_filter != 'all':
-        orders = orders.filter(status=status_filter)
-    
-    context = {
-        'orders': orders,
-        'status_filter': status_filter,
-        'status_choices': Order.STATUS_CHOICES,
-    }
-    
-    return render(request, 'restaurant/view_orders.html', context)
-
-@login_required
-def manage_tables(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    # Get tables with owner filtering
-    from accounts.models import get_owner_filter
-    owner_filter = get_owner_filter(request.user)
-    if owner_filter:
-        tables = TableInfo.objects.filter(owner=owner_filter).order_by('tbl_no')
-    else:
-        tables = TableInfo.objects.order_by('tbl_no')
-    
-    return render(request, 'restaurant/manage_tables.html', {'tables': tables})
-
-@login_required
-def add_table(request):
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
-        messages.error(request, 'Access denied. Owner privileges required.')
-        return redirect('restaurant:home')
-    
-    if request.method == 'POST':
-        form = TableForm(request.POST)
-        if form.is_valid():
-            # Set owner before saving
-            from accounts.models import get_owner_filter
-            owner_filter = get_owner_filter(request.user)
-            table = form.save(commit=False)
-            if owner_filter:
-                table.owner = owner_filter
-            table.save()
-            messages.success(request, 'Table added successfully!')
-            return redirect('restaurant:manage_tables')
-    else:
-        form = TableForm()
-    
-    return render(request, 'restaurant/add_table.html', {'form': form})
-
-
-# Happy Hour Management Views
+        return redirect('restaurant:owner_dashboard')
 @login_required
 def manage_promotions(request):
     """View all Happy Hour promotions for the current owner"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -662,6 +498,10 @@ def manage_promotions(request):
         try:
             from restaurant.models_restaurant import Restaurant
             target_restaurant = Restaurant.objects.get(id=restaurant_filter)
+            # Security: verify user has access to this restaurant
+            if not request.user.is_administrator():
+                if not restaurant_context['accessible_restaurants'].filter(id=target_restaurant.id).exists():
+                    target_restaurant = None
         except Restaurant.DoesNotExist:
             target_restaurant = None
     elif current_restaurant and not view_all_restaurants:
@@ -711,17 +551,18 @@ def manage_promotions(request):
         elif status_filter == 'inactive':
             promotions = promotions.filter(is_active=False)
     
-    # Calculate real-time statistics for dashboard
-    total_promotions = promotions.count()
-    active_promotions = promotions.filter(is_active=True).count()
-    currently_running = len([p for p in promotions if p.is_currently_active()])
+    # Calculate real-time statistics — evaluate queryset once (3→1 query)
+    _promotions_list = list(promotions)
+    total_promotions = len(_promotions_list)
+    active_promotions = sum(1 for p in _promotions_list if p.is_active)
+    currently_running = sum(1 for p in _promotions_list if p.is_currently_active())
     
     # Pagination
     try:
         per_page = int(request.GET.get('per_page', 5))
     except (ValueError, TypeError):
         per_page = 5
-    paginator = Paginator(promotions, per_page)
+    paginator = Paginator(_promotions_list, per_page)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
@@ -738,9 +579,10 @@ def manage_promotions(request):
 
 
 @login_required
+@transaction.atomic
 def add_promotion(request):
     """Add a new Happy Hour promotion"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -818,9 +660,10 @@ def add_promotion(request):
 
 
 @login_required
+@transaction.atomic
 def edit_promotion(request, promotion_id):
     """Edit an existing Happy Hour promotion"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -943,7 +786,7 @@ def edit_promotion(request, promotion_id):
 @login_required
 def delete_promotion(request, promotion_id):
     """Delete a Happy Hour promotion"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -987,7 +830,7 @@ def delete_promotion(request, promotion_id):
 @login_required
 def get_restaurant_products(request):
     """Get products, categories, and subcategories for a specific restaurant (AJAX endpoint)"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
     
     try:
@@ -998,9 +841,17 @@ def get_restaurant_products(request):
         
         # Import Restaurant model
         from restaurant.models import Restaurant
+        from admin_panel.restaurant_utils import get_restaurant_context as _get_ctx
         
         # Get restaurant and determine owner
         restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+        
+        # Security: verify user has access to this restaurant
+        if not request.user.is_administrator():
+            _session_rid = request.session.get('selected_restaurant_id')
+            _ctx = _get_ctx(request.user, _session_rid, request)
+            if not _ctx['accessible_restaurants'].filter(id=restaurant.id).exists():
+                return JsonResponse({'success': False, 'message': 'Access denied'})
         
         if restaurant.is_main_restaurant:
             owner = restaurant.main_owner
@@ -1008,9 +859,21 @@ def get_restaurant_products(request):
             owner = restaurant.branch_owner or restaurant.main_owner
         
         # Get products, main categories, and subcategories for this owner
-        products = Product.objects.filter(main_category__owner=owner).values('id', 'name')
-        main_categories = MainCategory.objects.filter(owner=owner).values('id', 'name')
-        sub_categories = SubCategory.objects.filter(main_category__owner=owner).values('id', 'name')
+        products = Product.objects.filter(
+            Q(main_category__owner=owner) |
+            Q(main_category__restaurant__main_owner=owner) |
+            Q(main_category__restaurant__branch_owner=owner)
+        ).distinct().values('id', 'name')
+        main_categories = MainCategory.objects.filter(
+            Q(owner=owner) |
+            Q(restaurant__main_owner=owner) |
+            Q(restaurant__branch_owner=owner)
+        ).distinct().values('id', 'name')
+        sub_categories = SubCategory.objects.filter(
+            Q(main_category__owner=owner) |
+            Q(main_category__restaurant__main_owner=owner) |
+            Q(main_category__restaurant__branch_owner=owner)
+        ).distinct().values('id', 'name')
         
         return JsonResponse({
             'success': True,
@@ -1027,7 +890,7 @@ def get_restaurant_products(request):
 @login_required 
 def toggle_promotion(request, promotion_id):
     """Toggle promotion active/inactive status via AJAX"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     # Import restaurant context utilities
@@ -1065,7 +928,7 @@ def toggle_promotion(request, promotion_id):
 @login_required
 def promotion_preview(request, promotion_id):
     """Preview promotion details and affected products"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -1080,7 +943,9 @@ def promotion_preview(request, promotion_id):
         Q(pk__in=promotion.products.all()) |
         Q(main_category__in=promotion.main_categories.all()) |
         Q(sub_category__in=promotion.sub_categories.all()),
-        main_category__owner=owner_filter
+        Q(main_category__owner=owner_filter) |
+        Q(main_category__restaurant__main_owner=owner_filter) |
+        Q(main_category__restaurant__branch_owner=owner_filter)
     ).distinct().select_related('main_category', 'sub_category')
     
     context = {
@@ -1105,7 +970,7 @@ from datetime import datetime, timedelta
 @login_required
 def manage_events(request):
     """List all events for the restaurant owner"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -1211,9 +1076,10 @@ def manage_events(request):
 
 
 @login_required
+@transaction.atomic
 def add_event(request):
     """Add a new event"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -1250,9 +1116,10 @@ def add_event(request):
 
 
 @login_required
+@transaction.atomic
 def edit_event(request, event_id):
     """Edit an existing event"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -1291,7 +1158,7 @@ def edit_event(request, event_id):
 @login_required
 def view_event(request, event_id):
     """View event details"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -1319,7 +1186,7 @@ def view_event(request, event_id):
 @login_required
 def delete_event(request, event_id):
     """Delete an event"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     from accounts.models import get_owner_filter
@@ -1348,7 +1215,7 @@ def delete_event(request, event_id):
 @login_required
 def update_event_status(request, event_id):
     """Update event status via AJAX"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     if request.method != 'POST':
@@ -1384,7 +1251,7 @@ def update_event_status(request, event_id):
 @login_required
 def event_reports(request):
     """Event reports and analytics"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
     
@@ -1497,12 +1364,13 @@ def event_reports(request):
 
 
 @login_required
+@transaction.atomic
 def record_event_payment(request, event_id):
     """Record a payment for an event"""
     import logging
     logger = logging.getLogger(__name__)
     
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     if request.method != 'POST':
@@ -1553,10 +1421,10 @@ def record_event_payment(request, event_id):
         return JsonResponse({'success': False, 'message': 'Event not found.'})
     except (ValueError, TypeError) as e:
         logger.error(f"Payment error: {str(e)}")
-        return JsonResponse({'success': False, 'message': f'Invalid payment amount: {str(e)}'})
+        return JsonResponse({'success': False, 'message': 'Invalid payment amount. Please enter a valid number.'})
     except Exception as e:
         logger.error(f"Unexpected error recording payment: {str(e)}")
-        return JsonResponse({'success': False, 'message': f'Error: {str(e)}'})
+        return JsonResponse({'success': False, 'message': 'An error occurred while recording the payment.'}, status=500)
 
 
 @login_required
@@ -1565,7 +1433,7 @@ def approve_event_payment(request, event_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Invalid request method'})
     
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     from accounts.models import get_owner_filter
@@ -1596,7 +1464,8 @@ def approve_event_payment(request, event_id):
     except Event.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Event not found.'})
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error approving payment: {str(e)}'})
+        logger.error(f"Error approving event payment: {str(e)}")
+        return JsonResponse({'success': False, 'message': 'An error occurred while approving the payment.'}, status=500)
 
 
 @login_required
@@ -1605,7 +1474,7 @@ def export_events_csv(request):
     import csv
     from django.http import HttpResponse
     
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return HttpResponse('Access denied', status=403)
     
     from accounts.models import get_owner_filter
@@ -1684,19 +1553,19 @@ def export_events_csv(request):
             event.event_date.strftime('%Y-%m-%d'),
             event.start_time.strftime('%H:%M') if event.start_time else '',
             event.end_time.strftime('%H:%M') if event.end_time else '',
-            event.title,
+            _safe_csv(event.title),
             event.get_event_type_display(),
             event.total_pax,
             f'{currency_symbol}{event.price_per_pax}',
             f'{currency_symbol}{event.total_amount}',
             f'{currency_symbol}{event.amount_paid}',
             f'{currency_symbol}{event.balance_due}',
-            event.contact_name,
-            event.contact_phone,
-            event.contact_email or '',
+            _safe_csv(event.contact_name),
+            _safe_csv(event.contact_phone),
+            _safe_csv(event.contact_email or ''),
             event.get_status_display(),
             event.get_payment_status_display(),
-            event.description or '',
+            _safe_csv(event.description or ''),
             event.created_at.strftime('%Y-%m-%d %H:%M')
         ])
     
@@ -1722,7 +1591,7 @@ def export_events_pdf(request):
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from io import BytesIO
     
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return HttpResponse('Access denied', status=403)
     
     from accounts.models import get_owner_filter

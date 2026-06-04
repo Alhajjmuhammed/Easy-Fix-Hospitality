@@ -17,6 +17,9 @@ class PrintJob(models.Model):
         ('kot', 'Kitchen Order Ticket'),
         ('bot', 'Bar Order Ticket'),
         ('receipt', 'Payment Receipt'),
+        ('bill', 'Bill / Pre-Payment Receipt'),
+        ('buffet', 'Buffet Order Ticket'),
+        ('service', 'Service Order Ticket'),
     ]
     
     STATUS_CHOICES = [
@@ -29,7 +32,7 @@ class PrintJob(models.Model):
     # Restaurant identification
     restaurant = models.ForeignKey(
         User, 
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='print_jobs',
         help_text="Restaurant owner whose printer should print this"
     )
@@ -52,14 +55,14 @@ class PrintJob(models.Model):
     # Related objects
     order = models.ForeignKey(
         'orders.Order',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='print_jobs'
     )
     payment = models.ForeignKey(
         'cashier.Payment',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='print_jobs'

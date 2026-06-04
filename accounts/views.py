@@ -2,11 +2,11 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Q
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
 from decimal import Decimal
 import json
 import logging
@@ -63,12 +63,20 @@ def login_view(request):
                     return redirect('system_admin:dashboard')  # Redirect admins to system dashboard
                 elif user.is_owner():
                     return redirect('admin_panel:admin_dashboard')  # Owners now use admin panel
+                elif user.is_manager():
+                    return redirect('admin_panel:admin_dashboard')  # Managers use same dashboard as owners
                 elif user.is_kitchen_staff():
                     return redirect('orders:kitchen_dashboard')
                 elif user.is_customer_care():
                     return redirect('orders:customer_care_dashboard')
                 elif user.is_cashier():
                     return redirect('cashier:dashboard')
+                elif user.is_bar_staff():
+                    return redirect('orders:bar_dashboard')
+                elif user.is_buffet_staff():
+                    return redirect('orders:buffet_dashboard')
+                elif user.is_service_staff():
+                    return redirect('orders:service_dashboard')
                 else:
                     return redirect('restaurant:menu')
             else:
@@ -92,6 +100,7 @@ def login_view(request):
     
     return render(request, 'accounts/login.html', {'form': form})
 
+@login_required
 @require_POST
 def logout_view(request):
     """Logout view - requires POST to prevent CSRF logout attacks"""
@@ -194,10 +203,20 @@ def profile_view(request):
         from orders.models import Order
         recent_orders = Order.objects.filter(ordered_by=user).order_by('-created_at')[:5]
     
-    # Get staff management data for owner/admin
+    # Get staff management data for owner/admin/manager
+    # Security: always scope to the owner's restaurant, never return all-system staff
     staff_users = []
-    if user.is_owner() or user.is_administrator():
-        staff_users = User.objects.filter(role__name__in=['customer_care', 'kitchen']).select_related('role')
+    if user.is_owner():
+        staff_users = User.objects.filter(
+            role__name__in=['customer_care', 'kitchen'],
+            owner=user,
+        ).select_related('role')
+    elif user.is_administrator() or user.is_manager():
+        if user.owner_id:
+            staff_users = User.objects.filter(
+                role__name__in=['customer_care', 'kitchen'],
+                owner=user.owner,
+            ).select_related('role')
     
     context = {
         'user': user,
@@ -217,6 +236,15 @@ def profile_view(request):
         template = 'accounts/profile_kitchen.html'
     elif user.is_cashier():
         template = 'accounts/profile_cashier.html'
+        from restaurant.models import Product
+        from .models import get_owner_filter
+        _owner = get_owner_filter(user)
+        if _owner:
+            context['waste_products'] = Product.objects.filter(
+                Q(main_category__owner=_owner) |
+                Q(main_category__restaurant__main_owner=_owner) |
+                Q(main_category__restaurant__branch_owner=_owner)
+            ).distinct().order_by('name')
     else:  # customer
         template = 'accounts/profile_customer.html'
     
@@ -367,6 +395,7 @@ def qr_code_access(request, qr_code):
         return redirect('accounts:login')
 
 
+@rate_limit_registration
 def customer_register_view(request, qr_code):
     """Customer registration specifically for QR code access"""
     try:
@@ -524,8 +553,8 @@ def customer_register_view(request, qr_code):
 @require_POST
 def update_tax_rate(request):
     """Update restaurant owner's tax rate"""
-    if not request.user.is_owner():
-        return JsonResponse({'success': False, 'message': 'Only restaurant owners can update tax rates.'})
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
+        return JsonResponse({'success': False, 'message': 'Only restaurant owners and managers can update tax rates.'})
     
     try:
         data = json.loads(request.body)
@@ -545,6 +574,7 @@ def update_tax_rate(request):
     except (json.JSONDecodeError, ValueError, TypeError) as e:
         return JsonResponse({'success': False, 'message': 'Invalid tax rate value'})
     except Exception as e:
+        logger.error(f"Unexpected error updating tax rate: {e}", exc_info=True)
         return JsonResponse({'success': False, 'message': 'An error occurred while updating tax rate'})
 
 
@@ -659,6 +689,6 @@ def menu_qr_access(request, menu_qr_code):
         return render(request, 'restaurant/menu_view_only.html', context)
         
     except Exception as e:
-        logger.error(f"Error in menu QR access: {str(e)}")
+        logger.error(f"Error in menu QR access: {str(e)}", exc_info=True)
         messages.error(request, 'An error occurred while accessing the menu.')
         return redirect('accounts:login')

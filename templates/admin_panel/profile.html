@@ -144,7 +144,7 @@
     </div>
 </div>
 
-{% if user.is_owner %}
+{% if user.is_owner or user.is_manager %}
 <!-- Restaurant Settings Card -->
 <div class="row">
     <div class="col-lg-8 col-md-12">
@@ -563,7 +563,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-{% if user.is_owner %}
+{% if user.is_owner or user.is_manager %}
 // Currency symbols mapping
 const currencySymbols = {
     'USD': '$',

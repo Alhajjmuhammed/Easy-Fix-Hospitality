@@ -2,77 +2,367 @@
 
 {% block title %}Login - Restaurant System{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Override base container to fill viewport */
+    main.container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .login-wrapper {
+        min-height: calc(100vh - 120px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #fdf0f5 0%, #fce4ef 50%, #f8d0e6 100%);
+        padding: 2rem 1rem;
+    }
+
+    .login-card {
+        display: flex;
+        width: 100%;
+        max-width: 900px;
+        min-height: 520px;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+        border: none;
+    }
+
+    /* ── Left decorative panel ── */
+    .login-brand-panel {
+        flex: 1;
+        background: linear-gradient(160deg, #d63384 0%, #b02a6a 60%, #8a1a4e 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem 2rem;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-brand-panel::before {
+        content: '';
+        position: absolute;
+        width: 300px; height: 300px;
+        background: rgba(255,255,255,0.06);
+        border-radius: 50%;
+        top: -80px; right: -80px;
+    }
+
+    .login-brand-panel::after {
+        content: '';
+        position: absolute;
+        width: 200px; height: 200px;
+        background: rgba(255,255,255,0.04);
+        border-radius: 50%;
+        bottom: -60px; left: -60px;
+    }
+
+    .brand-logo {
+        font-size: 5rem;
+        margin-bottom: 1.25rem;
+        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+        line-height: 1;
+    }
+
+    .brand-logo i {
+        font-size: 5rem;
+        color: rgba(255,255,255,0.95);
+    }
+
+    .brand-title {
+        font-size: 1.9rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+
+    .brand-subtitle {
+        font-size: 0.95rem;
+        opacity: 0.85;
+        text-align: center;
+        line-height: 1.6;
+    }
+
+    .brand-features {
+        list-style: none;
+        padding: 0;
+        margin: 2rem 0 0;
+        width: 100%;
+        max-width: 220px;
+    }
+
+    .brand-features li {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 0.88rem;
+        opacity: 0.9;
+        margin-bottom: 0.6rem;
+    }
+
+    .brand-features li i {
+        font-size: 1rem;
+        opacity: 0.95;
+    }
+
+    /* ── Right form panel ── */
+    .login-form-panel {
+        flex: 1;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 3rem 2.5rem;
+    }
+
+    .login-form-panel h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #1a1a2e;
+        margin-bottom: 0.35rem;
+    }
+
+    .login-form-panel .lead-text {
+        color: #6c757d;
+        font-size: 0.93rem;
+        margin-bottom: 2rem;
+    }
+
+    /* Form inputs */
+    .form-floating-custom {
+        position: relative;
+        margin-bottom: 1.25rem;
+    }
+
+    .input-icon-wrap {
+        position: relative;
+    }
+
+    .input-icon-wrap .input-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #adb5bd;
+        font-size: 1rem;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .input-icon-wrap input {
+        padding-left: 2.6rem !important;
+        height: 52px;
+        border-radius: 12px !important;
+        border: 1.5px solid #e0e0e0 !important;
+        font-size: 0.95rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        background: #f8f9fc;
+    }
+
+    .input-icon-wrap input:focus {
+        border-color: #d63384 !important;
+        box-shadow: 0 0 0 3px rgba(214, 51, 132, 0.12) !important;
+        background: #fff;
+    }
+
+    /* Eye toggle */
+    .pw-toggle {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        padding: 0;
+        color: #adb5bd;
+        font-size: 1.05rem;
+        cursor: pointer;
+        z-index: 3;
+        transition: color 0.2s;
+    }
+
+    .pw-toggle:hover { color: #d63384; }
+
+    .form-label-custom {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #495057;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.4rem;
+    }
+
+    /* Sign in button */
+    .btn-signin {
+        height: 52px;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #d63384, #9b1d5a);
+        border: none;
+        letter-spacing: 0.03em;
+        transition: transform 0.15s, box-shadow 0.15s;
+        box-shadow: 0 4px 16px rgba(214, 51, 132, 0.35);
+    }
+
+    .btn-signin:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 22px rgba(214, 51, 132, 0.45);
+        background: linear-gradient(135deg, #e04090, #b02a6a);
+    }
+
+    .btn-signin:active { transform: translateY(0); }
+
+    /* Error alert */
+    .login-alert {
+        border-radius: 10px;
+        font-size: 0.88rem;
+        padding: 0.65rem 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .divider-text {
+        text-align: center;
+        color: #adb5bd;
+        font-size: 0.85rem;
+        margin: 1.25rem 0 0;
+    }
+
+    .divider-text a {
+        color: #d63384;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .divider-text a:hover { text-decoration: underline; }
+
+    /* Responsive: stack on mobile */
+    @media (max-width: 640px) {
+        .login-brand-panel { display: none; }
+        .login-form-panel { padding: 2.5rem 1.75rem; border-radius: 24px; }
+        .login-card { max-width: 420px; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow">
-            <div class="card-body p-4">
-                <div class="text-center mb-4">
-                    <i class="bi bi-person-circle display-4 text-primary"></i>
-                    <h3 class="card-title mt-2">Welcome Back</h3>
-                    <p class="text-muted">Please sign in to your account</p>
-                    
-                    {% if form.non_field_errors %}
-                        <div class="alert alert-danger py-2 mt-3 mb-0" role="alert">
-                            <i class="bi bi-exclamation-triangle"></i> {{ form.non_field_errors.0 }}
+<div class="login-wrapper">
+    <div class="login-card">
+
+        <!-- Left branding panel -->
+        <div class="login-brand-panel">
+            <div class="brand-logo"><i class="bi bi-shop"></i></div>
+            <div class="brand-title">Restaurant System</div>
+            <p class="brand-subtitle">Your complete restaurant<br>management platform</p>
+            <ul class="brand-features">
+                <li><i class="bi bi-graph-up-arrow"></i> Real-time Reports</li>
+                <li><i class="bi bi-boxes"></i> Inventory Control</li>
+                <li><i class="bi bi-receipt"></i> Order Management</li>
+                <li><i class="bi bi-cash-coin"></i> Money Flow Tracking</li>
+            </ul>
+        </div>
+
+        <!-- Right form panel -->
+        <div class="login-form-panel">
+            <h2><i class="bi bi-hand-wave me-1" style="color:#d63384;"></i> Welcome back!</h2>
+            <p class="lead-text">Sign in to continue to your dashboard</p>
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger login-alert" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    {{ form.non_field_errors.0 }}
+                </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <!-- Username -->
+                <div class="form-floating-custom">
+                    <label class="form-label-custom" for="{{ form.username.id_for_label }}">Username</label>
+                    <div class="input-icon-wrap">
+                        <i class="bi bi-person-fill input-icon"></i>
+                        <input type="text"
+                               id="{{ form.username.id_for_label }}"
+                               name="{{ form.username.html_name }}"
+                               class="form-control{% if form.username.errors %} is-invalid{% endif %}"
+                               placeholder="Enter your username"
+                               value="{{ form.username.value|default:'' }}"
+                               autocomplete="username"
+                               autofocus>
+                    </div>
+                    {% if form.username.errors %}
+                        <div class="text-danger small mt-1">
+                            <i class="bi bi-exclamation-circle me-1"></i>{{ form.username.errors.0 }}
                         </div>
                     {% endif %}
                 </div>
 
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="{{ form.username.id_for_label }}" class="form-label">
-                            <i class="bi bi-person"></i> Username
-                        </label>
-                        {{ form.username }}
-                        {% if form.username.errors %}
-                            <div class="text-danger small mt-1">
-                                {{ form.username.errors.0 }}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="{{ form.password.id_for_label }}" class="form-label">
-                            <i class="bi bi-lock"></i> Password
-                        </label>
-                        {{ form.password }}
-                        {% if form.password.errors %}
-                            <div class="text-danger small mt-1">
-                                {{ form.password.errors.0 }}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="bi bi-box-arrow-in-right"></i> Sign In
+                <!-- Password -->
+                <div class="form-floating-custom">
+                    <label class="form-label-custom" for="{{ form.password.id_for_label }}">Password</label>
+                    <div class="input-icon-wrap">
+                        <i class="bi bi-lock-fill input-icon"></i>
+                        <input type="password"
+                               id="{{ form.password.id_for_label }}"
+                               name="{{ form.password.html_name }}"
+                               class="form-control{% if form.password.errors %} is-invalid{% endif %}"
+                               placeholder="Enter your password"
+                               autocomplete="current-password">
+                        <button type="button" class="pw-toggle" id="pw-eye" aria-label="Toggle password visibility">
+                            <i class="bi bi-eye-fill" id="pw-eye-icon"></i>
                         </button>
                     </div>
-                </form>
-
-                <div class="text-center mt-3">
-                    <p class="mb-0">Don't have an account? 
-                        <a href="{% url 'accounts:register' %}" class="text-primary text-decoration-none">
-                            Sign up here
-                        </a>
-                    </p>
+                    {% if form.password.errors %}
+                        <div class="text-danger small mt-1">
+                            <i class="bi bi-exclamation-circle me-1"></i>{{ form.password.errors.0 }}
+                        </div>
+                    {% endif %}
                 </div>
-            </div>
+
+                <!-- Submit -->
+                <div class="d-grid mt-1">
+                    <button type="submit" class="btn btn-primary btn-signin">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+                    </button>
+                </div>
+            </form>
+
+            <p class="divider-text">
+                Don't have an account? <a href="{% url 'accounts:register' %}">Sign up here</a>
+            </p>
         </div>
+
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Unregister any service workers to prevent auto-reload
+// Password visibility toggle
+document.getElementById('pw-eye').addEventListener('click', function () {
+    var input = document.getElementById('{{ form.password.id_for_label }}');
+    var icon  = document.getElementById('pw-eye-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash-fill';
+    } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye-fill';
+    }
+});
+
+// Unregister service workers
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (let registration of registrations) {
-            registration.unregister();
-        }
+        registrations.forEach(function(r) { r.unregister(); });
     });
 }
 </script>

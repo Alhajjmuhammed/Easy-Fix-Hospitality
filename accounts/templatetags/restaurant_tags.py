@@ -64,8 +64,8 @@ def get_user_currency_info(user, request=None):
                 except Exception:
                     pass
         
-        # For owners, check their own currency setting
-        if user.is_owner() or user.is_main_owner() or user.is_branch_owner():
+        # For owners and managers, check their own currency setting
+        if user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager():
             return user.currency_code, CURRENCY_SYMBOLS.get(user.currency_code, '$')
         
         # For staff, check their owner's currency setting
@@ -151,8 +151,8 @@ def get_restaurant_name(context):
     
     if user.is_customer():
         return user.get_restaurant_name(request)
-    elif user.is_owner() or user.is_main_owner() or user.is_branch_owner():
-        # Use get_restaurant_name for all owners to handle branch→main logic
+    elif user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager():
+        # Use get_restaurant_name for all owners and managers to handle branch→main logic
         return user.get_restaurant_name(request)
     elif user.is_kitchen_staff() or user.is_bar_staff() or user.is_buffet_staff() or user.is_service_staff() or user.is_cashier() or user.is_customer_care():
         # For staff members, use the get_restaurant_name method

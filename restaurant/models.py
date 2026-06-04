@@ -1,7 +1,31 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from decimal import Decimal
+import os
+
+
+def validate_image_file(file):
+    """Validate uploaded image: allowed types, max 5MB size, and real content check."""
+    allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext not in allowed_extensions:
+        raise ValidationError(
+            f'Unsupported file type "{ext}". Allowed: {", ".join(allowed_extensions)}'
+        )
+    max_size = 5 * 1024 * 1024  # 5 MB
+    if file.size > max_size:
+        raise ValidationError('Image file size must be under 5 MB.')
+    # Verify actual file content matches a real image (prevents disguised uploads)
+    try:
+        from PIL import Image
+        file.seek(0)
+        img = Image.open(file)
+        img.verify()  # Raises if not a valid image
+        file.seek(0)  # Reset for subsequent save
+    except Exception:
+        raise ValidationError('Uploaded file is not a valid image.')
 
 User = get_user_model()
 
@@ -10,12 +34,12 @@ from .models_restaurant import Restaurant
 
 class TableInfo(models.Model):
     # Legacy owner field (will be deprecated)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tables', 
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name='tables', 
                              limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']}, 
                              null=True, blank=True)
     
     # New restaurant field for hierarchical management
-    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tables',
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.PROTECT, related_name='tables',
                                   null=True, blank=True, help_text="Restaurant/branch this table belongs to")
     
     tbl_no = models.CharField(
@@ -62,7 +86,16 @@ class TableInfo(models.Model):
         if self.restaurant:
             return self.restaurant.branch_owner or self.restaurant.main_owner
         return self.owner
-    
+
+    @property
+    def display_restaurant_name(self):
+        """Return restaurant name regardless of which FK (owner or restaurant) is set"""
+        if self.restaurant:
+            return self.restaurant.name
+        if self.owner:
+            return self.owner.restaurant_name or self.owner.username
+        return ''
+
     def get_tax_rate(self):
         """Get tax rate for this table from Restaurant or Owner"""
         from decimal import Decimal
@@ -121,17 +154,17 @@ class TableInfo(models.Model):
 
 class MainCategory(models.Model):
     # Legacy owner field (will be deprecated)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='main_categories',
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name='main_categories',
                              limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']}, 
                              null=True, blank=True)
     
     # New restaurant field for hierarchical management
-    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='main_categories',
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.PROTECT, related_name='main_categories',
                                   null=True, blank=True, help_text="Restaurant/branch this category belongs to")
     
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    image = models.ImageField(upload_to='categories/', blank=True, null=True)
+    image = models.ImageField(upload_to='categories/', blank=True, null=True, validators=[validate_image_file])
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -183,8 +216,17 @@ class MainCategory(models.Model):
             return self.restaurant.branch_owner or self.restaurant.main_owner
         return self.owner
 
+    @property
+    def display_restaurant_name(self):
+        """Return restaurant name regardless of which FK (owner or restaurant) is set"""
+        if self.restaurant:
+            return self.restaurant.name
+        if self.owner:
+            return self.owner.restaurant_name or self.owner.username
+        return ''
+
 class SubCategory(models.Model):
-    main_category = models.ForeignKey(MainCategory, on_delete=models.CASCADE, related_name='subcategories')
+    main_category = models.ForeignKey(MainCategory, on_delete=models.PROTECT, related_name='subcategories')
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
@@ -216,8 +258,8 @@ class SubCategory(models.Model):
 class Product(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField()
-    main_category = models.ForeignKey(MainCategory, on_delete=models.CASCADE, related_name='products')
-    sub_category = models.ForeignKey(SubCategory, on_delete=models.CASCADE, related_name='products', null=True, blank=True)
+    main_category = models.ForeignKey(MainCategory, on_delete=models.PROTECT, related_name='products')
+    sub_category = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, related_name='products', null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     available_in_stock = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     is_available = models.BooleanField(default=True)
@@ -253,6 +295,20 @@ class Product(models.Model):
     
     def get_current_price(self):
         """Get current price considering active Happy Hour promotions"""
+        # Use pre-computed cache set by the menu view (avoids N+1)
+        if hasattr(self, '_calculated_price_cache'):
+            return self._calculated_price_cache
+
+        # If active promotion cache is already populated, derive price from it
+        # (avoids a second DB query when get_active_promotion() was already called)
+        if hasattr(self, '_active_promotion_cache'):
+            promotion = self._active_promotion_cache
+            if promotion:
+                discount_amount = self.price * (promotion.discount_percentage / Decimal('100'))
+                discounted_price = self.price - discount_amount
+                return max(discounted_price, Decimal('0.01'))
+            return self.price
+
         from django.utils import timezone
         
         # Get current time in the configured timezone
@@ -293,6 +349,10 @@ class Product(models.Model):
     
     def get_active_promotion(self):
         """Get the currently active promotion for this product"""
+        # Use pre-computed cache set by the menu view (avoids N+1)
+        if hasattr(self, '_active_promotion_cache'):
+            return self._active_promotion_cache
+
         from django.utils import timezone
         
         # Get current time in the configured timezone
@@ -348,7 +408,7 @@ class HappyHourPromotion(models.Model):
         ('7', 'Sunday'),
     ]
     
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='happy_hour_promotions',
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name='happy_hour_promotions',
                              limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']})
     name = models.CharField(max_length=100, help_text="e.g., 'Happy Hour Special', 'Weekend Discount'")
     description = models.TextField(blank=True, help_text="Optional description of the promotion")
@@ -433,7 +493,9 @@ class HappyHourPromotion(models.Model):
             Q(pk__in=self.products.all()) |
             Q(main_category__in=self.main_categories.all()) |
             Q(sub_category__in=self.sub_categories.all()),
-            main_category__owner=self.owner
+            Q(main_category__owner=self.owner) |
+            Q(main_category__restaurant__main_owner=self.owner) |
+            Q(main_category__restaurant__branch_owner=self.owner)
         ).distinct().count()
         
         return total_products
@@ -485,7 +547,7 @@ class Event(models.Model):
     # Owner/Restaurant relationship
     owner = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='events',
         limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']},
         help_text="Restaurant owner managing this event"

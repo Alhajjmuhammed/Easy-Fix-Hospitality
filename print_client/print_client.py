@@ -257,6 +257,18 @@ class ThermalPrinter:
             formatted += CENTER + DOUBLE_SIZE + BOLD_ON
             formatted += "BAR ORDER\n"
             formatted += BOLD_OFF + NORMAL_SIZE + LEFT
+        elif job_type == 'buffet':
+            formatted += CENTER + DOUBLE_SIZE + BOLD_ON
+            formatted += "BUFFET ORDER\n"
+            formatted += BOLD_OFF + NORMAL_SIZE + LEFT
+        elif job_type == 'service':
+            formatted += CENTER + DOUBLE_SIZE + BOLD_ON
+            formatted += "SERVICE ORDER\n"
+            formatted += BOLD_OFF + NORMAL_SIZE + LEFT
+        elif job_type == 'bill':
+            formatted += CENTER + DOUBLE_SIZE + BOLD_ON
+            formatted += "BILL\n"
+            formatted += BOLD_OFF + NORMAL_SIZE + LEFT
         elif job_type == 'receipt':
             # Receipt already has its own formatting in content
             pass
@@ -268,12 +280,12 @@ class ThermalPrinter:
         formatted += FEED
         formatted += CUT
         
-        # Open cash drawer for receipts only (not KOT/BOT)
+        # Open cash drawer for receipts only (not KOT/BOT/BILL/BUFFET/SERVICE)
         # Some printers need drawer command AFTER cut, some BEFORE
         # We send it AFTER cut which works for most printers
         if job_type == 'receipt':
             formatted += OPEN_DRAWER
-            logger.info("💰 Cash drawer command added to receipt")
+            logger.info("Cash drawer command added to receipt")
         
         return formatted
     

@@ -26,8 +26,8 @@ class Order(models.Model):
     ]
     
     order_number = models.CharField(max_length=20, unique=True)
-    table_info = models.ForeignKey(TableInfo, on_delete=models.CASCADE, related_name='orders')
-    ordered_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders_placed')
+    table_info = models.ForeignKey(TableInfo, on_delete=models.PROTECT, related_name='orders')
+    ordered_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='orders_placed')
     confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders_confirmed')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
@@ -39,7 +39,10 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Order {self.order_number} - Table {self.table_info.tbl_no} ({self.get_owner().restaurant_name})"
+        table_num = self.table_info.tbl_no if self.table_info else 'Unknown'
+        owner = self.get_owner()
+        restaurant = owner.restaurant_name if owner else 'Unknown'
+        return f"Order {self.order_number} - Table {table_num} ({restaurant})"
     
     @property
     def owner(self):
@@ -55,24 +58,25 @@ class Order(models.Model):
     
     def get_subtotal(self):
         """Get subtotal before tax and discounts"""
-        return sum(item.get_total_price() for item in self.order_items.all())
+        return sum(item.get_subtotal() for item in self.order_items.all())
     
     def get_total_discount(self):
         """Calculate total discount amount from promotional items"""
         total_discount = Decimal('0.00')
         for item in self.order_items.all():
-            if hasattr(item.product, 'has_active_promotion') and item.product.has_active_promotion():
-                original_price = item.product.price
-                discounted_price = item.product.get_current_price()
-                discount_per_item = original_price - discounted_price
+            if not hasattr(item.product, 'get_active_promotion'):
+                continue
+            promo = item.product.get_active_promotion()
+            if promo:
+                # Derive discount directly from promotion — no 2nd DB query
+                discount_per_item = item.product.price * (promo.discount_percentage / Decimal('100'))
                 total_discount += discount_per_item * item.quantity
         return total_discount
     
     def get_tax_amount(self):
-        """Calculate tax amount using restaurant/branch configured tax rate"""
-        # Use centralized tax rate from table
-        tax_rate = self.table_info.get_tax_rate()
-        return self.get_subtotal() * tax_rate
+        """Calculate tax from stored order total — historically accurate regardless of current tax rate."""
+        tax = self.total_amount - self.get_subtotal()
+        return max(Decimal('0.00'), tax)
     
     @property
     def tax_rate(self):
@@ -88,9 +92,10 @@ class Order(models.Model):
         return subtotal + tax
     
     def calculate_total(self):
-        total = sum(item.get_subtotal() for item in self.order_items.all())
-        self.total_amount = total
-        return total
+        subtotal = sum(item.get_subtotal() for item in self.order_items.all())
+        tax_rate = self.table_info.get_tax_rate() if self.table_info else 0
+        self.total_amount = subtotal * (1 + tax_rate)
+        return self.total_amount
     
     def is_table_occupying(self):
         """Check if this order should occupy the table"""
@@ -131,12 +136,15 @@ class Order(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['payment_status']),
             models.Index(fields=['created_at']),
-            models.Index(fields=['table_info', 'status']),  # Compound index for common queries
+            models.Index(fields=['table_info', 'status']),          # Compound index for common queries
+            models.Index(fields=['table_info', 'payment_status']),  # Payment status lookups
+            models.Index(fields=['ordered_by']),                    # User order history
+            models.Index(fields=['created_at', 'status']),          # Date-filtered status reports
         ]
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.IntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     special_notes = models.TextField(blank=True)
@@ -157,7 +165,7 @@ class OrderItem(models.Model):
         return self.get_subtotal()
     
     def save(self, *args, **kwargs):
-        if not self.unit_price:
+        if self.unit_price is None:
             self.unit_price = self.product.price
         super().save(*args, **kwargs)
 
@@ -169,8 +177,8 @@ class BillRequest(models.Model):
         ('completed', 'Completed'),
     ]
     
-    table_info = models.ForeignKey(TableInfo, on_delete=models.CASCADE, related_name='bill_requests')
-    requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bill_requests')
+    table_info = models.ForeignKey(TableInfo, on_delete=models.SET_NULL, null=True, blank=True, related_name='bill_requests')
+    requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='bill_requests')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     completed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='bill_requests_completed')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -178,14 +186,21 @@ class BillRequest(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['table_info', 'status']),
+        ]
     
     def __str__(self):
         return f"Bill Request - Table {self.table_info.tbl_no} ({self.status})"
-    
+
     @property
     def owner(self):
         """Get the restaurant owner this bill request belongs to"""
-        return self.table_info.owner
+        if self.table_info:
+            return self.table_info.get_owner()
+        return None
 
 
 # Import PrintJob model

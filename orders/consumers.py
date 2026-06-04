@@ -117,35 +117,54 @@ class OrderConsumer(AsyncWebsocketConsumer):
     def check_order_permission(self, user, order_id):
         """Check if user has permission to view this order"""
         try:
-            order = Order.objects.select_related('ordered_by', 'table_info__owner').get(id=order_id)
-            
-            # Order owner can view
-            if order.ordered_by == user:
-                return True
-                
-            # Staff from same restaurant can view
-            if hasattr(user, 'owner') and user.owner:
-                if hasattr(order, 'table_info') and order.table_info and hasattr(order.table_info, 'owner'):
-                    if order.table_info.owner == user.owner:
-                        return True
-            
-            # Restaurant owner can view their own orders
-            if user.is_owner() or user.is_main_owner() or user.is_branch_owner():
-                if hasattr(order, 'table_info') and order.table_info and hasattr(order.table_info, 'owner'):
-                    if order.table_info.owner == user:
-                        return True
-            
+            order = Order.objects.select_related(
+                'ordered_by',
+                'table_info__owner',
+                'table_info__restaurant__main_owner',
+                'table_info__restaurant__branch_owner',
+            ).get(id=order_id)
+
             # System administrators can view all
             if user.is_administrator():
                 return True
-                
+
+            # The customer who placed the order can view it
+            if order.ordered_by == user:
+                return True
+
+            # Get the restaurant this table belongs to
+            table = order.table_info
+            if not table:
+                return False
+
+            # Check via restaurant FK (new system)
+            if table.restaurant:
+                rest = table.restaurant
+                if (rest.main_owner == user or
+                        rest.branch_owner == user or
+                        (hasattr(user, 'owner') and user.owner and
+                         (rest.main_owner == user.owner or rest.branch_owner == user.owner))):
+                    return True
+
+            # Check via legacy owner FK (old system)
+            if table.owner:
+                if table.owner == user:
+                    return True
+                # Staff assigned to this owner
+                if hasattr(user, 'owner') and user.owner and user.owner == table.owner:
+                    return True
+
+            logger.warning(
+                f"User {user.username} (role={getattr(user.role, 'name', 'unknown')}) "
+                f"denied access to order {order_id} WebSocket"
+            )
             return False
-            
+
         except Order.DoesNotExist:
-            logger.error(f"Order {order_id} not found")
+            logger.error(f"Order {order_id} not found during WebSocket permission check")
             return False
         except Exception as e:
-            logger.error(f"Error checking order permission: {str(e)}")
+            logger.error(f"Error checking order permission for order {order_id}: {str(e)}")
             return False
 
     @database_sync_to_async
@@ -168,7 +187,7 @@ class OrderConsumer(AsyncWebsocketConsumer):
                 'total_amount': str(order.total_amount),
                 'created_at': order.created_at.isoformat() if order.created_at else None,
                 'updated_at': order.updated_at.isoformat() if order.updated_at else None,
-                'items_count': order.order_items.count(),
+                'items_count': len(order.order_items.all()),  # Uses prefetch cache
                 'confirmed_by': (order.confirmed_by.get_full_name() 
                                if order.confirmed_by else None),
             }
@@ -193,8 +212,8 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
                 await self.close(code=4001)
                 return
             
-            # Only staff members can connect to restaurant updates
-            if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or 
+            # Only staff members and managers can connect to restaurant updates
+            if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager() or
                     user.is_kitchen_staff() or user.is_bar_staff() or user.is_buffet_staff() or 
                     user.is_service_staff() or user.is_customer_care() or user.is_cashier()):
                 logger.warning(f"User {user.username} with role {user.role} attempted unauthorized restaurant WebSocket connection")
@@ -303,8 +322,8 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
             if user.is_administrator():
                 return True
             
-            # Owner/main_owner/branch_owner can access their own restaurant
-            if (user.is_owner() or user.is_main_owner() or user.is_branch_owner()) and user.id == owner_id:
+            # Owner/main_owner/branch_owner/manager can access their own restaurant
+            if (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager()) and user.id == owner_id:
                 return True
                 
             # Staff can access their owner's restaurant
@@ -321,7 +340,7 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
     def get_user_restaurant_id(self, user):
         """Get the restaurant ID for the user (deprecated - kept for compatibility)"""
         try:
-            if user.is_owner():
+            if user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager():
                 return user.id
             elif hasattr(user, 'owner') and user.owner:
                 return user.owner.id

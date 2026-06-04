@@ -17,7 +17,7 @@
         <form method="get" id="filter-form">
             <div class="row">
                 <!-- Restaurant Filter (for PRO/BRANCH users) -->
-                {% if accessible_restaurants.count > 1 %}
+                {% if accessible_restaurants|length > 1 %}
                 <div class="col-md-3">
                     <label for="restaurant_filter">Restaurant:</label>
                     <select class="form-control" id="restaurant_filter" name="restaurant_filter" onchange="this.form.submit()">

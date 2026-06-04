@@ -1,22 +1,22 @@
-Django==4.2.7
-Pillow==10.1.0
-openpyxl==3.1.2
+Django==4.2.30
+Pillow==12.1.0
+openpyxl==3.1.5
 pandas==2.1.4
-reportlab==4.0.7
-qrcode[pil]==7.4.2
-channels==4.0.0
-channels-redis==4.1.0
-redis==5.0.1
+reportlab==4.4.10
+qrcode[pil]==8.2
+channels==4.1.0
+channels-redis==4.2.0
+redis==7.3.0
 daphne==4.2.1
-djangorestframework==3.14.0  # REST API for print clients
+djangorestframework==3.16.1  # REST API for print clients
 python-decouple==3.8         # Environment variable management
 
 # Security packages
 django-ratelimit==4.1.0      # Rate limiting for views
-django-axes==6.1.1           # Failed login attempt tracking
-django-cors-headers==4.3.1   # CORS headers management
-bleach==6.1.0                # HTML sanitization
-argon2-cffi==23.1.0          # Argon2 password hashing (required by production_settings.py)
+django-axes==8.3.1           # Failed login attempt tracking
+django-cors-headers==4.9.0   # CORS headers management
+bleach==6.3.0                # HTML sanitization
+argon2-cffi==25.1.0          # Argon2 password hashing (required by production_settings.py)
 
 # SSL/TLS packages (required for Daphne/Twisted)
 cryptography>=46.0.0         # Modern cryptography library

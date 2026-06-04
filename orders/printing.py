@@ -103,6 +103,39 @@ def get_restaurant_print_settings(order):
     # First, try to get settings from Restaurant model (preferred for branches)
     if hasattr(table, 'restaurant') and table.restaurant:
         restaurant = table.restaurant
+
+        kitchen_printer = normalize_printer_name(restaurant.kitchen_printer_name)
+        bar_printer = normalize_printer_name(restaurant.bar_printer_name)
+        buffet_printer = normalize_printer_name(getattr(restaurant, 'buffet_printer_name', None))
+        service_printer = normalize_printer_name(getattr(restaurant, 'service_printer_name', None))
+        receipt_printer = normalize_printer_name(restaurant.receipt_printer_name)
+
+        # If branch has NO printers configured, inherit from parent restaurant so
+        # print jobs are created under the parent owner's queue (which the print
+        # client is connected to) with the parent's printer names.
+        has_any_printer = any([kitchen_printer, bar_printer, buffet_printer, service_printer, receipt_printer])
+        if not has_any_printer and not restaurant.is_main_restaurant and restaurant.parent_restaurant:
+            parent = restaurant.parent_restaurant
+            logger.info(
+                f" Branch '{restaurant.name}' has no printers — inheriting from "
+                f"parent '{parent.name}' for print queue"
+            )
+            return {
+                'source': 'parent_restaurant',
+                'name': restaurant.name,
+                'auto_print_kot': restaurant.auto_print_kot,
+                'auto_print_bot': restaurant.auto_print_bot,
+                'auto_print_buffet': getattr(restaurant, 'auto_print_buffet', False),
+                'auto_print_service': getattr(restaurant, 'auto_print_service', False),
+                'kitchen_printer_name': normalize_printer_name(parent.kitchen_printer_name),
+                'bar_printer_name': normalize_printer_name(parent.bar_printer_name),
+                'buffet_printer_name': normalize_printer_name(getattr(parent, 'buffet_printer_name', None)),
+                'service_printer_name': normalize_printer_name(getattr(parent, 'service_printer_name', None)),
+                'receipt_printer_name': normalize_printer_name(parent.receipt_printer_name),
+                'restaurant_obj': parent,
+                'owner': parent.main_owner or parent.branch_owner,
+            }
+
         return {
             'source': 'restaurant',
             'name': restaurant.name,
@@ -110,11 +143,11 @@ def get_restaurant_print_settings(order):
             'auto_print_bot': restaurant.auto_print_bot,
             'auto_print_buffet': getattr(restaurant, 'auto_print_buffet', False),
             'auto_print_service': getattr(restaurant, 'auto_print_service', False),
-            'kitchen_printer_name': normalize_printer_name(restaurant.kitchen_printer_name),
-            'bar_printer_name': normalize_printer_name(restaurant.bar_printer_name),
-            'buffet_printer_name': normalize_printer_name(getattr(restaurant, 'buffet_printer_name', None)),
-            'service_printer_name': normalize_printer_name(getattr(restaurant, 'service_printer_name', None)),
-            'receipt_printer_name': normalize_printer_name(restaurant.receipt_printer_name),
+            'kitchen_printer_name': kitchen_printer,
+            'bar_printer_name': bar_printer,
+            'buffet_printer_name': buffet_printer,
+            'service_printer_name': service_printer,
+            'receipt_printer_name': receipt_printer,
             'restaurant_obj': restaurant,
             'owner': restaurant.branch_owner or restaurant.main_owner,
         }
@@ -715,7 +748,7 @@ class ThermalPrinter:
         lines.append("KITCHEN ITEMS:")
         lines.append("-" * width)
         
-        kitchen_items = [item for item in order.order_items.all() if item.product.station == 'kitchen']
+        kitchen_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'kitchen']
         
         for item in kitchen_items:
             # Item name and quantity - left aligned
@@ -788,7 +821,7 @@ class ThermalPrinter:
         lines.append("BAR ITEMS:")
         lines.append("-" * width)
         
-        bar_items = [item for item in order.order_items.all() if item.product.station == 'bar']
+        bar_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'bar']
         
         for item in bar_items:
             # Item name and quantity - left aligned
@@ -861,7 +894,7 @@ class ThermalPrinter:
         lines.append("BUFFET ITEMS:")
         lines.append("-" * width)
         
-        buffet_items = [item for item in order.order_items.all() if item.product.station == 'buffet']
+        buffet_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'buffet']
         
         for item in buffet_items:
             # Item name and quantity - left aligned
@@ -934,7 +967,7 @@ class ThermalPrinter:
         lines.append("SERVICE ITEMS:")
         lines.append("-" * width)
         
-        service_items = [item for item in order.order_items.all() if item.product.station == 'service']
+        service_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'service']
         
         for item in service_items:
             # Item name and quantity - left aligned
@@ -1061,11 +1094,12 @@ def auto_print_order(order):
             logger.warning(f" Auto-print disabled for {print_settings['name']}")
             return result
         
-        # Check for items by station
-        has_kitchen_items = any(item.product.station == 'kitchen' for item in order.order_items.all())
-        has_bar_items = any(item.product.station == 'bar' for item in order.order_items.all())
-        has_buffet_items = any(item.product.station == 'buffet' for item in order.order_items.all())
-        has_service_items = any(item.product.station == 'service' for item in order.order_items.all())
+        # Check for items by station — load once to avoid 4 separate DB queries
+        all_order_items = list(order.order_items.select_related('product').all())
+        has_kitchen_items = any(item.product.station == 'kitchen' for item in all_order_items)
+        has_bar_items = any(item.product.station == 'bar' for item in all_order_items)
+        has_buffet_items = any(item.product.station == 'buffet' for item in all_order_items)
+        has_service_items = any(item.product.station == 'service' for item in all_order_items)
         
         # Determine print mode
         use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
@@ -1405,31 +1439,41 @@ def _generate_bill_content(order, printed_by=None):
     # Items section
     lines.append("ITEMS:")
     lines.append("-" * width)
-    
+
+    # Evaluate items once — reuse for display AND totals (avoids re-querying order_items)
+    _items = list(order.order_items.select_related('product').all())
+
     # Items list with better alignment
-    for item in order.order_items.all():
-        item_total = item.get_total_price()
+    for item in _items:
+        item_total = item.get_subtotal()
         qty_str = f"{item.quantity}x"
         item_name = item.product.name[:width-16]  # Truncate long names
         price_str = f"{currency_symbol}{float(item_total):.2f}"
-        
+
         # Format: "2x Item Name..................$10.00"
         name_section = f"{qty_str:4} {item_name}"
         dots_needed = width - len(name_section) - len(price_str)
         line = name_section + ("." * dots_needed) + price_str
         lines.append(line)
-    
+
     # Separator
     lines.append("-" * width)
-    
-    # Totals section
-    subtotal = order.get_subtotal()
-    discount = order.get_total_discount() if hasattr(order, 'get_total_discount') else Decimal('0')
-    
-    # Get tax from Order model which has correct tax rate logic
-    tax_amount = order.get_tax_amount()
-    tax_percentage = order.tax_rate if hasattr(order, 'tax_rate') else 8.0  # tax_rate property returns percentage
-    total = order.get_total() if hasattr(order, 'get_total') else (subtotal - discount + tax_amount)
+
+    # Totals — compute directly from already-fetched items (no extra SQL)
+    from decimal import Decimal as _D
+    subtotal = sum(item.get_subtotal() for item in _items)
+    discount = _D('0')
+    for item in _items:
+        if hasattr(item.product, 'get_active_promotion'):
+            _promo = item.product.get_active_promotion()
+            if _promo:
+                discount += item.product.price * (_promo.discount_percentage / _D('100')) * item.quantity
+
+    # Get tax from table config (single FK access, no order_items queries)
+    tax_rate = order.table_info.get_tax_rate()
+    tax_amount = subtotal * tax_rate
+    tax_percentage = float(tax_rate * 100)
+    total = subtotal + tax_amount  # same as get_total(); computed from already-fetched values
     
     # Subtotal
     subtotal_label = "Subtotal:"
@@ -1539,7 +1583,7 @@ def _generate_kot_content(order):
     lines.append("KITCHEN ITEMS:")
     lines.append("-" * width)
     
-    kitchen_items = [item for item in order.order_items.all() if item.product.station == 'kitchen']
+    kitchen_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'kitchen']
     
     for item in kitchen_items:
         # Item name and quantity - left aligned
@@ -1613,7 +1657,7 @@ def _generate_bot_content(order):
     lines.append("BAR ITEMS:")
     lines.append("-" * width)
     
-    bar_items = [item for item in order.order_items.all() if item.product.station == 'bar']
+    bar_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'bar']
     
     for item in bar_items:
         # Item name and quantity - left aligned
@@ -1687,7 +1731,7 @@ def _generate_buffet_content(order):
     lines.append("BUFFET ITEMS:")
     lines.append("-" * width)
     
-    buffet_items = [item for item in order.order_items.all() if item.product.station == 'buffet']
+    buffet_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'buffet']
     
     for item in buffet_items:
         # Item name and quantity - left aligned
@@ -1761,7 +1805,7 @@ def _generate_service_content(order):
     lines.append("SERVICE ITEMS:")
     lines.append("-" * width)
     
-    service_items = [item for item in order.order_items.all() if item.product.station == 'service']
+    service_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'service']
     
     for item in service_items:
         # Item name and quantity - left aligned
@@ -2310,9 +2354,11 @@ def _generate_receipt_content(payment):
     # Items section
     lines.append("ITEMS:")
     lines.append("-" * width)
+    # Evaluate items once — reuse for display AND totals (avoids re-querying order_items)
+    _items = list(order.order_items.select_related('product').all())
     # Items list with better alignment
-    for item in order.order_items.all():
-        item_total = item.get_total_price()
+    for item in _items:
+        item_total = item.get_subtotal()
         qty_str = f"{item.quantity}x"
         item_name = item.product.name[:width-16]  # Truncate long names
         price_str = f"{currency_symbol}{float(item_total):.2f}"
@@ -2325,14 +2371,18 @@ def _generate_receipt_content(payment):
     
     # Dotted separator - EXACTLY like HTML
     lines.append("-" * width)
-    # Totals section - EXACTLY like HTML
-    subtotal = order.get_subtotal()
-    discount = order.get_total_discount() if hasattr(order, 'get_total_discount') else Decimal('0')
-    
-    # Get tax from Order model which has correct tax rate logic
-    tax_amount = order.get_tax_amount()
-    tax_percentage = order.tax_rate if hasattr(order, 'tax_rate') else 8.0  # tax_rate property returns percentage
-    total = order.get_total() if hasattr(order, 'get_total') else (subtotal - discount + tax_amount)
+    # Totals — computed from already-fetched items (no extra SQL)
+    subtotal = sum(item.get_subtotal() for item in _items)
+    discount = Decimal('0')
+    for item in _items:
+        if hasattr(item.product, 'get_active_promotion'):
+            _promo = item.product.get_active_promotion()
+            if _promo:
+                discount += item.product.price * (_promo.discount_percentage / Decimal('100')) * item.quantity
+    tax_rate = order.table_info.get_tax_rate()
+    tax_amount = subtotal * tax_rate
+    tax_percentage = float(tax_rate * 100)
+    total = subtotal + tax_amount
     
     # Subtotal - right-aligned EXACTLY like HTML
     subtotal_label = "Subtotal:"

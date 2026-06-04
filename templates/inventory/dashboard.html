@@ -1,0 +1,237 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Inventory Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-boxes mr-2"></i>Inventory Dashboard</h1>
+        <div>
+            <a href="{% url 'inventory:add_record' %}" class="btn btn-primary btn-sm mr-2">
+                <i class="fas fa-plus mr-1"></i> Add Record
+            </a>
+            <a href="{% url 'inventory:items' %}" class="btn btn-secondary btn-sm mr-2">
+                <i class="fas fa-cog mr-1"></i> Manage Items
+            </a>
+            <a href="{% url 'inventory:history' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-history mr-1"></i> Full History
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;border:none;position:relative;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Total Items</div>
+                            <div class="h4 mb-0 font-weight-bold text-gray-800">{{ total_items }}</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-boxes fa-2x text-primary" style="opacity:.3;"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;border:none;position:relative;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#f6d365,#fda085);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Low Stock Items</div>
+                            <div class="h4 mb-0 font-weight-bold text-warning">{{ low_stock_count }}</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-exclamation-triangle fa-2x text-warning" style="opacity:.3;"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;border:none;position:relative;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#f093fb,#f5576c);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Out of Stock</div>
+                            <div class="h4 mb-0 font-weight-bold text-danger">{{ out_of_stock_count }}</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-times-circle fa-2x text-danger" style="opacity:.3;"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;border:none;position:relative;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#4facfe,#00f2fe);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Recent Records</div>
+                            <div class="h4 mb-0 font-weight-bold text-info">{{ recent_records|length }}</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-clipboard-list fa-2x text-info" style="opacity:.3;"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Stock Overview Table -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow" style="border-radius:8px;border:none;">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center" style="background:#fff;border-bottom:2px solid #f0f0f0;">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-table mr-1"></i>Current Stock Levels</h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <form method="get" id="dashboardPerPageForm" class="d-flex align-items-center gap-2">
+                            <label class="mb-0 text-muted small"><i class="fas fa-list"></i> Per Page</label>
+                            <select name="per_page" class="form-select form-select-sm" style="width:auto;" id="dashboardPerPageSelect">
+                                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                        </form>
+                        <a href="{% url 'inventory:items' %}" class="btn btn-sm btn-outline-primary">Manage Items</a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th style="width:50px;">#</th>
+                                    <th>Item</th>
+                                    <th>Category</th>
+                                    <th>Current Stock</th>
+                                    <th>Unit</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in page_obj %}
+                                <tr>
+                                    <td class="text-muted">{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                                    <td class="font-weight-bold">{{ row.item.name }}</td>
+                                    <td><span class="badge bg-secondary">{{ row.item.category }}</span></td>
+                                    <td class="{% if row.is_out %}text-danger font-weight-bold{% elif row.is_low %}text-warning font-weight-bold{% else %}text-success{% endif %}">
+                                        {{ row.stock|floatformat:"-2" }}
+                                    </td>
+                                    <td class="text-muted">{{ row.item.unit }}</td>
+                                    <td>
+                                        {% if row.is_out %}
+                                            <span class="badge bg-danger">Out of Stock</span>
+                                        {% elif row.is_low %}
+                                            <span class="badge bg-warning text-dark">Low Stock</span>
+                                        {% else %}
+                                            <span class="badge bg-success">OK</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'inventory:add_record' %}?item={{ row.item.id }}" class="btn btn-xs btn-outline-primary">
+                                            <i class="fas fa-plus"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if page_obj.has_other_pages %}
+                    <div class="card-footer bg-white border-top-0 d-flex justify-content-between align-items-center py-3">
+                        <div class="text-muted small">
+                            Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} items
+                        </div>
+                        <nav aria-label="Stock levels pagination">
+                            <ul class="pagination pagination-sm mb-0">
+                                {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?per_page={{ per_page }}&page=1"><i class="fas fa-angle-double-left"></i></a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?per_page={{ per_page }}&page={{ page_obj.previous_page_number }}"><i class="fas fa-angle-left"></i></a>
+                                </li>
+                                {% endif %}
+                                {% for num in page_obj.paginator.page_range %}
+                                    {% if page_obj.number == num %}
+                                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item"><a class="page-link" href="?per_page={{ per_page }}&page={{ num }}">{{ num }}</a></li>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?per_page={{ per_page }}&page={{ page_obj.next_page_number }}"><i class="fas fa-angle-right"></i></a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?per_page={{ per_page }}&page={{ page_obj.paginator.num_pages }}"><i class="fas fa-angle-double-right"></i></a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-boxes fa-3x mb-3" style="opacity:.3;"></i>
+                        <p>No inventory items yet.</p>
+                        <a href="{% url 'inventory:items' %}" class="btn btn-primary btn-sm">Add Your First Item</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Records -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow" style="border-radius:8px;border:none;">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center" style="background:#fff;border-bottom:2px solid #f0f0f0;">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-history mr-1"></i>Recent Activity</h6>
+                    <a href="{% url 'inventory:history' %}" class="btn btn-sm btn-outline-secondary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_records %}
+                    <ul class="list-group list-group-flush">
+                        {% for record in recent_records %}
+                        <li class="list-group-item px-3 py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="font-weight-bold small">{{ record.item.name }}</div>
+                                    <div class="text-muted" style="font-size:.75rem;">{{ record.get_record_type_display }}</div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="badge {% if record.quantity_change >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {% if record.quantity_change >= 0 %}+{% endif %}{{ record.quantity_change|floatformat:"-2" }}
+                                    </span>
+                                    <div class="text-muted" style="font-size:.7rem;">{{ record.recorded_at|date:"M d, H:i" }}</div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-clipboard fa-2x mb-2" style="opacity:.3;"></i>
+                        <p class="small">No records yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('dashboardPerPageSelect').addEventListener('change', function() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('per_page', this.value);
+    params.delete('page');
+    window.location.href = '?' + params.toString();
+});
+</script>
+{% endblock %}

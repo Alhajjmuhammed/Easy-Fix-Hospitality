@@ -1,8 +1,16 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+
+
+def _safe_csv(value):
+    """Prevent CSV formula injection: prefix dangerous leading characters."""
+    s = str(value) if value is not None else ''
+    if s and s[0] in ('=', '+', '-', '@', '|', '%'):
+        return '\t' + s
+    return s
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q, Sum, Count, Avg
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, TruncYear
 from django.views.decorators.http import require_http_methods
@@ -47,29 +55,33 @@ def detect_automatic_waste():
         created_at__lt=pickup_timeout,
     ).exclude(
         waste_logs__waste_reason='customer_left'  # Don't duplicate
-    )
-    
+    ).prefetch_related('order_items__product')
+
     auto_waste_count = 0
-    
+
+    # Look up system user once — not inside the loop
+    system_user = User.objects.filter(role__name='administrator').first()
+    if not system_user:
+        system_user = User.objects.filter(role__name='owner').first()
+
+    if not system_user:
+        return auto_waste_count
+
+    # Pre-load existing customer_left waste log keys to avoid per-item EXISTS queries
+    existing_keys = set(
+        FoodWasteLog.objects.filter(
+            order__in=abandoned_orders,
+            waste_reason='customer_left',
+        ).values_list('order_id', 'product_id')
+    )
+
     for order in abandoned_orders:
-        # Get a system user to record the waste
-        system_user = User.objects.filter(role__name='administrator').first()
-        if not system_user:
-            system_user = User.objects.filter(role__name='owner').first()
-        
-        if not system_user:
-            continue
-        
         # Create waste logs for each item in the order
-        for item in order.order_items.all():
-            # Check if we already recorded waste for this item
-            existing_waste = FoodWasteLog.objects.filter(
-                order=order,
-                product=item.product,
-                waste_reason='customer_left'
-            ).exists()
-            
-            if not existing_waste:
+        with transaction.atomic():
+            for item in order.order_items.all():  # uses prefetch_related cache
+                if (order.id, item.product_id) in existing_keys:
+                    continue
+
                 waste_log = FoodWasteLog.objects.create(
                     order=order,
                     product=item.product,
@@ -79,11 +91,11 @@ def detect_automatic_waste():
                     notes=f'🤖 Auto-detected: Order #{order.id} abandoned after 2 hours',
                     recorded_by=system_user
                 )
-                
+
                 # Calculate costs
                 waste_log.calculate_costs()
                 waste_log.save()
-                
+
                 auto_waste_count += 1
     
     return auto_waste_count
@@ -96,7 +108,7 @@ def waste_dashboard(request):
     if request.user.is_cashier():
         return redirect('waste_management:cashier_record')
         
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Only owners and administrators can access waste management dashboard.")
         return redirect('restaurant:home')
     
@@ -126,6 +138,10 @@ def waste_dashboard(request):
     if restaurant_filter and restaurant_filter != 'view_all':
         try:
             target_restaurant = Restaurant.objects.get(id=int(restaurant_filter))
+            # Security: verify user has access to this restaurant
+            if not request.user.is_administrator():
+                if not restaurant_context['accessible_restaurants'].filter(id=target_restaurant.id).exists():
+                    target_restaurant = None
         except (Restaurant.DoesNotExist, ValueError):
             target_restaurant = None
     
@@ -158,6 +174,16 @@ def waste_dashboard(request):
             waste_logs = FoodWasteLog.objects.filter(waste_query)
         else:
             waste_logs = FoodWasteLog.objects.none()
+    elif restaurant_context['current_restaurant']:
+        # Single selected restaurant (e.g. owner not in view-all mode)
+        current_restaurant = restaurant_context['current_restaurant']
+        if current_restaurant.is_main_restaurant:
+            waste_logs = FoodWasteLog.objects.filter(
+                Q(product__main_category__restaurant=current_restaurant) |
+                Q(product__main_category__owner=current_restaurant.main_owner, product__main_category__restaurant__isnull=True)
+            )
+        else:
+            waste_logs = FoodWasteLog.objects.filter(product__main_category__restaurant=current_restaurant)
     else:
         waste_logs = FoodWasteLog.objects.none()
     
@@ -201,9 +227,13 @@ def waste_dashboard(request):
     if to_date:
         waste_logs = waste_logs.filter(created_at__date__lte=to_date)
     
-    # Calculate summary data
-    total_items_wasted = waste_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-    total_waste_cost = waste_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
+    # Calculate summary data — single aggregate instead of 2 separate queries
+    _summary_agg = waste_logs.aggregate(
+        total_items=Sum('quantity_wasted'),
+        total_cost=Sum('total_cost'),
+    )
+    total_items_wasted = _summary_agg['total_items'] or 0
+    total_waste_cost = _summary_agg['total_cost'] or Decimal('0.00')
     avg_cost_per_item = (total_waste_cost / total_items_wasted) if total_items_wasted > 0 else 0
     
     # Waste by reason
@@ -221,6 +251,14 @@ def waste_dashboard(request):
     # Generate branch/location performance data if viewing all restaurants
     branch_performance = []
     if not target_restaurant and restaurant_context['accessible_restaurants'].count() > 1:
+        # Compute totals once outside the loop — avoids 2 extra queries per branch iteration
+        _totals = waste_logs.aggregate(
+            all_items=Sum('quantity_wasted'),
+            all_cost=Sum('total_cost'),
+        )
+        _all_items = _totals['all_items'] or 1
+        _all_cost  = _totals['all_cost'] or Decimal('1.00')
+
         for restaurant in restaurant_context['accessible_restaurants']:
             # Query for this specific restaurant
             if restaurant.is_main_restaurant:
@@ -230,18 +268,19 @@ def waste_dashboard(request):
                 )
             else:
                 rest_logs = waste_logs.filter(product__main_category__restaurant=restaurant)
-            
-            # Calculate stats
-            total_items = rest_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-            total_cost = rest_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
+
+            # Single aggregate per branch instead of 2 separate queries
+            _branch = rest_logs.aggregate(
+                total_items=Sum('quantity_wasted'),
+                total_cost=Sum('total_cost'),
+            )
+            total_items = _branch['total_items'] or 0
+            total_cost  = _branch['total_cost'] or Decimal('0.00')
             avg_cost = (total_cost / total_items) if total_items > 0 else Decimal('0.00')
-            
-            # Calculate percentage of total
-            all_items = waste_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 1
-            all_cost = waste_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('1.00')
-            items_percentage = (total_items / all_items * 100) if all_items > 0 else 0
-            cost_percentage = (total_cost / all_cost * 100) if all_cost > 0 else 0
-            
+
+            items_percentage = (total_items / _all_items * 100) if _all_items > 0 else 0
+            cost_percentage  = (float(total_cost) / float(_all_cost) * 100) if _all_cost > 0 else 0
+
             branch_performance.append({
                 'restaurant': restaurant,
                 'total_items': total_items,
@@ -250,7 +289,7 @@ def waste_dashboard(request):
                 'items_percentage': round(items_percentage, 1),
                 'cost_percentage': round(cost_percentage, 1),
             })
-    
+
     # Waste logs with pagination
     logs_list = waste_logs.select_related('product', 'order', 'recorded_by').order_by('-created_at')
     
@@ -350,7 +389,7 @@ def waste_dashboard(request):
 @login_required
 def export_waste_csv(request):
     """Export waste data to CSV with same filtering as dashboard"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
     
@@ -373,6 +412,10 @@ def export_waste_csv(request):
         try:
             from restaurant.models_restaurant import Restaurant
             target_restaurant = Restaurant.objects.get(id=int(restaurant_filter))
+            # Security: verify user has access to this restaurant
+            if not request.user.is_administrator():
+                if not restaurant_context['accessible_restaurants'].filter(id=target_restaurant.id).exists():
+                    target_restaurant = None
         except (Restaurant.DoesNotExist, ValueError):
             target_restaurant = None
     
@@ -405,6 +448,15 @@ def export_waste_csv(request):
             waste_logs = FoodWasteLog.objects.filter(waste_query)
         else:
             waste_logs = FoodWasteLog.objects.none()
+    elif restaurant_context['current_restaurant']:
+        current_restaurant = restaurant_context['current_restaurant']
+        if current_restaurant.is_main_restaurant:
+            waste_logs = FoodWasteLog.objects.filter(
+                Q(product__main_category__restaurant=current_restaurant) |
+                Q(product__main_category__owner=current_restaurant.main_owner, product__main_category__restaurant__isnull=True)
+            )
+        else:
+            waste_logs = FoodWasteLog.objects.filter(product__main_category__restaurant=current_restaurant)
     else:
         waste_logs = FoodWasteLog.objects.none()
     
@@ -436,10 +488,14 @@ def export_waste_csv(request):
     if to_date:
         waste_logs = waste_logs.filter(created_at__date__lte=to_date)
     
-    # Calculate summary data
-    total_items = waste_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-    total_cost = waste_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
-    
+    # Calculate summary data — single aggregate instead of 2 separate queries
+    _csv_agg = waste_logs.aggregate(
+        total_items=Sum('quantity_wasted'),
+        total_cost=Sum('total_cost'),
+    )
+    total_items = _csv_agg['total_items'] or 0
+    total_cost = _csv_agg['total_cost'] or Decimal('0.00')
+
     # Create CSV response
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="waste_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
@@ -463,21 +519,21 @@ def export_waste_csv(request):
     ])
     
     # Write waste data
-    for log in waste_logs.select_related('product', 'recorded_by').order_by('-created_at'):
+    for log in waste_logs.select_related('product', 'product__main_category', 'product__sub_category', 'recorded_by').order_by('-created_at'):
         writer.writerow([
             log.created_at.strftime('%Y-%m-%d'),
             log.created_at.strftime('%H:%M:%S'),
-            log.product.name,
-            log.product.main_category.name,
-            log.product.sub_category.name if log.product.sub_category else '',
+            _safe_csv(log.product.name),
+            _safe_csv(log.product.main_category.name),
+            _safe_csv(log.product.sub_category.name) if log.product.sub_category else '',
             log.quantity_wasted,
             log.get_waste_reason_display(),
             f'${log.total_cost:.2f}',
             f'${log.ingredient_cost:.2f}',
             f'${log.labor_cost:.2f}',
             f'${log.overhead_cost:.2f}',
-            log.recorded_by.get_full_name() if log.recorded_by else '',
-            log.notes or ''
+            _safe_csv(log.recorded_by.get_full_name()) if log.recorded_by else '',
+            _safe_csv(log.notes or '')
         ])
     
     # Add branch performance summary if viewing all restaurants
@@ -526,9 +582,14 @@ def export_waste_csv(request):
             if to_date:
                 rest_logs = rest_logs.filter(created_at__date__lte=to_date)
             
-            rest_total_items = rest_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-            rest_total_cost = rest_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
-            
+            # Single aggregate instead of two separate aggregate() calls
+            _agg = rest_logs.aggregate(
+                total_items=Sum('quantity_wasted'),
+                total_cost=Sum('total_cost'),
+            )
+            rest_total_items = _agg['total_items'] or 0
+            rest_total_cost = _agg['total_cost'] or Decimal('0.00')
+
             total_all_items += rest_total_items
             total_all_cost += rest_total_cost
             branch_data.append({
@@ -536,7 +597,7 @@ def export_waste_csv(request):
                 'total_items': rest_total_items,
                 'total_cost': rest_total_cost
             })
-        
+
         # Write branch performance with percentages
         for data in branch_data:
             items_percentage = (data['total_items'] / total_all_items * 100) if total_all_items > 0 else 0
@@ -558,7 +619,7 @@ def export_waste_csv(request):
 @login_required
 def export_waste_pdf(request):
     """Export waste data to PDF with same filtering as dashboard"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
     
@@ -581,6 +642,10 @@ def export_waste_pdf(request):
         try:
             from restaurant.models_restaurant import Restaurant
             target_restaurant = Restaurant.objects.get(id=int(restaurant_filter))
+            # Security: verify user has access to this restaurant
+            if not request.user.is_administrator():
+                if not restaurant_context['accessible_restaurants'].filter(id=target_restaurant.id).exists():
+                    target_restaurant = None
         except (Restaurant.DoesNotExist, ValueError):
             target_restaurant = None
     
@@ -613,6 +678,15 @@ def export_waste_pdf(request):
             waste_logs = FoodWasteLog.objects.filter(waste_query)
         else:
             waste_logs = FoodWasteLog.objects.none()
+    elif restaurant_context['current_restaurant']:
+        current_restaurant = restaurant_context['current_restaurant']
+        if current_restaurant.is_main_restaurant:
+            waste_logs = FoodWasteLog.objects.filter(
+                Q(product__main_category__restaurant=current_restaurant) |
+                Q(product__main_category__owner=current_restaurant.main_owner, product__main_category__restaurant__isnull=True)
+            )
+        else:
+            waste_logs = FoodWasteLog.objects.filter(product__main_category__restaurant=current_restaurant)
     else:
         waste_logs = FoodWasteLog.objects.none()
     
@@ -641,10 +715,14 @@ def export_waste_pdf(request):
     if to_date:
         waste_logs = waste_logs.filter(created_at__date__lte=to_date)
     
-    # Calculate summary
-    total_items = waste_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-    total_cost = waste_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
-    
+    # Calculate summary — single aggregate instead of 2 separate queries
+    _pdf_agg = waste_logs.aggregate(
+        total_items=Sum('quantity_wasted'),
+        total_cost=Sum('total_cost'),
+    )
+    total_items = _pdf_agg['total_items'] or 0
+    total_cost = _pdf_agg['total_cost'] or Decimal('0.00')
+
     # Create PDF
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -689,7 +767,7 @@ def export_waste_pdf(request):
         data = [['Date', 'Product', 'Category', 'Qty', 'Reason', 'Cost', 'Recorded By']]
         
         # Add waste data
-        for log in waste_logs.select_related('product', 'recorded_by').order_by('-created_at'):
+        for log in waste_logs.select_related('product', 'product__main_category', 'product__sub_category', 'recorded_by').order_by('-created_at'):
             data.append([
                 log.created_at.strftime('%Y-%m-%d'),
                 log.product.name[:20] + '...' if len(log.product.name) > 20 else log.product.name,
@@ -764,9 +842,14 @@ def export_waste_pdf(request):
             if to_date:
                 rest_logs = rest_logs.filter(created_at__date__lte=to_date)
             
-            rest_total_items = rest_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-            rest_total_cost = rest_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
-            
+            # Single aggregate instead of two separate aggregate() calls
+            _agg = rest_logs.aggregate(
+                total_items=Sum('quantity_wasted'),
+                total_cost=Sum('total_cost'),
+            )
+            rest_total_items = _agg['total_items'] or 0
+            rest_total_cost = _agg['total_cost'] or Decimal('0.00')
+
             total_all_items += rest_total_items
             total_all_cost += rest_total_cost
             branch_data.append({
@@ -774,7 +857,7 @@ def export_waste_pdf(request):
                 'total_items': rest_total_items,
                 'total_cost': rest_total_cost
             })
-        
+
         # Create branch performance table
         perf_data = [['Restaurant', 'Total Items', 'Items %', 'Total Cost', 'Cost %', 'Avg Cost']]
         for data in branch_data:
@@ -821,7 +904,7 @@ def export_waste_pdf(request):
 @require_http_methods(["POST"])
 def auto_detect_waste(request):
     """API endpoint to manually trigger automatic waste detection"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
     
     try:
@@ -840,7 +923,7 @@ def auto_detect_waste(request):
 @require_http_methods(["POST"])
 def record_food_waste(request):
     """Record a food waste incident"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_cashier()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager() or request.user.is_cashier()):
         return JsonResponse({'error': 'Access denied. Only owners, administrators, and cashiers can record waste.'}, status=403)
     
     try:
@@ -856,8 +939,19 @@ def record_food_waste(request):
         if not product_id or quantity_wasted <= 0 or not waste_reason:
             return JsonResponse({'error': 'Missing required fields'}, status=400)
         
-        # Get product
-        product = get_object_or_404(Product, id=product_id)
+        # Get product — scope to owner so staff cannot record waste against another tenant's products
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            product = get_object_or_404(
+                Product.objects.filter(
+                    Q(main_category__owner=owner_filter) |
+                    Q(main_category__restaurant__main_owner=owner_filter) |
+                    Q(main_category__restaurant__branch_owner=owner_filter)
+                ),
+                id=product_id
+            )
+        else:
+            product = get_object_or_404(Product, id=product_id)
         
         # Create waste log
         waste_log = FoodWasteLog.objects.create(
@@ -951,7 +1045,7 @@ def record_food_waste(request):
 @login_required
 def waste_reports(request):
     """Waste reports with filters and export options"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
     
@@ -973,6 +1067,10 @@ def waste_reports(request):
     if restaurant_filter and restaurant_filter != 'view_all':
         try:
             target_restaurant = Restaurant.objects.get(id=int(restaurant_filter))
+            # Security: verify user has access to this restaurant
+            if not request.user.is_administrator():
+                if not restaurant_context['accessible_restaurants'].filter(id=target_restaurant.id).exists():
+                    target_restaurant = None
         except (Restaurant.DoesNotExist, ValueError):
             target_restaurant = None
     
@@ -1024,6 +1122,15 @@ def waste_reports(request):
             waste_logs = FoodWasteLog.objects.filter(waste_query)
         else:
             waste_logs = FoodWasteLog.objects.none()
+    elif restaurant_context['current_restaurant']:
+        current_restaurant = restaurant_context['current_restaurant']
+        if current_restaurant.is_main_restaurant:
+            waste_logs = FoodWasteLog.objects.filter(
+                Q(product__main_category__restaurant=current_restaurant) |
+                Q(product__main_category__owner=current_restaurant.main_owner, product__main_category__restaurant__isnull=True)
+            )
+        else:
+            waste_logs = FoodWasteLog.objects.filter(product__main_category__restaurant=current_restaurant)
     else:
         waste_logs = FoodWasteLog.objects.none()
     
@@ -1042,6 +1149,14 @@ def waste_reports(request):
     # Generate branch/location performance data if viewing all restaurants
     branch_performance = []
     if not target_restaurant and restaurant_context['accessible_restaurants'].count() > 1:
+        # Compute totals once outside the loop — avoids 2 extra queries per branch iteration
+        _rpt_totals = waste_logs.aggregate(
+            all_items=Sum('quantity_wasted'),
+            all_cost=Sum('total_cost'),
+        )
+        _rpt_all_items = _rpt_totals['all_items'] or 1
+        _rpt_all_cost  = _rpt_totals['all_cost'] or Decimal('1.00')
+
         for restaurant in restaurant_context['accessible_restaurants']:
             # Query for this specific restaurant
             if restaurant.is_main_restaurant:
@@ -1051,18 +1166,19 @@ def waste_reports(request):
                 )
             else:
                 rest_logs = waste_logs.filter(product__main_category__restaurant=restaurant)
-            
-            # Calculate stats
-            total_items = rest_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-            total_cost = rest_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
+
+            # Single aggregate per branch instead of 2 separate queries
+            _rbranch = rest_logs.aggregate(
+                total_items=Sum('quantity_wasted'),
+                total_cost=Sum('total_cost'),
+            )
+            total_items = _rbranch['total_items'] or 0
+            total_cost  = _rbranch['total_cost'] or Decimal('0.00')
             avg_cost = (total_cost / total_items) if total_items > 0 else Decimal('0.00')
-            
-            # Calculate percentage of total
-            all_items = waste_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 1
-            all_cost = waste_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('1.00')
-            items_percentage = (total_items / all_items * 100) if all_items > 0 else 0
-            cost_percentage = (total_cost / all_cost * 100) if all_cost > 0 else 0
-            
+
+            items_percentage = (total_items / _rpt_all_items * 100) if _rpt_all_items > 0 else 0
+            cost_percentage  = (float(total_cost) / float(_rpt_all_cost) * 100) if _rpt_all_cost > 0 else 0
+
             branch_performance.append({
                 'restaurant': restaurant,
                 'total_items': total_items,
@@ -1071,7 +1187,7 @@ def waste_reports(request):
                 'items_percentage': round(items_percentage, 1),
                 'cost_percentage': round(cost_percentage, 1),
             })
-    
+
     # Get products for filter dropdown with restaurant context
     from restaurant.models import MainCategory
     if request.user.is_administrator():
@@ -1123,12 +1239,19 @@ def waste_reports(request):
 def generate_waste_report_data(waste_logs, period_type, date_from, date_to):
     """Generate comprehensive report data"""
     
-    # Summary statistics
-    total_items = waste_logs.aggregate(total=Sum('quantity_wasted'))['total'] or 0
-    total_cost = waste_logs.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
-    total_ingredient_cost = waste_logs.aggregate(total=Sum('ingredient_cost'))['total'] or Decimal('0.00')
-    total_labor_cost = waste_logs.aggregate(total=Sum('labor_cost'))['total'] or Decimal('0.00')
-    total_overhead_cost = waste_logs.aggregate(total=Sum('overhead_cost'))['total'] or Decimal('0.00')
+    # Summary statistics — single aggregate instead of 5 separate queries
+    _stats = waste_logs.aggregate(
+        total_items=Sum('quantity_wasted'),
+        total_cost=Sum('total_cost'),
+        total_ingredient_cost=Sum('ingredient_cost'),
+        total_labor_cost=Sum('labor_cost'),
+        total_overhead_cost=Sum('overhead_cost'),
+    )
+    total_items = _stats['total_items'] or 0
+    total_cost = _stats['total_cost'] or Decimal('0.00')
+    total_ingredient_cost = _stats['total_ingredient_cost'] or Decimal('0.00')
+    total_labor_cost = _stats['total_labor_cost'] or Decimal('0.00')
+    total_overhead_cost = _stats['total_overhead_cost'] or Decimal('0.00')
     
     # Breakdown by reason
     reason_breakdown = waste_logs.values('waste_reason').annotate(
@@ -1201,7 +1324,7 @@ def generate_waste_report_data(waste_logs, period_type, date_from, date_to):
 @login_required
 def export_waste_report(request):
     """Export waste report in various formats"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     export_format = request.GET.get('format', 'csv')
@@ -1228,6 +1351,10 @@ def export_waste_report(request):
     if restaurant_filter and restaurant_filter != 'view_all':
         try:
             target_restaurant = Restaurant.objects.get(id=int(restaurant_filter))
+            # Security: verify user has access to this restaurant
+            if not request.user.is_administrator():
+                if not restaurant_context['accessible_restaurants'].filter(id=target_restaurant.id).exists():
+                    target_restaurant = None
         except (Restaurant.DoesNotExist, ValueError):
             target_restaurant = None
     
@@ -1260,6 +1387,15 @@ def export_waste_report(request):
             waste_logs = FoodWasteLog.objects.filter(waste_query)
         else:
             waste_logs = FoodWasteLog.objects.none()
+    elif restaurant_context['current_restaurant']:
+        current_restaurant = restaurant_context['current_restaurant']
+        if current_restaurant.is_main_restaurant:
+            waste_logs = FoodWasteLog.objects.filter(
+                Q(product__main_category__restaurant=current_restaurant) |
+                Q(product__main_category__owner=current_restaurant.main_owner, product__main_category__restaurant__isnull=True)
+            )
+        else:
+            waste_logs = FoodWasteLog.objects.filter(product__main_category__restaurant=current_restaurant)
     else:
         waste_logs = FoodWasteLog.objects.none()
     
@@ -1312,7 +1448,7 @@ def export_csv(report_data, date_from, date_to):
     for log in report_data['waste_logs']:
         writer.writerow([
             log.created_at.strftime('%Y-%m-%d %H:%M'),
-            log.product.name,
+            _safe_csv(log.product.name),
             log.quantity_wasted,
             log.get_waste_reason_display(),
             log.get_disposal_method_display(),
@@ -1321,8 +1457,8 @@ def export_csv(report_data, date_from, date_to):
             f"${log.overhead_cost:.2f}",
             f"${log.total_cost:.2f}",
             log.order.order_number if log.order else '',
-            log.recorded_by.username,
-            log.notes
+            _safe_csv(log.recorded_by.username),
+            _safe_csv(log.notes),
         ])
     
     writer.writerow([])
@@ -1345,7 +1481,7 @@ def export_csv(report_data, date_from, date_to):
     writer.writerow(['Product', 'Count', 'Quantity', 'Total Cost'])
     for item in report_data['product_breakdown']:
         writer.writerow([
-            item['product__name'],
+            _safe_csv(item['product__name']),
             item['count'],
             item['quantity'],
             f"${item['cost']:.2f}"
@@ -1563,7 +1699,7 @@ def export_pdf(report_data, date_from, date_to):
 @login_required
 def cost_settings(request):
     """Manage product cost settings"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
     
@@ -1572,23 +1708,40 @@ def cost_settings(request):
     if request.user.is_administrator():
         products = Product.objects.all()
     else:
-        products = Product.objects.filter(main_category__owner=owner_filter)
+        products = Product.objects.filter(
+            Q(main_category__owner=owner_filter) |
+            Q(main_category__restaurant__main_owner=owner_filter) |
+            Q(main_category__restaurant__branch_owner=owner_filter)
+        ).distinct()
     
-    # Get or create cost settings for each product
-    cost_settings = []
-    for product in products:
-        setting, created = ProductCostSettings.objects.get_or_create(
-            product=product,
-            defaults={
-                'ingredient_cost_per_unit': product.price * Decimal('0.18'),  # 18% of menu price
-                'labor_cost_per_unit': product.price * Decimal('0.08'),       # 8% of menu price
-                'overhead_cost_per_unit': product.price * Decimal('0.04'),    # 4% of menu price
-            }
-        )
-        cost_settings.append(setting)
+    # Get or create cost settings efficiently — avoid N+1 get_or_create per product
+    products_list = list(products)
+    existing = {s.product_id: s for s in ProductCostSettings.objects.filter(product__in=products_list)}
+    missing = [p for p in products_list if p.id not in existing]
+    if missing:
+        ProductCostSettings.objects.bulk_create([
+            ProductCostSettings(
+                product=p,
+                ingredient_cost_per_unit=p.price * Decimal('0.18'),
+                labor_cost_per_unit=p.price * Decimal('0.08'),
+                overhead_cost_per_unit=p.price * Decimal('0.04'),
+            ) for p in missing
+        ])
+        # Re-fetch to include newly created records
+        existing = {s.product_id: s for s in ProductCostSettings.objects.filter(product__in=products_list)}
+    cost_settings = [existing[p.id] for p in products_list if p.id in existing]
     
+    # Default global percentage settings (displayed in summary cards)
+    from types import SimpleNamespace
+    current_settings = SimpleNamespace(
+        ingredient_cost_percentage=30,
+        labor_cost_percentage=25,
+        overhead_cost_percentage=10,
+    )
+
     context = {
         'cost_settings': cost_settings,
+        'current_settings': current_settings,
     }
     
     return render(request, 'waste_management/cost_settings.html', context)
@@ -1598,14 +1751,25 @@ def cost_settings(request):
 @require_http_methods(["POST"])
 def update_cost_settings(request):
     """Update product cost settings"""
-    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     try:
         data = json.loads(request.body)
         setting_id = data.get('setting_id')
         
-        setting = get_object_or_404(ProductCostSettings, id=setting_id)
+        owner_filter = get_owner_filter(request.user)
+        if owner_filter:
+            setting = get_object_or_404(
+                ProductCostSettings.objects.filter(
+                    Q(product__main_category__owner=owner_filter) |
+                    Q(product__main_category__restaurant__main_owner=owner_filter) |
+                    Q(product__main_category__restaurant__branch_owner=owner_filter)
+                ),
+                id=setting_id
+            )
+        else:
+            setting = get_object_or_404(ProductCostSettings, id=setting_id)
         
         # Update costs
         setting.ingredient_cost_per_unit = Decimal(str(data.get('ingredient_cost', 0)))
@@ -1635,8 +1799,12 @@ def cashier_record_waste(request):
     
     owner_filter = get_owner_filter(request.user)
     
-    # Get products for the dropdown - filter by main_category__owner
-    products = Product.objects.filter(main_category__owner=owner_filter)
+    # Get products for the dropdown - filter by main_category owner
+    products = Product.objects.filter(
+        Q(main_category__owner=owner_filter) |
+        Q(main_category__restaurant__main_owner=owner_filter) |
+        Q(main_category__restaurant__branch_owner=owner_filter)
+    ).distinct()
     
     context = {
         'products': products,
@@ -1655,8 +1823,10 @@ def recent_waste_records(request):
     
     # Get recent records (last 10) for this user or restaurant
     waste_logs = FoodWasteLog.objects.filter(
+        Q(product__main_category__owner=owner_filter) |
+        Q(product__main_category__restaurant__main_owner=owner_filter) |
+        Q(product__main_category__restaurant__branch_owner=owner_filter),
         recorded_by=request.user,
-        product__main_category__owner=owner_filter
     ).select_related('product').order_by('-created_at')[:10]
     
     # Format records for API response
@@ -1683,11 +1853,13 @@ def cashier_waste_form(request):
     
     owner_filter = get_owner_filter(request.user)
     
-    # Get products for the dropdown - filter by main_category__owner
+    # Get products for the dropdown - filter by main_category owner
     products = Product.objects.filter(
-        main_category__owner=owner_filter,
-        is_available=True
-    ).select_related('main_category').order_by('name')
+        Q(main_category__owner=owner_filter) |
+        Q(main_category__restaurant__main_owner=owner_filter) |
+        Q(main_category__restaurant__branch_owner=owner_filter),
+        is_available=True,
+    ).distinct().select_related('main_category').order_by('name')
     
     context = {
         'products': products,
@@ -1707,9 +1879,11 @@ def cashier_waste_interface(request):
     
     # Get products for the dropdown - filter by main_category__owner
     products = Product.objects.filter(
-        main_category__owner=owner_filter,
-        is_available=True
-    ).select_related('main_category').order_by('name')
+        Q(main_category__owner=owner_filter) |
+        Q(main_category__restaurant__main_owner=owner_filter) |
+        Q(main_category__restaurant__branch_owner=owner_filter),
+        is_available=True,
+    ).distinct().select_related('main_category').order_by('name')
     
     context = {
         'products': products,

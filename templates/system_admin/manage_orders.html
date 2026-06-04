@@ -311,7 +311,7 @@
                                 </div>
                             </div>
                             <div class="text-muted">
-                                Showing {{ orders.count }} orders
+                                Showing {{ filtered_count }} orders
                                 {% if selected_restaurant %}for {{ selected_restaurant.restaurant_name }}{% endif %}
                             </div>
                         </div>
@@ -330,7 +330,7 @@
                                 <div class="flex-grow-1">
                                     <div class="order-number">{{ order.order_number }}</div>
                                     <div class="mb-2">
-                                        <span class="restaurant-badge">{{ order.table_info.owner.restaurant_name }}</span>
+                                        <span class="restaurant-badge">{{ order.table_info.display_restaurant_name }}</span>
                                     </div>
                                     <div class="table-info">
                                         <i class="fas fa-chair"></i> Table {{ order.table_info.tbl_no }}
@@ -440,7 +440,7 @@
                                     <br><small class="text-muted"><i class="fas fa-sticky-note"></i> Has notes</small>
                                     {% endif %}
                                 </td>
-                                <td>{{ order.table_info.owner.restaurant_name }}</td>
+                                <td>{{ order.table_info.display_restaurant_name }}</td>
                                 <td>
                                     <i class="fas fa-chair"></i> {{ order.table_info.tbl_no }}
                                 </td>

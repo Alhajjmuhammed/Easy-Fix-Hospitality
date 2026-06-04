@@ -1,0 +1,146 @@
+{% extends 'system_admin/base.html' %}
+{% load static %}
+
+{% block title %}View Orders - System Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+.badge.order-status-pending { background-color: #ff9800 !important; color: #000 !important; }
+.badge.order-status-confirmed { background-color: #2196f3 !important; color: #fff !important; }
+.badge.order-status-preparing { background-color: #3f51b5 !important; color: #fff !important; }
+.badge.order-status-ready { background-color: #4caf50 !important; color: #fff !important; }
+.badge.order-status-served { background-color: #424242 !important; color: #fff !important; }
+.badge.order-status-cancelled { background-color: #f44336 !important; color: #fff !important; }
+.badge.payment-paid { background-color: #4caf50 !important; color: #fff !important; }
+.badge.payment-partial { background-color: #ff5722 !important; color: #fff !important; }
+.badge.payment-pending { background-color: #f44336 !important; color: #fff !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-list-alt me-2"></i>View All Orders</h2>
+            <p class="text-muted">System-wide read-only order overview</p>
+        </div>
+        <a href="{% url 'system_admin:manage_orders' %}" class="btn btn-primary">
+            <i class="fas fa-tasks me-1"></i> Manage Orders
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filter Orders</h6></div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status" onchange="this.form.submit()">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Restaurant</label>
+                    <select class="form-select" name="restaurant" onchange="this.form.submit()">
+                        <option value="all" {% if restaurant_filter == 'all' %}selected{% endif %}>All Restaurants</option>
+                        {% for owner in restaurant_owners %}
+                        <option value="{{ owner.id }}" {% if restaurant_filter == owner.id|stringformat:'s' %}selected{% endif %}>
+                            {{ owner.restaurant_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <a href="{% url 'system_admin:view_orders' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i> Clear Filters
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="fas fa-receipt me-2"></i>Orders ({{ orders|length }})</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Restaurant</th>
+                            <th>Table</th>
+                            <th>Customer</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td><strong>#{{ order.order_number }}</strong></td>
+                            <td>
+                                {% if order.table_info and order.table_info.owner %}
+                                    <small>{{ order.table_info.display_restaurant_name }}</small>
+                                {% else %}
+                                    <small class="text-muted">—</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if order.table_info %}
+                                    {{ order.table_info.name }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if order.ordered_by %}
+                                    {{ order.ordered_by.get_full_name|default:order.ordered_by.username }}
+                                {% else %}
+                                    <span class="text-muted">Walk-in</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ order.orderitem_set.all|length }} item{{ order.orderitem_set.all|length|pluralize }}</td>
+                            <td><strong>{{ order.total_amount }}</strong></td>
+                            <td>
+                                <span class="badge order-status-{{ order.status }}">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge payment-{{ order.payment_status }}">
+                                    {{ order.get_payment_status_display }}
+                                </span>
+                            </td>
+                            <td><small>{{ order.created_at|date:"d M Y H:i" }}</small></td>
+                            <td>
+                                <a href="{% url 'system_admin:order_details' order.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-4">
+                                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                No orders found matching the selected filters.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

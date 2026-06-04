@@ -339,9 +339,9 @@
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-store text-primary me-2"></i>
                                     <div>
-                                        <strong>{{ order.restaurant.name }}</strong>
-                                        {% if order.restaurant.address %}
-                                            <br><small class="text-muted">{{ order.restaurant.address|truncatechars:25 }}</small>
+                                        <strong>{{ order.table_info.display_restaurant_name }}</strong>
+                                        {% if order.table_info.restaurant.address %}
+                                            <br><small class="text-muted">{{ order.table_info.restaurant.address|truncatechars:25 }}</small>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -366,8 +366,8 @@
                                     {% for item in order.orderitem_set.all|slice:":2" %}
                                         <div>{{ item.quantity }}x {{ item.product.name }}</div>
                                     {% endfor %}
-                                    {% if order.orderitem_set.count > 2 %}
-                                        <small class="text-muted">+{{ order.orderitem_set.count|add:"-2" }} more...</small>
+                                    {% if order.orderitem_set.all|length > 2 %}
+                                        <small class="text-muted">+{{ order.orderitem_set.all|length|add:"-2" }} more...</small>
                                     {% endif %}
                                 </div>
                             </td>

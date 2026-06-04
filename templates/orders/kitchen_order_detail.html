@@ -137,7 +137,7 @@
 function confirmOrder(orderId) {
     if (!confirm('Confirm this order?')) return;
     
-    fetch(`/orders/kitchen/confirm/${orderId}/`, {
+    fetch(`/orders/confirm-order/${orderId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}',
@@ -163,7 +163,7 @@ function updateStatus(orderId, newStatus) {
     
     if (!confirm(statusMessages[newStatus])) return;
     
-    fetch(`/orders/kitchen/update-status/${orderId}/`, {
+    fetch(`/orders/update-status/${orderId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}',

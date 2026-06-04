@@ -257,19 +257,19 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <span class="badge bg-info">{{ category.owner.restaurant_name }}</span>
+                                        <span class="badge bg-info">{{ category.display_restaurant_name }}</span>
                                     </td>
                                     <td>
                                         <small class="text-muted">{{ category.description|default:"No description"|truncatechars:50 }}</small>
                                     </td>
                                     <td>
                                         <span class="badge bg-warning text-dark">
-                                            <i class="fas fa-folder"></i> {{ category.subcategories.count }}
+                                            <i class="fas fa-folder"></i> {{ category.subcategory_count }}
                                         </span>
                                     </td>
                                     <td>
                                         <span class="badge bg-success">
-                                            <i class="fas fa-utensils"></i> {{ category.products.count }}
+                                            <i class="fas fa-utensils"></i> {{ category.product_count }}
                                         </span>
                                     </td>
                                     <td>
@@ -283,7 +283,7 @@
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                             <button class="btn btn-outline-danger" 
-                                                    onclick="deleteCategory({{ category.id }}, '{{ category.name }}', '{{ category.owner.restaurant_name }}')" 
+                                                    onclick="deleteCategory({{ category.id }}, '{{ category.name }}', '{{ category.display_restaurant_name }}')" 
                                                     title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>

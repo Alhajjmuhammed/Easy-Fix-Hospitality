@@ -146,12 +146,12 @@
                                     </td>
                                     <td>
                                         <strong>{{ order.get_total_products }}</strong> items
-                                        {% if order.order_items.count > 0 %}
+                                        {% if order.order_items.all|length > 0 %}
                                         <br><small class="text-muted">
                                             {% for item in order.order_items.all|slice:":2" %}
                                                 {{ item.product.name }}{% if not forloop.last %}, {% endif %}
                                             {% endfor %}
-                                            {% if order.order_items.count > 2 %}...{% endif %}
+                                            {% if order.order_items.all|length > 2 %}...{% endif %}
                                         </small>
                                         {% endif %}
                                     </td>

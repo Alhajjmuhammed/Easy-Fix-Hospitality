@@ -262,6 +262,10 @@
                                                     <i class="fas fa-ban me-1"></i>Expired
                                                 </span>
                                             {% endif %}
+                                            {% if restaurant.subscription_end_date %}
+                                                <br><small class="text-muted mt-1 d-block"><strong>{{ restaurant.subscription_end_date|date:"d M Y" }}</strong></small>
+                                                <br><small class="text-muted">{{ restaurant.subscription_end_date|date:"l" }}</small>
+                                            {% endif %}
                                             {% if restaurant.subscription_status %}
                                                 <br><small class="text-muted mt-1">Status: {{ restaurant.subscription_status|title }}</small>
                                             {% endif %}

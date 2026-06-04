@@ -19,9 +19,11 @@ urlpatterns = [
     
     # Buffet management
     path('buffet/', views.buffet_dashboard, name='buffet_dashboard'),
-    
+    path('buffet/reports/', views.buffet_reports, name='buffet_reports'),
+
     # Service management
     path('service/', views.service_dashboard, name='service_dashboard'),
+    path('service/reports/', views.service_reports, name='service_reports'),
     
     path('', views.order_list, name='order_list'),
     path('create/', views.create_order, name='create_order'),

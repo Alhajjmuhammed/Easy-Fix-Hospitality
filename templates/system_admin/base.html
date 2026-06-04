@@ -103,7 +103,42 @@
             font-size: 1.1rem;
         }
 
+        /* Logout button styling to match other menu items */
+        .sidebar-menu li .nav-link-btn {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: #ecf0f1;
+            text-decoration: none;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            background: none;
+            border: none;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            font-size: inherit;
+        }
+
+        .sidebar-menu li .nav-link-btn:hover {
+            background: var(--sidebar-hover);
+            color: white;
+            border-left-color: var(--sidebar-active);
+        }
+
+        .sidebar-menu li .nav-link-btn i {
+            width: 20px;
+            text-align: center;
+            margin-right: 15px;
+            font-size: 1.1rem;
+        }
+
         .sidebar.collapsed .sidebar-menu li a span {
+            display: none;
+        }
+
+        .sidebar.collapsed .sidebar-menu li .nav-link-btn span {
             display: none;
         }
 
@@ -582,7 +617,7 @@
             <li>
                 <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to logout?')">
                     {% csrf_token %}
-                    <button type="submit" style="background: none; border: none; padding: 0; cursor: pointer; width: 100%; text-align: left;" class="nav-link-btn">
+                    <button type="submit" class="nav-link-btn">
                         <i class="fas fa-sign-out-alt"></i>
                         <span>Logout</span>
                     </button>

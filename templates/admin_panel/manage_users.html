@@ -82,7 +82,7 @@
                 <form method="get" id="filterForm" class="mb-0">
                     <div class="row g-3">
                         <!-- Search Input -->
-                        <div class="col-md-4">
+                        <div class="col-12 col-sm-6 col-lg-6 col-xl-4">
                             <label for="userSearch" class="form-label">
                                 <i class="fas fa-search"></i> Search Users
                             </label>
@@ -97,7 +97,7 @@
                         </div>
 
                         <!-- Restaurant Filter -->
-                        <div class="col-md-2">
+                        <div class="col-12 col-sm-6 col-lg-6 col-xl-2">
                             <label for="restaurantFilter" class="form-label">
                                 <i class="fas fa-building"></i> Restaurant
                             </label>
@@ -115,7 +115,7 @@
                         </div>
 
                         <!-- Role Filter -->
-                        <div class="col-md-2">
+                        <div class="col-12 col-sm-4 col-lg-4 col-xl-2">
                             <label for="roleFilter" class="form-label">
                                 <i class="fas fa-user-tag"></i> Role
                             </label>
@@ -130,7 +130,7 @@
                         </div>
 
                         <!-- Status Filter -->
-                        <div class="col-md-2">
+                        <div class="col-12 col-sm-4 col-lg-4 col-xl-2">
                             <label for="statusFilter" class="form-label">
                                 <i class="fas fa-toggle-on"></i> Status
                             </label>
@@ -142,7 +142,7 @@
                         </div>
 
                         <!-- Items Per Page -->
-                        <div class="col-md-2">
+                        <div class="col-12 col-sm-4 col-lg-4 col-xl-2">
                             <label for="perPageSelect" class="form-label">
                                 <i class="fas fa-list"></i> Per Page
                             </label>
@@ -205,11 +205,13 @@
                         </td>
                         <td>{{ user.email }}</td>
                         <td>
-                            <span class="badge role-badge bg-{% if user.is_superuser %}danger{% elif user.is_owner %}warning{% elif user.is_kitchen_staff %}info{% elif user.is_bar_staff %}primary{% elif user.is_buffet_staff %}warning{% elif user.is_service_staff %}secondary{% elif user.is_customer_care %}success{% elif user.is_cashier %}dark{% else %}secondary{% endif %}">
+                            <span class="badge role-badge bg-{% if user.is_superuser %}danger{% elif user.is_owner %}warning{% elif user.is_manager %}primary{% elif user.is_kitchen_staff %}info{% elif user.is_bar_staff %}primary{% elif user.is_buffet_staff %}warning{% elif user.is_service_staff %}secondary{% elif user.is_customer_care %}success{% elif user.is_cashier %}dark{% else %}secondary{% endif %}">
                                 {% if user.is_superuser %}
                                     <i class="fas fa-crown me-1"></i>Super Admin
                                 {% elif user.is_owner %}
                                     <i class="fas fa-store me-1"></i>Owner
+                                {% elif user.is_manager %}
+                                    <i class="fas fa-user-tie me-1"></i>Manager
                                 {% elif user.is_kitchen_staff %}
                                     <i class="fas fa-utensils me-1"></i>Kitchen Staff
                                 {% elif user.is_bar_staff %}
@@ -451,7 +453,7 @@
                         </td>
                         <td>
                             <span class="badge bg-light text-dark">
-                                <i class="fas fa-users me-1"></i>{{ role.user_set.count }}
+                                <i class="fas fa-users me-1"></i>{{ role.user_count }}
                             </span>
                         </td>
                         <td>

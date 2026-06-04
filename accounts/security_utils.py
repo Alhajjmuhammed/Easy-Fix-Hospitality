@@ -80,11 +80,16 @@ def validate_session_table(session, restaurant=None):
     if table_id:
         try:
             table_id = int(table_id)
-            query = {'id': table_id, 'tbl_no': table_number}
             if restaurant:
-                query['owner'] = restaurant
-            
-            TableInfo.objects.get(**query)
+                from django.db.models import Q as _Q
+                _tq = (
+                    _Q(owner=restaurant) |
+                    _Q(restaurant__main_owner=restaurant) |
+                    _Q(restaurant__branch_owner=restaurant)
+                )
+                TableInfo.objects.filter(_tq, id=table_id, tbl_no=table_number).distinct().get()
+            else:
+                TableInfo.objects.get(id=table_id, tbl_no=table_number)
         except (ValueError, TypeError, TableInfo.DoesNotExist):
             logger.warning(f"Table validation failed: {table_number} (id: {table_id})")
             _clear_table_session(session)

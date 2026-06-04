@@ -1,0 +1,227 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Add Inventory Record{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-clipboard-check mr-2"></i>Add Inventory Record</h1>
+        <div>
+            <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary btn-sm mr-2">
+                <i class="fas fa-arrow-left mr-1"></i> Dashboard
+            </a>
+            <a href="{% url 'inventory:history' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-history mr-1"></i> History
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card shadow" style="border-radius:8px;border:none;">
+                <div class="card-header py-3" style="background:#fff;border-bottom:2px solid #f0f0f0;">
+                    <h6 class="m-0 font-weight-bold text-primary">Record a Stock Movement</h6>
+                </div>
+                <div class="card-body">
+                    {% if errors %}
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            {% for err in errors %}<li>{{ err }}</li>{% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="form-group">
+                            <label class="font-weight-bold">Inventory Item <span class="text-danger">*</span></label>
+                            <select name="item_id" id="itemSelect" class="form-control" required onchange="fetchItemStock(this.value)">
+                                <option value="">-- Select an item --</option>
+                                {% regroup items by category as item_groups %}
+                                {% for group in item_groups %}
+                                <optgroup label="{{ group.grouper }}">
+                                    {% for item in group.list %}
+                                    <option value="{{ item.id }}"
+                                        {% if form_data.item_id == item.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ item.name }} ({{ item.unit }})
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div id="currentStockBadge" class="mb-3 d-none">
+                            <span class="text-muted small">Current stock: </span>
+                            <strong id="stockValue"></strong>
+                            <span id="stockUnit" class="text-muted small"></span>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="font-weight-bold">Record Type <span class="text-danger">*</span></label>
+                            <select name="record_type" id="recordType" class="form-control" required onchange="updateQuantityHint(); updateCostField();">
+                                <option value="">-- Select type --</option>
+                                {% for value, label in record_type_choices %}
+                                <option value="{{ value }}"
+                                    {% if form_data.record_type == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small id="typeHint" class="text-muted"></small>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="font-weight-bold">Quantity <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number" name="quantity" id="quantityInput" class="form-control"
+                                    placeholder="Enter quantity (always positive)"
+                                    step="0.01" min="0.01" required
+                                    value="{{ form_data.quantity }}">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="unitLabel">units</span>
+                                </div>
+                            </div>
+                            <small class="text-muted">Always enter a positive number. Stock-out types (Used, Waste, Returned) will automatically be recorded as negative.</small>
+                        </div>
+
+                        <div class="form-group" id="costFieldGroup">
+                            <label id="costLabel" class="font-weight-bold">Cost <span class="text-muted fw-normal">(optional)</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text" id="costPrefix">{{ currency_symbol }}</span>
+                                <input type="number" name="unit_price" id="unitPriceInput" class="form-control"
+                                    placeholder="e.g. 50.00"
+                                    step="0.01" min="0">
+                            </div>
+                            <small id="costHint" class="text-muted">Total cost paid for this transaction. Leave empty if not tracking cost.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="font-weight-bold">Notes <span class="text-muted">(optional)</span></label>
+                            <textarea name="notes" class="form-control" rows="3"
+                                placeholder="Supplier name, batch number, reason for adjustment…">{{ form_data.notes }}</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'inventory:dashboard' %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save mr-1"></i> Save Record
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick reference card -->
+        <div class="col-lg-4">
+            <div class="card shadow" style="border-radius:8px;border:none;">
+                <div class="card-header py-3" style="background:#fff;border-bottom:2px solid #f0f0f0;">
+                    <h6 class="m-0 font-weight-bold text-secondary"><i class="fas fa-info-circle mr-1"></i>Record Types Guide</h6>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><span class="badge badge-success mr-2">+</span><strong>Opening Stock</strong> — Initial stock entry</li>
+                        <li class="list-group-item"><span class="badge badge-success mr-2">+</span><strong>Stock Received</strong> — Delivery from supplier</li>
+                        <li class="list-group-item"><span class="badge badge-info mr-2">±</span><strong>Closing Count</strong> — End-of-day counted quantity (sets absolute level via adjustment)</li>
+                        <li class="list-group-item"><span class="badge badge-warning mr-2">±</span><strong>Manual Adjustment</strong> — Corrections, audits</li>
+                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>Used / Consumed</strong> — Removed for service</li>
+                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>Waste / Spoilage</strong> — Thrown away</li>
+                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>Returned to Supplier</strong> — Sent back</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const ITEM_API_BASE = "{% url 'inventory:item_detail' 0 %}".replace('/0/', '/');
+const stockOutTypes = ['used', 'waste', 'returned'];
+
+function fetchItemStock(itemId) {
+    const badge = document.getElementById('currentStockBadge');
+    const unitLabel = document.getElementById('unitLabel');
+    if (!itemId) { badge.classList.add('d-none'); unitLabel.textContent = 'units'; return; }
+    fetch(ITEM_API_BASE + itemId + '/')
+        .then(r => r.json())
+        .then(d => {
+            if (d.id) {
+                document.getElementById('stockValue').textContent = parseFloat(d.current_stock).toFixed(2);
+                document.getElementById('stockUnit').textContent = ' ' + d.unit_display;
+                unitLabel.textContent = d.unit_display;
+                badge.classList.remove('d-none');
+            }
+        })
+        .catch(() => {});
+}
+
+function updateQuantityHint() {
+    const rt = document.getElementById('recordType').value;
+    const hint = document.getElementById('typeHint');
+    if (stockOutTypes.includes(rt)) {
+        hint.textContent = 'This type removes stock (will be recorded as negative automatically).';
+        hint.className = 'text-danger small';
+    } else if (rt) {
+        hint.textContent = 'This type adds stock.';
+        hint.className = 'text-success small';
+    } else {
+        hint.textContent = '';
+    }
+}
+
+function updateCostField() {
+    const rt = document.getElementById('recordType').value;
+    const label = document.getElementById('costLabel');
+    const hint = document.getElementById('costHint');
+    const input = document.getElementById('unitPriceInput');
+    const group = document.getElementById('costFieldGroup');
+
+    if (rt === 'returned') {
+        label.innerHTML = 'Refund Received <span class="text-muted fw-normal">(optional)</span>';
+        input.placeholder = 'e.g. 30.00 — amount the supplier refunded you';
+        hint.innerHTML = '<span class="text-success">&#8592; Money coming back to you.</span> Enter the refund amount if the supplier paid you back.';
+        group.style.background = '#f0fdf4';
+        group.style.border = '1px solid #86efac';
+        group.style.borderRadius = '6px';
+        group.style.padding = '12px';
+    } else if (rt === 'used' || rt === 'waste') {
+        label.innerHTML = 'Cost <span class="text-muted fw-normal">(not usually applicable)</span>';
+        input.placeholder = 'Usually leave empty — no cash transaction';
+        hint.textContent = 'Used/Waste records are internal movements — no new cash is paid. Leave empty.';
+        group.style.background = '';
+        group.style.border = '';
+        group.style.borderRadius = '';
+        group.style.padding = '';
+    } else if (rt === 'received' || rt === 'opening') {
+        label.innerHTML = 'Amount Paid <span class="text-muted fw-normal">(optional)</span>';
+        input.placeholder = 'e.g. 50.00 — total you paid for this delivery';
+        hint.innerHTML = '<span class="text-danger">&#8594; Money going out.</span> Enter what you paid the supplier.';
+        group.style.background = '#fff8f8';
+        group.style.border = '1px solid #fca5a5';
+        group.style.borderRadius = '6px';
+        group.style.padding = '12px';
+    } else {
+        label.innerHTML = 'Cost <span class="text-muted fw-normal">(optional)</span>';
+        input.placeholder = 'e.g. 50.00';
+        hint.textContent = 'Total cost for this transaction. Leave empty if not tracking cost.';
+        group.style.background = '';
+        group.style.border = '';
+        group.style.borderRadius = '';
+        group.style.padding = '';
+    }
+}
+
+// Pre-select item if passed via query string
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    const itemId = params.get('item');
+    if (itemId) {
+        const sel = document.getElementById('itemSelect');
+        if (sel) { sel.value = itemId; fetchItemStock(itemId); }
+    }
+})();
+</script>
+{% endblock %}

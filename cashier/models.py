@@ -13,10 +13,10 @@ class Payment(models.Model):
         ('voucher', 'Voucher'),
     ]
     
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='payments')  # PROTECT: never lose payment history
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
-    processed_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='processed_payments')
+    processed_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='processed_payments')  # PROTECT: audit trail
     reference_number = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
     is_voided = models.BooleanField(default=False)
@@ -33,10 +33,19 @@ class Payment(models.Model):
         status = " (VOIDED)" if self.is_voided else ""
         return f"Payment ${self.amount} for Order {self.order.order_number}{status}"
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['order']),               # Fast lookup by order
+            models.Index(fields=['processed_by']),        # Staff payment reports
+            models.Index(fields=['created_at']),          # Date range reports
+            models.Index(fields=['is_voided']),           # Filter active vs voided
+            models.Index(fields=['payment_method']),      # Payment method reports
+        ]
+
 class OrderItemPayment(models.Model):
     """Track which specific items were paid for in split bill scenarios"""
-    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='item_payments')
-    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE)
+    payment = models.ForeignKey(Payment, on_delete=models.PROTECT, related_name='item_payments')  # PROTECT: financial record
+    order_item = models.ForeignKey(OrderItem, on_delete=models.PROTECT)  # PROTECT: financial record
     quantity_paid = models.IntegerField()
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
     
@@ -45,8 +54,8 @@ class OrderItemPayment(models.Model):
 
 class VoidTransaction(models.Model):
     """Track voided transactions for audit purposes"""
-    original_payment = models.ForeignKey(Payment, on_delete=models.CASCADE)
-    voided_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    original_payment = models.ForeignKey(Payment, on_delete=models.PROTECT)  # PROTECT: void audit trail
+    voided_by = models.ForeignKey(User, on_delete=models.PROTECT)  # PROTECT: audit trail
     void_reason = models.TextField()
     refund_amount = models.DecimalField(max_digits=10, decimal_places=2)
     refund_method = models.CharField(max_length=20, choices=Payment.PAYMENT_METHOD_CHOICES)

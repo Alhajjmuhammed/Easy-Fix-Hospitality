@@ -3,7 +3,7 @@
     <div class="row">
         <div class="col-md-6">
             <h4>Table {{ table.tbl_no }}</h4>
-            <p><strong>Restaurant:</strong> {{ table.owner.restaurant_name }}</p>
+            <p><strong>Restaurant:</strong> {{ table.display_restaurant_name }}</p>
             <p><strong>Capacity:</strong> {{ table.capacity }} seats</p>
             {% if table.location %}
             <p><strong>Location:</strong> {{ table.location }}</p>

@@ -5,8 +5,32 @@ Supports main owners with multiple branches based on subscription plans.
 
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 import uuid
+import os
+
+
+def validate_restaurant_image(file):
+    """Validate uploaded restaurant logo: allowed types, max 5MB size, and real content check."""
+    allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext not in allowed_extensions:
+        raise ValidationError(
+            f'Unsupported file type "{ext}". Allowed: {", ".join(allowed_extensions)}'
+        )
+    max_size = 5 * 1024 * 1024  # 5 MB
+    if file.size > max_size:
+        raise ValidationError('Image file size must be under 5 MB.')
+    # Verify actual file content matches a real image (prevents disguised uploads)
+    try:
+        from PIL import Image
+        file.seek(0)
+        img = Image.open(file)
+        img.verify()  # Raises if not a valid image
+        file.seek(0)  # Reset for subsequent save
+    except Exception:
+        raise ValidationError('Uploaded file is not a valid image.')
 
 User = get_user_model()
 
@@ -44,6 +68,7 @@ class Restaurant(models.Model):
         upload_to='restaurant_logos/',
         null=True,
         blank=True,
+        validators=[validate_restaurant_image],
         help_text="Restaurant logo (displayed on menu QR view)"
     )
     

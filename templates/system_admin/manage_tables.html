@@ -151,7 +151,7 @@
                                         <span class="badge bg-secondary">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</span>
                                     </td>
                                     <td><strong>{{ table.tbl_no }}</strong></td>
-                                    <td>{{ table.owner.restaurant_name }}</td>
+                                    <td>{{ table.display_restaurant_name }}</td>
                                     <td>
                                         <span class="badge bg-info">
                                             <i class="fas fa-users"></i> {{ table.capacity }}
@@ -173,7 +173,7 @@
                                             <button class="btn btn-sm btn-warning" onclick="editTable({{ table.id }})">
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-danger" onclick="deleteTable({{ table.id }}, '{{ table.tbl_no }}', '{{ table.owner.restaurant_name }}')">
+                                            <button class="btn btn-sm btn-danger" onclick="deleteTable({{ table.id }}, '{{ table.tbl_no }}', '{{ table.display_restaurant_name }}')">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </div>

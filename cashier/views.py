@@ -1,8 +1,17 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+
+
+def _safe_csv(value):
+    """Prevent CSV formula injection: prefix dangerous leading characters."""
+    s = str(value) if value is not None else ''
+    if s and s[0] in ('=', '+', '-', '@', '|', '%'):
+        return '\t' + s
+    return s
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q, Sum, Prefetch
+from django.db import transaction
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
@@ -12,6 +21,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 from accounts.models import get_owner_filter
+
+try:
+    from restaurant_system.security_decorators import rate_limit_payment
+except ImportError:
+    def rate_limit_payment(func):
+        return func
 from orders.models import Order, OrderItem
 from restaurant.models import TableInfo, Product
 from waste_management.models import FoodWasteLog
@@ -38,22 +53,26 @@ def cashier_dashboard(request):
     # Base queryset for orders with period filter
     from datetime import timedelta
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
+    _oq_dash = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
     if period == 'today':
         orders = Order.objects.filter(
-            table_info__owner=owner,
+            _oq_dash,
             created_at__gte=today_start,
             created_at__lt=today_start + timedelta(days=1)
         )
     elif period == 'weekly':
         week_start = today_start - timedelta(days=today_start.weekday())
         orders = Order.objects.filter(
-            table_info__owner=owner,
+            _oq_dash,
             created_at__gte=week_start
         )
     else:
         orders = Order.objects.filter(
-            table_info__owner=owner,
+            _oq_dash,
             created_at__gte=today_start,
             created_at__lt=today_start + timedelta(days=1)
         )
@@ -81,39 +100,37 @@ def cashier_dashboard(request):
     ).order_by('-created_at')
     
     # Get all tables for dropdown
-    tables = TableInfo.objects.filter(owner=owner).order_by('tbl_no')
+    _tq_cashier = (
+        Q(owner=owner) |
+        Q(restaurant__main_owner=owner) |
+        Q(restaurant__branch_owner=owner)
+    )
+    tables = TableInfo.objects.filter(_tq_cashier).distinct().order_by('tbl_no')
     
     # Get customer care users for filter
     from django.contrib.auth import get_user_model
-    from django.db.models import Q
     User = get_user_model()
-    
-    customer_care_users = User.objects.filter(role__name='customer_care')
-    if hasattr(owner, 'branch_owner'):
-        customer_care_users = customer_care_users.filter(branch_owner=owner)
-    elif hasattr(owner, 'owner'):
-        customer_care_users = customer_care_users.filter(owner=owner)
-    else:
-        customer_care_users = customer_care_users.filter(Q(owner=owner) | Q(branch_owner=owner))
-    customer_care_users = customer_care_users.order_by('first_name', 'username')
-    
+
+    customer_care_users = User.objects.filter(
+        role__name='customer_care', owner=owner
+    ).order_by('first_name', 'username')
+
     # Get cashier users for filter
-    cashier_users = User.objects.filter(role__name='cashier')
-    if hasattr(owner, 'branch_owner'):
-        cashier_users = cashier_users.filter(branch_owner=owner)
-    elif hasattr(owner, 'owner'):
-        cashier_users = cashier_users.filter(owner=owner)
-    else:
-        cashier_users = cashier_users.filter(Q(owner=owner) | Q(branch_owner=owner))
-    cashier_users = cashier_users.order_by('first_name', 'username')
+    cashier_users = User.objects.filter(
+        role__name='cashier', owner=owner
+    ).order_by('first_name', 'username')
     
     # Get products for waste recording modal
-    waste_products = Product.objects.filter(main_category__owner=owner).order_by('name')
+    waste_products = Product.objects.filter(
+        Q(main_category__owner=owner) |
+        Q(main_category__restaurant__main_owner=owner) |
+        Q(main_category__restaurant__branch_owner=owner)
+    ).distinct().order_by('name')
     
-    # Calculate payment summaries for each order
+    # Calculate payment summaries using already-prefetched payments (avoids N+1)
+    # Note: .filter().aggregate() would bypass the prefetch cache, so iterate in Python instead.
     for order in orders:
-        total_paid = order.payments.filter(is_voided=False).aggregate(
-            total=Sum('amount'))['total'] or Decimal('0.00')
+        total_paid = sum(p.amount for p in order.payments.all() if not p.is_voided) or Decimal('0.00')
         order.total_paid = total_paid
         order.balance_due = order.total_amount - total_paid
         order.is_fully_paid = order.balance_due <= Decimal('0.00')
@@ -145,25 +162,36 @@ def my_orders(request):
     owner = get_owner_filter(request.user)
     
     # Get only orders created by this cashier
+    _oq_mo = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
     orders = Order.objects.filter(
-        table_info__owner=owner,
+        _oq_mo,
         ordered_by=request.user
     ).select_related('table_info', 'ordered_by').prefetch_related(
         Prefetch('order_items', queryset=OrderItem.objects.select_related('product')),
         'payments'
     ).order_by('-created_at')
     
-    # Calculate payment summaries
+    # Calculate payment summaries using already-prefetched payments (avoids N+1)
     for order in orders:
-        total_paid = order.payments.filter(is_voided=False).aggregate(
-            total=Sum('amount'))['total'] or Decimal('0.00')
+        total_paid = sum(p.amount for p in order.payments.all() if not p.is_voided) or Decimal('0.00')
         order.total_paid = total_paid
         order.balance_due = order.total_amount - total_paid
         order.is_fully_paid = order.balance_due <= Decimal('0.00')
     
+    waste_products = Product.objects.filter(
+        Q(main_category__owner=owner) |
+        Q(main_category__restaurant__main_owner=owner) |
+        Q(main_category__restaurant__branch_owner=owner)
+    ).distinct().order_by('name')
+
     context = {
         'orders': orders,
         'payment_status_choices': Order.PAYMENT_STATUS_CHOICES,
+        'waste_products': waste_products,
     }
     
     return render(request, 'cashier/my_orders.html', context)
@@ -171,23 +199,39 @@ def my_orders(request):
 
 @login_required
 @require_http_methods(["GET", "POST"])
+@rate_limit_payment
+@transaction.atomic
 def process_payment(request, order_id):
     """Process payment for an order - full or partial"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
-    order = get_object_or_404(Order, id=order_id, table_info__owner=owner)
-    
+    _oq_pp = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
+    # Use select_for_update() on POST to prevent concurrent payment race conditions.
+    # GET uses a plain queryset (no lock needed for read-only data).
+    if request.method == 'POST':
+        order = get_object_or_404(Order.objects.select_for_update().filter(_oq_pp), id=order_id)
+    else:
+        order = get_object_or_404(Order.objects.filter(_oq_pp), id=order_id)
+
     if request.method == 'GET':
         # Return order details for payment form
+        # Batch query all paid quantities for this order's items in one DB round-trip
+        paid_qty_map = {}
+        for oip in OrderItemPayment.objects.filter(
+            order_item__order=order,
+            payment__is_voided=False
+        ).values('order_item_id').annotate(total=Sum('quantity_paid')):
+            paid_qty_map[oip['order_item_id']] = oip['total'] or 0
+
         order_items = []
-        for item in order.order_items.all():
-            # Calculate how much of this item has been paid
-            paid_quantity = OrderItemPayment.objects.filter(
-                order_item=item,
-                payment__is_voided=False
-            ).aggregate(total=Sum('quantity_paid'))['total'] or 0
+        for item in order.order_items.select_related('product').all():
+            paid_quantity = paid_qty_map.get(item.id, 0)
             
             remaining_quantity = item.quantity - paid_quantity
             
@@ -265,7 +309,7 @@ def process_payment(request, order_id):
         if selected_items:
             total_item_amount = Decimal('0.00')
             for item_data in selected_items:
-                order_item = get_object_or_404(OrderItem, id=item_data['id'])
+                order_item = get_object_or_404(OrderItem, id=item_data['id'], order=order)
                 quantity_paid = int(item_data['quantity'])
                 item_amount = order_item.unit_price * quantity_paid
                 
@@ -344,13 +388,21 @@ def process_payment(request, order_id):
 
 @login_required
 @require_http_methods(["POST"])
+@rate_limit_payment
+@transaction.atomic
 def void_payment(request, payment_id):
     """Void a payment transaction"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
-    payment = get_object_or_404(Payment, id=payment_id, order__table_info__owner=owner)
+    _pq_vp = (
+        Q(order__table_info__owner=owner) |
+        Q(order__table_info__restaurant__main_owner=owner) |
+        Q(order__table_info__restaurant__branch_owner=owner)
+    )
+    # select_for_update prevents concurrent void of the same payment
+    payment = get_object_or_404(Payment.objects.select_for_update().filter(_pq_vp), id=payment_id)
     
     if payment.is_voided:
         return JsonResponse({'error': 'Payment already voided'}, status=400)
@@ -429,22 +481,102 @@ def void_payment(request, payment_id):
 
 @login_required
 @require_http_methods(["POST"])
+@transaction.atomic
+def transfer_table(request, order_id):
+    """Transfer an active order to a different table"""
+    if not (request.user.is_cashier() or request.user.is_customer_care() or
+            request.user.is_owner() or request.user.is_main_owner() or
+            request.user.is_branch_owner() or request.user.is_manager()):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+
+    owner = get_owner_filter(request.user)
+    _oq_tt = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
+    order = get_object_or_404(Order.objects.filter(_oq_tt), id=order_id)
+
+    if order.status == 'cancelled':
+        return JsonResponse({'error': 'Cannot transfer a cancelled order'}, status=400)
+    if order.payment_status == 'paid':
+        return JsonResponse({'error': 'Cannot transfer a fully paid order'}, status=400)
+
+    try:
+        data = json.loads(request.body)
+        target_table_id = data.get('target_table_id')
+    except (json.JSONDecodeError, KeyError):
+        return JsonResponse({'error': 'Invalid request data'}, status=400)
+
+    if not target_table_id:
+        return JsonResponse({'error': 'Please select a target table'}, status=400)
+
+    _ttq = (
+        Q(owner=owner) |
+        Q(restaurant__main_owner=owner) |
+        Q(restaurant__branch_owner=owner)
+    )
+    target_table = get_object_or_404(TableInfo.objects.filter(_ttq).distinct(), id=target_table_id)
+
+    if target_table.id == order.table_info_id:
+        return JsonResponse({'error': 'Order is already on this table'}, status=400)
+
+    old_table = order.table_info
+
+    # Move the order to the new table
+    order.table_info = target_table
+    order.save(update_fields=['table_info'])
+
+    # Release old table if no other active orders remain on it
+    other_active = Order.objects.filter(
+        table_info=old_table,
+        status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
+        payment_status__in=['unpaid', 'partial']
+    ).exclude(id=order.id).exists()
+    if not other_active:
+        old_table.is_available = True
+        old_table.save(update_fields=['is_available'])
+
+    # Mark new table as occupied
+    target_table.is_available = False
+    target_table.save(update_fields=['is_available'])
+
+    # Transfer any pending bill requests that were tied to the old table
+    from orders.models import BillRequest
+    BillRequest.objects.filter(table_info=old_table, status='pending').update(table_info=target_table)
+
+    logger.info(f'Order {order.order_number} transferred from Table {old_table.tbl_no} to Table {target_table.tbl_no} by {request.user.username}')
+
+    return JsonResponse({
+        'success': True,
+        'message': f'Order {order.order_number} transferred from Table {old_table.tbl_no} to Table {target_table.tbl_no}'
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
 def cancel_order(request, order_id):
     """Cancel an unpaid order"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
-    order = get_object_or_404(Order, id=order_id, table_info__owner=owner)
+    _oq_co = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
+    order = get_object_or_404(Order.objects.filter(_oq_co), id=order_id)
+    
+    # Check if order status allows cancellation (mirrors mobile API and kitchen staff logic)
+    if order.status in ['served', 'cancelled']:
+        return JsonResponse({'error': f'Cannot cancel an order with status "{order.status}"'}, status=400)
     
     # Check if order has any non-voided payments
     has_payments = order.payments.filter(is_voided=False).exists()
     if has_payments:
         return JsonResponse({'error': 'Cannot cancel order with payments. Void payments first.'}, status=400)
-    
-    # Check if order is not already cancelled
-    if order.status == 'cancelled':
-        return JsonResponse({'error': 'Order already cancelled'}, status=400)
     
     try:
         data = json.loads(request.body)
@@ -470,11 +602,16 @@ def cancel_order(request, order_id):
 @login_required
 def payment_history(request, order_id):
     """Get payment history for an order"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
-    order = get_object_or_404(Order, id=order_id, table_info__owner=owner)
+    _oq_ph = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
+    order = get_object_or_404(Order.objects.filter(_oq_ph), id=order_id)
     
     payments = order.payments.select_related('processed_by', 'voided_by').order_by('-created_at')
     
@@ -509,23 +646,25 @@ def payment_history(request, order_id):
 @login_required
 def generate_receipt(request, payment_id):
     """Generate receipt for a specific payment"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Cashier, Customer Care, or Owner role required.")
         return redirect('accounts:profile')
     
     owner = get_owner_filter(request.user)
-    payment = get_object_or_404(
-        Payment, 
-        id=payment_id, 
-        order__table_info__owner=owner
+    _pq_gr = (
+        Q(order__table_info__owner=owner) |
+        Q(order__table_info__restaurant__main_owner=owner) |
+        Q(order__table_info__restaurant__branch_owner=owner)
     )
+    payment = get_object_or_404(Payment.objects.filter(_pq_gr), id=payment_id)
     
-    # Get the order with all related data
-    order = payment.order
+    # Fetch order with prefetch to avoid repeated order_items queries when calling get_total()
+    order = Order.objects.prefetch_related('order_items__product').get(pk=payment.order_id)
     
-    # Calculate change and remaining balance
-    change_amount = payment.amount - order.get_total() if payment.payment_method == 'cash' and payment.amount > order.get_total() else Decimal('0.00')
-    remaining_balance = order.get_total() - payment.amount if payment.amount < order.get_total() else Decimal('0.00')
+    # Calculate change and remaining balance (compute total once)
+    order_total = order.get_total()
+    change_amount = payment.amount - order_total if payment.payment_method == 'cash' and payment.amount > order_total else Decimal('0.00')
+    remaining_balance = order_total - payment.amount if payment.amount < order_total else Decimal('0.00')
     
     context = {
         'payment': payment,
@@ -541,26 +680,28 @@ def generate_receipt(request, payment_id):
 @login_required  
 def reprint_receipt(request, payment_id):
     """Reprint an existing receipt"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Cashier, Customer Care, or Owner role required.")
         return redirect('accounts:profile')
     
     owner = get_owner_filter(request.user)
-    payment = get_object_or_404(
-        Payment, 
-        id=payment_id, 
-        order__table_info__owner=owner
+    _pq_rr = (
+        Q(order__table_info__owner=owner) |
+        Q(order__table_info__restaurant__main_owner=owner) |
+        Q(order__table_info__restaurant__branch_owner=owner)
     )
+    payment = get_object_or_404(Payment.objects.filter(_pq_rr), id=payment_id)
     
     # Add a message indicating this is a reprint
     messages.info(request, f"Reprinting receipt #{payment.id:06d}")
     
-    # Get the order with all related data
-    order = payment.order
+    # Fetch order with prefetch to avoid repeated order_items queries when calling get_total()
+    order = Order.objects.prefetch_related('order_items__product').get(pk=payment.order_id)
     
-    # Calculate change and remaining balance
-    change_amount = payment.amount - order.get_total() if payment.payment_method == 'cash' and payment.amount > order.get_total() else Decimal('0.00')
-    remaining_balance = order.get_total() - payment.amount if payment.amount < order.get_total() else Decimal('0.00')
+    # Calculate change and remaining balance (compute total once)
+    order_total = order.get_total()
+    change_amount = payment.amount - order_total if payment.payment_method == 'cash' and payment.amount > order_total else Decimal('0.00')
+    remaining_balance = order_total - payment.amount if payment.amount < order_total else Decimal('0.00')
     
     context = {
         'payment': payment,
@@ -589,8 +730,13 @@ def receipt_management(request):
     date_to = request.GET.get('date_to', '')
     
     # Base queryset for payments
+    _pq_rm = (
+        Q(order__table_info__owner=owner) |
+        Q(order__table_info__restaurant__main_owner=owner) |
+        Q(order__table_info__restaurant__branch_owner=owner)
+    )
     payments = Payment.objects.filter(
-        order__table_info__owner=owner,
+        _pq_rm,
         is_voided=False
     ).select_related(
         'order', 'order__table_info', 'processed_by'
@@ -613,7 +759,11 @@ def receipt_management(request):
     payments = payments[:50]
     
     # Get products for waste recording modal
-    waste_products = Product.objects.filter(main_category__owner=owner).order_by('name')
+    waste_products = Product.objects.filter(
+        Q(main_category__owner=owner) |
+        Q(main_category__restaurant__main_owner=owner) |
+        Q(main_category__restaurant__branch_owner=owner)
+    ).distinct().order_by('name')
     
     context = {
         'payments': payments,
@@ -630,12 +780,20 @@ def receipt_management(request):
 @require_http_methods(["POST"])
 def print_bill(request, order_id):
     """Print bill for an order (before payment) - shows what customer owes"""
-    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+    if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
-    order = get_object_or_404(Order, id=order_id, table_info__owner=owner)
-    
+    _oq_pb = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
+    order = get_object_or_404(
+        Order.objects.prefetch_related('order_items__product').filter(_oq_pb),
+        id=order_id
+    )
+
     # Check if order is cancelled
     if order.status == 'cancelled':
         return JsonResponse({'error': 'Cannot print bill for cancelled order'}, status=400)
@@ -695,7 +853,12 @@ def cashier_reports(request):
     export_format = request.GET.get('export')
     
     # Base queryset - cashier sees ALL orders from their restaurant
-    orders = Order.objects.filter(table_info__owner=owner)
+    _oq_cr = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
+    orders = Order.objects.filter(_oq_cr)
     
     # Apply staff filter (by specific user)
     if staff_filter != 'all':
@@ -748,7 +911,7 @@ def cashier_reports(request):
     ).prefetch_related(
         'order_items__product__main_category',
         'order_items__product__sub_category',
-        'payments'
+        'payments__processed_by',
     ).order_by('-created_at')
     
     # Calculate statistics
@@ -761,7 +924,7 @@ def cashier_reports(request):
     for order in orders:
         # Count all revenue from order
         total_revenue += order.total_amount
-        total_items += order.order_items.count()
+        total_items += len(order.order_items.all())  # use prefetch cache
         
         # Calculate paid and unpaid amounts
         if order.payment_status == 'paid':
@@ -769,9 +932,8 @@ def cashier_reports(request):
         elif order.payment_status == 'unpaid':
             unpaid_amount += order.total_amount
         elif order.payment_status == 'partial':
-            # For partial payments, calculate what's been paid
-            total_paid = order.payments.filter(is_voided=False).aggregate(
-                total=Sum('amount'))['total'] or Decimal('0.00')
+            # For partial payments, use prefetched payments to avoid N+1
+            total_paid = sum(p.amount for p in order.payments.all() if not p.is_voided) or Decimal('0.00')
             paid_amount += total_paid
             unpaid_amount += (order.total_amount - total_paid)
     
@@ -787,13 +949,14 @@ def cashier_reports(request):
         writer.writerow(['Order #', 'Date', 'Time', 'Table', 'Items', 'Categories', 'Stations', 'Ordered By', 'Paid By', 'Total Amount', 'Payment Status'])
         
         for order in orders:
-            items_list = ', '.join([f"{item.quantity}x {item.product.name}" for item in order.order_items.all()])
-            categories = ', '.join(set([item.product.main_category.name for item in order.order_items.all() if item.product.main_category]))
-            stations = ', '.join(set([item.product.get_station_display() for item in order.order_items.all()]))
+            _items = list(order.order_items.all())  # read prefetch cache once
+            items_list = ', '.join([f"{item.quantity}x {_safe_csv(item.product.name)}" for item in _items])
+            categories = ', '.join(set([_safe_csv(item.product.main_category.name) for item in _items if item.product.main_category]))
+            stations = ', '.join(set([item.product.get_station_display() for item in _items]))
             
-            # Get paid by information
+            # Get paid by information — use prefetch cache (.all() not .filter())
             paid_by_list = []
-            for payment in order.payments.filter(is_voided=False):
+            for payment in [p for p in order.payments.all() if not p.is_voided]:
                 name = payment.processed_by.get_full_name() or payment.processed_by.username
                 if payment.processed_by.is_cashier():
                     paid_by_list.append(f"{name}-cs")
@@ -811,7 +974,7 @@ def cashier_reports(request):
                 items_list,
                 categories,
                 stations,
-                order.ordered_by.get_full_name() or order.ordered_by.username,
+                _safe_csv(order.ordered_by.get_full_name() or order.ordered_by.username),
                 paid_by,
                 f'{currency_symbol}{order.total_amount:.2f}',
                 order.get_payment_status_display()
@@ -877,16 +1040,17 @@ def cashier_reports(request):
         table_data = [['Order #', 'Date & Time', 'Table', 'Items', 'Category', 'Station', 'Ordered By', 'Paid By', 'Total', 'Payment']]
         
         for order in orders:
-            items_str = ', '.join([f"{item.quantity}x {item.product.name[:15]}" for item in order.order_items.all()[:3]])
-            if order.order_items.count() > 3:
+            _items = list(order.order_items.all())  # read prefetch cache once
+            items_str = ', '.join([f"{item.quantity}x {item.product.name[:15]}" for item in _items[:3]])
+            if len(_items) > 3:
                 items_str += '...'
+
+            categories = ', '.join(set([item.product.main_category.name[:15] for item in _items if item.product.main_category]))
+            stations = ', '.join(set([item.product.get_station_display()[:10] for item in _items]))
             
-            categories = ', '.join(set([item.product.main_category.name[:15] for item in order.order_items.all() if item.product.main_category]))
-            stations = ', '.join(set([item.product.get_station_display()[:10] for item in order.order_items.all()]))
-            
-            # Get paid by information
+            # Get paid by information — use prefetch cache (.all() not .filter())
             paid_by_list = []
-            for payment in order.payments.filter(is_voided=False):
+            for payment in [p for p in order.payments.all() if not p.is_voided]:
                 name = (payment.processed_by.get_full_name() or payment.processed_by.username)[:10]
                 if payment.processed_by.is_cashier():
                     paid_by_list.append(f"{name}-cs")
@@ -938,32 +1102,27 @@ def cashier_reports(request):
     from django.contrib.auth import get_user_model
     User = get_user_model()
     
-    categories = MainCategory.objects.filter(owner=owner).order_by('name')
-    subcategories = SubCategory.objects.filter(main_category__owner=owner).order_by('name')
+    _cq_cashier = (
+        Q(owner=owner) |
+        Q(restaurant__main_owner=owner) |
+        Q(restaurant__branch_owner=owner)
+    )
+    categories = MainCategory.objects.filter(_cq_cashier).distinct().order_by('name')
+    subcategories = SubCategory.objects.filter(
+        Q(main_category__owner=owner) |
+        Q(main_category__restaurant__main_owner=owner) |
+        Q(main_category__restaurant__branch_owner=owner)
+    ).distinct().order_by('name')
     
     # Get customer care users for filter
     customer_care_users = User.objects.filter(
-        role__name='customer_care'
-    )
-    # Filter by owner assignment
-    if hasattr(owner, 'branch_owner'):
-        customer_care_users = customer_care_users.filter(branch_owner=owner)
-    elif hasattr(owner, 'owner'):
-        customer_care_users = customer_care_users.filter(owner=owner)
-    else:
-        customer_care_users = customer_care_users.filter(Q(owner=owner) | Q(branch_owner=owner))
-    
-    customer_care_users = customer_care_users.order_by('first_name', 'username')
-    
+        role__name='customer_care', owner=owner
+    ).order_by('first_name', 'username')
+
     # Get cashier users for filter
-    cashier_users = User.objects.filter(role__name='cashier')
-    if hasattr(owner, 'branch_owner'):
-        cashier_users = cashier_users.filter(branch_owner=owner)
-    elif hasattr(owner, 'owner'):
-        cashier_users = cashier_users.filter(owner=owner)
-    else:
-        cashier_users = cashier_users.filter(Q(owner=owner) | Q(branch_owner=owner))
-    cashier_users = cashier_users.order_by('first_name', 'username')
+    cashier_users = User.objects.filter(
+        role__name='cashier', owner=owner
+    ).order_by('first_name', 'username')
     
     # Station choices
     station_choices = [
@@ -973,6 +1132,12 @@ def cashier_reports(request):
         ('service', 'Service')
     ]
     
+    waste_products = Product.objects.filter(
+        Q(main_category__owner=owner) |
+        Q(main_category__restaurant__main_owner=owner) |
+        Q(main_category__restaurant__branch_owner=owner)
+    ).distinct().order_by('name')
+
     context = {
         'orders': orders,
         'total_revenue': total_revenue,
@@ -985,6 +1150,7 @@ def cashier_reports(request):
         'station_choices': station_choices,
         'customer_care_users': customer_care_users,
         'cashier_users': cashier_users,
+        'waste_products': waste_products,
         'filters': {
             'period': period,
             'payment_status': payment_status,

@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 from restaurant.models import TableInfo
 from .models import Order
 from accounts.models import get_owner_filter
@@ -29,12 +30,20 @@ class TableSelectionForm(forms.Form):
             
             if self.restaurant:
                 # Use restaurant from QR code
-                queryset = queryset.filter(owner=self.restaurant)
+                queryset = queryset.filter(
+                    Q(owner=self.restaurant) |
+                    Q(restaurant__main_owner=self.restaurant) |
+                    Q(restaurant__branch_owner=self.restaurant)
+                )
             elif self.user:
                 # Fall back to user's owner filter
                 owner_filter = get_owner_filter(self.user)
                 if owner_filter:
-                    queryset = queryset.filter(owner=owner_filter)
+                    queryset = queryset.filter(
+                        Q(owner=owner_filter) |
+                        Q(restaurant__main_owner=owner_filter) |
+                        Q(restaurant__branch_owner=owner_filter)
+                    )
             
             table = queryset.get(tbl_no=table_number)
             if not table.is_available:

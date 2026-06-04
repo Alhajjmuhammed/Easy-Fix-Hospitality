@@ -159,14 +159,14 @@ class OwnerRegistrationForm(forms.ModelForm):
     subscription_plan = forms.ChoiceField(
         choices=[
             ('SINGLE', 'Single Restaurant - Basic plan for one location'),
-            ('PRO', 'Pro Plan - Advanced plan with unlimited branches'),
+            # ('PRO', 'Pro Plan - Advanced plan with unlimited branches'),  # Disabled - must be upgraded by admin
         ],
         initial='SINGLE',
         required=True,
         widget=forms.RadioSelect(attrs={
             'class': 'form-check-input'
         }),
-        help_text="Choose your subscription plan. You can upgrade later if needed."
+        help_text="New registrations start with SINGLE plan. Contact admin to upgrade to PRO plan for multi-branch support."
     )
     
     # Honeypot field to detect bots

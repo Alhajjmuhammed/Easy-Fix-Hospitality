@@ -1,12 +1,20 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+
+
+def _safe_csv(value):
+    """Prevent CSV formula injection: prefix dangerous leading characters."""
+    s = str(value) if value is not None else ''
+    if s and s[0] in ('=', '+', '-', '@', '|', '%'):
+        return '\t' + s
+    return s
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 from orders.models import Order, OrderItem
 from cashier.models import Payment
 from restaurant.models import MainCategory, SubCategory
 from accounts.models import get_owner_filter, User
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, F, ExpressionWrapper, DecimalField
 from datetime import datetime, timedelta
 from django.utils import timezone
 import csv
@@ -246,8 +254,15 @@ def dashboard(request):
         total_tax = Decimal('0.00')
         for order in orders:
             total_tax += order.get_tax_amount()
-    total_revenue_with_tax = total_revenue + total_tax
+        # sum(total_amount) is tax-inclusive; derive pre-tax base to avoid double-counting
+        _total_rev_with_tax = Decimal(str(total_revenue))
+        total_revenue = _total_rev_with_tax - total_tax
+        avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
+    total_revenue_with_tax = Decimal(str(total_revenue)) + total_tax
     avg_order_value_with_tax = (total_revenue_with_tax / total_orders) if total_orders > 0 else 0
+    # Use effective tax rate for display when current rate is 0 but historical tax exists
+    if tax_rate_percentage == 0 and total_tax > 0 and total_revenue > 0:
+        tax_rate_percentage = round(float(total_tax / Decimal(str(total_revenue)) * 100), 1)
     
     # Calculate payment status counts and revenues
     paid_orders = orders.filter(payment_status='paid')
@@ -262,7 +277,8 @@ def dashboard(request):
         paid_tax = Decimal('0.00')
         for order in paid_orders:
             paid_tax += order.get_tax_amount()
-    paid_revenue_with_tax = paid_revenue + paid_tax
+        paid_revenue = Decimal(str(paid_revenue)) - paid_tax
+    paid_revenue_with_tax = Decimal(str(paid_revenue)) + paid_tax
 
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
@@ -276,7 +292,8 @@ def dashboard(request):
         unpaid_tax = Decimal('0.00')
         for order in unpaid_orders:
             unpaid_tax += order.get_tax_amount()
-    unpaid_revenue_with_tax = unpaid_revenue + unpaid_tax
+        unpaid_revenue = Decimal(str(unpaid_revenue)) - unpaid_tax
+    unpaid_revenue_with_tax = Decimal(str(unpaid_revenue)) + unpaid_tax
 
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
@@ -290,7 +307,8 @@ def dashboard(request):
         partial_tax = Decimal('0.00')
         for order in partial_orders:
             partial_tax += order.get_tax_amount()
-    partial_revenue_with_tax = partial_revenue + partial_tax
+        partial_revenue = Decimal(str(partial_revenue)) - partial_tax
+    partial_revenue_with_tax = Decimal(str(partial_revenue)) + partial_tax
     
     # Calculate station-specific metrics
     kitchen_orders_count = len([o for o in orders if has_kitchen_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'kitchen' else 0)
@@ -418,7 +436,13 @@ def dashboard(request):
     # SECURITY: scope top products to this restaurant's own categories only
     top_products = OrderItem.objects.filter(order__in=orders, product__main_category__in=categories)\
         .values('product__name', 'product__station')\
-        .annotate(total_quantity=Sum('quantity'), total_revenue=Sum('unit_price'))\
+        .annotate(
+            total_quantity=Sum('quantity'),
+            total_revenue=ExpressionWrapper(
+                Sum(F('unit_price') * F('quantity')),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        )\
         .order_by('-total_quantity')[:5]
 
     # Filter subcategories by selected category if applicable
@@ -519,6 +543,13 @@ def dashboard(request):
 @login_required
 def export_csv(request):
     """Export filtered data to CSV with station filtering"""
+    from django.shortcuts import redirect
+    from django.contrib import messages as _messages
+    if not (request.user.is_administrator() or request.user.is_owner() or
+            request.user.is_main_owner() or request.user.is_branch_owner() or
+            request.user.is_customer_care()):
+        _messages.error(request, "Access denied. Owner or Customer Care role required.")
+        return redirect('restaurant:home')
     
     # Import restaurant context utilities
     from admin_panel.restaurant_utils import get_restaurant_context
@@ -685,28 +716,39 @@ def export_csv(request):
         total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
         total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
-    
+
+    # Separate tax from revenue so CSV matches dashboard (total_amount is tax-inclusive)
+    from decimal import Decimal as _D
+    if not _item_filter_active:
+        _csv_total_tax = sum(_o.get_tax_amount() for _o in orders)
+        total_revenue = _D(str(orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_csv_total_tax))
+    else:
+        _csv_total_tax = _D('0.00')
+
     # Calculate payment status breakdown
     paid_orders = orders.filter(payment_status='paid')
     paid_orders_count = paid_orders.count()
     if _item_filter_active:
         paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
     else:
-        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        _pr_tax = sum(_o.get_tax_amount() for _o in paid_orders)
+        paid_revenue = _D(str(paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pr_tax))
 
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
     if _item_filter_active:
         unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
     else:
-        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        _ur_tax = sum(_o.get_tax_amount() for _o in unpaid_orders)
+        unpaid_revenue = _D(str(unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_ur_tax))
 
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
     if _item_filter_active:
         partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
     else:
-        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        _par_tax = sum(_o.get_tax_amount() for _o in partial_orders)
+        partial_revenue = _D(str(partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_par_tax))
     
     # Get currency symbol from user settings
     currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
@@ -737,8 +779,11 @@ def export_csv(request):
         period_desc += f" (Station: {station_filter.title()})"
     if staff_filter != 'all':
         try:
-            staff_user = User.objects.get(id=int(staff_filter))
-            period_desc += f" (Staff: {staff_user.first_name} {staff_user.last_name})"
+            # SECURITY: only resolve user if they have orders in the already-scoped queryset
+            # prevents cross-tenant user name/role enumeration via arbitrary staff_filter IDs
+            if orders.filter(ordered_by_id=int(staff_filter)).exists():
+                staff_user = User.objects.get(id=int(staff_filter))
+                period_desc += f" (Staff: {staff_user.first_name} {staff_user.last_name})"
         except (User.DoesNotExist, ValueError):
             pass
     
@@ -756,8 +801,10 @@ def export_csv(request):
     writer.writerow(['Station Filter:', station_filter.title()])
     if staff_filter != 'all':
         try:
-            staff_user = User.objects.get(id=int(staff_filter))
-            writer.writerow(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
+            # SECURITY: only resolve user if they have orders in the already-scoped queryset
+            if orders.filter(ordered_by_id=int(staff_filter)).exists():
+                staff_user = User.objects.get(id=int(staff_filter))
+                writer.writerow(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
         except (User.DoesNotExist, ValueError):
             pass
     if target_restaurant:
@@ -901,11 +948,14 @@ def export_csv(request):
                         .values('product__name')\
                         .annotate(
                             total_quantity=Sum('quantity'),
-                            total_revenue=Sum('unit_price')
+                            total_revenue=ExpressionWrapper(
+                                Sum(F('unit_price') * F('quantity')),
+                                output_field=DecimalField(max_digits=12, decimal_places=2)
+                            )
                         )\
                         .order_by('-total_quantity')[:5]
                     
-                    location_label = f"{restaurant.name}"
+                    location_label = _safe_csv(restaurant.name)
                     if not restaurant.is_main_restaurant:
                         location_label += " (Branch)"
                     
@@ -914,7 +964,7 @@ def export_csv(request):
                         
                         writer.writerow([
                             location_label if idx == 0 else '',  # Only show location name on first row
-                            product['product__name'],
+                            _safe_csv(product['product__name']),
                             f"{product['total_quantity']:,}",
                             f"{currency_symbol}{product['total_revenue']:,.2f}",
                             f"{product_percentage:.1f}%"
@@ -1037,6 +1087,13 @@ def export_csv(request):
 @login_required
 def export_pdf(request):
     """Export filtered data to PDF with station filtering"""
+    from django.shortcuts import redirect
+    from django.contrib import messages as _messages
+    if not (request.user.is_administrator() or request.user.is_owner() or
+            request.user.is_main_owner() or request.user.is_branch_owner() or
+            request.user.is_customer_care()):
+        _messages.error(request, "Access denied. Owner or Customer Care role required.")
+        return redirect('restaurant:home')
     
     # Import restaurant context utilities
     from admin_panel.restaurant_utils import get_restaurant_context
@@ -1203,28 +1260,39 @@ def export_pdf(request):
         total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
         total_items = OrderItem.objects.filter(order__in=orders).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
-    
+
+    # Separate tax from revenue so PDF matches dashboard (total_amount is tax-inclusive)
+    from decimal import Decimal as _D
+    if not _item_filter_active:
+        _pdf_total_tax = sum(_o.get_tax_amount() for _o in orders)
+        total_revenue = _D(str(orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_total_tax))
+    else:
+        _pdf_total_tax = _D('0.00')
+
     # Calculate payment status breakdown
     paid_orders = orders.filter(payment_status='paid')
     paid_orders_count = paid_orders.count()
     if _item_filter_active:
         paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
     else:
-        paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        _pdf_pr_tax = sum(_o.get_tax_amount() for _o in paid_orders)
+        paid_revenue = _D(str(paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_pr_tax))
 
     unpaid_orders = orders.filter(payment_status='unpaid')
     unpaid_orders_count = unpaid_orders.count()
     if _item_filter_active:
         unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
     else:
-        unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        _pdf_ur_tax = sum(_o.get_tax_amount() for _o in unpaid_orders)
+        unpaid_revenue = _D(str(unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_ur_tax))
 
     partial_orders = orders.filter(payment_status='partial')
     partial_orders_count = partial_orders.count()
     if _item_filter_active:
         partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
     else:
-        partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        _pdf_par_tax = sum(_o.get_tax_amount() for _o in partial_orders)
+        partial_revenue = _D(str(partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_par_tax))
     
     # Get currency symbol from user settings
     currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
@@ -1255,8 +1323,10 @@ def export_pdf(request):
         period_desc += f" (Station: {station_filter.title()})"
     if staff_filter != 'all':
         try:
-            staff_user = User.objects.get(id=int(staff_filter))
-            period_desc += f" (Staff: {staff_user.first_name} {staff_user.last_name})"
+            # SECURITY: only resolve user if they have orders in the already-scoped queryset
+            if orders.filter(ordered_by_id=int(staff_filter)).exists():
+                staff_user = User.objects.get(id=int(staff_filter))
+                period_desc += f" (Staff: {staff_user.first_name} {staff_user.last_name})"
         except (User.DoesNotExist, ValueError):
             pass
     
@@ -1520,7 +1590,10 @@ def export_pdf(request):
                         .values('product__name')\
                         .annotate(
                             total_quantity=Sum('quantity'),
-                            total_revenue=Sum('unit_price')
+                            total_revenue=ExpressionWrapper(
+                                Sum(F('unit_price') * F('quantity')),
+                                output_field=DecimalField(max_digits=12, decimal_places=2)
+                            )
                         )\
                         .order_by('-total_quantity')[:5]
                     
@@ -1663,4 +1736,179 @@ def export_pdf(request):
     response.write(pdf)
     
     return response
+
+
+# ---------------------------------------------------------------------------
+# Money Flow Dashboard
+# ---------------------------------------------------------------------------
+
+@login_required
+def money_flow(request):
+    """Unified money flow: Sales revenue + Event income vs Inventory costs."""
+    from django.shortcuts import redirect
+    from django.contrib import messages as _messages
+    if not (request.user.is_administrator() or request.user.is_owner() or
+            request.user.is_main_owner() or request.user.is_branch_owner() or
+            request.user.is_manager() or request.user.is_customer_care()):
+        _messages.error(request, "Access denied. Owner or Manager role required.")
+        return redirect('restaurant:home')
+    from inventory.models import InventoryRecord
+    from restaurant.models import Event
+
+    owner = get_owner_filter(request.user)
+    currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
+
+    # ── Period filter ────────────────────────────────────────────────────────
+    period = request.GET.get('period', 'today')
+    date_from_raw = request.GET.get('date_from', '')
+    date_to_raw = request.GET.get('date_to', '')
+    today = timezone.now().date()
+
+    if period == 'today':
+        date_from = date_to = today
+    elif period == 'week':
+        date_from = today - timedelta(days=today.weekday())
+        date_to = today
+    elif period == 'month':
+        date_from = today.replace(day=1)
+        date_to = today
+    elif period == 'custom' and date_from_raw and date_to_raw:
+        try:
+            date_from = datetime.strptime(date_from_raw, '%Y-%m-%d').date()
+            date_to = datetime.strptime(date_to_raw, '%Y-%m-%d').date()
+        except ValueError:
+            date_from = date_to = today
+    else:
+        date_from = date_to = today
+
+    # ── Orders / Sales ───────────────────────────────────────────────────────
+    if owner:
+        from django.db.models import Q as DQ
+        orders_qs = Order.objects.filter(
+            DQ(table_info__owner=owner) | DQ(table_info__restaurant__main_owner=owner)
+        )
+    elif request.user.is_administrator():
+        orders_qs = Order.objects.all()
+    else:
+        orders_qs = Order.objects.none()
+
+    orders_qs = orders_qs.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
+
+    sales_revenue      = orders_qs.filter(payment_status='paid').aggregate(t=Sum('total_amount'))['t'] or 0
+    sales_unpaid       = orders_qs.filter(payment_status='unpaid').aggregate(t=Sum('total_amount'))['t'] or 0
+    sales_partial      = orders_qs.filter(payment_status='partial').aggregate(t=Sum('total_amount'))['t'] or 0
+    sales_total_orders = orders_qs.count()
+    sales_paid_orders  = orders_qs.filter(payment_status='paid').count()
+
+    # ── Events ───────────────────────────────────────────────────────────────
+    try:
+        if owner:
+            events_qs = Event.objects.filter(owner=owner)
+        elif request.user.is_administrator():
+            events_qs = Event.objects.all()
+        else:
+            events_qs = Event.objects.none()
+
+        events_qs = events_qs.filter(event_date__gte=date_from, event_date__lte=date_to)
+
+        event_collected   = events_qs.aggregate(t=Sum('amount_paid'))['t'] or 0
+        event_outstanding = events_qs.exclude(payment_status='fully_paid').aggregate(
+            t=Sum('balance_due'))['t'] or 0
+        event_total_value = events_qs.aggregate(
+            t=Sum('price_per_pax'))['t'] or 0   # rough; ideally price_per_pax * total_pax
+        event_count       = events_qs.count()
+    except Exception:
+        event_collected = event_outstanding = event_total_value = 0
+        event_count = 0
+
+    # ── Inventory costs ──────────────────────────────────────────────────────
+    if owner:
+        inv_qs = InventoryRecord.objects.filter(item__owner=owner)
+    elif request.user.is_administrator():
+        inv_qs = InventoryRecord.objects.all()
+    else:
+        inv_qs = InventoryRecord.objects.none()
+
+    inv_qs = inv_qs.filter(recorded_at__date__gte=date_from, recorded_at__date__lte=date_to)
+
+    from django.db.models import ExpressionWrapper as _EW, DecimalField as _DF
+    from django.db.models.functions import Abs as _Abs
+    _inv_cost_expr = _EW(_Abs(F('quantity_change')) * F('unit_price'), output_field=_DF(max_digits=14, decimal_places=2))
+    inv_spent   = inv_qs.exclude(record_type='returned').exclude(unit_price__isnull=True).aggregate(t=Sum(_inv_cost_expr))['t'] or 0
+    inv_refunds = inv_qs.filter(record_type='returned').exclude(unit_price__isnull=True).aggregate(t=Sum(_inv_cost_expr))['t'] or 0
+    inv_net     = inv_spent - inv_refunds
+
+    # ── Totals ───────────────────────────────────────────────────────────────
+    total_in         = sales_revenue + event_collected
+    total_out        = inv_net          # net inventory spend (after refunds)
+    total_outstanding = sales_unpaid + sales_partial + event_outstanding
+    net_position     = total_in - total_out
+
+    # ── Daily chart data (money in vs out per day in range) ──────────────────
+    from collections import defaultdict
+    delta = (date_to - date_from).days + 1
+    chart_labels = []
+    chart_in = []
+    chart_out = []
+
+    for i in range(delta):
+        day = date_from + timedelta(days=i)
+        label = day.strftime('%b %d') if delta <= 31 else day.strftime('%Y-%m-%d')
+        chart_labels.append(label)
+
+        day_orders_revenue = orders_qs.filter(
+            created_at__date=day, payment_status='paid'
+        ).aggregate(t=Sum('total_amount'))['t'] or 0
+
+        try:
+            day_event_collected = events_qs.filter(
+                event_date=day
+            ).aggregate(t=Sum('amount_paid'))['t'] or 0
+        except Exception:
+            day_event_collected = 0
+
+        day_inv_spent = inv_qs.filter(
+            recorded_at__date=day
+        ).exclude(record_type='returned').exclude(unit_price__isnull=True).aggregate(t=Sum(_inv_cost_expr))['t'] or 0
+        day_inv_refunds = inv_qs.filter(
+            recorded_at__date=day, record_type='returned'
+        ).exclude(unit_price__isnull=True).aggregate(t=Sum(_inv_cost_expr))['t'] or 0
+
+        chart_in.append(float(day_orders_revenue + day_event_collected))
+        chart_out.append(float(max(0, day_inv_spent - day_inv_refunds)))
+
+    import json
+    context = {
+        'currency_symbol': currency_symbol,
+        'period': period,
+        'date_from': date_from_raw or str(date_from),
+        'date_to': date_to_raw or str(date_to),
+        'date_from_display': date_from,
+        'date_to_display': date_to,
+        # Sales
+        'sales_revenue': sales_revenue,
+        'sales_unpaid': sales_unpaid,
+        'sales_partial': sales_partial,
+        'sales_total_orders': sales_total_orders,
+        'sales_paid_orders': sales_paid_orders,
+        # Events
+        'event_collected': event_collected,
+        'event_outstanding': event_outstanding,
+        'event_count': event_count,
+        # Inventory
+        'inv_spent': inv_spent,
+        'inv_refunds': inv_refunds,
+        'inv_net': inv_net,
+        # Totals
+        'total_in': total_in,
+        'total_out': total_out,
+        'total_outstanding': total_outstanding,
+        'net_position': net_position,
+        # Chart
+        'chart_labels': json.dumps(chart_labels),
+        'chart_in': json.dumps(chart_in),
+        'chart_out': json.dumps(chart_out),
+    }
+    return render(request, 'reports/money_flow.html', context)
+
 

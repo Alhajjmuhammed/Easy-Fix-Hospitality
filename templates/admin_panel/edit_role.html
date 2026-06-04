@@ -1,0 +1,76 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Edit Role - Admin Panel{% endblock %}
+
+{% block page_title %}Edit Role{% endblock %}
+{% block page_description %}Update role description{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    <h5 class="mb-0">Edit Role: {{ edit_role.get_name_display }}</h5>
+                </div>
+                <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Users
+                </a>
+            </div>
+            <div class="card-body">
+                <div id="alertContainer"></div>
+
+                <form id="editRoleForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Role Name</label>
+                        <input type="text" class="form-control" value="{{ edit_role.get_name_display }}" readonly>
+                        <div class="form-text">Role names are system-defined and cannot be changed.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ edit_role.description }}</textarea>
+                        <div class="form-text">Brief description of this role's responsibilities.</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Save Changes
+                        </button>
+                        <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('editRoleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = new FormData(form);
+    const alertBox = document.getElementById('alertContainer');
+
+    fetch('{% url "admin_panel:update_role" edit_role.id %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': data.get('csrfmiddlewaretoken')},
+        body: data
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            alertBox.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>' + res.message + '</div>';
+            setTimeout(() => { window.location.href = '{% url "admin_panel:manage_users" %}'; }, 1500);
+        } else {
+            alertBox.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + res.message + '</div>';
+        }
+    })
+    .catch(() => {
+        alertBox.innerHTML = '<div class="alert alert-danger">An unexpected error occurred. Please try again.</div>';
+    });
+});
+</script>
+{% endblock %}

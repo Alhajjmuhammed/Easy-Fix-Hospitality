@@ -310,7 +310,7 @@
         
         <!-- Footer -->
         <div class="kot-footer">
-            <div>Total Items: {{ order.order_items.count }}</div>
+            <div>Total Items: {{ order.order_items.all|length }}</div>
             <div>Total Quantity: {{ order.get_total_products }}</div>
             <div class="kot-time">Printed: {{ now|date:"d/m/Y h:i A" }}</div>
             <div style="margin-top: 10px; font-size: 10px;">

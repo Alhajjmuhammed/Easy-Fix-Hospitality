@@ -225,7 +225,7 @@
                 <div class="order-details">
                     <div class="order-info-item">
                         <i class="fas fa-shopping-bag"></i>
-                        <span>{{ order.order_items.count }} item{{ order.order_items.count|pluralize }}</span>
+                        <span>{{ order.order_items.all|length }} item{{ order.order_items.all|length|pluralize }}</span>
                     </div>
                     <div class="order-info-item">
                         <i class="fas fa-dollar-sign"></i>

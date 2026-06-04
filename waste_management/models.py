@@ -35,9 +35,9 @@ class FoodWasteLog(models.Model):
         ('returned_supplier', 'Returned to Supplier'),
     ]
     
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='waste_logs', null=True, blank=True)
-    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name='waste_logs', null=True, blank=True)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='waste_logs')
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='waste_logs', null=True, blank=True)
+    order_item = models.ForeignKey(OrderItem, on_delete=models.SET_NULL, related_name='waste_logs', null=True, blank=True)
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='waste_logs')
     quantity_wasted = models.IntegerField()
     
     # Cost breakdown
@@ -52,14 +52,14 @@ class FoodWasteLog(models.Model):
     notes = models.TextField(blank=True)
     
     # Tracking
-    recorded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='waste_records')
+    recorded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='waste_records')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     # Restaurant relationship
     @property
     def owner(self):
-        if self.order:
+        if self.order and self.order.table_info:
             return self.order.table_info.owner
         return self.product.owner
     
@@ -106,7 +106,7 @@ class FoodWasteLog(models.Model):
 class OrderCostBreakdown(models.Model):
     """Track detailed cost breakdown for each order"""
     
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='cost_breakdown')
+    order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name='cost_breakdown')
     
     # Revenue
     menu_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
@@ -160,7 +160,7 @@ class WasteReportSummary(models.Model):
         ('yearly', 'Yearly'),
     ]
     
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='waste_summaries')
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name='waste_summaries')
     period_type = models.CharField(max_length=20, choices=PERIOD_TYPE_CHOICES)
     period_start = models.DateField()
     period_end = models.DateField()
@@ -170,13 +170,31 @@ class WasteReportSummary(models.Model):
     total_waste_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     total_revenue_lost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     
-    # Breakdown by reason
+    # Breakdown by reason — all 13 FoodWasteLog.WASTE_REASON_CHOICES are tracked
     customer_refused_count = models.IntegerField(default=0)
     customer_refused_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     kitchen_error_count = models.IntegerField(default=0)
     kitchen_error_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     quality_issue_count = models.IntegerField(default=0)
     quality_issue_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    wrong_order_count = models.IntegerField(default=0)
+    wrong_order_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    overcooking_count = models.IntegerField(default=0)
+    overcooking_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    undercooking_count = models.IntegerField(default=0)
+    undercooking_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    contamination_count = models.IntegerField(default=0)
+    contamination_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    equipment_failure_count = models.IntegerField(default=0)
+    equipment_failure_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    ingredient_expired_count = models.IntegerField(default=0)
+    ingredient_expired_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    staff_error_count = models.IntegerField(default=0)
+    staff_error_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    customer_complaint_count = models.IntegerField(default=0)
+    customer_complaint_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    customer_left_count = models.IntegerField(default=0)
+    customer_left_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     other_waste_count = models.IntegerField(default=0)
     other_waste_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     
@@ -194,7 +212,7 @@ class WasteReportSummary(models.Model):
 class ProductCostSettings(models.Model):
     """Store cost settings for products to calculate waste costs"""
     
-    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='cost_settings')
+    product = models.OneToOneField(Product, on_delete=models.PROTECT, related_name='cost_settings')
     
     # Cost per unit
     ingredient_cost_per_unit = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))

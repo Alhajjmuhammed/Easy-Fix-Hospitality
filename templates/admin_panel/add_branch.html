@@ -616,7 +616,7 @@
                                                     <label class="form-label fw-bold text-muted">Username:</label>
                                                     <div class="input-group">
                                                         <input type="text" class="form-control fw-bold" value="{{ branch_credentials.username }}" readonly>
-                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.username }}', this)">
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.username|escapejs }}', this)">
                                                             <i class="fas fa-copy"></i>
                                                         </button>
                                                     </div>
@@ -625,7 +625,7 @@
                                                     <label class="form-label fw-bold text-muted">Email:</label>
                                                     <div class="input-group">
                                                         <input type="text" class="form-control fw-bold" value="{{ branch_credentials.email }}" readonly>
-                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.email }}', this)">
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.email|escapejs }}', this)">
                                                             <i class="fas fa-copy"></i>
                                                         </button>
                                                     </div>
@@ -635,8 +635,8 @@
                                                 <div class="mb-3">
                                                     <label class="form-label fw-bold text-muted">Password:</label>
                                                     <div class="input-group">
-                                                        <input type="text" class="form-control fw-bold text-primary" value="{{ branch_credentials.password }}" readonly>
-                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.password }}', this)">
+                                                        <input type="password" class="form-control fw-bold text-primary" id="branchCredPassword" value="{{ branch_credentials.password }}" readonly>
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.password|escapejs }}', this)">
                                                             <i class="fas fa-copy"></i>
                                                         </button>
                                                     </div>
@@ -1104,60 +1104,35 @@ $(document).ready(function() {
 
 // Print credentials function
 function printCredentials() {
+    // Store credentials in JS variables (escapejs applied server-side)
+    var credFullName = "{{ branch_credentials.full_name|escapejs }}";
+    var credUsername = "{{ branch_credentials.username|escapejs }}";
+    var credEmail    = "{{ branch_credentials.email|escapejs }}";
+    var credPassword = "{{ branch_credentials.password|escapejs }}";
+    var credRole     = "{{ branch_credentials.role|escapejs }}";
+
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-        <head>
-            <title>Branch Owner Credentials</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .credentials { background: #f8f9fa; padding: 20px; border: 1px solid #dee2e6; }
-                .credential-row { margin: 10px 0; }
-                .label { font-weight: bold; display: inline-block; width: 120px; }
-                .important { color: #dc3545; font-weight: bold; margin-top: 20px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h2>Branch Owner Login Credentials</h2>
-                <p>Restaurant Management System</p>
-            </div>
-            
-            <div class="credentials">
-                <div class="credential-row">
-                    <span class="label">Full Name:</span>
-                    {{ branch_credentials.full_name }}
-                </div>
-                <div class="credential-row">
-                    <span class="label">Username:</span>
-                    {{ branch_credentials.username }}
-                </div>
-                <div class="credential-row">
-                    <span class="label">Email:</span>
-                    {{ branch_credentials.email }}
-                </div>
-                <div class="credential-row">
-                    <span class="label">Password:</span>
-                    {{ branch_credentials.password }}
-                </div>
-                <div class="credential-row">
-                    <span class="label">Role:</span>
-                    {{ branch_credentials.role }}
-                </div>
-                <div class="credential-row">
-                    <span class="label">Login URL:</span>
-                    ${window.location.origin}/accounts/login/
-                </div>
-            </div>
-            
-            <p class="important">
-                IMPORTANT: Save these credentials securely. The password cannot be recovered.
-            </p>
-        </body>
-    </html>
-    `);
+    printWindow.document.write(
+    '<!DOCTYPE html><html><head><title>Branch Owner Credentials</title>' +
+    '<style>body{font-family:Arial,sans-serif;padding:20px;}' +
+    '.header{text-align:center;margin-bottom:30px;}' +
+    '.credentials{background:#f8f9fa;padding:20px;border:1px solid #dee2e6;}' +
+    '.credential-row{margin:10px 0;}' +
+    '.label{font-weight:bold;display:inline-block;width:120px;}' +
+    '.important{color:#dc3545;font-weight:bold;margin-top:20px;}' +
+    '</style></head><body>' +
+    '<div class="header"><h2>Branch Owner Login Credentials</h2><p>Restaurant Management System</p></div>' +
+    '<div class="credentials">' +
+    '<div class="credential-row"><span class="label">Full Name:</span>' + credFullName + '</div>' +
+    '<div class="credential-row"><span class="label">Username:</span>' + credUsername + '</div>' +
+    '<div class="credential-row"><span class="label">Email:</span>' + credEmail + '</div>' +
+    '<div class="credential-row"><span class="label">Password:</span>' + credPassword + '</div>' +
+    '<div class="credential-row"><span class="label">Role:</span>' + credRole + '</div>' +
+    '<div class="credential-row"><span class="label">Login URL:</span>' + window.location.origin + '/accounts/login/</div>' +
+    '</div>' +
+    '<p class="important">IMPORTANT: Save these credentials securely. The password cannot be recovered.</p>' +
+    '</body></html>'
+    );
     printWindow.document.close();
     printWindow.print();
 }

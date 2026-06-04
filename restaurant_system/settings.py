@@ -32,7 +32,7 @@ SECRET_KEY = config('SECRET_KEY', default='dev-only-insecure-key-do-not-use-in-p
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*', 'testserver', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['testserver', '127.0.0.1', 'localhost', '*']  # '*' allows mobile devices on LAN during development
 
 # Application definition
 INSTALLED_APPS = [
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',  # Token authentication for print clients
     'axes',  # Django-axes for failed login tracking
     'corsheaders',  # CORS headers
+    'mobile_api',   # Mobile REST API
     'accounts',
     'restaurant',
     'orders',
@@ -56,6 +57,7 @@ INSTALLED_APPS = [
     'cashier',
     'waste_management',
     'reports',
+    'inventory',
 ]
 
 MIDDLEWARE = [
@@ -66,7 +68,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',  # Re-enabled for security
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'restaurant_system.session_timeout_middleware.SessionTimeoutMiddleware',  # ✅ Auto-logout after 15 min inactivity - RE-ENABLED
-    'subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
+    'restaurant_system.subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',  # Django-axes for failed login tracking
@@ -128,6 +130,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
@@ -178,12 +181,20 @@ SESSION_SAVE_EVERY_REQUEST = True  # Update last activity on every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Don't expire when browser closes (honor timeout instead)
 
 # Try Redis first, fall back to in-memory channels for development
-try:
-    import redis
-    # Test Redis connection
-    r = redis.Redis(host='127.0.0.1', port=6379, db=0)
-    r.ping()
-    # Redis is available
+def _redis_available(host='127.0.0.1', port=6379, timeout=0.2):
+    """Fast TCP probe - no redis client, no retry logic, no blocking."""
+    import socket as _sock
+    s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
+    s.settimeout(timeout)
+    try:
+        s.connect((host, port))
+        return True
+    except Exception:
+        return False
+    finally:
+        s.close()
+
+if _redis_available():
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -193,7 +204,7 @@ try:
         },
     }
     sys.stderr.write("Info: Using Redis for WebSocket channels\n")
-except (ImportError, redis.ConnectionError, redis.ResponseError):
+else:
     # Redis not available, use in-memory channels (development only)
     CHANNEL_LAYERS = {
         'default': {
@@ -216,6 +227,14 @@ class SecurityHeadersMiddleware:
         response['Cross-Origin-Embedder-Policy'] = 'require-corp'
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        response['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+            "img-src 'self' data: blob:; "
+            "font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
+            "connect-src 'self' ws: wss:;"
+        )
         
         return response
 
@@ -269,10 +288,7 @@ CACHES = {
 }
 
 # Try to use Redis for caching if available
-try:
-    import redis
-    r = redis.Redis(host='127.0.0.1', port=6379, db=1)
-    r.ping()
+if _redis_available():
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
@@ -283,14 +299,19 @@ try:
         }
     }
     sys.stderr.write("Info: Using Redis for caching and rate limiting\n")
-except Exception:
+else:
     sys.stderr.write("Warning: Using in-memory cache - Redis recommended for production\n")
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    'http://localhost:8081',   # React Native / Expo Metro bundler
+    'http://127.0.0.1:8081',
+    'http://localhost:19006',  # Expo web
 ]
+# Allow all origins in DEBUG mode for mobile development
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',

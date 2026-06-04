@@ -220,7 +220,7 @@
                                     {% for category in categories %}
                                     <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:'s' %}selected{% endif %}>
                                         {{ category.name }}
-                                        {% if not selected_restaurant %} ({{ category.owner.restaurant_name }}){% endif %}
+                                        {% if not selected_restaurant %} ({{ category.display_restaurant_name }}){% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
@@ -323,7 +323,7 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <span class="badge bg-info">{{ product.main_category.owner.restaurant_name }}</span>
+                                        <span class="badge bg-info">{{ product.main_category.display_restaurant_name }}</span>
                                     </td>
                                     <td>
                                         <div>
@@ -369,7 +369,7 @@
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                             <button class="btn btn-outline-danger" 
-                                                    onclick="deleteProduct({{ product.id }}, '{{ product.name }}', '{{ product.main_category.owner.restaurant_name }}')" 
+                                                    onclick="deleteProduct({{ product.id }}, '{{ product.name }}', '{{ product.main_category.display_restaurant_name }}')" 
                                                     title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>

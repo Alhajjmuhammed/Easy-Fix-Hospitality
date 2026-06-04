@@ -207,7 +207,7 @@
                         </td>
                         <td>
                             {% if category.restaurant %}
-                                {{ category.restaurant.name }}
+                                {{ category.display_restaurant_name }}
                             {% elif category.owner %}
                                 {{ category.owner.restaurant_name|default:"-" }}
                             {% else %}
@@ -227,7 +227,7 @@
                         </td>
                         <td>
                             <span class="badge bg-info">
-                                <i class="fas fa-folder-open me-1"></i>{{ category.subcategories.count }}
+                                <i class="fas fa-folder-open me-1"></i>{{ category.subcategory_count }}
                             </span>
                         </td>
                         <td>
@@ -393,7 +393,7 @@
                         </td>
                         <td>
                             {% if subcategory.main_category.restaurant %}
-                                {{ subcategory.main_category.restaurant.name }}
+                                {{ subcategory.main_category.display_restaurant_name }}
                             {% elif subcategory.main_category.owner %}
                                 {{ subcategory.main_category.owner.restaurant_name|default:"-" }}
                             {% else %}
@@ -413,7 +413,7 @@
                         </td>
                         <td>
                             <span class="badge bg-info">
-                                <i class="fas fa-utensils me-1"></i>{{ subcategory.products.count }}
+                                <i class="fas fa-utensils me-1"></i>{{ subcategory.product_count }}
                             </span>
                         </td>
                         <td>

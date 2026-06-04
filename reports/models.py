@@ -31,11 +31,11 @@ class SalesReport(models.Model):
     date_to = models.DateField()
     
     # Owner/Restaurant context
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sales_reports')
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name='sales_reports')
     
     # Category context (null for overall reports)
-    category = models.ForeignKey('restaurant.MainCategory', on_delete=models.CASCADE, null=True, blank=True)
-    subcategory = models.ForeignKey('restaurant.SubCategory', on_delete=models.CASCADE, null=True, blank=True)
+    category = models.ForeignKey('restaurant.MainCategory', on_delete=models.SET_NULL, null=True, blank=True)
+    subcategory = models.ForeignKey('restaurant.SubCategory', on_delete=models.SET_NULL, null=True, blank=True)
     
     # Sales metrics
     total_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -58,7 +58,7 @@ class SalesReport(models.Model):
     
     # Timestamps
     generated_at = models.DateTimeField(auto_now_add=True)
-    generated_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='generated_reports')
+    generated_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='generated_reports')
     
     class Meta:
         ordering = ['-generated_at']
@@ -82,7 +82,7 @@ class ProductSalesDetail(models.Model):
     """Detailed product sales for each report"""
     
     report = models.ForeignKey(SalesReport, on_delete=models.CASCADE, related_name='product_details')
-    product = models.ForeignKey('restaurant.Product', on_delete=models.CASCADE)
+    product = models.ForeignKey('restaurant.Product', on_delete=models.PROTECT)
     
     # Sales metrics for this product
     quantity_sold = models.IntegerField(default=0)
@@ -104,7 +104,7 @@ class CashierPerformance(models.Model):
     """Cashier performance tracking for reports"""
     
     report = models.ForeignKey(SalesReport, on_delete=models.CASCADE, related_name='cashier_performance')
-    cashier = models.ForeignKey(User, on_delete=models.CASCADE, related_name='performance_records')
+    cashier = models.ForeignKey(User, on_delete=models.PROTECT, related_name='performance_records')
     
     # Performance metrics
     orders_processed = models.IntegerField(default=0)

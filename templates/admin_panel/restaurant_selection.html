@@ -318,7 +318,7 @@
                     <div class="restaurant-stats">
                         <div class="row">
                             <div class="col-6 stat-item">
-                                <span class="stat-number">{{ restaurants.count }}</span>
+                                <span class="stat-number">{{ restaurants|length }}</span>
                                 <span class="stat-label">Total Locations</span>
                             </div>
                             <div class="col-6 stat-item">
@@ -446,8 +446,15 @@ function selectRestaurant(restaurantId, restaurantName) {
                 // Show success message
                 showSuccessMessage(data.message);
                 
-                // Use redirect URL from server response
-                var redirectUrl = data.redirect_url || '/admin-panel/main-owner-dashboard/';
+                // Use redirect URL from server response — validate it stays on same origin
+                var rawRedirect = data.redirect_url || '/admin-panel/main-owner-dashboard/';
+                var redirectUrl = '/admin-panel/main-owner-dashboard/';
+                try {
+                    var parsed = new URL(rawRedirect, window.location.origin);
+                    if (parsed.origin === window.location.origin) {
+                        redirectUrl = rawRedirect;
+                    }
+                } catch (e) {}
                 
                 // Redirect after short delay
                 setTimeout(function() {

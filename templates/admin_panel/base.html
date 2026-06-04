@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- CSRF enabled for proper form security -->
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>{% block title %}{% if user.is_owner %}{{ user.get_restaurant_name }} - Management System{% else %}Admin Panel - Restaurant System{% endif %}{% endblock %}</title>
+    <title>{% block title %}{% if user.is_owner or user.is_manager %}{{ user.get_restaurant_name }} - Management System{% else %}Admin Panel - Restaurant System{% endif %}{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -469,6 +469,103 @@
             border-color: var(--accent-color);
             background: rgba(52, 152, 219, 0.1);
         }
+
+        /* =============================================
+           RESPONSIVE IMPROVEMENTS & VISUAL POLISH
+           ============================================= */
+
+        /* Filter cards get a subtle left accent */
+        .card .card-body > form .row.g-3 {
+            --bs-gutter-y: 1rem;
+        }
+
+        /* Filter labels always visible, no overflow */
+        .form-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            display: block;
+        }
+
+        /* Sidebar at md/lg: slightly narrower to give content more room */
+        @media (min-width: 768px) and (max-width: 1399.98px) {
+            :root {
+                --sidebar-width: 240px;
+            }
+        }
+
+        /* Table horizontal scroll on small content areas */
+        .modern-table .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Action buttons in tables — keep compact */
+        .btn-group-sm > .btn, .btn-sm {
+            white-space: nowrap;
+        }
+
+        /* Content wrapper max-width safety */
+        @media (min-width: 992px) {
+            .content-wrapper {
+                padding: 1.5rem 2rem;
+            }
+        }
+
+        /* Stats cards: always at least 2 per row */
+        @media (max-width: 575.98px) {
+            .stats-number {
+                font-size: 1.8rem;
+            }
+        }
+
+        /* Page title area on small screens */
+        @media (max-width: 767.98px) {
+            .content-header h1, .content-header h2 {
+                font-size: 1.25rem;
+            }
+            .content-header p {
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Nice card hover lift for all cards in content */
+        .content-wrapper .card {
+            transition: box-shadow 0.2s ease;
+        }
+        .content-wrapper .card:hover {
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important;
+        }
+
+        /* Sidebar nav link smooth active indicator */
+        .sidebar .nav-link {
+            position: relative;
+        }
+
+        /* Clear filter button — full width on small screens */
+        @media (max-width: 575.98px) {
+            .d-flex.align-items-end > .btn {
+                width: 100%;
+            }
+        }
+
+        /* Badge polish */
+        .badge {
+            letter-spacing: 0.3px;
+        }
+
+        /* Input focus glow improvement */
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+        }
+
+        /* Table head gradient */
+        .modern-table .table thead th {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -489,6 +586,8 @@
                     <span class="restaurant-text">
                         {% if user.is_owner %}
                             {{ user.get_restaurant_name }}
+                        {% elif user.is_manager and restaurant_name %}
+                            {{ restaurant_name }}
                         {% else %}
                             Admin Panel
                         {% endif %}
@@ -510,16 +609,16 @@
                 <div class="nav-section">
                     <div class="nav-section-title">Management</div>
                     
-                    <!-- All owners get staff management -->
-                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner %}
+                    <!-- All owners and managers get staff management -->
+                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}" href="{% url 'admin_panel:manage_users' %}" data-tooltip="{% if user.is_owner and not user.is_administrator %}Staff Management{% else %}Users & Roles{% endif %}">
                         <i class="fas fa-users"></i>
                         <span>{% if user.is_owner and not user.is_administrator %}Staff Management{% else %}Users & Roles{% endif %}</span>
                     </a>
                     {% endif %}
                     
-                    <!-- All owners get full restaurant management -->
-                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner %}
+                    <!-- All owners and managers get full restaurant management -->
+                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_categories' %}active{% endif %}" href="{% url 'admin_panel:manage_categories' %}" data-tooltip="Categories">
                         <i class="fas fa-tags"></i>
                         <span>Categories</span>
@@ -534,8 +633,8 @@
                     </a>
                     {% endif %}
                     
-                    <!-- Happy Hour for restaurant owners -->
-                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner %}
+                    <!-- Happy Hour for restaurant owners and managers -->
+                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'restaurant' and 'promotion' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'restaurant:manage_promotions' %}" data-tooltip="Happy Hour">
                         <i class="fas fa-clock text-warning"></i>
                         <span>Happy Hour</span>
@@ -555,6 +654,10 @@
                         <i class="fas fa-eye"></i>
                         <span>Monitor Branches</span>
                     </a>
+                    <a class="nav-link {% if request.resolver_match.url_name in 'manage_branches add_branch edit_branch' %}active{% endif %}" href="{% url 'admin_panel:manage_branches' %}" data-tooltip="Manage Branches">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Manage Branches</span>
+                    </a>
                     <a class="nav-link {% if request.resolver_match.url_name == 'branch_reports' %}active{% endif %}" href="{% url 'admin_panel:branch_reports' %}" data-tooltip="Branch Reports">
                         <i class="fas fa-chart-line"></i>
                         <span>Branch Reports</span>
@@ -570,21 +673,29 @@
                 <div class="nav-section">
                     <div class="nav-section-title">Operations</div>
                     
-                    <!-- All owners get normal operations -->
-                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner %}
+                    <!-- All owners and managers get normal operations -->
+                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_orders' %}active{% endif %}" href="{% url 'admin_panel:manage_orders' %}" data-tooltip="Orders">
                         <i class="fas fa-shopping-cart"></i>
                         <span>Orders</span>
                     </a>
-                    <a class="nav-link {% if request.resolver_match.namespace == 'reports' %}active{% endif %}" href="{% url 'reports:dashboard' %}" data-tooltip="Sales Reports">
+                    <a class="nav-link {% if request.resolver_match.namespace == 'reports' and request.resolver_match.url_name != 'money_flow' %}active{% endif %}" href="{% url 'reports:dashboard' %}" data-tooltip="Sales Reports">
                         <i class="fas fa-chart-bar"></i>
                         <span>Sales Reports</span>
                     </a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'money_flow' %}active{% endif %}" href="{% url 'reports:money_flow' %}" data-tooltip="Money Flow">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <span>Money Flow</span>
+                    </a>
                     {% endif %}
-                    {% if user.is_owner or user.is_administrator or user.is_branch_owner or user.is_main_owner %}
+                    {% if user.is_owner or user.is_administrator or user.is_branch_owner or user.is_main_owner or user.is_manager %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'waste_management' %}active{% endif %}" href="{% url 'waste_management:dashboard' %}" data-tooltip="{% if user.is_administrator %}System Waste Reports{% else %}Waste Management{% endif %}">
                         <i class="fas fa-trash-alt"></i>
                         <span>{% if user.is_administrator %}System Waste Reports{% else %}Waste Management{% endif %}</span>
+                    </a>
+                    <a class="nav-link {% if request.resolver_match.namespace == 'inventory' %}active{% endif %}" href="{% url 'inventory:dashboard' %}" data-tooltip="Inventory">
+                        <i class="fas fa-boxes"></i>
+                        <span>Inventory</span>
                     </a>
                     {% elif user.is_cashier %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'waste_management' %}active{% endif %}" href="{% url 'waste_management:cashier_record' %}" data-tooltip="Record Waste">
@@ -597,7 +708,7 @@
                 <!-- System Section -->
                 <div class="nav-section">
                     <div class="nav-section-title">System</div>
-                    {% if user.is_owner or user.is_main_owner or user.is_branch_owner %}
+                    {% if user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'printer_settings' %}active{% endif %}" href="{% url 'admin_panel:printer_settings' %}" data-tooltip="Printer Settings">
                         <i class="fas fa-print"></i>
                         <span>Printer Settings</span>

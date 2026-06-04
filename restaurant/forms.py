@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -27,7 +28,11 @@ class ProductForm(forms.ModelForm):
         
         # Filter main categories by owner
         if owner:
-            self.fields['main_category'].queryset = MainCategory.objects.filter(owner=owner)
+            self.fields['main_category'].queryset = MainCategory.objects.filter(
+                Q(owner=owner) |
+                Q(restaurant__main_owner=owner) |
+                Q(restaurant__branch_owner=owner)
+            ).distinct()
         
         self.fields['sub_category'].queryset = SubCategory.objects.none()
         
@@ -169,9 +174,21 @@ class HappyHourPromotionForm(forms.ModelForm):
         
         # Filter categories and products by owner
         if owner:
-            self.fields['products'].queryset = Product.objects.filter(main_category__owner=owner)
-            self.fields['main_categories'].queryset = MainCategory.objects.filter(owner=owner)
-            self.fields['sub_categories'].queryset = SubCategory.objects.filter(main_category__owner=owner)
+            self.fields['products'].queryset = Product.objects.filter(
+                Q(main_category__owner=owner) |
+                Q(main_category__restaurant__main_owner=owner) |
+                Q(main_category__restaurant__branch_owner=owner)
+            ).distinct()
+            self.fields['main_categories'].queryset = MainCategory.objects.filter(
+                Q(owner=owner) |
+                Q(restaurant__main_owner=owner) |
+                Q(restaurant__branch_owner=owner)
+            ).distinct()
+            self.fields['sub_categories'].queryset = SubCategory.objects.filter(
+                Q(main_category__owner=owner) |
+                Q(main_category__restaurant__main_owner=owner) |
+                Q(main_category__restaurant__branch_owner=owner)
+            ).distinct()
         
         # Pre-populate days_selection if editing existing promotion
         if self.instance.pk and self.instance.days_of_week:

@@ -1,0 +1,126 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Edit User - Admin Panel{% endblock %}
+
+{% block page_title %}Edit User{% endblock %}
+{% block page_description %}Update user account information{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-user-edit me-2"></i>
+                    <h5 class="mb-0">Edit User: {{ edit_user.username }}</h5>
+                </div>
+                <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Users
+                </a>
+            </div>
+            <div class="card-body">
+                <div id="alertContainer"></div>
+
+                <form id="editUserForm">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="first_name" name="first_name"
+                                   value="{{ edit_user.first_name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="last_name" name="last_name"
+                                   value="{{ edit_user.last_name }}" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="username" name="username"
+                                   value="{{ edit_user.username }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   value="{{ edit_user.email }}" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="phone_number" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone_number" name="phone_number"
+                                   value="{{ edit_user.phone_number }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
+                            <select class="form-select" id="role" name="role" required>
+                                {% for r in roles %}
+                                <option value="{{ r.name }}" {% if r == edit_user.role %}selected{% endif %}>
+                                    {{ r.get_name_display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Address</label>
+                        <textarea class="form-control" id="address" name="address" rows="2">{{ edit_user.address }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="password" name="password"
+                               placeholder="Leave blank to keep current password">
+                        <div class="form-text">Only fill this if you want to change the password.</div>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="is_active" name="is_active"
+                               {% if edit_user.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="is_active">Account Active</label>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Save Changes
+                        </button>
+                        <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('editUserForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = new FormData(form);
+    const alertBox = document.getElementById('alertContainer');
+
+    fetch('{% url "admin_panel:update_user" edit_user.id %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': data.get('csrfmiddlewaretoken')},
+        body: data
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            alertBox.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>' + res.message + '</div>';
+            setTimeout(() => { window.location.href = '{% url "admin_panel:manage_users" %}'; }, 1500);
+        } else {
+            alertBox.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + res.message + '</div>';
+        }
+    })
+    .catch(() => {
+        alertBox.innerHTML = '<div class="alert alert-danger">An unexpected error occurred. Please try again.</div>';
+    });
+});
+</script>
+{% endblock %}

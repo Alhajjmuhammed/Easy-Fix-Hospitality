@@ -164,7 +164,7 @@
                     <p class="card-text mb-2" style="font-size: 0.75rem;">
                         <i class="fas fa-store"></i> 
                         {% if table.restaurant %}
-                            {{ table.restaurant.name }}
+                            {{ table.display_restaurant_name }}
                         {% elif table.owner %}
                             {{ table.owner.restaurant_name|default:"-" }}
                         {% else %}

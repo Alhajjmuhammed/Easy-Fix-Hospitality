@@ -1,0 +1,315 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Money Flow{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-money-bill-wave mr-2"></i>Money Flow</h1>
+            <small class="text-muted">
+                {% if date_from_display == date_to_display %}
+                    {{ date_from_display }}
+                {% else %}
+                    {{ date_from_display }} &mdash; {{ date_to_display }}
+                {% endif %}
+            </small>
+        </div>
+        <div>
+            <a href="{% url 'reports:dashboard' %}" class="btn btn-outline-secondary btn-sm mr-2">
+                <i class="fas fa-chart-bar mr-1"></i> Sales Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Period Tabs -->
+    <div class="card shadow mb-4">
+        <div class="card-body py-2">
+            <form method="get" id="periodForm" class="d-flex flex-wrap align-items-center gap-2">
+                <div class="btn-group mr-3">
+                    <a href="?period=today" class="btn btn-sm {% if period == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Today</a>
+                    <a href="?period=week" class="btn btn-sm {% if period == 'week' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Week</a>
+                    <a href="?period=month" class="btn btn-sm {% if period == 'month' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Month</a>
+                    <a href="#" class="btn btn-sm {% if period == 'custom' %}btn-primary{% else %}btn-outline-secondary{% endif %}" onclick="document.getElementById('customRange').classList.toggle('d-none');return false;">Custom</a>
+                </div>
+                <div id="customRange" class="d-flex align-items-center gap-2 {% if period != 'custom' %}d-none{% endif %}">
+                    <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" style="width:140px;">
+                    <span class="text-muted">to</span>
+                    <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm" style="width:140px;">
+                    <input type="hidden" name="period" value="custom">
+                    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+
+        <!-- Money In -->
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;position:relative;border:none;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">MONEY IN</div>
+                            <div class="h5 mb-0 font-weight-bold text-success">{{ currency_symbol }}{{ total_in|floatformat:"2" }}</div>
+                            <div class="text-xs text-muted mt-1">Sales + Events collected</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-arrow-down fa-2x text-success" style="opacity:.25;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Money Out -->
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;position:relative;border:none;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">MONEY OUT</div>
+                            <div class="h5 mb-0 font-weight-bold text-danger">{{ currency_symbol }}{{ total_out|floatformat:"2" }}</div>
+                            <div class="text-xs text-muted mt-1">Net inventory spend</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-arrow-up fa-2x text-danger" style="opacity:.25;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Outstanding -->
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;position:relative;border:none;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">OUTSTANDING</div>
+                            <div class="h5 mb-0 font-weight-bold text-warning">{{ currency_symbol }}{{ total_outstanding|floatformat:"2" }}</div>
+                            <div class="text-xs text-muted mt-1">Unpaid orders + event balances</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-warning" style="opacity:.25;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Net Position -->
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card shadow h-100 py-2" style="border-radius:8px;position:relative;border:none;">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:8px 8px 0 0;"></div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">NET POSITION</div>
+                            {% if net_position >= 0 %}
+                            <div class="h5 mb-0 font-weight-bold text-success">{{ currency_symbol }}{{ net_position|floatformat:"2" }}</div>
+                            {% else %}
+                            <div class="h5 mb-0 font-weight-bold text-danger">-{{ currency_symbol }}{{ net_position|floatformat:"2"|slice:"1:" }}</div>
+                            {% endif %}
+                            <div class="text-xs text-muted mt-1">Money In &minus; Money Out</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calculator fa-2x text-primary" style="opacity:.25;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Chart -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-chart-area mr-2"></i>Daily Money Flow</h6>
+            <small class="text-muted">Green = Money In &nbsp;|&nbsp; Red = Money Out</small>
+        </div>
+        <div class="card-body">
+            <canvas id="moneyFlowChart" height="100"></canvas>
+        </div>
+    </div>
+
+    <!-- Breakdown Panels -->
+    <div class="row">
+
+        <!-- Sales Breakdown -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-shopping-cart mr-2"></i>Sales Orders
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <span class="text-muted">Total Orders</span>
+                        <strong>{{ sales_total_orders }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><i class="fas fa-check-circle text-success mr-1"></i>Paid</span>
+                        <span class="text-success font-weight-bold">{{ currency_symbol }}{{ sales_revenue|floatformat:"2" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><i class="fas fa-exclamation-circle text-danger mr-1"></i>Unpaid</span>
+                        <span class="text-danger">{{ currency_symbol }}{{ sales_unpaid|floatformat:"2" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span><i class="fas fa-adjust text-warning mr-1"></i>Partial</span>
+                        <span class="text-warning">{{ currency_symbol }}{{ sales_partial|floatformat:"2" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                        <span class="font-weight-bold">Collected</span>
+                        <span class="font-weight-bold text-success">{{ currency_symbol }}{{ sales_revenue|floatformat:"2" }}</span>
+                    </div>
+                    <div class="mt-3 text-right">
+                        <a href="{% url 'reports:dashboard' %}" class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-external-link-alt mr-1"></i>View Sales Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Events Breakdown -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-calendar-star mr-2"></i>Events
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <span class="text-muted">Total Events</span>
+                        <strong>{{ event_count }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><i class="fas fa-check-circle text-success mr-1"></i>Collected</span>
+                        <span class="text-success font-weight-bold">{{ currency_symbol }}{{ event_collected|floatformat:"2" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span><i class="fas fa-hourglass-half text-warning mr-1"></i>Outstanding</span>
+                        <span class="text-warning">{{ currency_symbol }}{{ event_outstanding|floatformat:"2" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                        <span class="font-weight-bold">Collected</span>
+                        <span class="font-weight-bold text-success">{{ currency_symbol }}{{ event_collected|floatformat:"2" }}</span>
+                    </div>
+                    <div class="mt-3 text-right">
+                        <a href="{% url 'restaurant:manage_events' %}" class="btn btn-sm btn-outline-info">
+                            <i class="fas fa-external-link-alt mr-1"></i>View Events
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Breakdown -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-danger">
+                        <i class="fas fa-boxes mr-2"></i>Inventory Costs
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <span class="text-muted">Transactions</span>
+                        <strong>&nbsp;</strong>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><i class="fas fa-arrow-right text-danger mr-1"></i>Purchases</span>
+                        <span class="text-danger">{{ currency_symbol }}{{ inv_spent|floatformat:"2" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span><i class="fas fa-arrow-left text-success mr-1"></i>Refunds</span>
+                        <span class="text-success">{{ currency_symbol }}{{ inv_refunds|floatformat:"2" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                        <span class="font-weight-bold">Net Cost</span>
+                        {% if inv_net >= 0 %}
+                        <span class="font-weight-bold text-danger">{{ currency_symbol }}{{ inv_net|floatformat:"2" }}</span>
+                        {% else %}
+                        <span class="font-weight-bold text-success">-{{ currency_symbol }}{{ inv_net|floatformat:"2"|slice:"1:" }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3 text-right">
+                        <a href="{% url 'inventory:history' %}" class="btn btn-sm btn-outline-danger">
+                            <i class="fas fa-external-link-alt mr-1"></i>View Inventory
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /row -->
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const labels = {{ chart_labels|safe }};
+    const dataIn = {{ chart_in|safe }};
+    const dataOut = {{ chart_out|safe }};
+
+    const ctx = document.getElementById('moneyFlowChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Money In',
+                    data: dataIn,
+                    backgroundColor: 'rgba(34,197,94,0.6)',
+                    borderColor: 'rgba(22,163,74,1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                },
+                {
+                    label: 'Money Out',
+                    data: dataOut,
+                    backgroundColor: 'rgba(239,68,68,0.5)',
+                    borderColor: 'rgba(220,38,38,1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                },
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ' {{ currency_symbol }}' + ctx.parsed.y.toFixed(2)
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: v => '{{ currency_symbol }}' + v.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

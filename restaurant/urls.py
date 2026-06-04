@@ -6,6 +6,7 @@ app_name = 'restaurant'
 urlpatterns = [
     path('', views.home, name='home'),
     path('menu/', views.menu, name='menu'),
+    path('owner-dashboard/', views.owner_dashboard, name='owner_dashboard'),
     
     # Happy Hour Management
     path('promotions/', views.manage_promotions, name='manage_promotions'),
@@ -15,7 +16,9 @@ urlpatterns = [
     path('promotions/<int:promotion_id>/toggle/', views.toggle_promotion, name='toggle_promotion'),
     path('promotions/<int:promotion_id>/preview/', views.promotion_preview, name='promotion_preview'),
     path('ajax/get-restaurant-products/', views.get_restaurant_products, name='get_restaurant_products'),
-    
+    path('add-staff/', views.add_staff, name='add_staff'),
+    path('manage-staff/', views.manage_staff, name='manage_staff'),
+
     # Event Management
     path('events/', views.manage_events, name='manage_events'),
     path('events/add/', views.add_event, name='add_event'),

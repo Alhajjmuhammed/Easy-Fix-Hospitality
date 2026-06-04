@@ -1,9 +1,12 @@
+import logging
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from decimal import Decimal
 from datetime import date, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 def get_owner_filter(user):
@@ -40,6 +43,7 @@ class Role(models.Model):
         ('main_owner', 'Main Owner'),  # Can manage multiple restaurants/branches
         ('branch_owner', 'Branch Owner'),  # Manages specific branch under main owner
         ('owner', 'Owner'),  # Legacy role - kept for backward compatibility
+        ('manager', 'Manager'),  # Senior staff with full operational access
         ('customer_care', 'Customer Care'),
         ('kitchen', 'Kitchen'),
         ('bar', 'Bar'),
@@ -57,10 +61,10 @@ class Role(models.Model):
         return self.get_name_display()
 
 class User(AbstractUser):
-    role = models.ForeignKey(Role, on_delete=models.CASCADE, null=True, blank=True)
+    role = models.ForeignKey(Role, on_delete=models.PROTECT, null=True, blank=True)
     # Owner relationship - customers and staff belong to an owner
-    owner = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, 
-                             related_name='owned_users', limit_choices_to={'role__name': 'owner'})
+    owner = models.ForeignKey('self', on_delete=models.PROTECT, null=True, blank=True, 
+                             related_name='owned_users', limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']})
     # Restaurant information for owners
     restaurant_name = models.CharField(max_length=200, blank=True, 
                                      help_text="Name of the restaurant (for owners only)")
@@ -142,6 +146,8 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
     is_active_staff = models.BooleanField(default=True)
+    # Mobile push notification token (Expo push token for customer notifications)
+    expo_push_token = models.CharField(max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -152,7 +158,11 @@ class User(AbstractUser):
     
     def is_administrator(self):
         return self.role and self.role.name == 'administrator'
-    
+
+    def is_admin(self):
+        """Alias for is_administrator() for template compatibility"""
+        return self.is_administrator()
+
     def is_main_owner(self):
         return self.role and self.role.name == 'main_owner'
     
@@ -184,6 +194,9 @@ class User(AbstractUser):
     
     def is_cashier(self):
         return self.role and self.role.name == 'cashier'
+    
+    def is_manager(self):
+        return self.role and self.role.name == 'manager'
     
     def is_customer(self):
         return self.role and self.role.name == 'customer'
@@ -237,6 +250,7 @@ class User(AbstractUser):
                 return main_restaurant.subscription_plan == 'PRO'
             return False
         except Exception:
+            logger.exception('has_pro_plan_access check failed for user %s', self)
             return False
     
     def can_access_branch_features(self):
@@ -308,7 +322,8 @@ class User(AbstractUser):
                     }
             
             return None
-        except Exception as e:
+        except Exception:
+            logger.exception('get_user_restaurant_info failed for user %s', self)
             return None
     
     def get_restaurant_name(self, request=None):
@@ -409,6 +424,30 @@ class User(AbstractUser):
         return None
     
     def save(self, *args, **kwargs):
+        # Allow bypassing validation for system operations (migrations, fixtures, etc.)
+        skip_role_validation = kwargs.pop('skip_role_validation', False)
+        
+        # Validate role changes for security (unless explicitly bypassed)
+        if not skip_role_validation and self.pk:
+            try:
+                original = User.objects.get(pk=self.pk)
+                
+                # Check if role is changing to an owner role
+                if original.role != self.role and self.role and self.role.name in ['main_owner', 'branch_owner', 'owner']:
+                    # This is a role escalation - log it for security audit
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f'SECURITY: Role escalation detected - User {self.username} (ID: {self.pk}) '
+                        f'role changed from {original.role.name if original.role else "None"} to {self.role.name}. '
+                        f'Ensure this is authorized. Use skip_role_validation=True flag to bypass if intentional.'
+                    )
+                    
+                    # Note: We log but don't block here to avoid breaking existing functionality
+                    # View-level validation should handle the actual blocking
+            except User.DoesNotExist:
+                pass  # New user, no validation needed
+        
         # Owners don't have an owner (they are the owner)
         if self.is_owner():
             self.owner = None
@@ -451,9 +490,9 @@ class RestaurantSubscription(models.Model):
     # Core subscription fields
     restaurant_owner = models.OneToOneField(
         User, 
-        on_delete=models.CASCADE, 
+        on_delete=models.PROTECT, 
         related_name='subscription',
-        limit_choices_to={'role__name': 'owner'}
+        limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']}
     )
     
     # Subscription period management
@@ -870,7 +909,7 @@ class SubscriptionLog(models.Model):
     
     subscription = models.ForeignKey(
         RestaurantSubscription,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='logs'
     )
     

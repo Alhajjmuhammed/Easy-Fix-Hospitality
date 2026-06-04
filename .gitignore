@@ -59,6 +59,29 @@ verify_*.py
 diagnose_*.py
 *_check.py
 
+# Local development tools and audit scripts
+dev_tools/
+
+# Node / mobile app (React Native client - not needed on server)
+node_modules/
+mobile_app/
+package-lock.json
+
+# Local temp scripts
+_browser_live_test.py
+_final_deep_test.py
+test_export.pdf
+
+# Local batch scripts (Windows dev only)
+START_SERVER.bat
+STOP_OLD_SERVER.bat
+SETUP_DEMO_DATA.bat
+
+# Local markdown docs
+PROMOTIONAL_PRICING_PROOF.md
+QUICKSTART.md
+ROLE_HIERARCHY_GUIDE.md
+
 # Build artifacts
 print_client/build/
 print_client/dist/

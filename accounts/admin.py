@@ -78,6 +78,44 @@ class CustomUserAdmin(UserAdmin):
     
     readonly_fields = ['get_print_token', 'get_available_printers']
     
+    def save_model(self, request, obj, form, change):
+        """
+        Override save_model to validate role changes against subscription plans.
+        SECURITY: Prevents bypassing subscription restrictions via Django Admin.
+        """
+        if change:  # Only validate on updates
+            try:
+                original = User.objects.get(pk=obj.pk)
+                
+                # Check if role is changing to an owner role
+                if original.role != obj.role and obj.role and obj.role.name in ['main_owner', 'branch_owner', 'owner']:
+                    # Find associated restaurant to check subscription plan
+                    from restaurant.models_restaurant import Restaurant
+                    from django.db.models import Q
+                    
+                    # Get restaurant from owner relationship
+                    target_restaurant = None
+                    if obj.owner:
+                        target_restaurant = Restaurant.objects.filter(
+                            Q(main_owner=obj.owner) | Q(branch_owner=obj.owner)
+                        ).first()
+                    
+                    # Check subscription plan
+                    if target_restaurant and target_restaurant.subscription_plan == 'SINGLE':
+                        from django.contrib import messages
+                        messages.error(
+                            request,
+                            f'Cannot change {obj.username} to {obj.role.name} role. '
+                            f'Restaurant "{target_restaurant.name}" has SINGLE plan which does not allow owner roles. '
+                            f'Upgrade to PRO plan first.'
+                        )
+                        # Prevent save by restoring original role
+                        obj.role = original.role
+            except User.DoesNotExist:
+                pass  # New user, no validation needed
+        
+        super().save_model(request, obj, form, change)
+    
     def has_print_token(self, obj):
         """Check if user has API token"""
         if not HAS_REST_FRAMEWORK or Token is None:

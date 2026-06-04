@@ -35,7 +35,7 @@ class IsRestaurantOwnerOrStaff(BasePermission):
         if not hasattr(request.user, 'role') or not request.user.role:
             return False
         
-        allowed_roles = ['owner', 'main_owner', 'branch_owner', 'cashier', 'kitchen', 'bar', 'customer_care']
+        allowed_roles = ['owner', 'main_owner', 'branch_owner', 'manager', 'cashier', 'kitchen', 'bar', 'customer_care']
         return request.user.role.name in allowed_roles
     
     def has_object_permission(self, request, view, obj):
@@ -95,7 +95,7 @@ class PrintJobViewSet(viewsets.ModelViewSet):
                 logger.warning(f"No restaurant filter for user: {user.username}")
                 return PrintJob.objects.none()
             
-            return PrintJob.objects.filter(restaurant=restaurant)
+            return PrintJob.objects.filter(restaurant=restaurant).select_related('restaurant', 'order')
         except PermissionDenied:
             logger.warning(f"Permission denied for user: {user.username}")
             return PrintJob.objects.none()
@@ -106,12 +106,28 @@ class PrintJobViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def pending(self, request):
         """
-        Get all pending print jobs for this restaurant
+        Get all pending print jobs for this restaurant.
+        Also auto-resets stale 'printing' jobs (stuck > 10 min) back to 'pending'
+        so the client can retry them.
         Endpoint: /api/print-jobs/pending/
         """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Reset stale 'printing' jobs that got stuck (client crashed mid-job)
+        stale_threshold = timezone.now() - timedelta(minutes=10)
+        stale_jobs = self.get_queryset().filter(
+            status='printing',
+            created_at__lt=stale_threshold
+        )
+        if stale_jobs.exists():
+            count = stale_jobs.count()
+            stale_jobs.update(status='pending', printed_by_client='')
+            logger.info(f"Auto-reset {count} stale 'printing' job(s) to 'pending'")
+
         pending_jobs = self.get_queryset().filter(status='pending').order_by('created_at')
         serializer = self.get_serializer(pending_jobs, many=True)
-        
+
         return Response({
             'count': pending_jobs.count(),
             'jobs': serializer.data

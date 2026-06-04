@@ -38,7 +38,7 @@ class Command(BaseCommand):
             raise CommandError(f'User "{username}" does not exist')
 
         # Check if user is a restaurant owner
-        if not hasattr(user, 'role') or user.role.name != 'Owner':
+        if not hasattr(user, 'role') or user.role.name not in ['owner', 'main_owner', 'branch_owner']:
             self.stdout.write(
                 self.style.WARNING(
                     f'Warning: User "{username}" is not a restaurant owner (Role: {user.role.name if hasattr(user, "role") else "None"})'

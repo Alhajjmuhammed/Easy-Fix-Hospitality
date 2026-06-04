@@ -150,7 +150,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
                             <h5 class="card-title mb-1">Branches</h5>
-                            <h3 class="mb-0">{{ branches.count }}</h3>
+                            <h3 class="mb-0">{{ branches_count }}</h3>
                         </div>
                         <div class="ml-3">
                             <i class="fas fa-code-branch fa-2x opacity-50"></i>
@@ -190,7 +190,7 @@
                                 </button>
                             {% else %}
                                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downgradeToSingle()" 
-                                        {% if branches.count > 0 %}disabled title="Delete all branches first"{% endif %}>
+                                        {% if branches_count > 0 %}disabled title="Delete all branches first"{% endif %}>
                                     <i class="fas fa-arrow-down me-1"></i> Downgrade to Single
                                 </button>
                             {% endif %}

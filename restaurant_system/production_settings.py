@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'cashier',
     'waste_management',
     'reports',
+    'mobile_api',
+    'inventory',
 ]
 
 MIDDLEWARE = [
@@ -59,7 +61,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',  # Enabled for production
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'restaurant_system.session_timeout_middleware.SessionTimeoutMiddleware',  # Auto-logout after 15 min inactivity
-    'subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
+    'restaurant_system.subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',  # Django-axes for failed login tracking
@@ -187,7 +189,7 @@ CHANNEL_LAYERS = {
 # Security Settings for Production
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow iframes from same origin
+X_FRAME_OPTIONS = 'DENY'  # No iframes used in this application
 
 # Cross-Origin Policies - Relaxed to allow CDN resources
 CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
@@ -196,6 +198,14 @@ CROSS_ORIGIN_EMBEDDER_POLICY = 'unsafe-none'  # Allow external CDN resources
 # SSL/HTTPS Detection - Read from environment
 # Default to True in production - should always use HTTPS
 USE_HTTPS = config('USE_HTTPS', default=True, cast=bool)
+
+# HTTPS / SSL Enforcement (enforced via nginx, but also set in Django for defense-in-depth)
+# With nginx as reverse proxy, SECURE_SSL_REDIRECT is set based on USE_HTTPS.
+# HSTS tells browsers to always use HTTPS for 1 year (31536000 seconds).
+SECURE_SSL_REDIRECT = USE_HTTPS  # Redirect HTTP → HTTPS (nginx handles this, Django as backup)
+SECURE_HSTS_SECONDS = 31536000 if USE_HTTPS else 0  # Only send HSTS header when actually on HTTPS
+SECURE_HSTS_INCLUDE_SUBDOMAINS = USE_HTTPS  # Apply HSTS to all subdomains
+SECURE_HSTS_PRELOAD = USE_HTTPS  # Allow browser preload lists
 
 # CSRF Settings
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
@@ -236,8 +246,10 @@ LOGGING = {
     'handlers': {
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': BASE_DIR / 'logs' / 'django.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB per file
+            'backupCount': 10,
             'formatter': 'verbose',
         },
         'console': {
@@ -289,7 +301,7 @@ class SecurityHeadersMiddleware:
         'font-src': ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
         'img-src': ["'self'", "data:", "https:", "blob:"],
         'connect-src': ["'self'", "wss:", "https:"],
-        'frame-ancestors': ["'self'"],
+        'frame-ancestors': ["'none'"],
         'base-uri': ["'self'"],
         'form-action': ["'self'"],
         'object-src': ["'none'"],
@@ -319,7 +331,7 @@ class SecurityHeadersMiddleware:
         # Add security headers
         response['Content-Security-Policy'] = csp_header
         response['X-Content-Type-Options'] = 'nosniff'
-        response['X-Frame-Options'] = 'SAMEORIGIN'
+        response['X-Frame-Options'] = 'DENY'
         response['X-XSS-Protection'] = '1; mode=block'
         response['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
         response['Cross-Origin-Embedder-Policy'] = 'unsafe-none'
@@ -352,7 +364,7 @@ AUTHENTICATION_BACKENDS = [
 AXES_ENABLED = True
 AXES_FAILURE_LIMIT = 10  # Allow 10 failed attempts before lockout (reasonable for busy restaurants)
 AXES_COOLOFF_TIME = timedelta(minutes=30)  # 30-minute cooldown (not too long, not too short)
-AXES_LOCKOUT_PARAMETERS = ["username"]  # Lock by username only (simpler and more reliable)
+AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]  # Lock by username+IP (prevents bypass via agent rotation)
 AXES_RESET_ON_SUCCESS = True  # Reset counter on successful login
 AXES_LOCKOUT_TEMPLATE = 'accounts/account_locked.html'  # Custom lockout page
 AXES_LOCKOUT_URL = None  # Use template instead of redirect
@@ -360,10 +372,10 @@ AXES_VERBOSE = True  # Log all attempts for security audit
 AXES_ENABLE_ACCESS_FAILURE_LOG = True  # Store in database for analysis
 
 # IP detection for nginx reverse proxy
-AXES_PROXY_COUNT = 1  # We have 1 proxy (nginx)
-AXES_META_PRECEDENCE_ORDER = [
+AXES_IPWARE_PROXY_COUNT = 1  # We have 1 proxy (nginx)
+AXES_IPWARE_META_PRECEDENCE_ORDER = [
     'HTTP_X_FORWARDED_FOR',
-    'HTTP_X_REAL_IP', 
+    'HTTP_X_REAL_IP',
     'REMOTE_ADDR',
 ]
 
@@ -439,6 +451,7 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'x-restaurant-id',  # Required for mobile API tenant resolution
 ]
 
 # Content Security Policy - Stricter for production
@@ -464,11 +477,8 @@ SESSION_COOKIE_NAME = 'restaurant_prod_session'
 
 # Enhanced Security Headers for Production
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-SECURE_HSTS_SECONDS = 31536000  # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-# SSL redirect as defense-in-depth (nginx also handles this)
-SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+# SECURE_HSTS_SECONDS, SECURE_HSTS_INCLUDE_SUBDOMAINS, SECURE_HSTS_PRELOAD, and
+# SECURE_SSL_REDIRECT are all set conditionally above based on USE_HTTPS.
 
 # Data Upload Limits
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB (stricter than dev)
@@ -485,6 +495,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
+        'mobile_api.permissions.IsSubscriptionActive',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,

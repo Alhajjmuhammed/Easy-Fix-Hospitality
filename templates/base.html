@@ -93,6 +93,58 @@
             flex: 1;
         }
 
+        /* ---- Customer-facing visual polish ---- */
+        :root {
+            --primary-color: #d63384;
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            border-radius: 8px;
+        }
+        .btn-primary:hover {
+            background-color: #b02a5b;
+            border-color: #b02a5b;
+        }
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            border-radius: 8px;
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(214, 51, 132, 0.12);
+        }
+        /* Consistent table headers */
+        .table thead th {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: #fff;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        /* Page headings responsive */
+        @media (max-width: 575.98px) {
+            h2 { font-size: 1.35rem; }
+            h3 { font-size: 1.15rem; }
+        }
+        /* Navbar brand don't wrap */
+        .navbar-brand {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* ---- End customer-facing visual polish ---- */
+
         /* Navbar sticky for all devices */
         .navbar {
             position: sticky !important;
@@ -149,14 +201,14 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'restaurant:home' %}">
+            <span class="navbar-brand text-truncate" style="max-width: 200px;">
                 <i class="bi bi-shop"></i> 
                 {% if user.is_authenticated %}
                     {% get_restaurant_name %}
                 {% else %}
                     Restaurant System
                 {% endif %}
-            </a>
+            </span>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -164,14 +216,16 @@
             
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
+                    {% if not user.is_authenticated or user.is_owner or user.is_manager or user.is_administrator %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'restaurant:home' %}">Home</a>
                     </li>
+                    {% endif %}
                     {% if user.is_authenticated %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'restaurant:menu' %}">Menu</a>
                         </li>
-                        {% if user.is_owner %}
+                        {% if user.is_owner or user.is_manager %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'admin_panel:admin_dashboard' %}">
                                     <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -236,7 +290,7 @@
                             </script>
                         {% elif user.is_admin %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'admin_panel:dashboard' %}">Admin Panel</a>
+                                <a class="nav-link" href="{% url 'admin_panel:admin_dashboard' %}">Admin Panel</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'reports:dashboard' %}">
@@ -323,12 +377,18 @@
                                 <span class="fw-semibold">{{ user.get_full_name|default:user.username }}</span>
                                 {% if user.is_owner %}
                                     <small class="text-muted">| Owner</small>
+                                {% elif user.is_manager %}
+                                    <small class="text-muted">| Manager</small>
                                 {% elif user.is_admin %}
                                     <small class="text-muted">| Administrator</small>
                                 {% elif user.is_kitchen_staff %}
                                     <small class="text-muted">| Kitchen Staff</small>
                                 {% elif user.is_bar_staff %}
                                     <small class="text-muted">| Bar Staff</small>
+                                {% elif user.is_buffet_staff %}
+                                    <small class="text-muted">| Buffet Staff</small>
+                                {% elif user.is_service_staff %}
+                                    <small class="text-muted">| Service Staff</small>
                                 {% elif user.is_customer_care %}
                                     <small class="text-muted">| Customer Care</small>
                                 {% elif user.is_cashier %}

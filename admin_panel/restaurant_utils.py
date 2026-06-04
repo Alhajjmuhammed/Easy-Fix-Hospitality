@@ -13,15 +13,29 @@ def get_user_restaurants(user):
     - Main owners: All restaurants they own (main + branches)
     - Branch owners: Only their assigned branch
     - Regular owners: Their restaurants (backward compatibility)
+    - Staff (managers, kitchen, bar, etc.): Their owner's restaurants
     """
+    # select_related prevents N+1 FK queries when looping over results and
+    # accessing restaurant.main_owner or restaurant.branch_owner attributes.
+    _base = Restaurant.objects.select_related('main_owner', 'branch_owner')
     if user.is_main_owner():
-        return Restaurant.objects.filter(main_owner=user).order_by('-is_main_restaurant', 'name')
+        return _base.filter(main_owner=user).order_by('-is_main_restaurant', 'name')
     elif user.is_branch_owner():
-        return Restaurant.objects.filter(branch_owner=user).order_by('name')
+        return _base.filter(branch_owner=user).order_by('name')
     elif user.is_owner() and not user.is_main_owner():
-        return Restaurant.objects.filter(
+        return _base.filter(
             Q(main_owner=user) | Q(branch_owner=user)
         ).order_by('name')
+    elif user.owner:
+        # Staff members (managers, kitchen, bar, cashier, etc.) - access their owner's restaurants
+        if user.owner.is_main_owner():
+            return _base.filter(main_owner=user.owner).order_by('-is_main_restaurant', 'name')
+        elif user.owner.is_branch_owner():
+            return _base.filter(branch_owner=user.owner).order_by('name')
+        else:
+            return _base.filter(
+                Q(main_owner=user.owner) | Q(branch_owner=user.owner)
+            ).order_by('name')
     else:
         return Restaurant.objects.none()
 
@@ -151,6 +165,17 @@ def get_restaurant_context(user, session_restaurant_id=None, request=None):
         elif user.is_owner():
             # Regular owners default to their restaurant
             current_restaurant = accessible_restaurants.first()
+        elif user.owner:
+            # Staff members (managers, kitchen, bar, etc.) - get their owner's default restaurant
+            if user.owner.is_branch_owner():
+                # Staff of branch owner - get that branch
+                current_restaurant = accessible_restaurants.first()
+            elif user.owner.is_main_owner():
+                # Staff of main owner - get main restaurant
+                current_restaurant = accessible_restaurants.filter(is_main_restaurant=True).first()
+            else:
+                # Staff of regular owner
+                current_restaurant = accessible_restaurants.first()
     
     # If view_all_restaurants is True, current_restaurant should be None for aggregated views
     if view_all_restaurants:

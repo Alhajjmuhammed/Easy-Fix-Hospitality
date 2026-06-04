@@ -307,7 +307,7 @@
                                 <th class="text-center">Qty</th>
                                 <th class="text-end">Price</th>
                                 <th class="text-end">Total</th>
-                                {% if user.is_customer_care or user.is_cashier or user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_kitchen_staff %}
+                                {% if user.is_customer_care or user.is_cashier or user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager or user.is_kitchen_staff %}
                                     {% if order.payment_status != 'paid' and order.status != 'cancelled' %}
                                     <th class="text-center">Action</th>
                                     {% endif %}
@@ -326,8 +326,8 @@
                                 <td class="text-center">{{ item.quantity }}</td>
                                 <td class="text-end">{% currency_symbol %}{{ item.unit_price }}</td>
                                 <td class="text-end"><strong>{% currency_symbol %}{{ item.get_subtotal }}</strong></td>
-                                {% if user.is_customer_care or user.is_cashier or user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_kitchen_staff %}
-                                    {% if order.payment_status != 'paid' and order.status != 'cancelled' and order.order_items.count > 1 %}
+                                {% if user.is_customer_care or user.is_cashier or user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager or user.is_kitchen_staff %}
+                                    {% if order.payment_status != 'paid' and order.status != 'cancelled' and order.order_items.all|length > 1 %}
                                     <td class="text-center">
                                         <button class="btn btn-danger btn-sm" onclick="cancelItem('{{ item.id }}', '{{ item.product.name }}', {{ item.quantity }})">
                                             <i class="bi bi-x-circle"></i> Cancel

@@ -46,7 +46,7 @@
                                             </td>
                                             <td>
                                                 <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#items-{{ order.id }}" aria-expanded="false">
-                                                    <span class="badge bg-primary">{{ order.order_items.count }} items</span> View
+                                                    <span class="badge bg-primary">{{ order.order_items.all|length }} items</span> View
                                                 </button>
                                                 <div class="collapse mt-2" id="items-{{ order.id }}">
                                                     <ul class="list-unstyled mb-0 small">
@@ -54,7 +54,7 @@
                                                             <li>
                                                                 {{ item.quantity }}x {{ item.product.name }} 
                                                                 <span class="text-muted">({% currency_symbol %}{{ item.get_subtotal }})</span>
-                                                                {% if request.user.is_cashier and order.status != 'cancelled' and order.payment_status != 'paid' and order.order_items.count > 1 %}
+                                                                {% if request.user.is_cashier and order.status != 'cancelled' and order.payment_status != 'paid' and order.order_items.all|length > 1 %}
                                                                     <button class="btn btn-xs btn-danger btn-sm ms-2" onclick="cancelItem({{ item.id }}, '{{ item.product.name }}', {{ item.quantity }})">
                                                                         <i class="fas fa-times"></i> Cancel
                                                                     </button>

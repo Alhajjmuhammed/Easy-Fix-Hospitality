@@ -36,7 +36,7 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
         '/manifest.json',
         '/api/auth/',  # Only auth API endpoints exempt
         '/api/health/',  # Health check endpoint
-        '/api/print/',  # Print client API (uses token auth)
+        '/orders/api/',  # Print client API (uses token auth)
     ]
     
     def _is_ajax_request(self, request):

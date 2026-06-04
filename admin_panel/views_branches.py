@@ -78,11 +78,15 @@ def manage_branches(request):
     # Check subscription capabilities
     can_add_branch = main_restaurant.can_create_branches() if main_restaurant else False
     
+    branches_qs = restaurants.filter(is_main_restaurant=False)
+    branches_count = branches_qs.count()
+
     context = {
         'restaurants': page_obj,
         'total_restaurants': restaurants.count(),
         'main_restaurant': main_restaurant,
-        'branches': restaurants.filter(is_main_restaurant=False),
+        'branches': branches_qs,
+        'branches_count': branches_count,
         'can_add_branch': can_add_branch,
         'subscription_plan': main_restaurant.get_subscription_display() if main_restaurant else 'Unknown',
         'subscription_plan_code': main_restaurant.subscription_plan if main_restaurant else 'SINGLE',
@@ -339,6 +343,7 @@ def edit_branch(request, restaurant_id):
 
 @login_required
 @require_POST
+@transaction.atomic
 def delete_branch(request, restaurant_id):
     """Delete a branch"""
     
@@ -791,7 +796,8 @@ def setup_main_restaurant(request):
                 name = request.POST.get('name', '').strip()
                 description = request.POST.get('description', '').strip()
                 address = request.POST.get('address', '').strip()
-                subscription_plan = request.POST.get('subscription_plan', 'SINGLE')
+                # Force SINGLE plan for new setups — PRO must be obtained via upgrade_to_pro
+                subscription_plan = 'SINGLE'
                 tax_rate = request.POST.get('tax_rate', '8.0')
                 
                 if not name or not address:

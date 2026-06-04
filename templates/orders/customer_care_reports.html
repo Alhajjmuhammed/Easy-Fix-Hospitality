@@ -23,15 +23,22 @@
     }
     
     .stat-value {
-        font-size: 2rem;
+        font-size: clamp(1.25rem, 4vw, 2rem);
         font-weight: bold;
         color: #2c5282;
         margin: 0.5rem 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     
+    .stat-card {
+        padding: 1rem;
+    }
+
     .stat-label {
         color: #666;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-weight: 600;
@@ -223,20 +230,20 @@
     </div>
     
     <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-lg-4 col-md-6">
+    <div class="row mb-4 g-2">
+        <div class="col-6 col-lg-4">
             <div class="stat-card">
                 <div class="stat-label">Total Revenue</div>
                 <div class="stat-value">{{ currency_symbol }}{{ total_revenue|floatformat:2 }}</div>
             </div>
         </div>
-        <div class="col-lg-4 col-md-6">
+        <div class="col-6 col-lg-4">
             <div class="stat-card">
                 <div class="stat-label">Total Orders</div>
                 <div class="stat-value">{{ total_orders }}</div>
             </div>
         </div>
-        <div class="col-lg-4 col-md-6">
+        <div class="col-6 col-lg-4">
             <div class="stat-card">
                 <div class="stat-label">Items Sold</div>
                 <div class="stat-value">{{ total_items }}</div>
@@ -248,7 +255,7 @@
     <div class="filter-card">
         <h6><i class="bi bi-funnel"></i> Report Filters</h6>
         <form method="get" action="{% url 'orders:customer_care_reports' %}" class="row g-3">
-            <div class="col-lg-2 col-md-4">
+            <div class="col-6 col-lg-2 col-md-4">
                 <label for="period" class="form-label">Period</label>
                 <select name="period" id="period" class="form-select">
                     <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
@@ -256,7 +263,7 @@
                 </select>
             </div>
             
-            <div class="col-lg-2 col-md-4">
+            <div class="col-6 col-lg-2 col-md-4">
                 <label for="category_id" class="form-label">Category</label>
                 <select name="category_id" id="category_id" class="form-select">
                     <option value="all" {% if category_id == 'all' %}selected{% endif %}>All Categories</option>
@@ -268,7 +275,7 @@
                 </select>
             </div>
             
-            <div class="col-lg-2 col-md-4">
+            <div class="col-6 col-lg-2 col-md-4">
                 <label for="subcategory_id" class="form-label">Sub Category</label>
                 <select name="subcategory_id" id="subcategory_id" class="form-select">
                     <option value="all" {% if subcategory_id == 'all' %}selected{% endif %}>All Sub Categories</option>
@@ -280,7 +287,7 @@
                 </select>
             </div>
             
-            <div class="col-lg-2 col-md-4">
+            <div class="col-6 col-lg-2 col-md-4">
                 <label for="station_filter" class="form-label">Station</label>
                 <select name="station_filter" id="station_filter" class="form-select">
                     <option value="all" {% if station_filter == 'all' %}selected{% endif %}>All Stations</option>
@@ -289,7 +296,7 @@
                 </select>
             </div>
             
-            <div class="col-lg-2 col-md-4">
+            <div class="col-6 col-lg-2 col-md-4">
                 <label for="payment_status" class="form-label">Payment Status</label>
                 <select name="payment_status" id="payment_status" class="form-select">
                     <option value="all" {% if payment_status == 'all' %}selected{% endif %}>All</option>
@@ -299,12 +306,12 @@
                 </select>
             </div>
             
-            <div class="col-lg-2 col-md-4">
+            <div class="col-6 col-lg-2 col-md-4">
                 <label for="from_date" class="form-label">From Date</label>
                 <input type="date" name="from_date" id="from_date" class="form-control" value="{{ from_date }}">
             </div>
             
-            <div class="col-lg-2 col-md-4">
+            <div class="col-6 col-lg-2 col-md-4">
                 <label for="to_date" class="form-label">To Date</label>
                 <input type="date" name="to_date" id="to_date" class="form-control" value="{{ to_date }}">
             </div>
@@ -328,7 +335,7 @@
     
     <!-- Orders Table -->
     <div class="table-container">
-        <h6><i class="bi bi-table"></i> Detailed Sales Data - {{ orders.count }} Orders</h6>
+        <h6><i class="bi bi-table"></i> Detailed Sales Data - {{ total_orders }} Orders</h6>
         
         {% if orders %}
         <div class="table-responsive">

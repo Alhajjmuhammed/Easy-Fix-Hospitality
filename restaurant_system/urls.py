@@ -70,10 +70,12 @@ urlpatterns = [
     path('system-admin/', include('system_admin.urls')),
     path('cashier/', include('cashier.urls')),
     path('waste-management/', include('waste_management.urls')),
+    path('inventory/', include('inventory.urls')),
     path('reports/', include('reports.urls')),
     path('accounts/', include('accounts.urls')),
     path('orders/', include('orders.urls')),
     path('restaurant/', include('restaurant.urls')),
+    path('api/v1/', include('mobile_api.urls')),  # Mobile REST API
 ]
 
 if settings.DEBUG:

@@ -8,7 +8,7 @@
 
 {% block content %}
 <!-- Restaurant Context Header -->
-{% if can_switch_restaurants %}
+{% if can_switch_restaurants or current_restaurant %}
 <style>
     .restaurant-header {
         background: linear-gradient(120deg, #1e3c72 0%, #2a5298 100%);
@@ -55,10 +55,10 @@
     <div class="col-12">
         <div class="card border-0 shadow-lg restaurant-header">
             <div class="card-body p-4 position-relative" style="z-index: 1;">
-                <div class="row align-items-center">
-                    <div class="col-lg-8 col-md-7">
+                <div class="row align-items-start">
+                    <div class="col-lg-8 col-12">
                         <div class="d-flex align-items-start">
-                            <div class="restaurant-icon-box me-3" style="width: 90px; height: 90px; overflow: hidden; border-radius: 12px;">
+                            <div class="restaurant-icon-box me-3" style="width: 80px; height: 80px; flex-shrink: 0; overflow: hidden; border-radius: 12px;">
                                 {% if restaurant_logo %}
                                     <img src="{{ restaurant_logo.url }}" alt="Restaurant Logo" 
                                          style="width: 100%; height: 100%; object-fit: cover; display: block;">
@@ -72,8 +72,8 @@
                                     </div>
                                 {% endif %}
                             </div>
-                            <div class="flex-grow-1">
-                                <h2 class="text-white mb-2 fw-bold" style="font-size: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <h2 class="text-white mb-2 fw-bold" style="font-size: clamp(1.25rem, 2.5vw, 1.75rem); text-shadow: 0 2px 4px rgba(0,0,0,0.1); word-break: break-word;">
                                     {{ restaurant_name }}
                                 </h2>
                                 <div class="d-flex flex-wrap align-items-center gap-2">
@@ -99,8 +99,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-5 text-md-end mt-3 mt-md-0">
-                        <div class="d-flex flex-column flex-md-row gap-2 justify-content-md-end">
+                    <div class="col-lg-4 col-12 text-lg-end mt-3 mt-lg-0">
+                        <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
                             {% if can_manage_branches %}
                                 <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-glass px-4 py-2 rounded-pill">
                                     <i class="fas fa-cog me-2"></i>Manage Branches
@@ -197,7 +197,7 @@
     </div>
 </div>
 
-{% if user.is_owner %}
+{% if user.is_owner or user.is_manager %}
 <!-- QR Code Section -->
 <div class="row mt-5">
     <div class="col-12">

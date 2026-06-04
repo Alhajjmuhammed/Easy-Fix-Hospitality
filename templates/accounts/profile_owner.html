@@ -1,11 +1,7 @@
-{% extends 'base.html' %}\n{% load restaurant_tags %}
+﻿{% extends 'base.html' %}
+{% load restaurant_tags %}
 
-{% block title %}Owner Dashboard - Restaurant System                            <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-outline-success w-100">
-                                <i class="bi bi-box-seam"></i> Manage Products
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'admin_panel:admin_dashboard' %}" class="btn btn-outline-primary w-100">block %}
+{% block title %}Owner Dashboard - Restaurant System{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -113,22 +109,22 @@
                     </h6>
                     <div class="row">
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'restaurant:add_product' %}" class="btn btn-success w-100">
+                            <a href="{% url 'admin_panel:add_product' %}" class="btn btn-success w-100">
                                 <i class="bi bi-plus-circle"></i> Add Product
                             </a>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'restaurant:manage_products' %}" class="btn btn-outline-success w-100">
+                            <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-outline-success w-100">
                                 <i class="bi bi-list-ul"></i> Manage Products
                             </a>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'restaurant:owner_dashboard' %}" class="btn btn-outline-primary w-100">
+                            <a href="{% url 'admin_panel:admin_dashboard' %}" class="btn btn-outline-primary w-100">
                                 <i class="bi bi-graph-up"></i> Dashboard
                             </a>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'orders:manage_orders' %}" class="btn btn-outline-warning w-100">
+                            <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-outline-warning w-100">
                                 <i class="bi bi-receipt"></i> All Orders
                             </a>
                         </div>
