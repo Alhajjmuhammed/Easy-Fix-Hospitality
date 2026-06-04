@@ -212,17 +212,20 @@ CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to read CSRF token
 CSRF_COOKIE_SECURE = USE_HTTPS  # Automatically set based on HTTPS
 CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cookies in same-site context
 CSRF_COOKIE_NAME = 'csrftoken'  # Default name
+CSRF_COOKIE_AGE = 31449600    # 1 year — prevents premature cookie expiry / session-cookie clearing
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie, not session
-# CSRF Trusted Origins - HTTPS only for production security
+# Custom failure handler — redirects back to login instead of raw 403
+CSRF_FAILURE_VIEW = 'accounts.views.csrf_failure'
+# CSRF Trusted Origins — both HTTPS and HTTP variants so nginx proxy edge-cases are covered
 CSRF_TRUSTED_ORIGINS = [
     'https://easyfixsoft.com',
     'https://www.easyfixsoft.com',
     'https://hospitality.easyfixsoft.com',
     'https://www.hospitality.easyfixsoft.com',
+    'http://hospitality.easyfixsoft.com',
+    'http://www.hospitality.easyfixsoft.com',
     'https://72.62.51.225',
-    # Development origins - remove in strict production
-    # 'http://localhost:8000',
-    # 'http://127.0.0.1:8000',
+    'http://72.62.51.225',
 ]
 
 # Session Configuration

@@ -164,9 +164,13 @@ CROSS_ORIGIN_EMBEDDER_POLICY = 'require-corp'
 # CSRF Configuration for development
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access for AJAX
 CSRF_COOKIE_SECURE = False    # Set to True in production with HTTPS
+CSRF_COOKIE_AGE = 31449600   # 1 year - prevents session-cookie clearing issues
+CSRF_FAILURE_VIEW = 'accounts.views.csrf_failure'
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
     'http://0.0.0.0:8000',
 ]
 

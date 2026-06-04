@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
 from django.http import JsonResponse
 from decimal import Decimal
 import json
@@ -27,6 +28,24 @@ except ImportError:
     def rate_limit_registration(func):
         return func
 
+def csrf_failure(request, reason=''):
+    """
+    Custom CSRF failure handler.
+    On login page failures, redirect back to login with a fresh token.
+    On other pages, redirect to login so a fresh token is issued.
+    """
+    logger.warning(f"CSRF failure: path={request.path}, reason={reason}, ip={request.META.get('REMOTE_ADDR', 'unknown')}")
+    messages.warning(request, 'Your session has expired or your request could not be verified. Please try again.')
+    # Redirect back to whatever page they were on, or login as fallback
+    referer = request.META.get('HTTP_REFERER', '')
+    if referer:
+        from urllib.parse import urlparse
+        path = urlparse(referer).path
+        return redirect(path)
+    return redirect('accounts:login')
+
+
+@never_cache
 @ensure_csrf_cookie
 @rate_limit_login
 def login_view(request):
