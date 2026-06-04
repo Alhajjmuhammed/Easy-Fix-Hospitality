@@ -948,10 +948,14 @@ def promotion_preview(request, promotion_id):
         Q(main_category__restaurant__branch_owner=owner_filter)
     ).distinct().select_related('main_category', 'sub_category')
     
+    from admin_panel.restaurant_utils import get_restaurant_context as _grc
+    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'promotion': promotion,
         'affected_products': affected_products,
         'affected_count': affected_products.count(),
+        **_rc,
     }
     
     return render(request, 'restaurant/promotion_preview.html', context)
@@ -1060,6 +1064,9 @@ def manage_events(request):
     page_number = request.GET.get('page')
     events_page = paginator.get_page(page_number)
     
+    from admin_panel.restaurant_utils import get_restaurant_context as _grc
+    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'events': events_page,
         'summary': summary,
@@ -1070,8 +1077,9 @@ def manage_events(request):
         'event_types': Event.EVENT_TYPE_CHOICES,
         'status_choices': Event.EVENT_STATUS_CHOICES,
         'currency_symbol': currency_symbol,
+        **_rc,
     }
-    
+
     return render(request, 'restaurant/manage_events.html', context)
 
 
@@ -1106,10 +1114,14 @@ def add_event(request):
     else:
         form = EventForm()
     
+    from admin_panel.restaurant_utils import get_restaurant_context as _grc
+    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'form': form,
         'action': 'Add',
         'currency_symbol': currency_symbol,
+        **_rc,
     }
     
     return render(request, 'restaurant/event_form.html', context)
@@ -1145,11 +1157,15 @@ def edit_event(request, event_id):
     else:
         form = EventForm(instance=event)
     
+    from admin_panel.restaurant_utils import get_restaurant_context as _grc
+    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'form': form,
         'event': event,
         'action': 'Edit',
         'currency_symbol': currency_symbol,
+        **_rc,
     }
     
     return render(request, 'restaurant/event_form.html', context)
@@ -1175,9 +1191,13 @@ def view_event(request, event_id):
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
+    from admin_panel.restaurant_utils import get_restaurant_context as _grc
+    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'event': event,
         'currency_symbol': currency_symbol,
+        **_rc,
     }
     
     return render(request, 'restaurant/event_detail.html', context)
@@ -1343,6 +1363,9 @@ def event_reports(request):
     # Check if this is an embedded request
     embed = request.GET.get('embed', '0') == '1'
     
+    from admin_panel.restaurant_utils import get_restaurant_context as _grc
+    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+
     context = {
         'stats': stats,
         'events_by_type': events_by_type,
@@ -1356,6 +1379,7 @@ def event_reports(request):
         'status_choices': dict(Event.EVENT_STATUS_CHOICES),
         'embed': embed,
         'currency_symbol': currency_symbol,
+        **_rc,
     }
     
     # Use a simpler template for embedded mode
