@@ -593,7 +593,7 @@ def place_order(request):
                             Q(main_category__restaurant__main_owner=current_restaurant) |
                             Q(main_category__restaurant__branch_owner=current_restaurant),
                             id=product_id,
-                        ).distinct().first()
+                        ).first()
                         
                         if not product:
                             raise Exception(f'Product not available')
@@ -3318,7 +3318,7 @@ def handle_add_to_existing_order(request, order_id, cart):
                     Q(main_category__restaurant__main_owner=owner_filter) |
                     Q(main_category__restaurant__branch_owner=owner_filter),
                     id=product_id,
-                ).distinct().first()
+                ).first()
                 
                 if not product:
                     raise Exception(f'Product not available')
