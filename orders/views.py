@@ -626,8 +626,10 @@ def place_order(request):
                     tax_rate = table.get_tax_rate()
                     order.total_amount = Decimal(str(total_amount)) * (1 + tax_rate)
                     order.save()
-                    
-                    # Log the order placement
+                    # --- transaction ends here, order is committed to DB ---
+
+                # Log the order placement (outside transaction so it never breaks order)
+                try:
                     log_security_event(
                         event_type='order_placed',
                         user=request.user,
@@ -641,88 +643,90 @@ def place_order(request):
                             'items_count': len(cart)
                         }
                     )
-                    
-                    # Send real-time notifications (non-blocking - failures won't break order)
-                    try:
-                        restaurant_id = current_restaurant.id
-                        async_to_sync(channel_layer.group_send)(
-                            f'restaurant_{restaurant_id}',
-                            {
-                                'type': 'new_order',
-                                'order_id': str(order.id),
-                                'order_number': order.order_number,
-                                'table_number': str(table.tbl_no),
-                                'customer_name': request.user.get_full_name() or request.user.username,
-                                'items_count': len(cart),
-                                'total_amount': str(total_amount),
-                                'message': f'New order #{order.order_number} from Table {table.tbl_no}',
-                                'timestamp': order.created_at.isoformat()
-                            }
-                        )
-                        
-                        async_to_sync(channel_layer.group_send)(
-                            f'order_{order.id}',
-                            {
-                                'type': 'order_status_update',
-                                'order_id': str(order.id),
-                                'status': order.status,
-                                'status_display': order.get_status_display(),
-                                'message': 'Order placed successfully! Kitchen will start preparing your order soon.',
-                                'updated_by': request.user.get_full_name() or request.user.username,
-                                'timestamp': order.created_at.isoformat()
-                            }
-                        )
-                    except Exception as ws_error:
-                        # WebSocket notification failure shouldn't break order placement
-                        logger.warning(f"WebSocket notification failed (non-critical): {ws_error}")
-                    
-                    # Clear cart but KEEP table selection for adding more orders
-                    del request.session['cart']
-                    # Do NOT clear selected_table - allows customer to order more at same table
-                    # del request.session['selected_table']  # COMMENTED OUT
-                    request.session.modified = True
-                    
-                    # ✨ SERVER-SIDE AUTO-PRINT (NO BROWSER DIALOG!)
-                    try:
-                        logger.info(f"Starting auto_print_order for Order #{order.order_number}")
-                        logger.debug(f"Order ID: {order.id}, Table: {order.table_info.tbl_no}")
-                        print_result = auto_print_order(order)
-                        logger.info(f"Print result: {print_result}")
-                        if print_result.get('kot_printed'):
-                            messages.success(request, '🖨️ KOT printed automatically!')
-                        if print_result.get('bot_printed'):
-                            messages.success(request, '🖨️ BOT printed automatically!')
-                        if print_result.get('buffet_printed'):
-                            messages.success(request, '🖨️ BUFFET printed automatically!')
-                        if print_result.get('service_printed'):
-                            messages.success(request, '🖨️ SERVICE printed automatically!')
-                        for error in print_result.get('errors', []):
-                            messages.warning(request, f'Print warning: {error}')
-                    except Exception as e:
-                        # Print error doesn't stop order processing
-                        messages.warning(request, 'Auto-print unavailable. Order was placed successfully.')
-                        logger.exception(f"Auto-print exception for Order #{order.order_number}: {str(e)}")
-                    
-                    # Check if order has kitchen, bar, buffet, or service items for browser fallback
-                    # Fetch items once with product to avoid 4 separate queries
-                    order_item_stations = {
-                        item.product.station
-                        for item in order.order_items.select_related('product').all()
-                    }
-                    has_kitchen_items = 'kitchen' in order_item_stations
-                    has_bar_items = 'bar' in order_item_stations
-                    has_buffet_items = 'buffet' in order_item_stations
-                    has_service_items = 'service' in order_item_stations
-                    
-                    # Store order ID and browser print flags (fallback if server print fails)
-                    request.session['new_order_id'] = order.id
-                    request.session['print_kot'] = has_kitchen_items and current_restaurant.auto_print_kot
-                    request.session['print_bot'] = has_bar_items and current_restaurant.auto_print_bot
-                    request.session['print_buffet'] = has_buffet_items and current_restaurant.auto_print_buffet
-                    request.session['print_service'] = has_service_items and current_restaurant.auto_print_service
-                    
-                    messages.success(request, f'Order {order.order_number} placed successfully!')
-                    return redirect('orders:order_confirmation', order_id=order.id)
+                except Exception as log_err:
+                    logger.warning(f"Audit log failed (non-critical): {log_err}")
+
+                # Send real-time notifications (non-blocking - failures won't break order)
+                try:
+                    restaurant_id = current_restaurant.id
+                    async_to_sync(channel_layer.group_send)(
+                        f'restaurant_{restaurant_id}',
+                        {
+                            'type': 'new_order',
+                            'order_id': str(order.id),
+                            'order_number': order.order_number,
+                            'table_number': str(table.tbl_no),
+                            'customer_name': request.user.get_full_name() or request.user.username,
+                            'items_count': len(cart),
+                            'total_amount': str(total_amount),
+                            'message': f'New order #{order.order_number} from Table {table.tbl_no}',
+                            'timestamp': order.created_at.isoformat()
+                        }
+                    )
+
+                    async_to_sync(channel_layer.group_send)(
+                        f'order_{order.id}',
+                        {
+                            'type': 'order_status_update',
+                            'order_id': str(order.id),
+                            'status': order.status,
+                            'status_display': order.get_status_display(),
+                            'message': 'Order placed successfully! Kitchen will start preparing your order soon.',
+                            'updated_by': request.user.get_full_name() or request.user.username,
+                            'timestamp': order.created_at.isoformat()
+                        }
+                    )
+                except Exception as ws_error:
+                    # WebSocket notification failure shouldn't break order placement
+                    logger.warning(f"WebSocket notification failed (non-critical): {ws_error}")
+
+                # Clear cart but KEEP table selection for adding more orders
+                del request.session['cart']
+                # Do NOT clear selected_table - allows customer to order more at same table
+                # del request.session['selected_table']  # COMMENTED OUT
+                request.session.modified = True
+
+                # ✨ SERVER-SIDE AUTO-PRINT (NO BROWSER DIALOG!)
+                try:
+                    logger.info(f"Starting auto_print_order for Order #{order.order_number}")
+                    logger.debug(f"Order ID: {order.id}, Table: {order.table_info.tbl_no}")
+                    print_result = auto_print_order(order)
+                    logger.info(f"Print result: {print_result}")
+                    if print_result.get('kot_printed'):
+                        messages.success(request, '🖨️ KOT printed automatically!')
+                    if print_result.get('bot_printed'):
+                        messages.success(request, '🖨️ BOT printed automatically!')
+                    if print_result.get('buffet_printed'):
+                        messages.success(request, '🖨️ BUFFET printed automatically!')
+                    if print_result.get('service_printed'):
+                        messages.success(request, '🖨️ SERVICE printed automatically!')
+                    for error in print_result.get('errors', []):
+                        messages.warning(request, f'Print warning: {error}')
+                except Exception as e:
+                    # Print error doesn't stop order processing
+                    messages.warning(request, 'Auto-print unavailable. Order was placed successfully.')
+                    logger.exception(f"Auto-print exception for Order #{order.order_number}: {str(e)}")
+
+                # Check if order has kitchen, bar, buffet, or service items for browser fallback
+                # Fetch items once with product to avoid 4 separate queries
+                order_item_stations = {
+                    item.product.station
+                    for item in order.order_items.select_related('product').all()
+                }
+                has_kitchen_items = 'kitchen' in order_item_stations
+                has_bar_items = 'bar' in order_item_stations
+                has_buffet_items = 'buffet' in order_item_stations
+                has_service_items = 'service' in order_item_stations
+
+                # Store order ID and browser print flags (fallback if server print fails)
+                request.session['new_order_id'] = order.id
+                request.session['print_kot'] = has_kitchen_items and current_restaurant.auto_print_kot
+                request.session['print_bot'] = has_bar_items and current_restaurant.auto_print_bot
+                request.session['print_buffet'] = has_buffet_items and current_restaurant.auto_print_buffet
+                request.session['print_service'] = has_service_items and current_restaurant.auto_print_service
+
+                messages.success(request, f'Order {order.order_number} placed successfully!')
+                return redirect('orders:order_confirmation', order_id=order.id)
                     
             except Exception as e:
                 logger.error(f'Error placing order: {str(e)}', exc_info=True)
