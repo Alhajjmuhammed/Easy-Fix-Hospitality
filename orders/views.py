@@ -566,7 +566,7 @@ def place_order(request):
                     )
                     table = TableInfo.objects.filter(
                         _tq_pt, tbl_no=table_number
-                    ).distinct().first()
+                    ).first()
                     if not table:
                         messages.error(request, f'Table {table_number} not found in {current_restaurant.restaurant_name}.')
                         return redirect('orders:select_table')
@@ -729,7 +729,7 @@ def place_order(request):
                 return redirect('orders:order_confirmation', order_id=order.id)
                     
             except Exception as e:
-                logger.error(f'Error placing order: {str(e)}', exc_info=True)
+                logger.error(f'Error placing order: {str(e)} | type={type(e).__name__}', exc_info=True)
                 messages.error(request, 'Error placing order. Please try again.')
                 return redirect('orders:view_cart')
     else:

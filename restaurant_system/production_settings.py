@@ -282,6 +282,16 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'orders': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'accounts': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }
 
