@@ -888,9 +888,14 @@ def manage_orders(request):
     cancelled_count = _counts.get('cancelled', 0)
     total_count     = sum(_counts.values())
 
-    # Paginate each tab separately (25 per page)
+    # Paginate each tab separately
     from django.core.paginator import Paginator
-    _per_page = 25
+    try:
+        _per_page = int(request.GET.get('per_page', 25))
+        if _per_page not in [10, 25, 50, 100]:
+            _per_page = 25
+    except (ValueError, TypeError):
+        _per_page = 25
     pending_page   = Paginator(pending_orders,   _per_page).get_page(request.GET.get('pending_page',   1))
     confirmed_page = Paginator(confirmed_orders, _per_page).get_page(request.GET.get('confirmed_page', 1))
     preparing_page = Paginator(preparing_orders, _per_page).get_page(request.GET.get('preparing_page', 1))

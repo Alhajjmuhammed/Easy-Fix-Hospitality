@@ -194,20 +194,30 @@
                     </div>
 
                     <!-- Period Filter -->
-                    <div class="col-12 col-lg-auto">
-                        <label class="form-label"><i class="fas fa-calendar-alt"></i> Period</label>
-                        <div class="d-flex flex-wrap gap-1">
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=today"
-                               class="btn btn-sm {% if period == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Today</a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=week"
-                               class="btn btn-sm {% if period == 'week' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Week</a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=month"
-                               class="btn btn-sm {% if period == 'month' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Month</a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=year"
-                               class="btn btn-sm {% if period == 'year' %}btn-primary{% else %}btn-outline-secondary{% endif %}">This Year</a>
-                            <a href="?{% for key, value in request.GET.items %}{% if key != 'period' and key != 'date_from' and key != 'date_to' %}{{ key }}={{ value }}&{% endif %}{% endfor %}period=all"
-                               class="btn btn-sm {% if period == 'all' or not period %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
-                        </div>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                        <label for="periodFilter" class="form-label">
+                            <i class="fas fa-calendar-alt"></i> Period
+                        </label>
+                        <select class="form-select" id="periodFilter" name="period" onchange="this.form.submit()">
+                            <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
+                            <option value="week" {% if period == 'week' %}selected{% endif %}>This Week</option>
+                            <option value="month" {% if period == 'month' %}selected{% endif %}>This Month</option>
+                            <option value="year" {% if period == 'year' %}selected{% endif %}>This Year</option>
+                            <option value="all" {% if period == 'all' or not period %}selected{% endif %}>All Time</option>
+                        </select>
+                    </div>
+
+                    <!-- Per Page -->
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                        <label for="perPageSelect" class="form-label">
+                            <i class="fas fa-list"></i> Per Page
+                        </label>
+                        <select class="form-select" id="perPageSelect" name="per_page" onchange="this.form.submit()">
+                            <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
+                            <option value="25" {% if request.GET.per_page == '25' or not request.GET.per_page %}selected{% endif %}>25</option>
+                            <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                            <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100</option>
+                        </select>
                     </div>
 
                     <!-- Custom Date Range (shown only when period=all) -->
