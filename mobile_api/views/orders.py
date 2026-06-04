@@ -225,7 +225,7 @@ def _place_order(request):
         try:
             # select_for_update() acquires a row-level lock inside this atomic block,
             # preventing concurrent orders from overselling the same stock (mirrors web).
-            product = Product.objects.select_for_update().filter(
+            product = Product.objects.select_for_update(of=('self',)).filter(
                 Q(main_category__owner=owner) |
                 Q(main_category__restaurant__main_owner=owner) |
                 Q(main_category__restaurant__branch_owner=owner)
@@ -760,7 +760,7 @@ def add_items_to_order(request, order_id):
                 status=400,
             )
         try:
-            product = Product.objects.select_for_update().filter(
+            product = Product.objects.select_for_update(of=('self',)).filter(
                 Q(main_category__owner=owner) |
                 Q(main_category__restaurant__main_owner=owner) |
                 Q(main_category__restaurant__branch_owner=owner)

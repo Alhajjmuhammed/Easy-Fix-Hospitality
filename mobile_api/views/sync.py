@@ -135,7 +135,7 @@ def _sync_order(user, owner, data):
         qty = max(1, min(qty, 100))  # clamp to valid range — mirrors _place_order bounds check
         # Use select_for_update() to prevent race conditions when multiple offline orders
         # sync simultaneously and compete for the same stock (mirrors _place_order).
-        product = Product.objects.select_for_update().filter(
+        product = Product.objects.select_for_update(of=('self',)).filter(
             Q(main_category__owner=owner) |
             Q(main_category__restaurant__main_owner=owner) |
             Q(main_category__restaurant__branch_owner=owner)

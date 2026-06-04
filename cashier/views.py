@@ -215,7 +215,7 @@ def process_payment(request, order_id):
     # Use select_for_update() on POST to prevent concurrent payment race conditions.
     # GET uses a plain queryset (no lock needed for read-only data).
     if request.method == 'POST':
-        order = get_object_or_404(Order.objects.select_for_update().filter(_oq_pp), id=order_id)
+        order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_pp), id=order_id)
     else:
         order = get_object_or_404(Order.objects.filter(_oq_pp), id=order_id)
 
@@ -402,7 +402,7 @@ def void_payment(request, payment_id):
         Q(order__table_info__restaurant__branch_owner=owner)
     )
     # select_for_update prevents concurrent void of the same payment
-    payment = get_object_or_404(Payment.objects.select_for_update().filter(_pq_vp), id=payment_id)
+    payment = get_object_or_404(Payment.objects.select_for_update(of=('self',)).filter(_pq_vp), id=payment_id)
     
     if payment.is_voided:
         return JsonResponse({'error': 'Payment already voided'}, status=400)
