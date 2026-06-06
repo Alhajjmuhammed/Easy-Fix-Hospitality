@@ -2415,56 +2415,6 @@ def _generate_receipt_content(payment):
     # Dotted separator - EXACTLY like HTML
     lines.append("-" * width)
     # NO blank line here
-    # Payment section - EXACTLY like HTML
-    lines.append("PAYMENT:")
-    # NO blank line after PAYMENT:
-    # Payment method - right-aligned EXACTLY like HTML
-    method_names = {
-        'cash': 'Cash',
-        'card': 'Card',
-        'digital': 'Digital Payment',
-        'voucher': 'Voucher'
-    }
-    payment_method = method_names.get(payment.payment_method, payment.payment_method.title())
-    
-    method_label = "Method:"
-    spacing = width - len(method_label) - len(payment_method)
-    lines.append(method_label + (" " * spacing) + payment_method)
-    
-    # Amount paid - right-aligned EXACTLY like HTML
-    amount_label = "Amount Paid:"
-    amount_value = f"{currency_symbol}{float(payment.amount):.2f}"
-    spacing = width - len(amount_label) - len(amount_value)
-    lines.append(amount_label + (" " * spacing) + amount_value)
-    
-    # Reference number (if any) - right-aligned EXACTLY like HTML
-    if payment.reference_number:
-        ref_label = "Reference:"
-        ref_value = payment.reference_number
-        spacing = width - len(ref_label) - len(ref_value)
-        lines.append(ref_label + (" " * spacing) + ref_value)
-    
-    # Change (for cash) - right-aligned EXACTLY like HTML
-    if payment.payment_method == 'cash' and payment.amount > total:
-        change = payment.amount - total
-        change_label = "Change:"
-        change_value = f"{currency_symbol}{float(change):.2f}"
-        spacing = width - len(change_label) - len(change_value)
-        lines.append(change_label + (" " * spacing) + change_value)
-    
-    # Remaining balance (for partial) - right-aligned EXACTLY like HTML
-    total_paid = order.payments.filter(is_voided=False).aggregate(
-        total=Sum('amount'))['total'] or Decimal('0.00')
-    
-    if total_paid < order.total_amount:
-        remaining = order.total_amount - total_paid
-        remaining_label = "Remaining:"
-        remaining_value = f"${float(remaining):.2f}"
-        spacing = width - len(remaining_label) - len(remaining_value)
-        lines.append(remaining_label + (" " * spacing) + remaining_value)
-    
-    # Dotted separator - EXACTLY like HTML
-    lines.append("-" * width)
     # Footer - centered EXACTLY like HTML
     lines.append("Thank you for dining with us!".center(width))
     lines.append("Please come again".center(width))
