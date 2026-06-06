@@ -339,40 +339,7 @@
                 </div>
             </div>
             
-            <!-- Payment Information -->
-            <div class="receipt-payment">
-                <div style="font-weight: bold; margin-bottom: 5px;">PAYMENT:</div>
-                <div class="total-row">
-                    <div>Method:</div>
-                    <div>{{ payment.get_payment_method_display }}</div>
-                </div>
-                <div class="total-row">
-                    <div>Amount Paid:</div>
-                    <div>{% currency_symbol %}{{ payment.amount|floatformat:2 }}</div>
-                </div>
-                {% if payment.reference_number %}
-                <div class="total-row">
-                    <div>Reference:</div>
-                    <div>{{ payment.reference_number }}</div>
-                </div>
-                {% endif %}
-                
-                <!-- Calculate change for cash payments -->
-                {% if change_amount > 0 %}
-                <div class="total-row" style="font-weight: bold;">
-                    <div>Change:</div>
-                    <div>{% currency_symbol %}{{ change_amount|floatformat:2 }}</div>
-                </div>
-                {% endif %}
-                
-                <!-- Show remaining balance if partial payment -->
-                {% if remaining_balance > 0 %}
-                <div class="total-row text-danger">
-                    <div><strong>Remaining:</strong></div>
-                    <div><strong>{% currency_symbol %}{{ remaining_balance|floatformat:2 }}</strong></div>
-                </div>
-                {% endif %}
-            </div>
+
             
             <!-- Footer -->
             <div style="text-align: center; margin-top: 8px; font-size: 12px;">
