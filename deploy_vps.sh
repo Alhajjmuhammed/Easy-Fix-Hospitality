@@ -17,13 +17,10 @@ echo "==> Running migrations..."
 python manage.py migrate --settings=restaurant_system.production_settings --no-input
 
 echo "==> Collecting static files..."
-python manage.py collectstatic --settings=restaurant_system.production_settings --no-input -q
+python manage.py collectstatic --settings=restaurant_system.production_settings --noinput
 
-echo "==> Restarting gunicorn..."
-systemctl restart gunicorn
-
-echo "==> Restarting daphne (WebSocket)..."
-systemctl restart daphne 2>/dev/null || true
+echo "==> Restarting services..."
+systemctl restart restaurant-gunicorn restaurant-daphne nginx
 
 echo ""
 echo "✔ Deploy complete."
