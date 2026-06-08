@@ -203,7 +203,72 @@ def _place_order(request):
     )
     table = get_object_or_404(TableInfo.objects.filter(_tq_place).distinct(), id=data['table_id'])
 
-    # Build special instructions before entering the transaction.
+    # ── Phase 1: validate all items BEFORE opening the transaction ────────────
+    # This ensures no return/error response happens inside the atomic block,
+    # which would corrupt the PostgreSQL connection.
+    pre_validated = []
+    unavailable = []
+    price_changes = []
+
+    for item in data['items']:
+        product_id = item.get('product_id')
+        try:
+            quantity = int(item.get('quantity', 1))
+        except (TypeError, ValueError):
+            return Response({'error': f'Invalid quantity for product {product_id}.'}, status=400)
+        if quantity < 1 or quantity > 100:
+            return Response(
+                {'error': f'Quantity must be between 1 and 100 (got {quantity}).'},
+                status=400,
+            )
+        client_price = float(item.get('price', 0))
+
+        product = Product.objects.filter(
+            Q(main_category__owner=owner) |
+            Q(main_category__restaurant__main_owner=owner) |
+            Q(main_category__restaurant__branch_owner=owner)
+        ).filter(id=product_id).first()
+
+        if product is None:
+            return Response({'error': f'Product {product_id} not found.'}, status=400)
+
+        if not product.is_available:
+            unavailable.append({'product_id': product_id, 'name': product.name})
+            continue
+
+        if product.available_in_stock is not None and product.available_in_stock < quantity:
+            return Response(
+                {'error': f'Only {product.available_in_stock} of "{product.name}" left in stock.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        fn = getattr(product, 'get_current_price', None)
+        server_price = float(fn()) if fn else float(product.price)
+
+        if abs(server_price - client_price) > 0.01:
+            price_changes.append({
+                'product_id': product_id,
+                'name': product.name,
+                'old_price': client_price,
+                'new_price': server_price,
+            })
+
+        pre_validated.append({'product_id': product_id, 'quantity': quantity, 'unit_price': server_price})
+
+    if unavailable:
+        return Response(
+            {'error': 'Some items are no longer available.', 'unavailable_items': unavailable},
+            status=status.HTTP_409_CONFLICT,
+        )
+    if price_changes:
+        return Response(
+            {'error': 'Prices have changed since you loaded the menu.', 'price_changes': price_changes},
+            status=status.HTTP_409_CONFLICT,
+        )
+    if not pre_validated:
+        return Response({'error': 'No valid items to order.'}, status=400)
+
+    # Build special instructions before the transaction.
     raw_special = data.get('special_instructions', '') or ''
     special = sanitize_special_instructions(raw_special)
     if offline_id:
@@ -211,78 +276,29 @@ def _place_order(request):
 
     order_number = f'ORD-{uuid.uuid4().hex[:8].upper()}'
 
-    # ── DB writes: product lock + order creation in one atomic block ─────────
-    # async_to_sync (used by _notify_ws) must NOT be called inside a transaction
-    # on PostgreSQL — it corrupts the connection and causes a 500. Same fix as
-    # the web's place_order (commit 872b9f2): keep only DB work inside the block.
+    # ── Phase 2: DB writes inside atomic block (no return statements inside) ──
+    # async_to_sync (used by _notify_ws) must NOT run inside a transaction on
+    # PostgreSQL — it corrupts the connection. Keep only pure DB writes here.
     with transaction.atomic():
         validated_items = []
-        unavailable = []
-        price_changes = []
-
-        for item in data['items']:
-            product_id = item.get('product_id')
-            try:
-                quantity = int(item.get('quantity', 1))
-            except (TypeError, ValueError):
-                return Response({'error': f'Invalid quantity for product {product_id}.'}, status=400)
-            if quantity < 1 or quantity > 100:
-                return Response(
-                    {'error': f'Quantity must be between 1 and 100 (got {quantity}).'},
-                    status=400,
-                )
-            client_price = float(item.get('price', 0))
-
-            try:
-                # select_for_update() acquires a row-level lock inside this atomic block,
-                # preventing concurrent orders from overselling the same stock (mirrors web).
-                product = Product.objects.select_for_update(of=('self',)).filter(
-                    Q(main_category__owner=owner) |
-                    Q(main_category__restaurant__main_owner=owner) |
-                    Q(main_category__restaurant__branch_owner=owner)
-                ).filter(id=product_id).first()
-                if product is None:
-                    raise Product.DoesNotExist
-            except Product.DoesNotExist:
-                return Response({'error': f'Product {product_id} not found.'}, status=400)
-
-            if not product.is_available:
-                unavailable.append({'product_id': product_id, 'name': product.name})
+        for pv in pre_validated:
+            # Re-fetch with row lock to prevent overselling under concurrent load
+            product = Product.objects.select_for_update(of=('self',)).filter(
+                Q(main_category__owner=owner) |
+                Q(main_category__restaurant__main_owner=owner) |
+                Q(main_category__restaurant__branch_owner=owner),
+                id=pv['product_id'],
+            ).first()
+            if product is None or not product.is_available:
                 continue
-
-            if product.available_in_stock is not None and product.available_in_stock < quantity:
-                return Response(
-                    {'error': f'Only {product.available_in_stock} of "{product.name}" left in stock.'},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            fn = getattr(product, 'get_current_price', None)
-            server_price = float(fn()) if fn else float(product.price)
-
-            if abs(server_price - client_price) > 0.01:
-                price_changes.append({
-                    'product_id': product_id,
-                    'name': product.name,
-                    'old_price': client_price,
-                    'new_price': server_price,
-                })
-
-            validated_items.append({'product': product, 'quantity': quantity, 'unit_price': server_price})
-
-        if unavailable:
-            return Response(
-                {'error': 'Some items are no longer available.', 'unavailable_items': unavailable},
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        if price_changes:
-            return Response(
-                {'error': 'Prices have changed since you loaded the menu.', 'price_changes': price_changes},
-                status=status.HTTP_409_CONFLICT,
-            )
+            # Re-check stock under lock
+            if product.available_in_stock is not None and product.available_in_stock < pv['quantity']:
+                continue
+            validated_items.append({'product': product, 'quantity': pv['quantity'], 'unit_price': pv['unit_price']})
 
         if not validated_items:
-            return Response({'error': 'No valid items to order.'}, status=400)
+            # All items became unavailable between validation and lock — safe to raise
+            raise Exception('No valid items could be locked for order.')
 
         total_amount = sum(i['unit_price'] * i['quantity'] for i in validated_items)
         tax_rate = table.get_tax_rate()
@@ -304,14 +320,13 @@ def _place_order(request):
                 quantity=item['quantity'],
                 unit_price=item['unit_price'],
             )
-            # Decrement stock if tracked
             p = item['product']
             if p.available_in_stock is not None:
                 p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
                 p.save(update_fields=['available_in_stock'])
+        # --- transaction commits here ---
 
-    # ── Outside transaction: WebSocket + print (must not run inside atomic) ──
-    # Note: Order.save() already called occupy_table() via model override above.
+    # ── Phase 3: outside transaction — WebSocket + print ─────────────────────
     _notify_ws(order, user, event_type='new_order')
 
     try:
