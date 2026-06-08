@@ -317,9 +317,10 @@ def _place_order(request):
             # All items became unavailable between validation and lock — safe to raise
             raise Exception('No valid items could be locked for order.')
 
-        total_amount = sum(i['unit_price'] * i['quantity'] for i in validated_items)
+        from decimal import Decimal as _Dec
+        total_amount = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated_items)
         tax_rate = table.get_tax_rate()
-        total_amount = total_amount * (1 + tax_rate)
+        total_amount = total_amount * (_Dec('1') + tax_rate)
 
         order = Order.objects.create(
             order_number=order_number,
@@ -812,9 +813,10 @@ def add_items_to_order(request, order_id):
             if p.available_in_stock is not None:
                 p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
                 p.save(update_fields=['available_in_stock'])
-        added = sum(i['unit_price'] * i['quantity'] for i in validated)
-        tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
-        order.total_amount = float(order.total_amount) + float(added) * float(1 + tax_rate)
+        from decimal import Decimal as _Dec
+        added = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated)
+        tax_rate = order.table_info.get_tax_rate() if order.table_info else _Dec('0')
+        order.total_amount = _Dec(str(order.total_amount)) + added * (_Dec('1') + tax_rate)
         extra_notes = sanitize_special_instructions(
             (request.data.get('special_instructions', '') or '').strip()
         )
@@ -962,8 +964,9 @@ def cancel_order_item(request, item_id):
         subtotal = sum(
             oi.get_subtotal() for oi in order.order_items.select_related('product').all()
         )
-        tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
-        order.total_amount = subtotal * (1 + tax_rate)
+        from decimal import Decimal as _Dec
+        tax_rate = order.table_info.get_tax_rate() if order.table_info else _Dec('0')
+        order.total_amount = subtotal * (_Dec('1') + tax_rate)
         order.save(update_fields=['total_amount', 'updated_at'])
         # --- transaction commits here ---
 
