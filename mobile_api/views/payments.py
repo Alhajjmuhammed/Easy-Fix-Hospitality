@@ -78,7 +78,6 @@ def _list_payments(request):
     return Response({'payments': PaymentSerializer(qs, many=True).data})
 
 
-@transaction.atomic
 def _process_payment(request):
     if not _is_payment_staff(request.user):
         return Response({'error': 'Access denied.'}, status=403)

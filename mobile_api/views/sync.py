@@ -84,7 +84,6 @@ def sync_push(request):
     return Response({'results': results, 'synced_at': timezone.now().isoformat()})
 
 
-@transaction.atomic
 def _sync_order(user, owner, data):
     offline_id = data.get('offline_id', '').strip()
 
@@ -174,13 +173,17 @@ def _sync_order(user, owner, data):
     table.is_available = False
     table.save(update_fields=['is_available'])
 
-    # Notify WebSocket listeners about the new order (mirrors _place_order)
-    _notify_ws(order, user, event_type='new_order')
+    # _notify_ws uses async_to_sync which must NOT run inside @transaction.atomic
+    # on PostgreSQL — call it after the decorated function returns (already outside).
+    # Since _sync_order is called from sync_push (no transaction), this is safe here.
+    try:
+        _notify_ws(order, user, event_type='new_order')
+    except Exception as e:
+        logger.warning('WS notify failed for synced order %s: %s', order.order_number, e)
 
     return {'status': 'created', 'order_id': order.id, 'order_number': order.order_number}
 
 
-@transaction.atomic
 def _sync_payment(user, owner, data):
     offline_id = data.get('offline_id', '').strip()
 
@@ -249,8 +252,11 @@ def _sync_payment(user, owner, data):
         order.payment_status = 'partial'
     order.save(update_fields=['payment_status', 'updated_at'])
 
-    # Notify WebSocket listeners that payment status changed
-    _notify_ws(order, user)
+    # _notify_ws uses async_to_sync — must not run inside @transaction.atomic.
+    try:
+        _notify_ws(order, user)
+    except Exception as e:
+        logger.warning('WS notify failed for synced payment: %s', e)
 
     return {'status': 'created', 'payment_id': payment.id}
 

@@ -412,7 +412,6 @@ def _send_push_async(token, title, body, data=None):
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
-@transaction.atomic
 def update_order_status(request, order_id):
     """Update order status (staff only)."""
     user = request.user
@@ -465,25 +464,24 @@ def update_order_status(request, order_id):
             status=400,
         )
 
-    order.status = new_status
+    with transaction.atomic():
+        order.status = new_status
+        if new_status == 'confirmed' and not order.confirmed_by:
+            order.confirmed_by = user
+            order.save(update_fields=['status', 'confirmed_by', 'updated_at'])
+        elif new_status == 'cancelled':
+            for item in order.order_items.all():
+                p = item.product
+                if p.available_in_stock is not None:
+                    p.available_in_stock += item.quantity
+                    p.save(update_fields=['available_in_stock'])
+            order.release_table()
+            order.save(update_fields=['status', 'updated_at'])
+        else:
+            order.save(update_fields=['status', 'updated_at'])
+        # --- transaction commits here ---
 
-    if new_status == 'confirmed' and not order.confirmed_by:
-        # Record who confirmed the order — mirrors web's confirm_order view.
-        order.confirmed_by = user
-        order.save(update_fields=['status', 'confirmed_by', 'updated_at'])
-    elif new_status == 'cancelled':
-        # Restore stock and release table — mirrors web's update_order_status cancel path.
-        for item in order.order_items.all():
-            p = item.product
-            if p.available_in_stock is not None:
-                p.available_in_stock += item.quantity
-                p.save(update_fields=['available_in_stock'])
-        order.release_table()
-        order.save(update_fields=['status', 'updated_at'])
-    else:
-        order.save(update_fields=['status', 'updated_at'])
-
-    # Notify customer via Expo push notification
+    # Outside transaction: push notification + WebSocket
     if new_status in _PUSH_STATUS_MESSAGES:
         try:
             customer = order.ordered_by
@@ -495,7 +493,6 @@ def update_order_status(request, order_id):
         except Exception as e:
             logger.warning('Push notification for order %s failed: %s', order.id, e)
 
-    # Notify kitchen/bar/buffet dashboards via WebSocket (mirrors web's update_order_status)
     _notify_ws(order, user)
 
     return Response(OrderSerializer(order, context={'request': request}).data)
@@ -552,7 +549,6 @@ def print_bill(request, order_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
-@transaction.atomic
 def transfer_table(request, order_id):
     """Transfer an order to a different table — same as web's /cashier/transfer-table/<id>/"""
     user = request.user
@@ -594,31 +590,26 @@ def transfer_table(request, order_id):
     if target_table.id == order.table_info_id:
         return Response({'error': 'Order is already on this table.'}, status=400)
 
-    old_table = order.table_info
-    order.table_info = target_table
-    order.save(update_fields=['table_info'])
-
-    # Release old table if no other active unpaid orders remain
-    still_active = Order.objects.filter(
-        table_info=old_table,
-        status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
-        payment_status__in=['unpaid', 'partial'],
-    ).exclude(id=order.id).exists()
-    if not still_active:
-        old_table.is_available = True
-        old_table.save(update_fields=['is_available'])
-
-    target_table.is_available = False
-    target_table.save(update_fields=['is_available'])
-
-    # Move pending bill requests too
-    from orders.models import BillRequest
-    BillRequest.objects.filter(table_info=old_table, status='pending').update(table_info=target_table)
+    with transaction.atomic():
+        old_table = order.table_info
+        order.table_info = target_table
+        order.save(update_fields=['table_info'])
+        still_active = Order.objects.filter(
+            table_info=old_table,
+            status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
+            payment_status__in=['unpaid', 'partial'],
+        ).exclude(id=order.id).exists()
+        if not still_active:
+            old_table.is_available = True
+            old_table.save(update_fields=['is_available'])
+        target_table.is_available = False
+        target_table.save(update_fields=['is_available'])
+        from orders.models import BillRequest
+        BillRequest.objects.filter(table_info=old_table, status='pending').update(table_info=target_table)
+        # --- transaction commits here ---
 
     logger.info('Mobile: Order %s transferred from Table %s to Table %s by %s',
                 order.order_number, old_table.tbl_no, target_table.tbl_no, user.username)
-
-    # Notify WebSocket listeners that the order was transferred
     _notify_ws(order, user)
 
     return Response({
@@ -630,7 +621,6 @@ def transfer_table(request, order_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
-@transaction.atomic
 def cancel_order(request, order_id):
     """Cancel an order.
     - Customers / CC: can only cancel their own PENDING orders.
@@ -688,30 +678,25 @@ def cancel_order(request, order_id):
             return Response({'error': 'Cancellation reason is required.'}, status=400)
         reason = 'Cancelled by customer'
 
-    # Restore product stock
-    for item in order.order_items.select_related('product').all():
-        p = item.product
-        if p.available_in_stock is not None:
-            p.available_in_stock += item.quantity
-            p.save(update_fields=['available_in_stock'])
+    with transaction.atomic():
+        for item in order.order_items.select_related('product').all():
+            p = item.product
+            if p.available_in_stock is not None:
+                p.available_in_stock += item.quantity
+                p.save(update_fields=['available_in_stock'])
+        order.status = 'cancelled'
+        order.reason_if_cancelled = reason
+        order.release_table()
+        order.save()
+        # --- transaction commits here ---
 
-    order.status = 'cancelled'
-    order.reason_if_cancelled = reason
-    order.release_table()
-    order.save()
-
-    # Notify kitchen/bar/buffet dashboards via WebSocket — mirrors web's update_order_status
-    # cancel path which also fires the group_send after setting status='cancelled'.
     _notify_ws(order, user)
-
     logger.info('Mobile: Order %s cancelled by %s. Reason: %s', order.order_number, user.username, reason)
-
     return Response({'success': True, 'message': f'Order {order.order_number} cancelled.'})
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
-@transaction.atomic
 def add_items_to_order(request, order_id):
     """Add more items to an existing order.
     Staff can add to any order. Customers can only add to their own orders.
@@ -798,27 +783,28 @@ def add_items_to_order(request, order_id):
     if not validated:
         return Response({'error': 'No valid items to add.'}, status=400)
 
-    for item in validated:
-        OrderItem.objects.create(
-            order=order,
-            product=item['product'],
-            quantity=item['quantity'],
-            unit_price=item['unit_price'],
+    with transaction.atomic():
+        for item in validated:
+            OrderItem.objects.create(
+                order=order,
+                product=item['product'],
+                quantity=item['quantity'],
+                unit_price=item['unit_price'],
+            )
+            p = item['product']
+            if p.available_in_stock is not None:
+                p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
+                p.save(update_fields=['available_in_stock'])
+        added = sum(i['unit_price'] * i['quantity'] for i in validated)
+        tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
+        order.total_amount = float(order.total_amount) + float(added) * float(1 + tax_rate)
+        extra_notes = sanitize_special_instructions(
+            (request.data.get('special_instructions', '') or '').strip()
         )
-        p = item['product']
-        if p.available_in_stock is not None:
-            p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
-            p.save(update_fields=['available_in_stock'])
-
-    added = sum(i['unit_price'] * i['quantity'] for i in validated)
-    tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
-    order.total_amount = float(order.total_amount) + float(added) * float(1 + tax_rate)
-    extra_notes = sanitize_special_instructions(
-        (request.data.get('special_instructions', '') or '').strip()
-    )
-    if extra_notes:
-        order.special_instructions = (order.special_instructions + '\n' + extra_notes).strip()
-    order.save(update_fields=['total_amount', 'special_instructions', 'updated_at'])
+        if extra_notes:
+            order.special_instructions = (order.special_instructions + '\n' + extra_notes).strip()
+        order.save(update_fields=['total_amount', 'special_instructions', 'updated_at'])
+        # --- transaction commits here ---
 
     try:
         from orders.printing import auto_print_order
@@ -826,7 +812,6 @@ def add_items_to_order(request, order_id):
     except Exception as e:
         logger.warning('Auto-print failed adding items to order %s: %s', order.order_number, e)
 
-    # Notify kitchen/bar/buffet dashboards via WebSocket so they see the new items
     _notify_ws(order, user)
 
     return Response({
@@ -918,7 +903,6 @@ def active_orders_for_table(request, table_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
-@transaction.atomic
 def cancel_order_item(request, item_id):
     """Cancel a single item from an order. Mirrors web /orders/cancel-item/<item_id>/"""
     user = request.user
@@ -952,26 +936,22 @@ def cancel_order_item(request, item_id):
     reason = (request.data.get('reason', '') or '').strip() or 'Item cancelled by staff'
     item_name = item.product.name if item.product else 'Item'
 
-    # Restore stock
-    p = item.product
-    if p and p.available_in_stock is not None:
-        p.available_in_stock += item.quantity
-        p.save(update_fields=['available_in_stock'])
-
-    item.delete()
-
-    # Recalculate order total including tax after item cancellation
-    subtotal = sum(
-        oi.get_subtotal() for oi in order.order_items.select_related('product').all()
-    )
-    tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
-    order.total_amount = subtotal * (1 + tax_rate)
-    order.save(update_fields=['total_amount', 'updated_at'])
+    with transaction.atomic():
+        p = item.product
+        if p and p.available_in_stock is not None:
+            p.available_in_stock += item.quantity
+            p.save(update_fields=['available_in_stock'])
+        item.delete()
+        subtotal = sum(
+            oi.get_subtotal() for oi in order.order_items.select_related('product').all()
+        )
+        tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
+        order.total_amount = subtotal * (1 + tax_rate)
+        order.save(update_fields=['total_amount', 'updated_at'])
+        # --- transaction commits here ---
 
     logger.info('Mobile: Item "%s" cancelled from Order %s by %s. Reason: %s',
                 item_name, order.order_number, user.username, reason)
-
-    # Notify WebSocket listeners that an item was cancelled
     _notify_ws(order, user)
 
     return Response({
