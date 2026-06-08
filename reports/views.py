@@ -140,7 +140,7 @@ def dashboard(request):
         end = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
         orders = orders.filter(created_at__gte=start, created_at__lt=end)
     elif period == 'weekly':
-        week_start = today - timedelta(days=today.weekday())
+        week_start = today - timedelta(days=6)  # Last 7 days including today
         start = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'monthly':
@@ -172,9 +172,18 @@ def dashboard(request):
     # Apply custom date filters (only when period allows custom dates)
     if (period == 'all' or period == 'custom') and (from_date or to_date):
         if from_date:
-            orders = orders.filter(created_at__date__gte=from_date)
+            try:
+                from_dt = datetime.strptime(from_date, '%Y-%m-%d').date()
+                orders = orders.filter(created_at__gte=timezone.make_aware(datetime.combine(from_dt, datetime.min.time())))
+            except (ValueError, TypeError):
+                pass
         if to_date:
-            orders = orders.filter(created_at__date__lte=to_date)
+            try:
+                to_dt = datetime.strptime(to_date, '%Y-%m-%d').date()
+                end_dt = timezone.make_aware(datetime.combine(to_dt + timedelta(days=1), datetime.min.time()))
+                orders = orders.filter(created_at__lt=end_dt)
+            except (ValueError, TypeError):
+                pass
     
     # Apply station filtering (Kitchen/Bar/Buffet/Service/All)
     if station_filter == 'kitchen':
@@ -655,7 +664,7 @@ def export_csv(request):
         end = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
         orders = orders.filter(created_at__gte=start, created_at__lt=end)
     elif period == 'weekly':
-        week_start = today - timedelta(days=today.weekday())
+        week_start = today - timedelta(days=6)  # Last 7 days including today
         start = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'monthly':
@@ -1209,7 +1218,7 @@ def export_pdf(request):
         end = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
         orders = orders.filter(created_at__gte=start, created_at__lt=end)
     elif period == 'weekly':
-        week_start = today - timedelta(days=today.weekday())
+        week_start = today - timedelta(days=6)  # Last 7 days including today
         start = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'monthly':
