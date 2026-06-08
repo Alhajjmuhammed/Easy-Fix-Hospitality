@@ -46,8 +46,9 @@ urlpatterns = [
     path('sync/pull/', sync.sync_pull, name='sync_pull'),
 
     # ── Reports ───────────────────────────────────────────────────────────
-    path('reports/cc/', reports.cc_reports, name='cc_reports'),
-    path('reports/revenue/', reports.owner_reports, name='owner_reports'),
+    path('reports/cc/',      reports.cc_reports,      name='cc_reports'),
+    path('reports/revenue/', reports.owner_reports,   name='owner_reports'),
+    path('reports/cashier/', reports.cashier_reports, name='cashier_reports'),
 
     # ── Waste Management ─────────────────────────────────────────────────
     path('waste/', waste.waste, name='waste'),
