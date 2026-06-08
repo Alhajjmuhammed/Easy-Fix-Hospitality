@@ -712,9 +712,10 @@ def manage_products(request):
             all_products = all_products.filter(name__icontains=search_query)
         
         # Pre-compute product counts per category — single GROUP BY, avoids 2 queries × N categories
+        # order_by() clears the default ordering to prevent Django from adding 'name' into GROUP BY
         _product_counts = {
             row['main_category_id']: row['count']
-            for row in all_products.values('main_category_id').annotate(count=Count('id'))
+            for row in all_products.order_by().values('main_category_id').annotate(count=Count('id'))
         }
 
         # Add pagination for each category
