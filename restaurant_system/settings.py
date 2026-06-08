@@ -436,7 +436,7 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 # ============================================================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'mobile_api.authentication.ExpiringTokenAuthentication',  # 15-day expiry
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
