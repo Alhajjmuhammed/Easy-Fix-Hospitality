@@ -129,25 +129,29 @@ def dashboard(request):
         orders = orders.filter(ordered_by=request.user)
     
     # Apply period filter using timezone-aware datetime boundaries.
-    # PostgreSQL extracts __date in UTC; orders placed late night local time (UTC+3)
-    # would appear on the wrong date. Use __gte/__lt with aware datetimes instead.
+    # PostgreSQL's __date lookup extracts date in UTC, but our timezone is UTC+3.
+    # An order placed at 1am local (= 10pm UTC prev day) would have __date = yesterday in DB.
+    # Fix: build aware datetime boundaries using get_current_timezone() so the comparison
+    # is always in local time regardless of UTC offset.
+    import pytz
+    local_tz = timezone.get_current_timezone()
     now_local = timezone.localtime(timezone.now())
     today = now_local.date()
     if period == 'today':
-        start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-        end = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
+        start = local_tz.localize(datetime.combine(today, datetime.min.time()))
+        end = local_tz.localize(datetime.combine(today + timedelta(days=1), datetime.min.time()))
         orders = orders.filter(created_at__gte=start, created_at__lt=end)
     elif period == 'weekly':
         week_start = today - timedelta(days=today.weekday())
-        start = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(week_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'monthly':
         month_start = today.replace(day=1)
-        start = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(month_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'yearly':
         year_start = today.replace(month=1, day=1)
-        start = timezone.make_aware(datetime.combine(year_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(year_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     # 'all' period means no date filter - show all orders
     
@@ -642,25 +646,29 @@ def export_csv(request):
         orders = orders.filter(ordered_by=request.user)
     
     # Apply period filter using timezone-aware datetime boundaries.
-    # PostgreSQL extracts __date in UTC; orders placed late night local time (UTC+3)
-    # would appear on the wrong date. Use __gte/__lt with aware datetimes instead.
+    # PostgreSQL's __date lookup extracts date in UTC, but our timezone is UTC+3.
+    # An order placed at 1am local (= 10pm UTC prev day) would have __date = yesterday in DB.
+    # Fix: build aware datetime boundaries using get_current_timezone() so the comparison
+    # is always in local time regardless of UTC offset.
+    import pytz
+    local_tz = timezone.get_current_timezone()
     now_local = timezone.localtime(timezone.now())
     today = now_local.date()
     if period == 'today':
-        start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-        end = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
+        start = local_tz.localize(datetime.combine(today, datetime.min.time()))
+        end = local_tz.localize(datetime.combine(today + timedelta(days=1), datetime.min.time()))
         orders = orders.filter(created_at__gte=start, created_at__lt=end)
     elif period == 'weekly':
         week_start = today - timedelta(days=today.weekday())
-        start = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(week_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'monthly':
         month_start = today.replace(day=1)
-        start = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(month_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'yearly':
         year_start = today.replace(month=1, day=1)
-        start = timezone.make_aware(datetime.combine(year_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(year_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     # 'all' period means no date filter - show all orders
     
@@ -1194,25 +1202,29 @@ def export_pdf(request):
         orders = orders.filter(ordered_by=request.user)
     
     # Apply period filter using timezone-aware datetime boundaries.
-    # PostgreSQL extracts __date in UTC; orders placed late night local time (UTC+3)
-    # would appear on the wrong date. Use __gte/__lt with aware datetimes instead.
+    # PostgreSQL's __date lookup extracts date in UTC, but our timezone is UTC+3.
+    # An order placed at 1am local (= 10pm UTC prev day) would have __date = yesterday in DB.
+    # Fix: build aware datetime boundaries using get_current_timezone() so the comparison
+    # is always in local time regardless of UTC offset.
+    import pytz
+    local_tz = timezone.get_current_timezone()
     now_local = timezone.localtime(timezone.now())
     today = now_local.date()
     if period == 'today':
-        start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-        end = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
+        start = local_tz.localize(datetime.combine(today, datetime.min.time()))
+        end = local_tz.localize(datetime.combine(today + timedelta(days=1), datetime.min.time()))
         orders = orders.filter(created_at__gte=start, created_at__lt=end)
     elif period == 'weekly':
         week_start = today - timedelta(days=today.weekday())
-        start = timezone.make_aware(datetime.combine(week_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(week_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'monthly':
         month_start = today.replace(day=1)
-        start = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(month_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     elif period == 'yearly':
         year_start = today.replace(month=1, day=1)
-        start = timezone.make_aware(datetime.combine(year_start, datetime.min.time()))
+        start = local_tz.localize(datetime.combine(year_start, datetime.min.time()))
         orders = orders.filter(created_at__gte=start)
     # 'all' period means no date filter - show all orders
     
