@@ -759,7 +759,7 @@ def add_items_to_order(request, order_id):
                 status=400,
             )
         try:
-            product = Product.objects.select_for_update(of=('self',)).filter(
+            product = Product.objects.filter(
                 Q(main_category__owner=owner) |
                 Q(main_category__restaurant__main_owner=owner) |
                 Q(main_category__restaurant__branch_owner=owner)
