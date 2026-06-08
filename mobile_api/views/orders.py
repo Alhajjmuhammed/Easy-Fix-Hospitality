@@ -28,86 +28,103 @@ logger = logging.getLogger(__name__)
 
 def _notify_ws(order, updated_by_user, event_type='order_status_update'):
     """
-    Send real-time WebSocket notifications to:
-      - order_{id}  — the customer tracking their own order
-      - restaurant_{owner_id} — kitchen/bar/buffet dashboards
+    Schedule real-time WebSocket notifications to fire AFTER the current transaction
+    commits, using transaction.on_commit().
 
-    Mirrors the group_send calls in the web's place_order and update_order_status views.
-    Failures are silently swallowed so they never break the HTTP response.
+    WHY on_commit(): production_settings.py sets ATOMIC_REQUESTS=True, which wraps
+    every HTTP request in a PostgreSQL transaction.  Calling async_to_sync() (used by
+    channel_layer.group_send) inside an open PostgreSQL transaction corrupts the DB
+    connection and causes a 500.  on_commit() defers the async call until after the
+    outermost transaction commits, so it never runs inside a transaction.
+    If there is no active transaction on_commit() fires the callback immediately.
+
+    All ORM values are captured NOW (before the callback) so the closure is a pure
+    data snapshot with no further DB access.
     """
-    try:
-        channel_layer = get_channel_layer()
-        if channel_layer is None:
-            return
-        actor = updated_by_user.get_full_name() or updated_by_user.username
-        ts = timezone.now().isoformat()
+    # ── Capture all data now, before handing off to on_commit ────────────────
+    _order_id       = order.id
+    _order_number   = order.order_number
+    _owner_id       = order.table_info.owner_id
+    _table_no       = str(order.table_info.tbl_no)
+    _status         = order.status
+    _status_display = order.get_status_display()
+    _items_count    = order.order_items.count()
+    _total          = str(order.total_amount)
+    _customer_name  = (
+        order.ordered_by.get_full_name() or order.ordered_by.username
+        if order.ordered_by else 'Unknown'
+    )
+    _actor          = updated_by_user.get_full_name() or updated_by_user.username
+    _ts             = timezone.now().isoformat()
+    _event_type     = event_type
 
-        if event_type == 'new_order':
-            # Mirrors web's place_order → restaurant_{id} group_send
-            async_to_sync(channel_layer.group_send)(
-                f'restaurant_{order.table_info.owner_id}',
-                {
-                    'type': 'new_order',
-                    'order_id': str(order.id),
-                    'order_number': order.order_number,
-                    'table_number': str(order.table_info.tbl_no),
-                    'customer_name': actor,
-                    'items_count': order.order_items.count(),
-                    'total_amount': str(order.total_amount),
-                    'message': f'New order #{order.order_number} from Table {order.table_info.tbl_no}',
-                    'timestamp': ts,
-                }
-            )
-            async_to_sync(channel_layer.group_send)(
-                f'order_{order.id}',
-                {
-                    'type': 'order_status_update',
-                    'order_id': str(order.id),
-                    'status': order.status,
-                    'status_display': order.get_status_display(),
-                    'message': 'Order placed successfully!',
-                    'updated_by': actor,
-                    'timestamp': ts,
-                }
-            )
-        else:
-            # Mirrors the flat format the consumer's order_status_update handler reads:
-            # event['order_id'], event['status'], event['status_display'], event['message'].
-            # (The web's update_order_status uses a nested 'message' dict — that's a
-            # pre-existing inconsistency in the web code; we use the correct flat format here.)
-            msg = f'Order {order.order_number} updated to {order.get_status_display()}'
-            async_to_sync(channel_layer.group_send)(
-                f'order_{order.id}',
-                {
-                    'type': 'order_status_update',
-                    'order_id': str(order.id),
-                    'order_number': order.order_number,
-                    'status': order.status,
-                    'status_display': order.get_status_display(),
-                    'message': msg,
-                    'updated_by': actor,
-                    'timestamp': ts,
-                }
-            )
-            async_to_sync(channel_layer.group_send)(
-                f'restaurant_{order.table_info.owner_id}',
-                {
-                    'type': 'order_status_update',
-                    'order_id': str(order.id),
-                    'order_number': order.order_number,
-                    'status': order.status,
-                    'status_display': order.get_status_display(),
-                    'customer': (
-                        order.ordered_by.get_full_name() or order.ordered_by.username
-                        if order.ordered_by else 'Unknown'
-                    ),
-                    'message': msg,
-                    'updated_by': actor,
-                    'timestamp': ts,
-                }
-            )
-    except Exception as e:
-        logger.warning('WS notification failed (non-critical): %s', e)
+    def _send():
+        try:
+            channel_layer = get_channel_layer()
+            if channel_layer is None:
+                return
+
+            if _event_type == 'new_order':
+                async_to_sync(channel_layer.group_send)(
+                    f'restaurant_{_owner_id}',
+                    {
+                        'type': 'new_order',
+                        'order_id': str(_order_id),
+                        'order_number': _order_number,
+                        'table_number': _table_no,
+                        'customer_name': _actor,
+                        'items_count': _items_count,
+                        'total_amount': _total,
+                        'message': f'New order #{_order_number} from Table {_table_no}',
+                        'timestamp': _ts,
+                    }
+                )
+                async_to_sync(channel_layer.group_send)(
+                    f'order_{_order_id}',
+                    {
+                        'type': 'order_status_update',
+                        'order_id': str(_order_id),
+                        'status': _status,
+                        'status_display': _status_display,
+                        'message': 'Order placed successfully!',
+                        'updated_by': _actor,
+                        'timestamp': _ts,
+                    }
+                )
+            else:
+                msg = f'Order {_order_number} updated to {_status_display}'
+                async_to_sync(channel_layer.group_send)(
+                    f'order_{_order_id}',
+                    {
+                        'type': 'order_status_update',
+                        'order_id': str(_order_id),
+                        'order_number': _order_number,
+                        'status': _status,
+                        'status_display': _status_display,
+                        'message': msg,
+                        'updated_by': _actor,
+                        'timestamp': _ts,
+                    }
+                )
+                async_to_sync(channel_layer.group_send)(
+                    f'restaurant_{_owner_id}',
+                    {
+                        'type': 'order_status_update',
+                        'order_id': str(_order_id),
+                        'order_number': _order_number,
+                        'status': _status,
+                        'status_display': _status_display,
+                        'customer': _customer_name,
+                        'message': msg,
+                        'updated_by': _actor,
+                        'timestamp': _ts,
+                    }
+                )
+        except Exception as e:
+            logger.warning('WS notification failed (non-critical): %s', e)
+
+    # Fire after the outermost transaction commits (or immediately if no transaction).
+    transaction.on_commit(_send)
 
 
 @api_view(['GET', 'POST'])
