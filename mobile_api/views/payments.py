@@ -36,6 +36,8 @@ def payments(request):
     return _process_payment(request)
 
 
+
+
 def _list_payments(request):
     if not _is_payment_staff(request.user):
         return Response({'error': 'Access denied.'}, status=403)
@@ -134,29 +136,31 @@ def _process_payment(request):
     if offline_id:
         notes = f'[offline:{offline_id}] {notes}'.strip()
 
-    payment = Payment.objects.create(
-        order=order,
-        amount=amount,
-        payment_method=data['payment_method'],
-        processed_by=request.user,
-        reference_number=data.get('reference_number', ''),
-        notes=notes,
-        is_voided=False,
-    )
+    # ── DB writes inside atomic block — no _notify_ws inside (PostgreSQL safe) ──
+    with transaction.atomic():
+        payment = Payment.objects.create(
+            order=order,
+            amount=amount,
+            payment_method=data['payment_method'],
+            processed_by=request.user,
+            reference_number=data.get('reference_number', ''),
+            notes=notes,
+            is_voided=False,
+        )
 
-    # Update order payment status
-    new_total = total_paid + amount
-    if new_total >= order.total_amount:
-        order.payment_status = 'paid'
-        order.release_table()
-    elif new_total > 0:
-        order.payment_status = 'partial'
-    order.save(update_fields=['payment_status', 'updated_at'])
+        # Update order payment status
+        new_total = total_paid + amount
+        if new_total >= order.total_amount:
+            order.payment_status = 'paid'
+            order.release_table()
+        elif new_total > 0:
+            order.payment_status = 'partial'
+        order.save(update_fields=['payment_status', 'updated_at'])
+        # --- transaction commits here ---
 
-    # Notify WebSocket listeners that payment status changed
+    # ── Outside transaction: WebSocket + print ────────────────────────────────
     _notify_ws(order, request.user)
 
-    # Auto-print receipt (best-effort)
     try:
         from orders.printing import auto_print_receipt
         auto_print_receipt(payment, printed_by=request.user)
@@ -173,7 +177,6 @@ def _process_payment(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
-@transaction.atomic
 def void_payment(request, payment_id):
     """Void a payment with a mandatory reason."""
     if not _is_payment_staff(request.user):
@@ -197,27 +200,29 @@ def void_payment(request, payment_id):
     if not reason:
         return Response({'error': 'Void reason is required.'}, status=400)
 
-    payment.is_voided = True
-    payment.void_reason = reason
-    payment.voided_by = request.user
-    payment.voided_at = timezone.now()
-    payment.save()
+    with transaction.atomic():
+        payment.is_voided = True
+        payment.void_reason = reason
+        payment.voided_by = request.user
+        payment.voided_at = timezone.now()
+        payment.save()
 
-    # Recalculate payment status on the order
-    still_paid = payment.order.payments.filter(is_voided=False).aggregate(
-        t=Sum('amount')
-    )['t'] or Decimal('0.00')
+        # Recalculate payment status on the order
+        still_paid = payment.order.payments.filter(is_voided=False).aggregate(
+            t=Sum('amount')
+        )['t'] or Decimal('0.00')
 
-    order = payment.order
-    if still_paid <= 0:
-        order.payment_status = 'unpaid'
-    elif still_paid < order.total_amount:
-        order.payment_status = 'partial'
-    else:
-        order.payment_status = 'paid'
-    order.save(update_fields=['payment_status', 'updated_at'])
+        order = payment.order
+        if still_paid <= 0:
+            order.payment_status = 'unpaid'
+        elif still_paid < order.total_amount:
+            order.payment_status = 'partial'
+        else:
+            order.payment_status = 'paid'
+        order.save(update_fields=['payment_status', 'updated_at'])
+        # --- transaction commits here ---
 
-    # Notify WebSocket listeners that payment was voided
+    # Outside transaction: WebSocket notification
     _notify_ws(order, request.user)
 
     return Response({'message': 'Payment voided successfully.'})
