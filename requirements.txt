@@ -7,6 +7,7 @@ qrcode[pil]==8.2
 channels==4.1.0
 channels-redis==4.2.0
 redis==7.3.0
+django-redis==5.4.0
 daphne==4.2.1
 djangorestframework==3.16.1  # REST API for print clients
 python-decouple==3.8         # Environment variable management

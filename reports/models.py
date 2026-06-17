@@ -82,7 +82,7 @@ class ProductSalesDetail(models.Model):
     """Detailed product sales for each report"""
     
     report = models.ForeignKey(SalesReport, on_delete=models.CASCADE, related_name='product_details')
-    product = models.ForeignKey('restaurant.Product', on_delete=models.PROTECT)
+    product = models.ForeignKey('restaurant.Product', on_delete=models.SET_NULL, null=True, blank=True)
     
     # Sales metrics for this product
     quantity_sold = models.IntegerField(default=0)

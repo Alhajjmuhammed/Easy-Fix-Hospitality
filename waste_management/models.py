@@ -37,7 +37,7 @@ class FoodWasteLog(models.Model):
     
     order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='waste_logs', null=True, blank=True)
     order_item = models.ForeignKey(OrderItem, on_delete=models.SET_NULL, related_name='waste_logs', null=True, blank=True)
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='waste_logs')
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='waste_logs')
     quantity_wasted = models.IntegerField()
     
     # Cost breakdown
@@ -212,7 +212,7 @@ class WasteReportSummary(models.Model):
 class ProductCostSettings(models.Model):
     """Store cost settings for products to calculate waste costs"""
     
-    product = models.OneToOneField(Product, on_delete=models.PROTECT, related_name='cost_settings')
+    product = models.OneToOneField(Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='cost_settings')
     
     # Cost per unit
     ingredient_cost_per_unit = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))

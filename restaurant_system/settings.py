@@ -299,6 +299,9 @@ if _redis_available():
             'LOCATION': 'redis://127.0.0.1:6379/1',
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                # Force RESP2 protocol - redis-py 5+ defaults to RESP3 (HELLO command)
+                # RESP2 is compatible with all Redis versions (3.x, 6.x, 7.x)
+                'CONNECTION_POOL_KWARGS': {'protocol': 2},
             }
         }
     }

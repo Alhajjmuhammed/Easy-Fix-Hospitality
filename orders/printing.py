@@ -2411,12 +2411,39 @@ def _generate_receipt_content(payment):
     total_value = f"{currency_symbol}{float(total):.2f}"
     spacing = width - len(total_label) - len(total_value)
     lines.append(total_label + (" " * spacing) + total_value)
-    
+
+    # Payment method section - show all non-voided payments on this order
+    lines.append("-" * width)
+    method_labels = {
+        'cash':    'Cash',
+        'card':    'Card',
+        'digital': 'Digital / Mobile',
+        'voucher': 'Voucher',
+    }
+    all_payments = list(order.payments.filter(is_voided=False).order_by('id'))
+    if len(all_payments) == 1:
+        # Single payment — compact one-liner
+        m = all_payments[0]
+        method_str = method_labels.get(m.payment_method, m.payment_method.title())
+        pay_label = f"Payment ({method_str}):"
+        pay_value = f"{currency_symbol}{float(m.amount):.2f}"
+        spacing = width - len(pay_label) - len(pay_value)
+        lines.append(pay_label + (" " * spacing) + pay_value)
+    elif len(all_payments) > 1:
+        # Split payment — list each method
+        lines.append("PAYMENT BREAKDOWN:")
+        for m in all_payments:
+            method_str = method_labels.get(m.payment_method, m.payment_method.title())
+            pay_label = f"  {method_str}:"
+            pay_value = f"{currency_symbol}{float(m.amount):.2f}"
+            spacing = width - len(pay_label) - len(pay_value)
+            lines.append(pay_label + (" " * spacing) + pay_value)
+
     # Dotted separator - EXACTLY like HTML
     lines.append("-" * width)
     # NO blank line here
     # Footer - centered EXACTLY like HTML
     lines.append("Thank you for dining with us!".center(width))
     lines.append("Please come again".center(width))
-    
+
     return "\n".join(lines)

@@ -1421,8 +1421,31 @@ def delete_main_category(request, category_id):
         
         category_name = category.name
         subcategory_count = category.subcategories.count()
-        
-        # Delete the category (this will cascade delete subcategories and products due to ON DELETE CASCADE)
+
+        # Gather all products in this category
+        from restaurant.models import Product as MenuProduct
+        from orders.models import OrderItem
+        category_products = MenuProduct.objects.filter(main_category=category)
+
+        # Null-out FK references so existing records (orders, waste logs, reports)
+        # are preserved but no longer point at the deleted products.
+        OrderItem.objects.filter(product__in=category_products).update(product=None)
+
+        try:
+            from waste_management.models import FoodWasteLog, ProductCostSettings
+            FoodWasteLog.objects.filter(product__in=category_products).update(product=None)
+            ProductCostSettings.objects.filter(product__in=category_products).delete()
+        except Exception:
+            pass
+
+        try:
+            from reports.models import ProductSalesDetail
+            ProductSalesDetail.objects.filter(product__in=category_products).update(product=None)
+        except Exception:
+            pass
+
+        category_products.delete()
+        category.subcategories.all().delete()
         category.delete()
 
         if subcategory_count > 0:

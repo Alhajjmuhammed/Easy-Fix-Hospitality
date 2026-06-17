@@ -52,6 +52,7 @@ def dashboard(request):
     
     # Get filter parameters
     payment_status = request.GET.get('payment_status', 'all')
+    payment_method = request.GET.get('payment_method', 'all')
     period = request.GET.get('period', 'today')  # Default to 'today' instead of 'all'
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
@@ -60,7 +61,7 @@ def dashboard(request):
     table_id = request.GET.get('table_id', 'all')
     staff_filter = request.GET.get('staff_filter', 'all')  # NEW: Staff member filtering
     restaurant_filter = request.GET.get('restaurant', '').strip()
-    
+
     # Get date filters (only use if no period is being used)
     from_date = request.GET.get('from_date')
     to_date = request.GET.get('to_date')
@@ -215,6 +216,10 @@ def dashboard(request):
     # Apply table filter (only orders from this specific table)
     if table_id != 'all':
         orders = orders.filter(table_info_id=table_id)
+
+    # Apply payment method filter (cash/card/digital/voucher)
+    if payment_method != 'all':
+        orders = orders.filter(payments__payment_method=payment_method, payments__is_voided=False).distinct()
 
     # Helper functions for station detection
     # Helper functions for station analysis
@@ -502,9 +507,25 @@ def dashboard(request):
         except (ValueError, Exception):
             table_id = 'all'
 
+    # Payment method breakdown (cash/card/digital/voucher counts and totals)
+    from cashier.models import Payment as PaymentModel
+    _method_qs = PaymentModel.objects.filter(order__in=orders, is_voided=False)\
+        .values('payment_method')\
+        .annotate(count=Count('id'), total=Sum('amount'))\
+        .order_by('payment_method')
+    payment_method_stats = {row['payment_method']: row for row in _method_qs}
+    cash_count    = payment_method_stats.get('cash',    {}).get('count', 0)
+    cash_total    = payment_method_stats.get('cash',    {}).get('total', 0) or 0
+    card_count    = payment_method_stats.get('card',    {}).get('count', 0)
+    card_total    = payment_method_stats.get('card',    {}).get('total', 0) or 0
+    digital_count = payment_method_stats.get('digital', {}).get('count', 0)
+    digital_total = payment_method_stats.get('digital', {}).get('total', 0) or 0
+    voucher_count = payment_method_stats.get('voucher', {}).get('count', 0)
+    voucher_total = payment_method_stats.get('voucher', {}).get('total', 0) or 0
+
     # Today's date for template defaults
     today_str = timezone.now().date().strftime('%Y-%m-%d')
-    
+
     context = {
         'total_orders': total_orders,
         'total_revenue': total_revenue,
@@ -517,6 +538,11 @@ def dashboard(request):
         'page_obj': page_obj,
         'orders': page_obj,
         'payment_status': payment_status,
+        'payment_method': payment_method,
+        'cash_count': cash_count, 'cash_total': cash_total,
+        'card_count': card_count, 'card_total': card_total,
+        'digital_count': digital_count, 'digital_total': digital_total,
+        'voucher_count': voucher_count, 'voucher_total': voucher_total,
         'period': period,
         'categories': categories,
         'subcategories': subcategories,
@@ -582,6 +608,7 @@ def export_csv(request):
     
     # Get same filters as dashboard
     payment_status = request.GET.get('payment_status', 'all')
+    payment_method = request.GET.get('payment_method', 'all')
     period = request.GET.get('period', 'today')  # Default to 'today' same as dashboard
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
@@ -724,7 +751,9 @@ def export_csv(request):
     # Apply table filter (only orders from this specific table)
     if table_id != 'all':
         orders = orders.filter(table_info_id=table_id)
-    
+    if payment_method != 'all':
+        orders = orders.filter(payments__payment_method=payment_method, payments__is_voided=False).distinct()
+
     # Calculate summary data for the export
     total_orders = orders.count()
     _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
@@ -827,6 +856,7 @@ def export_csv(request):
     writer.writerow(['Generated on:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
     writer.writerow(['Period:', period_desc])
     writer.writerow(['Payment Status Filter:', payment_status.title()])
+    writer.writerow(['Payment Method Filter:', payment_method.title() if payment_method != 'all' else 'All'])
     writer.writerow(['Station Filter:', station_filter.title()])
     if staff_filter != 'all':
         try:
@@ -905,6 +935,20 @@ def export_csv(request):
     writer.writerow(['Paid Orders:', f'{paid_orders_count:,}', f'{currency_symbol}{paid_revenue:,.2f}'])
     writer.writerow(['Unpaid Orders:', f'{unpaid_orders_count:,}', f'{currency_symbol}{unpaid_revenue:,.2f}'])
     writer.writerow(['Partial Payments:', f'{partial_orders_count:,}', f'{currency_symbol}{partial_revenue:,.2f}'])
+    writer.writerow([])  # Empty row
+    
+    # Payment method breakdown
+    from cashier.models import Payment as _CsvPaymentModel
+    from django.db.models import Sum as _CsvSum, Count as _CsvCount
+    _csv_method_qs = _CsvPaymentModel.objects.filter(order__in=orders, is_voided=False)\
+        .values('payment_method').annotate(count=_CsvCount('id'), total=_CsvSum('amount')).order_by('payment_method')
+    _csv_method_map = {r['payment_method']: r for r in _csv_method_qs}
+    writer.writerow(['PAYMENT METHOD BREAKDOWN'])
+    writer.writerow(['Method', 'Transactions', 'Total Amount'])
+    for _method in ['cash', 'card', 'digital', 'voucher']:
+        _row = _csv_method_map.get(_method, {})
+        if _row:
+            writer.writerow([_method.title(), f"{_row['count']:,}", f"{currency_symbol}{_row['total']:,.2f}"])
     writer.writerow([])  # Empty row
     
     # Branch Performance Analysis (only when viewing all restaurants for PRO plan)
@@ -1008,7 +1052,7 @@ def export_csv(request):
     
     # Write detailed data header
     writer.writerow(['DETAILED SALES DATA'])
-    writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Order Status', 'Order By', 'Paid By'])
+    writer.writerow(['Order ID', 'Customer', 'Date', 'Table', 'Restaurant/Branch', 'Items', 'Categories', 'Sub Categories', 'Stations', 'Total Amount', 'Payment Status', 'Payment Method', 'Order Status', 'Order By', 'Paid By'])
     
     # Get selected category/subcategory names for display
     # SECURITY: anchor to already-scoped orders — prevents cross-tenant name leakage
@@ -1106,6 +1150,7 @@ def export_csv(request):
             stations_list,
             f"{currency_symbol}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
             order.payment_status,
+            ', '.join(sorted(set(p.payment_method.title() for p in order.payments.all() if not p.is_voided))) or '-',
             order.status,
             order_by_name,
             paid_by_name
@@ -1136,6 +1181,7 @@ def export_pdf(request):
     
     # Get same filters as dashboard
     payment_status = request.GET.get('payment_status', 'all')
+    payment_method = request.GET.get('payment_method', 'all')
     period = request.GET.get('period', 'today')  # Default to 'today' same as dashboard
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
@@ -1278,7 +1324,9 @@ def export_pdf(request):
     # Apply table filter (only orders from this specific table)
     if table_id != 'all':
         orders = orders.filter(table_info_id=table_id)
-    
+    if payment_method != 'all':
+        orders = orders.filter(payments__payment_method=payment_method, payments__is_voided=False).distinct()
+
     # Calculate summary data for the export
     total_orders = orders.count()
     _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
@@ -1375,7 +1423,8 @@ def export_pdf(request):
     
     # Create PDF document
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    from reportlab.lib.pagesizes import landscape
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     
     # Container for the 'Flowable' objects
     elements = []
@@ -1410,6 +1459,7 @@ def export_pdf(request):
         ['Generated on:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
         ['Period:', period_desc],
         ['Payment Status Filter:', payment_status.title()],
+        ['Payment Method Filter:', payment_method.title() if payment_method != 'all' else 'All'],
         ['Station Filter:', station_filter.title()],
     ]
     
@@ -1678,7 +1728,7 @@ def export_pdf(request):
     elements.append(detailed_heading)
     
     # Table headers
-    headers = ['Order #', 'Date', 'Customer', 'Location', 'Items', 'Total', 'Payment', 'Status', 'Order By', 'Paid By']
+    headers = ['Order #', 'Date', 'Customer', 'Location', 'Items', 'Total', 'Pay Status', 'Method', 'Status', 'Order By', 'Paid By']
     data = [headers]
     
     # Table data
@@ -1741,22 +1791,23 @@ def export_pdf(request):
             items_list[:15],  # Limit length
             f"{currency_symbol}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
             order.payment_status.title(),
+            ', '.join(sorted(set(p.payment_method.title() for p in order.payments.all() if not p.is_voided))) or '-',
             order.status.title(),
             order_by_name[:12],  # Limit length
             paid_by_name[:12]  # Limit length
         ])
     
     # Create table with adjusted column widths to accommodate Order By and Paid By columns
-    table = Table(data, colWidths=[0.75*inch, 0.6*inch, 0.65*inch, 0.65*inch, 1.1*inch, 0.6*inch, 0.6*inch, 0.55*inch, 0.65*inch, 0.65*inch])
+    table = Table(data, colWidths=[0.95*inch, 0.75*inch, 0.85*inch, 0.85*inch, 1.5*inch, 0.75*inch, 0.75*inch, 0.75*inch, 0.75*inch, 0.85*inch, 0.85*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
         ('TOPPADDING', (0, 0), (-1, 0), 10),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),

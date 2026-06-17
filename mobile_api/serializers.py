@@ -136,7 +136,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'is_available', 'available_in_stock', 'preparation_time',
             'category_id', 'category_name',
             'subcategory_id', 'subcategory_name',
-            'image_url', 'updated_at',
+            'image_url', 'updated_at', 'station',
         ]
 
     def get_current_price(self, obj):
@@ -236,13 +236,14 @@ class OrderItemSerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(source='product.id', read_only=True)
     product_name = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
+    station = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
         fields = [
             'id', 'product_id', 'product_name',
             'quantity', 'unit_price', 'total_price',
-            'special_notes',
+            'special_notes', 'station',
         ]
 
     def get_product_name(self, obj):
@@ -253,6 +254,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
             return float(obj.get_subtotal())
         except Exception:
             return 0.0
+
+    def get_station(self, obj):
+        return obj.product.station if obj.product else None
 
 
 class OrderSerializer(serializers.ModelSerializer):

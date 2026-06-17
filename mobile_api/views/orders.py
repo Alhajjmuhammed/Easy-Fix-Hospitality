@@ -344,14 +344,19 @@ def _place_order(request):
                 p.save(update_fields=['available_in_stock'])
         # --- transaction commits here ---
 
-    # ── Phase 3: outside transaction — WebSocket + print ─────────────────────
+    # ── Phase 3: outside transaction — WebSocket + print ─────────────────
     _notify_ws(order, user, event_type='new_order')
 
-    try:
-        from orders.printing import auto_print_order
-        auto_print_order(order)
-    except Exception as e:
-        logger.warning('Auto-print failed for order %s: %s', order.order_number, e)
+    # X-Local-Print: true means the mobile app is printing KOT/BOT itself
+    # (Bluetooth or system dialog). Skip server queue to avoid orphan PrintJob
+    # rows accumulating in the DB for restaurants without a Windows Print Client.
+    # Default (header absent) = existing behaviour: server queue handles printing.
+    if request.META.get('HTTP_X_LOCAL_PRINT') != 'true':
+        try:
+            from orders.printing import auto_print_order
+            auto_print_order(order)
+        except Exception as e:
+            logger.warning('Auto-print failed for order %s: %s', order.order_number, e)
 
     logger.info('Mobile order created: %s by %s', order.order_number, user.username)
 
@@ -825,11 +830,13 @@ def add_items_to_order(request, order_id):
         order.save(update_fields=['total_amount', 'special_instructions', 'updated_at'])
         # --- transaction commits here ---
 
-    try:
-        from orders.printing import auto_print_order
-        auto_print_order(order)
-    except Exception as e:
-        logger.warning('Auto-print failed adding items to order %s: %s', order.order_number, e)
+    # X-Local-Print: true → mobile prints locally; skip server queue (same as _place_order)
+    if request.META.get('HTTP_X_LOCAL_PRINT') != 'true':
+        try:
+            from orders.printing import auto_print_order
+            auto_print_order(order)
+        except Exception as e:
+            logger.warning('Auto-print failed adding items to order %s: %s', order.order_number, e)
 
     _notify_ws(order, user)
 
