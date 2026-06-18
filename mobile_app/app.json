@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Easy Fix Hospitality",
+    "slug": "easy-fix-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1e40af"
+      },
+      "package": "com.easyfix.hospitality"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.easyfix.hospitality",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Used to connect to POS thermal printers.",
+        "NSCameraUsageDescription": "Used to scan QR codes for table selection."
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-camera",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "62a643fb-c660-4833-97dc-b7b10443060d"
+      }
+    },
+    "owner": "easyfixsoft"
+  }
+}

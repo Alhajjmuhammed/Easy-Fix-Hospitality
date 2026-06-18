@@ -62,10 +62,14 @@ diagnose_*.py
 # Local development tools and audit scripts
 dev_tools/
 
-# Node / mobile app (React Native client - not needed on server)
+# Node / mobile app (React Native client)
 node_modules/
-mobile_app/
 package-lock.json
+
+# Mobile app build artifacts (source is tracked)
+mobile_app/.expo/
+mobile_app/android/
+mobile_app/ios/
 
 # Local temp scripts
 _browser_live_test.py

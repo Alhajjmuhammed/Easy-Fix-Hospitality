@@ -1,0 +1,25 @@
+diff --git a/node_modules/@brooons/react-native-bluetooth-escpos-printer/index.js b/node_modules/@brooons/react-native-bluetooth-escpos-printer/index.js
+index 0980f53..b22a4a7 100644
+--- a/node_modules/@brooons/react-native-bluetooth-escpos-printer/index.js
++++ b/node_modules/@brooons/react-native-bluetooth-escpos-printer/index.js
+@@ -1,8 +1,11 @@
+-
++﻿
+ import { NativeModules } from 'react-native';
+ 
+ const { BluetoothManager, BluetoothEscposPrinter, BluetoothTscPrinter } = NativeModules;
+ 
++// Null guard: in Expo Go native modules are null — skip property assignment to avoid TypeError
++if (BluetoothTscPrinter && BluetoothEscposPrinter) {
++
+ BluetoothTscPrinter.DIRECTION = {
+     FORWARD: 0,
+     BACKWARD: 1
+@@ -151,4 +154,7 @@ BluetoothEscposPrinter.ALIGN = {
+     RIGHT: 2,
+ };
+ 
++} // end null guard for Expo Go
++
+ module.exports = { BluetoothManager, BluetoothEscposPrinter, BluetoothTscPrinter };
++
