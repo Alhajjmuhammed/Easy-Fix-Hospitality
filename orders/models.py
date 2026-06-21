@@ -26,7 +26,7 @@ class Order(models.Model):
     ]
     
     order_number = models.CharField(max_length=20, unique=True)
-    table_info = models.ForeignKey(TableInfo, on_delete=models.PROTECT, related_name='orders')
+    table_info = models.ForeignKey(TableInfo, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     ordered_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='orders_placed')
     confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders_confirmed')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -81,8 +81,7 @@ class Order(models.Model):
     @property
     def tax_rate(self):
         """Tax rate as percentage for display"""
-        # Use centralized tax rate from table
-        tax_rate_decimal = self.table_info.get_tax_rate()
+        tax_rate_decimal = self.table_info.get_tax_rate() if self.table_info else Decimal('0')
         return float(tax_rate_decimal * 100)
     
     def get_total(self):
@@ -104,19 +103,21 @@ class Order(models.Model):
     
     def occupy_table(self):
         """Mark the table as occupied by this order"""
-        if self.is_table_occupying():
+        if self.table_info and self.is_table_occupying():
             self.table_info.is_available = False
             self.table_info.save()
-    
+
     def release_table(self):
         """Release the table when order is completed or cancelled"""
+        if not self.table_info:
+            return
         # Check if any other active orders are using this table
         other_active_orders = Order.objects.filter(
             table_info=self.table_info,
             status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
             payment_status__in=['unpaid', 'partial']
         ).exclude(id=self.id)
-        
+
         # Only release table if no other active orders
         if not other_active_orders.exists():
             self.table_info.is_available = True

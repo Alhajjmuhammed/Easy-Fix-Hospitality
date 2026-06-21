@@ -24,6 +24,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_http_methods
 from django.template.loader import render_to_string
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import ProtectedError
 import json
 import qrcode
 import io
@@ -40,6 +41,45 @@ except ImportError:
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _cleanup_order_dependencies(order_ids):
+    """Delete/nullify all PROTECT FK references blocking order deletion on PostgreSQL."""
+    if not order_ids:
+        return
+    try:
+        from cashier.models import Payment, OrderItemPayment, VoidTransaction
+        payment_ids = list(Payment.objects.filter(order_id__in=order_ids).values_list('id', flat=True))
+        if payment_ids:
+            VoidTransaction.objects.filter(original_payment_id__in=payment_ids).delete()
+            OrderItemPayment.objects.filter(payment_id__in=payment_ids).delete()
+            Payment.objects.filter(id__in=payment_ids).delete()
+    except ImportError:
+        pass
+    try:
+        from waste_management.models import FoodWasteLog, OrderCostBreakdown
+        FoodWasteLog.objects.filter(order_id__in=order_ids).update(order=None)
+        OrderCostBreakdown.objects.filter(order_id__in=order_ids).delete()
+    except ImportError:
+        pass
+
+
+def _cleanup_product_dependencies(product_ids):
+    """Nullify/delete all PROTECT FK references blocking product deletion on PostgreSQL."""
+    if not product_ids:
+        return
+    OrderItem.objects.filter(product_id__in=product_ids).update(product=None)
+    try:
+        from waste_management.models import FoodWasteLog, ProductCostSettings
+        FoodWasteLog.objects.filter(product_id__in=product_ids).update(product=None)
+        ProductCostSettings.objects.filter(product_id__in=product_ids).delete()
+    except ImportError:
+        pass
+    try:
+        from reports.models import ProductSalesDetail
+        ProductSalesDetail.objects.filter(product_id__in=product_ids).update(product=None)
+    except ImportError:
+        pass
 
 
 def get_production_qr_url(request, qr_code):
@@ -1427,22 +1467,11 @@ def delete_main_category(request, category_id):
         from orders.models import OrderItem
         category_products = MenuProduct.objects.filter(main_category=category)
 
-        # Null-out FK references so existing records (orders, waste logs, reports)
-        # are preserved but no longer point at the deleted products.
-        OrderItem.objects.filter(product__in=category_products).update(product=None)
+        # Snapshot product IDs now so the subquery stays valid through all steps
+        product_ids = list(category_products.values_list('id', flat=True))
 
-        try:
-            from waste_management.models import FoodWasteLog, ProductCostSettings
-            FoodWasteLog.objects.filter(product__in=category_products).update(product=None)
-            ProductCostSettings.objects.filter(product__in=category_products).delete()
-        except Exception:
-            pass
-
-        try:
-            from reports.models import ProductSalesDetail
-            ProductSalesDetail.objects.filter(product__in=category_products).update(product=None)
-        except Exception:
-            pass
+        # Nullify all PROTECT FK references before deletion
+        _cleanup_product_dependencies(product_ids)
 
         category_products.delete()
         category.subcategories.all().delete()
@@ -1704,12 +1733,17 @@ def delete_subcategory(request, subcategory_id):
         
         subcategory_name = subcategory.name
         product_count = subcategory.products.count()
-        
-        # Delete the subcategory (this will cascade delete products due to ON DELETE CASCADE)
+
+        # Nullify FK refs for products in this subcategory so SET_NULL cascade works cleanly
+        product_ids = list(subcategory.products.values_list('id', flat=True))
+        if product_ids:
+            _cleanup_product_dependencies(product_ids)
+
+        # Deleting the subcategory sets sub_category=NULL on its products (SET_NULL)
         subcategory.delete()
 
         if product_count > 0:
-            message = f'Subcategory "{subcategory_name}" and its {product_count} products deleted successfully'
+            message = f'Subcategory "{subcategory_name}" deleted successfully ({product_count} products unlinked)'
         else:
             message = f'Subcategory "{subcategory_name}" deleted successfully'
 
@@ -1875,13 +1909,20 @@ def bulk_delete_main_categories(request):
         if not categories.exists():
             return JsonResponse({'success': False, 'message': 'No valid categories found'})
         
-        # Count related items before deletion — 2 aggregate queries instead of N+M
+        # Count related items before deletion
         category_names = list(categories.values_list('name', flat=True))
         total_subcategories = SubCategory.objects.filter(main_category__in=categories).count()
-        total_products = Product.objects.filter(sub_category__main_category__in=categories).count()
-        
-        # Delete categories (cascades to subcategories and products)
+        total_products = Product.objects.filter(main_category__in=categories).count()
+
+        # Nullify all PROTECT FK refs to these categories' products before deletion
+        product_ids = list(Product.objects.filter(main_category__in=categories).values_list('id', flat=True))
+        if product_ids:
+            _cleanup_product_dependencies(product_ids)
+
+        # Now delete in correct order: products → subcategories → categories
         deleted_count = categories.count()
+        Product.objects.filter(id__in=product_ids).delete()
+        SubCategory.objects.filter(main_category__in=categories).delete()
         categories.delete()
         
         # Build success message
@@ -1947,18 +1988,22 @@ def bulk_delete_subcategories(request):
         subcategory_names = list(subcategories.values_list('name', flat=True))
         total_products = Product.objects.filter(sub_category__in=subcategories).count()
         
-        # Delete subcategories (cascades to products)
+        # Nullify product deps so SET_NULL cascade on sub_category works cleanly
+        product_ids = list(Product.objects.filter(sub_category__in=subcategories).values_list('id', flat=True))
+        if product_ids:
+            _cleanup_product_dependencies(product_ids)
+
         deleted_count = subcategories.count()
         subcategories.delete()
-        
+
         # Build success message
         if deleted_count == 1:
             message = f'Subcategory "{subcategory_names[0]}" deleted successfully'
         else:
             message = f'{deleted_count} subcategories deleted successfully'
-        
+
         if total_products > 0:
-            message += f' (including {total_products} products)'
+            message += f' ({total_products} products unlinked)'
 
         return JsonResponse({
             'success': True,
@@ -2335,13 +2380,14 @@ def delete_product(request, product_id):
             product = get_object_or_404(Product, id=product_id)
         
         product_name = product.name
+        _cleanup_product_dependencies([product.id])
         product.delete()
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Product "{product_name}" deleted successfully'
         })
-        
+
     except Exception as e:
         logger.error(f'Error deleting product: {str(e)}')
         return JsonResponse({'success': False, 'message': 'Failed to delete product. Please try again.'})
@@ -2842,7 +2888,17 @@ def delete_user(request, user_id):
         
         user_name = user.get_full_name() or user.username
         user_role = user.role.name if user.role else 'no-role'
-        user.delete()
+
+        try:
+            user.delete()
+        except ProtectedError:
+            return JsonResponse({
+                'success': False,
+                'message': (
+                    f'Cannot delete user "{user_name}" because they have associated orders, '
+                    'payments, or waste records. Deactivate the account instead.'
+                )
+            })
 
         # Audit log: user deletion is a critical security event
         try:
@@ -2861,7 +2917,7 @@ def delete_user(request, user_id):
             'success': True,
             'message': f'User "{user_name}" deleted successfully'
         })
-        
+
     except Exception as e:
         logger.error(f'Error deleting user: {str(e)}')
         return JsonResponse({'success': False, 'message': 'Error deleting user. Please try again.'})
@@ -3414,13 +3470,15 @@ def delete_table(request):
             return JsonResponse({'success': False, 'message': 'Table not found'})
         
         table_number = table.tbl_no
+        # Detach orders that reference this table — table_info is now nullable (SET_NULL)
+        Order.objects.filter(table_info=table).update(table_info=None)
         table.delete()
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Table {table_number} deleted successfully'
         })
-        
+
     except Exception as e:
         logger.error(f'Error deleting table: {str(e)}')
         return JsonResponse({'success': False, 'message': 'Error deleting table. Please try again.'})
@@ -3729,13 +3787,14 @@ def delete_order(request, order_id):
                     return JsonResponse({'success': False, 'message': 'No restaurant context found.'})
 
         order_number = order.order_number
+        _cleanup_order_dependencies([order.id])
         order.delete()
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Order #{order_number} deleted successfully'
         })
-        
+
     except Exception as e:
         logger.error(f'Error deleting order: {str(e)}')
         return JsonResponse({'success': False, 'message': 'Error deleting order. Please try again.'})
@@ -3813,9 +3872,13 @@ def bulk_delete_orders(request):
                 'error': f'Some orders could not be found or you do not have permission to delete them. Found {found_count} out of {len(order_ids)} orders.'
             })
         
-        # Get order numbers for logging
+        # Get order numbers and IDs for logging and cleanup
         order_numbers = list(orders_to_delete.values_list('order_number', flat=True))
-        
+        order_ids = list(orders_to_delete.values_list('id', flat=True))
+
+        # Clean up all PROTECT FK chains before bulk deletion
+        _cleanup_order_dependencies(order_ids)
+
         # Perform bulk deletion
         deleted_count, deleted_details = orders_to_delete.delete()
         
@@ -4998,9 +5061,13 @@ def bulk_delete_products(request):
         #         'error': f'Cannot delete products that are in active orders. {len(active_order_products)} products have active orders.'
         #     })
         
-        # Get product names for logging
+        # Get product names and IDs for logging and cleanup
         product_names = list(products_to_delete.values_list('name', flat=True))
-        
+        product_ids = list(products_to_delete.values_list('id', flat=True))
+
+        # Nullify all PROTECT FK refs before bulk deletion
+        _cleanup_product_dependencies(product_ids)
+
         # Perform bulk deletion
         deleted_count, deleted_details = products_to_delete.delete()
         
