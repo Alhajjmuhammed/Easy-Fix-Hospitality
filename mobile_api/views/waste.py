@@ -52,7 +52,7 @@ def _list_waste(request, owner):
     for log in logs:
         data.append({
             'id': log.id,
-            'product_name': log.product.name,
+            'product_name': log.product.name if log.product else '[deleted product]',
             'quantity_wasted': log.quantity_wasted,
             'waste_reason': log.waste_reason,
             'disposal_method': log.disposal_method,

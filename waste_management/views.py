@@ -523,9 +523,9 @@ def export_waste_csv(request):
         writer.writerow([
             log.created_at.strftime('%Y-%m-%d'),
             log.created_at.strftime('%H:%M:%S'),
-            _safe_csv(log.product.name),
-            _safe_csv(log.product.main_category.name),
-            _safe_csv(log.product.sub_category.name) if log.product.sub_category else '',
+            _safe_csv(log.product.name if log.product else '[deleted product]'),
+            _safe_csv(log.product.main_category.name) if log.product and log.product.main_category else '',
+            _safe_csv(log.product.sub_category.name) if log.product and log.product.sub_category else '',
             log.quantity_wasted,
             log.get_waste_reason_display(),
             f'${log.total_cost:.2f}',
@@ -972,7 +972,7 @@ def record_food_waste(request):
             'message': 'Waste recorded successfully',
             'waste_log': {
                 'id': waste_log.id,
-                'product_name': waste_log.product.name,
+                'product_name': waste_log.product.name if waste_log.product else '[deleted product]',
                 'quantity_wasted': waste_log.quantity_wasted,
                 'total_cost': float(waste_log.total_cost),
                 'waste_reason': waste_log.get_waste_reason_display(),
@@ -1501,7 +1501,7 @@ def export_csv(report_data, date_from, date_to):
     for log in report_data['waste_logs']:
         writer.writerow([
             log.created_at.strftime('%Y-%m-%d %H:%M'),
-            _safe_csv(log.product.name),
+            _safe_csv(log.product.name if log.product else '[deleted product]'),
             log.quantity_wasted,
             log.get_waste_reason_display(),
             log.get_disposal_method_display(),
@@ -1588,7 +1588,7 @@ def export_excel(report_data, date_from, date_to):
     
     for row, log in enumerate(report_data['waste_logs'], 2):
         logs_sheet.cell(row=row, column=1, value=log.created_at.strftime('%Y-%m-%d %H:%M'))
-        logs_sheet.cell(row=row, column=2, value=log.product.name)
+        logs_sheet.cell(row=row, column=2, value=log.product.name if log.product else '[deleted product]')
         logs_sheet.cell(row=row, column=3, value=log.quantity_wasted)
         logs_sheet.cell(row=row, column=4, value=log.get_waste_reason_display())
         logs_sheet.cell(row=row, column=5, value=log.get_disposal_method_display())
@@ -1887,7 +1887,7 @@ def recent_waste_records(request):
     for log in waste_logs:
         records.append({
             'id': log.id,
-            'product_name': log.product.name,
+            'product_name': log.product.name if log.product else '[deleted product]',
             'quantity': log.quantity_wasted,
             'cost': float(log.total_cost),
             'reason': log.get_waste_reason_display(),
