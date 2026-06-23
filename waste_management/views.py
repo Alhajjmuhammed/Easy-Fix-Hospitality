@@ -1022,11 +1022,22 @@ def edit_waste_log(request, log_id):
         if quantity_wasted <= 0:
             return JsonResponse({'error': 'Quantity must be greater than zero'}, status=400)
 
+        old_quantity = waste_log.quantity_wasted
         waste_log.quantity_wasted = quantity_wasted
         waste_log.waste_reason = waste_reason
         waste_log.disposal_method = disposal_method
         waste_log.notes = notes
-        waste_log.total_cost = Decimal('0.00')  # trigger recalculation
+
+        if not waste_log.product and old_quantity > 0 and old_quantity != quantity_wasted:
+            # Product was deleted — scale stored component costs proportionally
+            ratio = Decimal(str(quantity_wasted)) / Decimal(str(old_quantity))
+            waste_log.ingredient_cost = (waste_log.ingredient_cost * ratio).quantize(Decimal('0.01'))
+            waste_log.labor_cost = (waste_log.labor_cost * ratio).quantize(Decimal('0.01'))
+            waste_log.overhead_cost = (waste_log.overhead_cost * ratio).quantize(Decimal('0.01'))
+            waste_log.total_cost = waste_log.ingredient_cost + waste_log.labor_cost + waste_log.overhead_cost
+        else:
+            waste_log.total_cost = Decimal('0.00')  # trigger full recalculation via save()
+
         waste_log.save()
 
         return JsonResponse({
