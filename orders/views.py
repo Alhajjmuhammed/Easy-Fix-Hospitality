@@ -689,7 +689,7 @@ def place_order(request):
                 # ✨ SERVER-SIDE AUTO-PRINT (NO BROWSER DIALOG!)
                 try:
                     logger.info(f"Starting auto_print_order for Order #{order.order_number}")
-                    logger.debug(f"Order ID: {order.id}, Table: {order.table_info.tbl_no}")
+                    logger.debug(f"Order ID: {order.id}, Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
                     print_result = auto_print_order(order)
                     logger.info(f"Print result: {print_result}")
                     if print_result.get('kot_printed'):
@@ -2484,12 +2484,12 @@ def view_receipt(request, order_id):
     total_amount = order.total_amount
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         # For branch owners, show the main restaurant name
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2497,8 +2497,8 @@ def view_receipt(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
-    
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
+
     context = {
         'order': order,
         'payments': payments,
@@ -2541,7 +2541,7 @@ def print_kot(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info.owner != owner_filter:
+            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
                 messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                 return redirect('orders:kitchen_dashboard')
     except Exception:
@@ -2549,11 +2549,11 @@ def print_kot(request, order_id):
         return redirect('orders:kitchen_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2561,7 +2561,7 @@ def print_kot(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Context for KOT template
     context = {
@@ -2606,11 +2606,11 @@ def reprint_kot(request, order_id):
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2618,7 +2618,7 @@ def reprint_kot(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Add reprint message
     messages.info(request, f'Reprinting KOT for Order #{order.order_number}')
@@ -2661,7 +2661,7 @@ def print_bot(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info.owner != owner_filter:
+            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
                 messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                 return redirect('orders:bar_dashboard')
     except Exception:
@@ -2669,11 +2669,11 @@ def print_bot(request, order_id):
         return redirect('orders:bar_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2681,7 +2681,7 @@ def print_bot(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Context for BOT template
     context = {
@@ -2725,11 +2725,11 @@ def reprint_bot(request, order_id):
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2737,7 +2737,7 @@ def reprint_bot(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Add reprint message
     messages.info(request, f'Reprinting BOT for Order #{order.order_number}')
@@ -2780,7 +2780,7 @@ def print_buffet(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info.owner != owner_filter:
+            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
                 messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                 return redirect('orders:buffet_dashboard')
     except Exception:
@@ -2788,11 +2788,11 @@ def print_buffet(request, order_id):
         return redirect('orders:buffet_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2800,7 +2800,7 @@ def print_buffet(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Context for BUFFET template
     context = {
@@ -2844,11 +2844,11 @@ def reprint_buffet(request, order_id):
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2856,7 +2856,7 @@ def reprint_buffet(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Add reprint message
     messages.info(request, f'Reprinting BUFFET for Order #{order.order_number}')
@@ -2899,7 +2899,7 @@ def print_service(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info.owner != owner_filter:
+            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
                 messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                 return redirect('orders:service_dashboard')
     except Exception:
@@ -2907,11 +2907,11 @@ def print_service(request, order_id):
         return redirect('orders:service_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2919,7 +2919,7 @@ def print_service(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Context for SERVICE template
     context = {
@@ -2963,11 +2963,11 @@ def reprint_service(request, order_id):
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner
-    if owner.is_branch_owner():
+    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=owner, 
+            branch_owner=owner,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2975,7 +2975,7 @@ def reprint_service(request, order_id):
         else:
             restaurant_name = owner.restaurant_name
     else:
-        restaurant_name = owner.restaurant_name
+        restaurant_name = owner.restaurant_name if owner else 'Restaurant'
     
     # Add reprint message
     messages.info(request, f'Reprinting SERVICE for Order #{order.order_number}')
@@ -3599,7 +3599,7 @@ def customer_care_reports(request):
                 order.order_number,
                 order.created_at.strftime('%Y-%m-%d'),
                 order.created_at.strftime('%H:%M:%S'),
-                order.table_info.tbl_no,
+                order.table_info.tbl_no if order.table_info else 'N/A',
                 ', '.join(items_list),
                 ', '.join(categories_list),
                 ', '.join(subcategories_list),
@@ -3673,7 +3673,7 @@ def customer_care_reports(request):
             table_data.append([
                 order.order_number,
                 order.created_at.strftime('%m/%d/%y %H:%M'),
-                order.table_info.tbl_no,
+                order.table_info.tbl_no if order.table_info else 'N/A',
                 Paragraph(items_str, styles['Normal']),
                 f"{currency_symbol}{order.total_amount:.2f}",
                 order.payment_status.upper()

@@ -50,7 +50,8 @@ class OrderItemPayment(models.Model):
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
     
     def __str__(self):
-        return f"{self.quantity_paid}x {self.order_item.product.name} - ${self.amount_paid}"
+        product_name = self.order_item.product.name if self.order_item.product else '[deleted product]'
+        return f"{self.quantity_paid}x {product_name} - ${self.amount_paid}"
 
 class VoidTransaction(models.Model):
     """Track voided transactions for audit purposes"""

@@ -145,8 +145,10 @@ class OrderCostBreakdown(models.Model):
     
     @property
     def owner(self):
-        return self.order.table_info.owner
-    
+        if self.order and self.order.table_info:
+            return self.order.table_info.owner
+        return None
+
     def __str__(self):
         return f"Cost Breakdown: {self.order.order_number} - Profit: ${self.gross_profit} ({self.profit_margin_percentage}%)"
 
@@ -237,7 +239,8 @@ class ProductCostSettings(models.Model):
     
     @property
     def owner(self):
-        return self.product.owner
-    
+        return self.product.owner if self.product else None
+
     def __str__(self):
-        return f"Cost Settings: {self.product.name} - ${self.total_cost_per_unit}/unit"
+        product_name = self.product.name if self.product else '[deleted product]'
+        return f"Cost Settings: {product_name} - ${self.total_cost_per_unit}/unit"

@@ -51,7 +51,9 @@ def get_restaurant_display_name(order):
         str: Restaurant name to display on prints
     """
     table = order.table_info
-    
+    if not table:
+        return getattr(order.ordered_by, 'restaurant_name', None) or 'Restaurant'
+
     # Prefer Restaurant model (for branches)
     if hasattr(table, 'restaurant') and table.restaurant:
         restaurant = table.restaurant
@@ -716,7 +718,7 @@ class ThermalPrinter:
         lines.append("")
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
-        lines.append(f"Table: {order.table_info.tbl_no}")
+        lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
         lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
@@ -748,7 +750,7 @@ class ThermalPrinter:
         lines.append("KITCHEN ITEMS:")
         lines.append("-" * width)
         
-        kitchen_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'kitchen']
+        kitchen_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'kitchen']
         
         for item in kitchen_items:
             # Item name and quantity - left aligned
@@ -789,7 +791,7 @@ class ThermalPrinter:
         lines.append("")
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
-        lines.append(f"Table: {order.table_info.tbl_no}")
+        lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
         lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
@@ -821,7 +823,7 @@ class ThermalPrinter:
         lines.append("BAR ITEMS:")
         lines.append("-" * width)
         
-        bar_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'bar']
+        bar_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'bar']
         
         for item in bar_items:
             # Item name and quantity - left aligned
@@ -862,7 +864,7 @@ class ThermalPrinter:
         lines.append("")
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
-        lines.append(f"Table: {order.table_info.tbl_no}")
+        lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
         lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
@@ -894,7 +896,7 @@ class ThermalPrinter:
         lines.append("BUFFET ITEMS:")
         lines.append("-" * width)
         
-        buffet_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'buffet']
+        buffet_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'buffet']
         
         for item in buffet_items:
             # Item name and quantity - left aligned
@@ -935,7 +937,7 @@ class ThermalPrinter:
         lines.append("")
         lines.append(f"Restaurant: {restaurant_name}")
         lines.append(f"Order #: {order.order_number}")
-        lines.append(f"Table: {order.table_info.tbl_no}")
+        lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
         lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
         
         # Show who placed the order
@@ -967,7 +969,7 @@ class ThermalPrinter:
         lines.append("SERVICE ITEMS:")
         lines.append("-" * width)
         
-        service_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'service']
+        service_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'service']
         
         for item in service_items:
             # Item name and quantity - left aligned
@@ -1096,10 +1098,10 @@ def auto_print_order(order):
         
         # Check for items by station — load once to avoid 4 separate DB queries
         all_order_items = list(order.order_items.select_related('product').all())
-        has_kitchen_items = any(item.product.station == 'kitchen' for item in all_order_items)
-        has_bar_items = any(item.product.station == 'bar' for item in all_order_items)
-        has_buffet_items = any(item.product.station == 'buffet' for item in all_order_items)
-        has_service_items = any(item.product.station == 'service' for item in all_order_items)
+        has_kitchen_items = any(item.product and item.product.station == 'kitchen' for item in all_order_items)
+        has_bar_items = any(item.product and item.product.station == 'bar' for item in all_order_items)
+        has_buffet_items = any(item.product and item.product.station == 'buffet' for item in all_order_items)
+        has_service_items = any(item.product and item.product.station == 'service' for item in all_order_items)
         
         # Determine print mode
         use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
@@ -1351,8 +1353,8 @@ def _generate_bill_content(order, printed_by=None):
     
     lines = []
     width = 48  # 80mm thermal printer - full width utilization
-    restaurant = order.table_info.owner
-    
+    restaurant = order.table_info.owner if order.table_info else None
+
     # Get currency symbol for this owner/restaurant
     currency_symbol = '$'  # Default
     if isinstance(restaurant, User):
@@ -1366,12 +1368,14 @@ def _generate_bill_content(order, printed_by=None):
                     currency_symbol = owner.get_currency_symbol()
         except Exception:
             pass
-    
+
     # Get restaurant name - use main restaurant name for branch staff
-    if restaurant.role and restaurant.role.name == 'branch_owner':
+    if not restaurant:
+        restaurant_name = "RESTAURANT NAME"
+    elif restaurant.role and restaurant.role.name == 'branch_owner':
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=restaurant, 
+            branch_owner=restaurant,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -1395,8 +1399,8 @@ def _generate_bill_content(order, printed_by=None):
     lines.append(f"Order: {order.order_number}")
     lines.append(f"Date: {timezone.localtime(timezone.now()).strftime('%b %d, %Y')}")
     lines.append(f"Time: {timezone.localtime(timezone.now()).strftime('%H:%M')}")
-    lines.append(f"Table: {order.table_info.tbl_no or 'Takeaway'}")
-    
+    lines.append(f"Table: {(order.table_info.tbl_no if order.table_info else None) or 'Takeaway'}")
+
     # Ordered by (person who created the order)
     ordered_by = order.ordered_by
     if ordered_by:
@@ -1412,12 +1416,12 @@ def _generate_bill_content(order, printed_by=None):
             role = "Customer"
         else:
             role = "Staff"
-        
+
         full_name = f"{ordered_by.first_name} {ordered_by.last_name}".strip()
         if not full_name:
             full_name = ordered_by.username
         lines.append(f"Ordered by: {full_name} ({role})")
-    
+
     # Printed by (person who requested bill print)
     if printed_by:
         if hasattr(printed_by, 'is_cashier') and printed_by.is_cashier():
@@ -1447,13 +1451,13 @@ def _generate_bill_content(order, printed_by=None):
     for item in _items:
         item_total = item.get_subtotal()
         qty_str = f"{item.quantity}x"
-        item_name = item.product.name[:width-16]  # Truncate long names
+        item_name = (item.product.name if item.product else '[deleted]')[:width-16]
         price_str = f"{currency_symbol}{float(item_total):.2f}"
 
         # Format: "2x Item Name..................$10.00"
         name_section = f"{qty_str:4} {item_name}"
         dots_needed = width - len(name_section) - len(price_str)
-        line = name_section + ("." * dots_needed) + price_str
+        line = name_section + ("." * max(0, dots_needed)) + price_str
         lines.append(line)
 
     # Separator
@@ -1464,13 +1468,13 @@ def _generate_bill_content(order, printed_by=None):
     subtotal = sum(item.get_subtotal() for item in _items)
     discount = _D('0')
     for item in _items:
-        if hasattr(item.product, 'get_active_promotion'):
+        if item.product and hasattr(item.product, 'get_active_promotion'):
             _promo = item.product.get_active_promotion()
             if _promo:
                 discount += item.product.price * (_promo.discount_percentage / _D('100')) * item.quantity
 
     # Get tax from table config (single FK access, no order_items queries)
-    tax_rate = order.table_info.get_tax_rate()
+    tax_rate = order.table_info.get_tax_rate() if order.table_info else _D('0')
     tax_amount = subtotal * tax_rate
     tax_percentage = float(tax_rate * 100)
     total = subtotal + tax_amount  # same as get_total(); computed from already-fetched values
@@ -1551,7 +1555,7 @@ def _generate_kot_content(order):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
@@ -1625,7 +1629,7 @@ def _generate_bot_content(order):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
@@ -1699,7 +1703,7 @@ def _generate_buffet_content(order):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
@@ -1773,7 +1777,7 @@ def _generate_service_content(order):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who placed the order
@@ -1848,7 +1852,7 @@ def _generate_kot_content_for_items(order, items_list):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
@@ -1880,7 +1884,7 @@ def _generate_kot_content_for_items(order, items_list):
     lines.append("NEW KITCHEN ITEMS:")
     lines.append("-" * width)
     
-    kitchen_items = [item for item in items_list if item.product.station == 'kitchen']
+    kitchen_items = [item for item in items_list if item.product and item.product.station == 'kitchen']
     
     for item in kitchen_items:
         # Item name and quantity - left aligned
@@ -1918,7 +1922,7 @@ def _generate_bot_content_for_items(order, items_list):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
@@ -1950,7 +1954,7 @@ def _generate_bot_content_for_items(order, items_list):
     lines.append("NEW BAR ITEMS:")
     lines.append("-" * width)
     
-    bar_items = [item for item in items_list if item.product.station == 'bar']
+    bar_items = [item for item in items_list if item.product and item.product.station == 'bar']
     
     for item in bar_items:
         # Item name and quantity - left aligned
@@ -1988,7 +1992,7 @@ def _generate_buffet_content_for_items(order, items_list):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
@@ -2058,7 +2062,7 @@ def _generate_service_content_for_items(order, items_list):
     lines.append("")
     lines.append(f"Restaurant: {restaurant_name}")
     lines.append(f"Order #: {order.order_number}")
-    lines.append(f"Table: {order.table_info.tbl_no}")
+    lines.append(f"Table: {order.table_info.tbl_no if order.table_info else 'N/A'}")
     lines.append(f"Time: {timezone.localtime(order.created_at).strftime('%d/%m/%Y %H:%M')}")
     
     # Show who added the items
@@ -2159,10 +2163,10 @@ def auto_print_new_items(order, new_items):
             return result
         
         # Check for items by station in NEW items only
-        has_kitchen_items = any(item.product.station == 'kitchen' for item in new_items)
-        has_bar_items = any(item.product.station == 'bar' for item in new_items)
-        has_buffet_items = any(item.product.station == 'buffet' for item in new_items)
-        has_service_items = any(item.product.station == 'service' for item in new_items)
+        has_kitchen_items = any(item.product and item.product.station == 'kitchen' for item in new_items)
+        has_bar_items = any(item.product and item.product.station == 'bar' for item in new_items)
+        has_buffet_items = any(item.product and item.product.station == 'buffet' for item in new_items)
+        has_service_items = any(item.product and item.product.station == 'service' for item in new_items)
         
         # Determine print mode
         use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
@@ -2278,8 +2282,8 @@ def _generate_receipt_content(payment):
     lines = []
     width = 48  # 80mm thermal printer - full width utilization
     order = payment.order
-    restaurant = order.table_info.owner
-    
+    restaurant = order.table_info.owner if order.table_info else None
+
     # Get currency symbol for this owner/restaurant
     currency_symbol = '$'  # Default
     if isinstance(restaurant, User):
@@ -2294,13 +2298,15 @@ def _generate_receipt_content(payment):
                     currency_symbol = owner.get_currency_symbol()
         except Exception:
             pass
-    
+
     # Get restaurant name - use main restaurant name for branch staff
-    if restaurant.role and restaurant.role.name == 'branch_owner':
+    if not restaurant:
+        restaurant_name = "RESTAURANT NAME"
+    elif restaurant.role and restaurant.role.name == 'branch_owner':
         # For branch owners, show the main restaurant name
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
-            branch_owner=restaurant, 
+            branch_owner=restaurant,
             is_main_restaurant=False
         ).first()
         if branch_restaurant and branch_restaurant.parent_restaurant:
@@ -2309,12 +2315,12 @@ def _generate_receipt_content(payment):
             restaurant_name = (restaurant.restaurant_name or "RESTAURANT NAME").upper()
     else:
         restaurant_name = (restaurant.restaurant_name or "RESTAURANT NAME").upper()
-    
+
     # Restaurant Header - EXACTLY like HTML
     lines.append(restaurant_name.center(width))
-    
+
     # Description - EXACTLY like HTML
-    if restaurant.restaurant_description:
+    if restaurant and restaurant.restaurant_description:
         lines.append(restaurant.restaurant_description.center(width))
     else:
         lines.append("Cashier Food & Service".center(width))
@@ -2330,8 +2336,8 @@ def _generate_receipt_content(payment):
     lines.append(f"Order: {order.order_number}")
     lines.append(f"Date: {timezone.localtime(timezone.now()).strftime('%b %d, %Y')}")
     lines.append(f"Time: {timezone.localtime(timezone.now()).strftime('%H:%M')}")
-    lines.append(f"Table: {order.table_info.tbl_no or 'Takeaway'}")
-    
+    lines.append(f"Table: {(order.table_info.tbl_no if order.table_info else None) or 'Takeaway'}")
+
     # Processed by (with role) - exactly like HTML
     processor = payment.processed_by
     if processor:
@@ -2360,26 +2366,26 @@ def _generate_receipt_content(payment):
     for item in _items:
         item_total = item.get_subtotal()
         qty_str = f"{item.quantity}x"
-        item_name = item.product.name[:width-16]  # Truncate long names
+        item_name = (item.product.name if item.product else '[deleted]')[:width-16]
         price_str = f"{currency_symbol}{float(item_total):.2f}"
-        
+
         # Format: "2x Item Name..................$10.00"
         name_section = f"{qty_str:4} {item_name}"
         dots_needed = width - len(name_section) - len(price_str)
-        line = name_section + ("." * dots_needed) + price_str
+        line = name_section + ("." * max(0, dots_needed)) + price_str
         lines.append(line)
-    
+
     # Dotted separator - EXACTLY like HTML
     lines.append("-" * width)
     # Totals — computed from already-fetched items (no extra SQL)
     subtotal = sum(item.get_subtotal() for item in _items)
     discount = Decimal('0')
     for item in _items:
-        if hasattr(item.product, 'get_active_promotion'):
+        if item.product and hasattr(item.product, 'get_active_promotion'):
             _promo = item.product.get_active_promotion()
             if _promo:
                 discount += item.product.price * (_promo.discount_percentage / Decimal('100')) * item.quantity
-    tax_rate = order.table_info.get_tax_rate()
+    tax_rate = order.table_info.get_tax_rate() if order.table_info else Decimal('0')
     tax_amount = subtotal * tax_rate
     tax_percentage = float(tax_rate * 100)
     total = subtotal + tax_amount

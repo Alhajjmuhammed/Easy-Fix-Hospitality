@@ -950,9 +950,9 @@ def cashier_reports(request):
         
         for order in orders:
             _items = list(order.order_items.all())  # read prefetch cache once
-            items_list = ', '.join([f"{item.quantity}x {_safe_csv(item.product.name)}" for item in _items])
-            categories = ', '.join(set([_safe_csv(item.product.main_category.name) for item in _items if item.product.main_category]))
-            stations = ', '.join(set([item.product.get_station_display() for item in _items]))
+            items_list = ', '.join([f"{item.quantity}x {_safe_csv(item.product.name if item.product else '[deleted]')}" for item in _items])
+            categories = ', '.join(set([_safe_csv(item.product.main_category.name) for item in _items if item.product and item.product.main_category]))
+            stations = ', '.join(set([item.product.get_station_display() for item in _items if item.product]))
             
             # Get paid by information — use prefetch cache (.all() not .filter())
             paid_by_list = []
@@ -970,7 +970,7 @@ def cashier_reports(request):
                 order.order_number,
                 order.created_at.strftime('%Y-%m-%d'),
                 order.created_at.strftime('%H:%M:%S'),
-                order.table_info.tbl_no,
+                order.table_info.tbl_no if order.table_info else 'N/A',
                 items_list,
                 categories,
                 stations,
@@ -1041,12 +1041,12 @@ def cashier_reports(request):
         
         for order in orders:
             _items = list(order.order_items.all())  # read prefetch cache once
-            items_str = ', '.join([f"{item.quantity}x {item.product.name[:15]}" for item in _items[:3]])
+            items_str = ', '.join([f"{item.quantity}x {(item.product.name if item.product else '[deleted]')[:15]}" for item in _items[:3]])
             if len(_items) > 3:
                 items_str += '...'
 
-            categories = ', '.join(set([item.product.main_category.name[:15] for item in _items if item.product.main_category]))
-            stations = ', '.join(set([item.product.get_station_display()[:10] for item in _items]))
+            categories = ', '.join(set([item.product.main_category.name[:15] for item in _items if item.product and item.product.main_category]))
+            stations = ', '.join(set([item.product.get_station_display()[:10] for item in _items if item.product]))
             
             # Get paid by information — use prefetch cache (.all() not .filter())
             paid_by_list = []
@@ -1063,7 +1063,7 @@ def cashier_reports(request):
             table_data.append([
                 order.order_number[:15],
                 order.created_at.strftime('%Y-%m-%d %H:%M'),
-                order.table_info.tbl_no,
+                order.table_info.tbl_no if order.table_info else 'N/A',
                 items_str[:30],
                 categories[:20],
                 stations[:15],

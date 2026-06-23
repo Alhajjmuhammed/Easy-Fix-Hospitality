@@ -44,8 +44,8 @@ def _notify_ws(order, updated_by_user, event_type='order_status_update'):
     # ── Capture all data now, before handing off to on_commit ────────────────
     _order_id       = order.id
     _order_number   = order.order_number
-    _owner_id       = order.table_info.owner_id
-    _table_no       = str(order.table_info.tbl_no)
+    _owner_id       = order.table_info.owner_id if order.table_info else None
+    _table_no       = str(order.table_info.tbl_no) if order.table_info else 'N/A'
     _status         = order.status
     _status_display = order.get_status_display()
     _items_count    = order.order_items.count()
