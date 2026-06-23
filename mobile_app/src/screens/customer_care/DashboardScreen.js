@@ -20,7 +20,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiCancelOrder, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiTables } from '../../api/tables';
 import { apiBillRequests, apiCompleteBillRequest } from '../../api/billRequests';
-import { getOrders } from '../../database/operations';
+import { getOrders, cacheOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -178,6 +178,7 @@ export default function CCDashboardScreen({ navigation }) {
           cancelled: orders.filter((o) => o.status === 'cancelled').length,
         });
         setIsOffline(false);
+        try { await cacheOrders(orders); } catch { /* best-effort */ }
       } else {
         const cached = await getOrders();
         setRecentOrders(cached.slice(0, 10));

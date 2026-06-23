@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useOrderWebSocket } from '../../hooks/useOrderWebSocket';
 import { apiOrderDetail, apiCancelOrder } from '../../api/orders';
 import { apiCreateBillRequest } from '../../api/billRequests';
-import { saveOfflineBillRequest, getOrderById } from '../../database/operations';
+import { saveOfflineBillRequest, getOrderById, cacheOrders } from '../../database/operations';
 import NetInfo from '@react-native-community/netinfo';
 import { useSyncStore } from '../../store/useSyncStore';
 
@@ -88,6 +88,7 @@ export default function OrderTrackingScreen({ route }) {
         const data = await apiOrderDetail(orderId);
         setOrder(data);
         setIsOffline(false);
+        try { await cacheOrders([data]); } catch { /* best-effort */ }
       } else {
         setIsOffline(true);
         const cached = await getOrderById(orderId);

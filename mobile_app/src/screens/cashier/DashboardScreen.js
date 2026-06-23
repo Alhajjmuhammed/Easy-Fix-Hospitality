@@ -9,7 +9,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
-import { getOrders } from '../../database/operations';
+import { getOrders, cacheOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 
 const PAYMENT_METHODS = [
@@ -83,8 +83,10 @@ export default function CashierDashboardScreen({ navigation }) {
           ? { status: 'pending,confirmed,preparing,ready' }
           : {};
         const data = await apiOrders(params);
-        setOrders(Array.isArray(data) ? data : data.results || []);
+        const fetched = Array.isArray(data) ? data : data.results || [];
+        setOrders(fetched);
         setIsOffline(false);
+        try { await cacheOrders(fetched); } catch { /* best-effort */ }
       } else {
         const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'served'];
         const cached = await getOrders(filter === 'active' ? activeStatuses : null);

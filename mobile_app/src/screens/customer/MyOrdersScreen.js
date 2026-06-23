@@ -16,7 +16,7 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiCancelOrder } from '../../api/orders';
-import { getOrders } from '../../database/operations';
+import { getOrders, cacheOrders } from '../../database/operations';
 import { useCartStore } from '../../store/useCartStore';
 
 const STATUS_COLORS = {
@@ -64,8 +64,10 @@ export default function MyOrdersScreen() {
       const net = await NetInfo.fetch();
       if (net.isConnected) {
         const data = await apiOrders();
-        setOrders(Array.isArray(data) ? data : data.results || []);
+        const fetched = Array.isArray(data) ? data : data.results || [];
+        setOrders(fetched);
         setIsOffline(false);
+        try { await cacheOrders(fetched); } catch { /* best-effort */ }
       } else {
         const cached = await getOrders();
         setOrders(cached);

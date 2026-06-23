@@ -313,14 +313,89 @@ export const saveOrders = async (orders) => {
   }
 
   // Prune orders that are no longer active (paid, cancelled, etc.).
-  // The pull only returns active orders, so anything not in this list is stale.
+  // Only prune when the server actually returned a non-empty list — if the list
+  // is empty it just means no active orders right now; don't wipe the whole cache.
   if (orders.length > 0) {
     const ids = orders.map((o) => o.id);
     const placeholders = ids.map(() => '?').join(',');
     await dbExec(`DELETE FROM orders WHERE id NOT IN (${placeholders})`, ids);
-  } else {
-    // No active orders — wipe the whole cache so stale entries don't linger.
-    await dbExec('DELETE FROM orders');
+  }
+};
+
+/**
+ * Upsert orders into the local cache without pruning anything.
+ * Call this after every successful apiOrders() / apiOrderDetail() call so the
+ * cache stays fresh even if a full sync hasn't run yet.
+ */
+export const cacheOrders = async (orders) => {
+  if (!orders || !orders.length) return;
+  const ts = now();
+  for (const o of orders) {
+    await dbExec(
+      `INSERT INTO orders (
+         id, order_number, table_info, table_number,
+         ordered_by_name, confirmed_by_name, status, payment_status,
+         total_amount, subtotal, tax_amount, discount_amount, total,
+         total_paid, balance_due, items_count,
+         special_instructions, reason_if_cancelled,
+         created_at, updated_at,
+         items_json, payments_json,
+         pending_bill_requested, pending_bill_requested_at,
+         synced_at
+       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET
+         order_number              = excluded.order_number,
+         table_info                = excluded.table_info,
+         table_number              = excluded.table_number,
+         ordered_by_name           = excluded.ordered_by_name,
+         confirmed_by_name         = excluded.confirmed_by_name,
+         status                    = excluded.status,
+         payment_status            = excluded.payment_status,
+         total_amount              = excluded.total_amount,
+         subtotal                  = excluded.subtotal,
+         tax_amount                = excluded.tax_amount,
+         discount_amount           = excluded.discount_amount,
+         total                     = excluded.total,
+         total_paid                = excluded.total_paid,
+         balance_due               = excluded.balance_due,
+         items_count               = excluded.items_count,
+         special_instructions      = excluded.special_instructions,
+         reason_if_cancelled       = excluded.reason_if_cancelled,
+         created_at                = excluded.created_at,
+         updated_at                = excluded.updated_at,
+         items_json                = excluded.items_json,
+         payments_json             = excluded.payments_json,
+         pending_bill_requested    = excluded.pending_bill_requested,
+         pending_bill_requested_at = excluded.pending_bill_requested_at,
+         synced_at                 = excluded.synced_at`,
+      [
+        o.id,
+        o.order_number || '',
+        o.table_info || null,
+        o.table_number || 'N/A',
+        o.ordered_by_name || '',
+        o.confirmed_by_name || null,
+        o.status || '',
+        o.payment_status || '',
+        o.total_amount ?? 0,
+        o.subtotal ?? 0,
+        o.tax_amount ?? 0,
+        o.discount_amount ?? 0,
+        o.total ?? 0,
+        o.total_paid ?? 0,
+        o.balance_due ?? 0,
+        o.items_count ?? 0,
+        o.special_instructions || '',
+        o.reason_if_cancelled || '',
+        o.created_at || ts,
+        o.updated_at || ts,
+        JSON.stringify(o.items || []),
+        JSON.stringify(o.payments || []),
+        o.pending_bill_requested ? 1 : 0,
+        o.pending_bill_requested_at || null,
+        ts,
+      ],
+    );
   }
 };
 
