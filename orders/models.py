@@ -152,7 +152,8 @@ class OrderItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"{self.quantity}x {self.product.name} for Order {self.order.order_number}"
+        product_name = self.product.name if self.product else '[deleted product]'
+        return f"{self.quantity}x {product_name} for Order {self.order.order_number}"
     
     def get_subtotal(self):
         return self.quantity * self.unit_price
@@ -166,7 +167,7 @@ class OrderItem(models.Model):
         return self.get_subtotal()
     
     def save(self, *args, **kwargs):
-        if self.unit_price is None:
+        if self.unit_price is None and self.product:
             self.unit_price = self.product.price
         super().save(*args, **kwargs)
 

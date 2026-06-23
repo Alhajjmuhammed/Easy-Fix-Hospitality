@@ -1426,6 +1426,7 @@ def edit_main_category(request, category_id):
 
 @login_required
 @require_POST
+@transaction.atomic
 def delete_main_category(request, category_id):
     """Delete a main category"""
     if not (request.user.is_administrator() or request.user.is_owner() or 
@@ -1698,6 +1699,7 @@ def edit_subcategory(request, subcategory_id):
 
 @login_required
 @require_POST
+@transaction.atomic
 def delete_subcategory(request, subcategory_id):
     """Delete a subcategory"""
     if not (request.user.is_administrator() or request.user.is_owner() or 
@@ -2357,6 +2359,7 @@ def toggle_product_availability(request, product_id):
 
 @login_required
 @require_http_methods(["POST"])
+@transaction.atomic
 def delete_product(request, product_id):
     """Delete product"""
     if not (request.user.is_administrator() or request.user.is_owner() or 
@@ -2865,6 +2868,7 @@ def toggle_user_status(request, user_id):
 
 @login_required
 @require_POST
+@transaction.atomic
 def delete_user(request, user_id):
     """Delete a user"""
     if not (request.user.is_administrator() or request.user.is_owner() or 
@@ -3434,6 +3438,7 @@ def toggle_table_status(request):
 
 @login_required
 @require_http_methods(["POST"])
+@transaction.atomic
 def delete_table(request):
     """Delete table"""
     if not (request.user.is_administrator() or request.user.is_owner() or 
@@ -3738,6 +3743,7 @@ def edit_order(request, order_id):
 
 @login_required
 @require_http_methods(["POST"])
+@transaction.atomic
 def delete_order(request, order_id):
     """Delete order"""
     if not (request.user.is_administrator() or request.user.is_owner() or 
