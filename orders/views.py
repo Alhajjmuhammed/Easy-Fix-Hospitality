@@ -712,6 +712,7 @@ def place_order(request):
                 order_item_stations = {
                     item.product.station
                     for item in order.order_items.select_related('product').all()
+                    if item.product
                 }
                 has_kitchen_items = 'kitchen' in order_item_stations
                 has_bar_items = 'bar' in order_item_stations
@@ -795,7 +796,7 @@ def order_confirmation(request, order_id):
 
     # Fetch items once using the prefetch cache — no additional DB hits
     items = list(order.order_items.all())
-    stations = {item.product.station for item in items}
+    stations = {item.product.station for item in items if item.product}
     has_kitchen_items = 'kitchen' in stations
     has_bar_items = 'bar' in stations
     
@@ -1296,7 +1297,7 @@ def kitchen_reports(request):
     
     for order in orders_with_kitchen_items:
         for item in order.order_items.all():
-            if item.product.station == 'kitchen':
+            if item.product and item.product.station == 'kitchen':
                 total_items += item.quantity
                 product_name = item.product.name
                 if product_name in items_by_product:
@@ -1408,7 +1409,7 @@ def bar_reports(request):
     
     for order in orders_with_bar_items:
         for item in order.order_items.all():
-            if item.product.station == 'bar':
+            if item.product and item.product.station == 'bar':
                 total_items += item.quantity
                 product_name = item.product.name
                 if product_name in items_by_product:
@@ -1518,7 +1519,7 @@ def buffet_reports(request):
 
     for order in orders_with_buffet_items:
         for item in order.order_items.all():
-            if item.product.station == 'buffet':
+            if item.product and item.product.station == 'buffet':
                 total_items += item.quantity
                 product_name = item.product.name
                 if product_name in items_by_product:
@@ -1626,7 +1627,7 @@ def service_reports(request):
 
     for order in orders_with_service_items:
         for item in order.order_items.all():
-            if item.product.station == 'service':
+            if item.product and item.product.station == 'service':
                 total_items += item.quantity
                 product_name = item.product.name
                 if product_name in items_by_product:
@@ -1751,25 +1752,25 @@ def update_order_status(request, order_id):
 
         # Check if bar staff is trying to update an order without bar items
         if request.user.is_bar_staff():
-            has_bar_items = any(item.product.station == 'bar' for item in _order_items)
+            has_bar_items = any(item.product and item.product.station == 'bar' for item in _order_items)
             if not has_bar_items:
                 return JsonResponse({'success': False, 'message': 'Access denied. This order contains no bar items.'})
 
         # Check if kitchen staff is trying to update an order without kitchen items
         if request.user.is_kitchen_staff():
-            has_kitchen_items = any(item.product.station == 'kitchen' for item in _order_items)
+            has_kitchen_items = any(item.product and item.product.station == 'kitchen' for item in _order_items)
             if not has_kitchen_items:
                 return JsonResponse({'success': False, 'message': 'Access denied. This order contains no kitchen items.'})
 
         # Check if buffet staff is trying to update an order without buffet items
         if request.user.is_buffet_staff():
-            has_buffet_items = any(item.product.station == 'buffet' for item in _order_items)
+            has_buffet_items = any(item.product and item.product.station == 'buffet' for item in _order_items)
             if not has_buffet_items:
                 return JsonResponse({'success': False, 'message': 'Access denied. This order contains no buffet items.'})
 
         # Check if service staff is trying to update an order without service items
         if request.user.is_service_staff():
-            has_service_items = any(item.product.station == 'service' for item in _order_items)
+            has_service_items = any(item.product and item.product.station == 'service' for item in _order_items)
             if not has_service_items:
                 return JsonResponse({'success': False, 'message': 'Access denied. This order contains no service items.'})
         
@@ -3098,7 +3099,8 @@ def mark_bill_request_completed(request, request_id):
         bill_request.completed_at = timezone.now()
         bill_request.save()
         
-        messages.success(request, f'Bill request for Table {bill_request.table_info.tbl_no} marked as completed.')
+        tbl_no = bill_request.table_info.tbl_no if bill_request.table_info else 'N/A'
+        messages.success(request, f'Bill request for Table {tbl_no} marked as completed.')
         
     except BillRequest.DoesNotExist:
         messages.error(request, 'Bill request not found.')
@@ -3590,10 +3592,10 @@ def customer_care_reports(request):
             stations_list = []
             
             for item in order.order_items.all():
-                items_list.append(f"{_safe_csv(item.product.name)} x{item.quantity}")
-                categories_list.append(_safe_csv(item.product.main_category.name) if item.product.main_category else '-')
-                subcategories_list.append(_safe_csv(item.product.sub_category.name) if item.product.sub_category else '-')
-                stations_list.append(item.product.station.upper() if item.product.station else '-')
+                items_list.append(f"{_safe_csv(item.product.name if item.product else '[deleted]')} x{item.quantity}")
+                categories_list.append(_safe_csv(item.product.main_category.name) if item.product and item.product.main_category else '-')
+                subcategories_list.append(_safe_csv(item.product.sub_category.name) if item.product and item.product.sub_category else '-')
+                stations_list.append(item.product.station.upper() if item.product and item.product.station else '-')
             
             writer.writerow([
                 order.order_number,
@@ -3666,7 +3668,7 @@ def customer_care_reports(request):
         
         for order in orders:
             _items = list(order.order_items.all())  # Uses prefetch cache
-            items_str = ', '.join([f"{item.product.name} x{item.quantity}" for item in _items[:3]])
+            items_str = ', '.join([f"{(item.product.name if item.product else '[deleted]')} x{item.quantity}" for item in _items[:3]])
             if len(_items) > 3:
                 items_str += '...'
             
@@ -3783,7 +3785,7 @@ def cancel_order_item(request, item_id):
         reason = data.get('reason', 'Item cancelled by staff').strip()
         
         # Store item details before deletion
-        item_name = item.product.name
+        item_name = item.product.name if item.product else '[deleted product]'
         item_quantity = item.quantity
         item_price = item.unit_price
         item_total = item.get_subtotal()

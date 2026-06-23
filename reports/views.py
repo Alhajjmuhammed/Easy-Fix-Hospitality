@@ -224,16 +224,16 @@ def dashboard(request):
     # Helper functions for station detection
     # Helper functions for station analysis
     def has_kitchen_items(order):
-        return any(item.product.station == 'kitchen' for item in order.order_items.all())
-    
+        return any(item.product and item.product.station == 'kitchen' for item in order.order_items.all())
+
     def has_bar_items(order):
-        return any(item.product.station == 'bar' for item in order.order_items.all())
-    
+        return any(item.product and item.product.station == 'bar' for item in order.order_items.all())
+
     def has_buffet_items(order):
-        return any(item.product.station == 'buffet' for item in order.order_items.all())
-    
+        return any(item.product and item.product.station == 'buffet' for item in order.order_items.all())
+
     def has_service_items(order):
-        return any(item.product.station == 'service' for item in order.order_items.all())
+        return any(item.product and item.product.station == 'service' for item in order.order_items.all())
 
     # Calculate summary data with optimized queries
     total_orders = orders.count()
@@ -1082,42 +1082,42 @@ def export_csv(request):
         elif subcategory_id != 'all':
             # Filter by subcategory
             for item in all_items:
-                if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
+                if item.product and item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
                     filtered_items.append(item)
         elif category_id != 'all':
             # Filter by category
             for item in all_items:
-                if str(item.product.main_category_id) == str(category_id):
+                if item.product and str(item.product.main_category_id) == str(category_id):
                     filtered_items.append(item)
         elif station_filter != 'all':
             # Filter by station
             for item in all_items:
-                if item.product.station == station_filter:
+                if item.product and item.product.station == station_filter:
                     filtered_items.append(item)
         else:
             # No filter - show all items
             filtered_items = all_items
         
         # Items column: shows filtered items
-        items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items])
-        
+        items_list = ', '.join([f"{(item.product.name if item.product else '[deleted]')} x{item.quantity}" for item in filtered_items])
+
         # Categories column: if filter active show filter name, else show ALL categories from ALL items
         if selected_category_name:
             categories_list = selected_category_name
         else:
-            categories_list = ', '.join(set([item.product.main_category.name for item in all_items])) if all_items else ''
-        
+            categories_list = ', '.join(set([item.product.main_category.name for item in all_items if item.product and item.product.main_category])) if all_items else ''
+
         # SubCategories column: if filter active show filter name, else show ALL subcategories from ALL items
         if selected_subcategory_name:
             subcategories_list = selected_subcategory_name
         else:
-            subcategories_list = ', '.join(set([item.product.sub_category.name if item.product.sub_category else '-' for item in all_items])) if all_items else ''
-        
+            subcategories_list = ', '.join(set([item.product.sub_category.name if item.product and item.product.sub_category else '-' for item in all_items])) if all_items else ''
+
         # Stations column: if filter active show filter name, else show ALL stations from ALL items
         if station_filter != 'all':
             stations_list = station_filter.title()
         else:
-            stations_list = ', '.join(set([item.product.station.title() for item in all_items])) if all_items else ''
+            stations_list = ', '.join(set([item.product.station.title() for item in all_items if item.product and item.product.station])) if all_items else ''
         
         table_number = order.table_info.tbl_no if order.table_info else '-'
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
@@ -1745,17 +1745,17 @@ def export_pdf(request):
         elif subcategory_id != 'all':
             # Filter by subcategory
             for item in all_items:
-                if item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
+                if item.product and item.product.sub_category and str(item.product.sub_category_id) == str(subcategory_id):
                     filtered_items.append(item)
         elif category_id != 'all':
             # Filter by category
             for item in all_items:
-                if str(item.product.main_category_id) == str(category_id):
+                if item.product and str(item.product.main_category_id) == str(category_id):
                     filtered_items.append(item)
         elif station_filter != 'all':
             # Filter by station
             for item in all_items:
-                if item.product.station == station_filter:
+                if item.product and item.product.station == station_filter:
                     filtered_items.append(item)
         else:
             # No filter - show all items

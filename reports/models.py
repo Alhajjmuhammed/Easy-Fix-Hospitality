@@ -97,7 +97,8 @@ class ProductSalesDetail(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.product.name} - {self.quantity_sold} sold"
+        product_name = self.product.name if self.product else '[deleted product]'
+        return f"{product_name} - {self.quantity_sold} sold"
 
 
 class CashierPerformance(models.Model):

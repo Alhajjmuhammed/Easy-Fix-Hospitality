@@ -195,7 +195,8 @@ class BillRequest(models.Model):
         ]
     
     def __str__(self):
-        return f"Bill Request - Table {self.table_info.tbl_no} ({self.status})"
+        tbl = self.table_info.tbl_no if self.table_info else 'N/A'
+        return f"Bill Request - Table {tbl} ({self.status})"
 
     @property
     def owner(self):
