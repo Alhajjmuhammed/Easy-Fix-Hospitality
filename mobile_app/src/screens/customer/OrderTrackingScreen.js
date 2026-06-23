@@ -11,13 +11,14 @@ import {
   Dialog,
   Portal,
   TextInput,
+  Banner,
   useTheme,
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useOrderWebSocket } from '../../hooks/useOrderWebSocket';
 import { apiOrderDetail, apiCancelOrder } from '../../api/orders';
 import { apiCreateBillRequest } from '../../api/billRequests';
-import { saveOfflineBillRequest } from '../../database/operations';
+import { saveOfflineBillRequest, getOrderById } from '../../database/operations';
 import NetInfo from '@react-native-community/netinfo';
 import { useSyncStore } from '../../store/useSyncStore';
 
@@ -73,6 +74,7 @@ export default function OrderTrackingScreen({ route }) {
   const [loading, setLoading] = useState(true);
   const [billRequesting, setBillRequesting] = useState(false);
   const [snack, setSnack] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
 
   // Cancel dialog state
   const [cancelVisible, setCancelVisible] = useState(false);
@@ -81,10 +83,27 @@ export default function OrderTrackingScreen({ route }) {
 
   const fetchOrder = useCallback(async () => {
     try {
-      const data = await apiOrderDetail(orderId);
-      setOrder(data);
+      const net = await NetInfo.fetch();
+      if (net.isConnected) {
+        const data = await apiOrderDetail(orderId);
+        setOrder(data);
+        setIsOffline(false);
+      } else {
+        setIsOffline(true);
+        const cached = await getOrderById(orderId);
+        if (cached) setOrder(cached);
+      }
     } catch {
-      // Silently ignore poll errors
+      // Network error — try cache
+      try {
+        const cached = await getOrderById(orderId);
+        if (cached) {
+          setOrder(cached);
+          setIsOffline(true);
+        }
+      } catch {
+        // SQLite error — leave existing order state as-is
+      }
     } finally {
       setLoading(false);
     }
@@ -150,7 +169,9 @@ export default function OrderTrackingScreen({ route }) {
   if (!order) {
     return (
       <View style={styles.center}>
-        <Text style={{ fontFamily: 'Poppins_400Regular' }}>Order not found</Text>
+        <Text style={{ fontFamily: 'Poppins_400Regular' }}>
+          {isOffline ? 'You are offline – order not in local cache' : 'Order not found'}
+        </Text>
       </View>
     );
   }
@@ -168,6 +189,13 @@ export default function OrderTrackingScreen({ route }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+
+      {/* ── Offline banner ── */}
+      {isOffline && (
+        <Banner visible icon="wifi-off" actions={[]} style={{ backgroundColor: '#FFF8E1', marginBottom: 8 }}>
+          You are offline – showing last synced data. Live updates paused.
+        </Banner>
+      )}
 
       {/* ── Status header card ── */}
       <Card style={styles.statusCard}>

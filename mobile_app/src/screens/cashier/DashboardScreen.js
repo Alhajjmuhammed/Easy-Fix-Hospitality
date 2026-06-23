@@ -2,12 +2,14 @@
 import { View, FlatList, StyleSheet, RefreshControl, Alert } from 'react-native';
 import {
   Text, Card, Button, TextInput, Dialog, Portal, Chip,
-  ActivityIndicator, Snackbar, useTheme, SegmentedButtons, FAB, Divider, Menu,
+  ActivityIndicator, Snackbar, Banner, useTheme, SegmentedButtons, FAB, Divider, Menu,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
+import { getOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 
 const PAYMENT_METHODS = [
@@ -43,6 +45,7 @@ export default function CashierDashboardScreen({ navigation }) {
   const [filter,          setFilter]          = useState('active');
   const [updatingStatus,  setUpdatingStatus]  = useState(null);
   const [snack,           setSnack]           = useState('');
+  const [isOffline,       setIsOffline]       = useState(false);
 
   // Pay dialog
   const [payDialog,  setPayDialog]  = useState(null);
@@ -74,13 +77,29 @@ export default function CashierDashboardScreen({ navigation }) {
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const params = filter === 'active'
-        ? { status: 'pending,confirmed,preparing,ready' }
-        : {};
-      const data = await apiOrders(params);
-      setOrders(Array.isArray(data) ? data : data.results || []);
+      const net = await NetInfo.fetch();
+      if (net.isConnected) {
+        const params = filter === 'active'
+          ? { status: 'pending,confirmed,preparing,ready' }
+          : {};
+        const data = await apiOrders(params);
+        setOrders(Array.isArray(data) ? data : data.results || []);
+        setIsOffline(false);
+      } else {
+        const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'served'];
+        const cached = await getOrders(filter === 'active' ? activeStatuses : null);
+        setOrders(cached);
+        setIsOffline(true);
+      }
     } catch {
-      setSnack('Could not load orders');
+      // Network error — fall back to cache
+      try {
+        const cached = await getOrders(['pending', 'confirmed', 'preparing', 'ready', 'served']);
+        setOrders(cached);
+      } catch {
+        setOrders([]);
+      }
+      setIsOffline(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -221,6 +240,14 @@ export default function CashierDashboardScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1' }}
+      >
+        You are offline – showing cached orders. Changes require connection.
+      </Banner>
       <SegmentedButtons
         value={filter}
         onValueChange={setFilter}

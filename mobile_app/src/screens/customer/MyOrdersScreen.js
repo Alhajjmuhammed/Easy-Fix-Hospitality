@@ -10,10 +10,13 @@ import {
   Portal,
   TextInput,
   Snackbar,
+  Banner,
   useTheme,
 } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiCancelOrder } from '../../api/orders';
+import { getOrders } from '../../database/operations';
 import { useCartStore } from '../../store/useCartStore';
 
 const STATUS_COLORS = {
@@ -46,6 +49,7 @@ export default function MyOrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reorderingId, setReorderingId] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   // Cancel dialog state
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -57,10 +61,25 @@ export default function MyOrdersScreen() {
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await apiOrders();
-      setOrders(Array.isArray(data) ? data : data.results || []);
+      const net = await NetInfo.fetch();
+      if (net.isConnected) {
+        const data = await apiOrders();
+        setOrders(Array.isArray(data) ? data : data.results || []);
+        setIsOffline(false);
+      } else {
+        const cached = await getOrders();
+        setOrders(cached);
+        setIsOffline(true);
+      }
     } catch {
-      // best-effort
+      // Network error — fall back to cache
+      try {
+        const cached = await getOrders();
+        setOrders(cached);
+      } catch {
+        setOrders([]);
+      }
+      setIsOffline(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -138,6 +157,16 @@ export default function MyOrdersScreen() {
 
   return (
     <>
+      {/* ── Offline banner ── */}
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={styles.offlineBanner}
+      >
+        You are offline – showing your last synced orders.
+      </Banner>
+
       {/* ── Filter tabs ── */}
       <ScrollView
         horizontal
@@ -335,6 +364,7 @@ export default function MyOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
+  offlineBanner: { backgroundColor: '#FFF8E1' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   filterBar: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
   filterChip: { backgroundColor: '#F5F5F5', borderRadius: 20 },

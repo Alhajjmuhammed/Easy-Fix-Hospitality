@@ -234,6 +234,128 @@ export const markBillRequestSynced = (offlineId, serverId) =>
     [serverId, offlineId],
   );
 
+// ── Cached Orders (from server pull) ─────────────────────────────────────────
+
+/**
+ * Upsert a list of server orders into the local SQLite cache.
+ * Called after every successful sync pull so the app can display orders offline.
+ */
+export const saveOrders = async (orders) => {
+  const ts = now();
+
+  // Upsert every order in the pulled list
+  for (const o of orders) {
+    await dbExec(
+      `INSERT INTO orders (
+         id, order_number, table_info, table_number,
+         ordered_by_name, confirmed_by_name, status, payment_status,
+         total_amount, subtotal, tax_amount, discount_amount, total,
+         total_paid, balance_due, items_count,
+         special_instructions, reason_if_cancelled,
+         created_at, updated_at,
+         items_json, payments_json,
+         pending_bill_requested, pending_bill_requested_at,
+         synced_at
+       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET
+         order_number              = excluded.order_number,
+         table_info                = excluded.table_info,
+         table_number              = excluded.table_number,
+         ordered_by_name           = excluded.ordered_by_name,
+         confirmed_by_name         = excluded.confirmed_by_name,
+         status                    = excluded.status,
+         payment_status            = excluded.payment_status,
+         total_amount              = excluded.total_amount,
+         subtotal                  = excluded.subtotal,
+         tax_amount                = excluded.tax_amount,
+         discount_amount           = excluded.discount_amount,
+         total                     = excluded.total,
+         total_paid                = excluded.total_paid,
+         balance_due               = excluded.balance_due,
+         items_count               = excluded.items_count,
+         special_instructions      = excluded.special_instructions,
+         reason_if_cancelled       = excluded.reason_if_cancelled,
+         created_at                = excluded.created_at,
+         updated_at                = excluded.updated_at,
+         items_json                = excluded.items_json,
+         payments_json             = excluded.payments_json,
+         pending_bill_requested    = excluded.pending_bill_requested,
+         pending_bill_requested_at = excluded.pending_bill_requested_at,
+         synced_at                 = excluded.synced_at`,
+      [
+        o.id,
+        o.order_number || '',
+        o.table_info || null,
+        o.table_number || 'N/A',
+        o.ordered_by_name || '',
+        o.confirmed_by_name || null,
+        o.status || '',
+        o.payment_status || '',
+        o.total_amount ?? 0,
+        o.subtotal ?? 0,
+        o.tax_amount ?? 0,
+        o.discount_amount ?? 0,
+        o.total ?? 0,
+        o.total_paid ?? 0,
+        o.balance_due ?? 0,
+        o.items_count ?? 0,
+        o.special_instructions || '',
+        o.reason_if_cancelled || '',
+        o.created_at || ts,
+        o.updated_at || ts,
+        JSON.stringify(o.items || []),
+        JSON.stringify(o.payments || []),
+        o.pending_bill_requested ? 1 : 0,
+        o.pending_bill_requested_at || null,
+        ts,
+      ],
+    );
+  }
+
+  // Prune orders that are no longer active (paid, cancelled, etc.).
+  // The pull only returns active orders, so anything not in this list is stale.
+  if (orders.length > 0) {
+    const ids = orders.map((o) => o.id);
+    const placeholders = ids.map(() => '?').join(',');
+    await dbExec(`DELETE FROM orders WHERE id NOT IN (${placeholders})`, ids);
+  } else {
+    // No active orders — wipe the whole cache so stale entries don't linger.
+    await dbExec('DELETE FROM orders');
+  }
+};
+
+/** Parse a raw SQLite row back into the shape the screens expect. */
+const _parseOrder = (row) => ({
+  ...row,
+  items:                   JSON.parse(row.items_json || '[]'),
+  payments:                JSON.parse(row.payments_json || '[]'),
+  pending_bill_requested:  !!row.pending_bill_requested,
+});
+
+/**
+ * Return cached orders, optionally filtered by one or more statuses.
+ * @param {string[]|null} statuses  e.g. ['pending','confirmed'] — null = all
+ */
+export const getOrders = async (statuses = null) => {
+  let rows;
+  if (statuses && statuses.length) {
+    const placeholders = statuses.map(() => '?').join(',');
+    rows = await dbQuery(
+      `SELECT * FROM orders WHERE status IN (${placeholders}) ORDER BY created_at DESC`,
+      statuses,
+    );
+  } else {
+    rows = await dbQuery('SELECT * FROM orders ORDER BY created_at DESC');
+  }
+  return rows.map(_parseOrder);
+};
+
+/** Return a single cached order by server ID, or null if not found. */
+export const getOrderById = async (id) => {
+  const rows = await dbQuery('SELECT * FROM orders WHERE id = ?', [id]);
+  return rows.length ? _parseOrder(rows[0]) : null;
+};
+
 // ── Security: clear all user-specific local data on logout ───────────────────
 // Must be called every time a user logs out to prevent data leaking to the
 // next user who logs in on the same device (different user, different restaurant).
@@ -242,9 +364,10 @@ export const clearAllUserData = async () => {
   await dbExec('DELETE FROM offline_orders');
   await dbExec('DELETE FROM offline_payments');
   await dbExec('DELETE FROM offline_bill_requests');
-  // Clear cached menu and table data — next user may belong to a different restaurant
+  // Clear cached server data — next user may belong to a different restaurant
   await dbExec("DELETE FROM sync_meta WHERE key IN ('menu_json', 'menu_last_synced', 'tables_last_synced')");
   await dbExec('DELETE FROM categories');
   await dbExec('DELETE FROM products');
   await dbExec('DELETE FROM tables');
+  await dbExec('DELETE FROM orders');
 };

@@ -7,6 +7,7 @@ import {
   Chip,
   ActivityIndicator,
   Snackbar,
+  Banner,
   Divider,
   useTheme,
   Surface,
@@ -15,9 +16,11 @@ import {
   Dialog,
   TextInput,
 } from 'react-native-paper';
+import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiCancelOrder, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiTables } from '../../api/tables';
 import { apiBillRequests, apiCompleteBillRequest } from '../../api/billRequests';
+import { getOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -141,6 +144,7 @@ export default function CCDashboardScreen({ navigation }) {
   const [stats, setStats]               = useState({ total: 0, pending: 0, completed: 0, cancelled: 0 });
   const [completing, setCompleting]     = useState(null);
   const [snack, setSnack]               = useState('');
+  const [isOffline, setIsOffline]       = useState(false);
 
   // Per-card action menus
   const [menuOpenId, setMenuOpenId]       = useState(null);
@@ -158,24 +162,51 @@ export default function CCDashboardScreen({ navigation }) {
   const fetchAll = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [ordersData, billData] = await Promise.all([
-        apiOrders({ period: 'today' }),
-        apiBillRequests(),
-      ]);
-
-      const orders = Array.isArray(ordersData) ? ordersData : [];
-      setBillRequests(billData.bill_requests || []);
-      setRecentOrders(orders.slice(0, 10));
-
-      // Compute stats from today's orders
-      setStats({
-        total:     orders.length,
-        pending:   orders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
-        completed: orders.filter((o) => o.status === 'served').length,
-        cancelled: orders.filter((o) => o.status === 'cancelled').length,
-      });
+      const net = await NetInfo.fetch();
+      if (net.isConnected) {
+        const [ordersData, billData] = await Promise.all([
+          apiOrders({ period: 'today' }),
+          apiBillRequests(),
+        ]);
+        const orders = Array.isArray(ordersData) ? ordersData : [];
+        setBillRequests(billData.bill_requests || []);
+        setRecentOrders(orders.slice(0, 10));
+        setStats({
+          total:     orders.length,
+          pending:   orders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
+          completed: orders.filter((o) => o.status === 'served').length,
+          cancelled: orders.filter((o) => o.status === 'cancelled').length,
+        });
+        setIsOffline(false);
+      } else {
+        const cached = await getOrders();
+        setRecentOrders(cached.slice(0, 10));
+        setBillRequests([]);
+        setStats({
+          total:     cached.length,
+          pending:   cached.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
+          completed: cached.filter((o) => o.status === 'served').length,
+          cancelled: cached.filter((o) => o.status === 'cancelled').length,
+        });
+        setIsOffline(true);
+      }
     } catch {
-      setSnack('Could not load dashboard data');
+      // Network error — fall back to cache
+      try {
+        const cached = await getOrders();
+        setRecentOrders(cached.slice(0, 10));
+        setBillRequests([]);
+        setStats({
+          total:     cached.length,
+          pending:   cached.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
+          completed: cached.filter((o) => o.status === 'served').length,
+          cancelled: cached.filter((o) => o.status === 'cancelled').length,
+        });
+      } catch {
+        setRecentOrders([]);
+        setBillRequests([]);
+      }
+      setIsOffline(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -272,6 +303,16 @@ export default function CCDashboardScreen({ navigation }) {
         <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(true); }} />
       }
     >
+      {/* Offline banner */}
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1', marginHorizontal: -16, marginTop: -16, marginBottom: 8 }}
+      >
+        You are offline – showing cached orders. Bill requests unavailable.
+      </Banner>
+
       {/* Restaurant Banner */}
       <RestaurantBanner />
 

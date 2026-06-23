@@ -12,6 +12,7 @@ import {
   markBillRequestSynced,
   saveCategories,
   saveTables,
+  saveOrders,
   setSyncMeta,
 } from '../database/operations';
 
@@ -109,6 +110,7 @@ export const useSyncStore = create((set, get) => ({
       const pullData = await apiSyncPull();
       if (pullData.categories) await saveCategories(pullData.categories);
       if (pullData.tables) await saveTables(pullData.tables);
+      if (pullData.active_orders) await saveOrders(pullData.active_orders);
 
       const now = new Date().toISOString();
       await setSyncMeta('last_sync', now);

@@ -23,6 +23,7 @@
  *   - Requires WiFi + Print Client running on a Windows machine
  */
 
+import { Platform, PermissionsAndroid } from 'react-native';
 import client from '../api/client';
 import { printReceiptLocal, buildReceiptHtml, printTicketLocal } from './printReceipt';
 import { usePrinterStore } from '../store/usePrinterStore';
@@ -70,6 +71,50 @@ export function isBtClassicAvailable() {
 }
 
 /**
+ * Request Bluetooth runtime permissions required on Android 12+ (API 31+).
+ * On older Android, requests ACCESS_FINE_LOCATION which is needed for BT scanning.
+ * On iOS, permissions are declared in Info.plist — no runtime request needed.
+ * Returns true if permissions are granted, false otherwise.
+ */
+async function requestBluetoothPermissions() {
+  if (Platform.OS !== 'android') return true;
+
+  try {
+    if (Platform.Version >= 31) {
+      // Android 12+ — BLUETOOTH_SCAN and BLUETOOTH_CONNECT are runtime permissions
+      const results = await PermissionsAndroid.requestMultiple([
+        'android.permission.BLUETOOTH_SCAN',
+        'android.permission.BLUETOOTH_CONNECT',
+      ]);
+      const scanGranted    = results['android.permission.BLUETOOTH_SCAN']    === PermissionsAndroid.RESULTS.GRANTED;
+      const connectGranted = results['android.permission.BLUETOOTH_CONNECT'] === PermissionsAndroid.RESULTS.GRANTED;
+      return scanGranted && connectGranted;
+    } else {
+      // Android 6–11 — location permission required for BT discovery
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      );
+      return result === PermissionsAndroid.RESULTS.GRANTED;
+    }
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Ask the OS to turn Bluetooth on (Android only — shows a system dialog).
+ * Resolves when BT is enabled or the user dismisses the dialog.
+ */
+async function ensureBluetoothEnabled(BluetoothManager) {
+  if (Platform.OS !== 'android') return;
+  try {
+    await BluetoothManager.enableBluetooth();
+  } catch (_) {
+    // User denied or BT already on — continue either way
+  }
+}
+
+/**
  * Scan for paired + nearby Bluetooth devices.
  * Returns array of { address: string, name: string }.
  */
@@ -77,16 +122,30 @@ export async function scanBluetoothDevices() {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('Bluetooth Classic not available on this build. Run: npx expo prebuild');
 
+  // 1. Runtime permissions — required on Android 12+ before any BT operation
+  const granted = await requestBluetoothPermissions();
+  if (!granted) {
+    throw new Error(
+      'Bluetooth permission denied.\n\n' +
+      'Go to phone Settings → Apps → Easy Fix → Permissions and allow Nearby Devices (Bluetooth).',
+    );
+  }
+
   const { BluetoothManager } = mod;
+
+  // 2. Make sure Bluetooth is switched on
+  await ensureBluetoothEnabled(BluetoothManager);
+
+  // 3. Scan — library returns either a JSON string or a plain object depending on version
   const result = await BluetoothManager.scanDevices();
   const parsed = typeof result === 'string' ? JSON.parse(result) : result;
-  const found  = parsed.found  || [];
-  const paired = parsed.paired || [];
+  const found  = Array.isArray(parsed.found)  ? parsed.found  : [];
+  const paired = Array.isArray(parsed.paired) ? parsed.paired : [];
 
-  // Merge, deduplicate by address
+  // Merge found + paired, deduplicate by address
   const map = new Map();
   [...found, ...paired].forEach((d) => {
-    if (d.address) map.set(d.address, { address: d.address, name: d.name || d.address });
+    if (d && d.address) map.set(d.address, { address: d.address, name: d.name || d.address });
   });
   return Array.from(map.values());
 }
@@ -97,6 +156,16 @@ export async function scanBluetoothDevices() {
 export async function connectBluetoothPrinter(address) {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('Bluetooth Classic not available on this build.');
+
+  // Runtime permissions required before connecting on Android 12+
+  const granted = await requestBluetoothPermissions();
+  if (!granted) {
+    throw new Error(
+      'Bluetooth permission denied. Allow Nearby Devices in phone Settings → Apps → Permissions.',
+    );
+  }
+
+  await ensureBluetoothEnabled(mod.BluetoothManager);
   await mod.BluetoothManager.connect(address);
 }
 

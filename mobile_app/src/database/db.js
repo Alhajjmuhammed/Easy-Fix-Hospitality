@@ -105,6 +105,34 @@ export const initDatabase = async () => {
       key   TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS orders (
+      id                        INTEGER PRIMARY KEY,
+      order_number              TEXT,
+      table_info                INTEGER,
+      table_number              TEXT,
+      ordered_by_name           TEXT,
+      confirmed_by_name         TEXT,
+      status                    TEXT,
+      payment_status            TEXT,
+      total_amount              REAL,
+      subtotal                  REAL,
+      tax_amount                REAL,
+      discount_amount           REAL,
+      total                     REAL,
+      total_paid                REAL,
+      balance_due               REAL,
+      items_count               INTEGER,
+      special_instructions      TEXT,
+      reason_if_cancelled       TEXT,
+      created_at                TEXT,
+      updated_at                TEXT,
+      items_json                TEXT,
+      payments_json             TEXT,
+      pending_bill_requested    INTEGER DEFAULT 0,
+      pending_bill_requested_at TEXT,
+      synced_at                 TEXT
+    );
   `);
 
   // ── Schema migrations (safe to run on every start) ─────────────────────────
@@ -112,7 +140,40 @@ export const initDatabase = async () => {
   // ignore that error so this is idempotent on new and existing installs.
   try {
     await db.runAsync(`ALTER TABLE products ADD COLUMN station TEXT DEFAULT 'kitchen'`);
-  } catch (_) {
-    // Column already exists — nothing to do
-  }
+  } catch (_) {}
+
+  // Migration: add orders cache table for existing installs that pre-date this feature.
+  // CREATE TABLE IF NOT EXISTS in the block above already handles fresh installs;
+  // this covers the case where initDatabase was already called once before orders existed.
+  try {
+    await db.runAsync(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id                        INTEGER PRIMARY KEY,
+        order_number              TEXT,
+        table_info                INTEGER,
+        table_number              TEXT,
+        ordered_by_name           TEXT,
+        confirmed_by_name         TEXT,
+        status                    TEXT,
+        payment_status            TEXT,
+        total_amount              REAL,
+        subtotal                  REAL,
+        tax_amount                REAL,
+        discount_amount           REAL,
+        total                     REAL,
+        total_paid                REAL,
+        balance_due               REAL,
+        items_count               INTEGER,
+        special_instructions      TEXT,
+        reason_if_cancelled       TEXT,
+        created_at                TEXT,
+        updated_at                TEXT,
+        items_json                TEXT,
+        payments_json             TEXT,
+        pending_bill_requested    INTEGER DEFAULT 0,
+        pending_bill_requested_at TEXT,
+        synced_at                 TEXT
+      )
+    `);
+  } catch (_) {}
 };
