@@ -1003,6 +1003,7 @@ def edit_waste_log(request, log_id):
                 Q(product__main_category__owner=owner_filter) |
                 Q(product__main_category__restaurant__main_owner=owner_filter) |
                 Q(product__main_category__restaurant__branch_owner=owner_filter) |
+                Q(recorded_by=owner_filter) |
                 Q(recorded_by__owner=owner_filter)
             ),
             id=log_id
@@ -1063,6 +1064,7 @@ def delete_waste_log(request, log_id):
                 Q(product__main_category__owner=owner_filter) |
                 Q(product__main_category__restaurant__main_owner=owner_filter) |
                 Q(product__main_category__restaurant__branch_owner=owner_filter) |
+                Q(recorded_by=owner_filter) |
                 Q(recorded_by__owner=owner_filter)
             ),
             id=log_id
