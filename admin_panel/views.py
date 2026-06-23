@@ -83,23 +83,9 @@ def _cleanup_product_dependencies(product_ids):
 
 
 def get_production_qr_url(request, qr_code):
-    """
-    Helper function to generate the correct QR URL
-    - Local development: http://127.0.0.1:8000/r/{qr_code}/
-    - Production: https://hospitality.easyfixsoft.com/r/{qr_code}/
-    """
-    host = request.get_host()
-    
-    # Force HTTPS for production domains
-    if 'easyfixsoft.com' in host or '72.62.51.225' in host:
-        return f'https://hospitality.easyfixsoft.com/r/{qr_code}/'
-    
-    # Local development - use HTTP
-    if '127.0.0.1' in host or 'localhost' in host:
-        return f'http://{host}/r/{qr_code}/'
-    
-    # Fallback - use HTTPS with current host
-    return f'https://{host}/r/{qr_code}/'
+    """Build absolute QR URL using the current request scheme and host.
+    SECURE_PROXY_SSL_HEADER in production_settings ensures HTTPS is detected correctly."""
+    return request.build_absolute_uri(f'/r/{qr_code}/')
 
 
 @login_required

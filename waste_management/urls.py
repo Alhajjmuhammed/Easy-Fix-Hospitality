@@ -17,4 +17,6 @@ urlpatterns = [
     path('cost-settings/', views.cost_settings, name='cost_settings'),
     path('update-cost-settings/', views.update_cost_settings, name='update_cost_settings'),
     path('api/recent-records/', views.recent_waste_records, name='recent_records'),
+    path('edit/<int:log_id>/', views.edit_waste_log, name='edit_log'),
+    path('delete/<int:log_id>/', views.delete_waste_log, name='delete_log'),
 ]

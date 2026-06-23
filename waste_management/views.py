@@ -13,7 +13,7 @@ from django.http import JsonResponse, HttpResponse
 from django.db import models, transaction
 from django.db.models import Q, Sum, Count, Avg
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, TruncYear
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.utils import timezone
 from django.core.paginator import Paginator
 from datetime import datetime, timedelta, date
@@ -985,61 +985,101 @@ def record_food_waste(request):
     except Exception as e:
         logger.error(f"Error in record_food_waste: {str(e)}", exc_info=True)
         return JsonResponse({'error': 'An error occurred while recording waste.'}, status=500)
-        
-        if order_item_id:
-            order_item = get_object_or_404(OrderItem, id=order_item_id)
-            product = order_item.product
-        elif product_id:
-            product = get_object_or_404(Product, id=product_id)
-        
-        if not product:
-            return JsonResponse({'error': 'Product is required'}, status=400)
-        
-        # Calculate costs
-        cost_settings = ProductCostSettings.objects.filter(product=product).first()
-        if cost_settings:
-            ingredient_cost = cost_settings.ingredient_cost_per_unit * quantity_wasted
-            labor_cost = cost_settings.labor_cost_per_unit * quantity_wasted
-            overhead_cost = cost_settings.overhead_cost_per_unit * quantity_wasted
-        else:
-            # Default cost calculation (30% of menu price)
-            base_cost = product.price * Decimal('0.30') * quantity_wasted
-            ingredient_cost = base_cost * Decimal('0.60')
-            labor_cost = base_cost * Decimal('0.25')
-            overhead_cost = base_cost * Decimal('0.15')
-        
-        total_cost = ingredient_cost + labor_cost + overhead_cost
-        
-        # Create waste log
-        waste_log = FoodWasteLog.objects.create(
-            order=order,
-            order_item=order_item,
-            product=product,
-            quantity_wasted=quantity_wasted,
-            ingredient_cost=ingredient_cost,
-            labor_cost=labor_cost,
-            overhead_cost=overhead_cost,
-            total_cost=total_cost,
-            waste_reason=waste_reason,
-            disposal_method=disposal_method,
-            notes=notes,
-            recorded_by=request.user
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def edit_waste_log(request, log_id):
+    """Edit an existing waste log entry (quantity, reason, disposal method, notes)."""
+    if not (request.user.is_administrator() or request.user.is_owner() or
+            request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+
+    owner_filter = get_owner_filter(request.user)
+    if owner_filter:
+        waste_log = get_object_or_404(
+            FoodWasteLog.objects.filter(
+                Q(product__main_category__owner=owner_filter) |
+                Q(product__main_category__restaurant__main_owner=owner_filter) |
+                Q(product__main_category__restaurant__branch_owner=owner_filter) |
+                Q(recorded_by__owner=owner_filter)
+            ),
+            id=log_id
         )
-        
-        # Update order status if applicable
-        if order and waste_reason in ['customer_refused', 'customer_left']:
-            order.status = 'customer_refused'
-            order.save()
-        
+    else:
+        waste_log = get_object_or_404(FoodWasteLog, id=log_id)
+
+    try:
+        data = json.loads(request.body)
+
+        quantity_wasted = int(data.get('quantity_wasted', waste_log.quantity_wasted))
+        waste_reason = data.get('waste_reason', waste_log.waste_reason)
+        disposal_method = data.get('disposal_method', waste_log.disposal_method)
+        notes = data.get('notes', waste_log.notes)
+
+        if quantity_wasted <= 0:
+            return JsonResponse({'error': 'Quantity must be greater than zero'}, status=400)
+
+        waste_log.quantity_wasted = quantity_wasted
+        waste_log.waste_reason = waste_reason
+        waste_log.disposal_method = disposal_method
+        waste_log.notes = notes
+        waste_log.total_cost = Decimal('0.00')  # trigger recalculation
+        waste_log.save()
+
         return JsonResponse({
             'success': True,
-            'message': f'Waste recorded: {quantity_wasted}x {product.name} - ${total_cost}',
-            'waste_log_id': waste_log.id
+            'message': 'Waste log updated successfully',
+            'waste_log': {
+                'id': waste_log.id,
+                'quantity_wasted': waste_log.quantity_wasted,
+                'total_cost': float(waste_log.total_cost),
+                'waste_reason': waste_log.get_waste_reason_display(),
+                'disposal_method': waste_log.get_disposal_method_display(),
+            }
         })
-        
+
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid data'}, status=400)
     except Exception as e:
-        logger.error(f"Error recording waste: {str(e)}", exc_info=True)
-        return JsonResponse({'error': 'An error occurred while recording waste.'}, status=400)
+        logger.error(f"Error editing waste log {log_id}: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'An error occurred while updating the waste log.'}, status=500)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def delete_waste_log(request, log_id):
+    """Delete a waste log entry."""
+    if not (request.user.is_administrator() or request.user.is_owner() or
+            request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+
+    owner_filter = get_owner_filter(request.user)
+    if owner_filter:
+        waste_log = get_object_or_404(
+            FoodWasteLog.objects.filter(
+                Q(product__main_category__owner=owner_filter) |
+                Q(product__main_category__restaurant__main_owner=owner_filter) |
+                Q(product__main_category__restaurant__branch_owner=owner_filter) |
+                Q(recorded_by__owner=owner_filter)
+            ),
+            id=log_id
+        )
+    else:
+        waste_log = get_object_or_404(FoodWasteLog, id=log_id)
+
+    try:
+        log_id_deleted = waste_log.id
+        waste_log.delete()
+        return JsonResponse({
+            'success': True,
+            'message': f'Waste log #{log_id_deleted} deleted successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error deleting waste log {log_id}: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'An error occurred while deleting the waste log.'}, status=500)
 
 
 @login_required

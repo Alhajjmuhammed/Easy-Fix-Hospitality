@@ -238,7 +238,7 @@ def process_payment(request, order_id):
             if remaining_quantity > 0:
                 order_items.append({
                     'id': item.id,
-                    'product_name': item.product.name,
+                    'product_name': item.product.name if item.product else '[deleted product]',
                     'unit_price': float(item.unit_price),
                     'total_quantity': item.quantity,
                     'paid_quantity': paid_quantity,
@@ -251,7 +251,7 @@ def process_payment(request, order_id):
         
         return JsonResponse({
             'order_number': order.order_number,
-            'table_number': order.table_info.tbl_no,
+            'table_number': order.table_info.tbl_no if order.table_info else 'N/A',
             'total_amount': float(order.total_amount),
             'total_paid': float(total_paid),
             'balance_due': float(order.total_amount - total_paid),

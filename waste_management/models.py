@@ -61,28 +61,28 @@ class FoodWasteLog(models.Model):
     def owner(self):
         if self.order and self.order.table_info:
             return self.order.table_info.owner
-        return self.product.owner
+        if self.product:
+            return self.product.owner
+        return None
     
     def calculate_costs(self):
         """Calculate costs based on product cost settings or default percentages"""
+        if not self.product:
+            self.total_cost = self.ingredient_cost + self.labor_cost + self.overhead_cost
+            return
         try:
-            # Try to get product-specific cost settings
             cost_settings = self.product.cost_settings
             self.ingredient_cost = cost_settings.ingredient_cost_per_unit * self.quantity_wasted
             self.labor_cost = cost_settings.labor_cost_per_unit * self.quantity_wasted
             self.overhead_cost = cost_settings.overhead_cost_per_unit * self.quantity_wasted
         except ProductCostSettings.DoesNotExist:
-            # Fall back to percentage-based calculation
             base_price = self.product.price
-            # Default percentages if no cost settings exist
-            ingredient_pct = Decimal('30.0')  # 30%
-            labor_pct = Decimal('25.0')       # 25%
-            overhead_pct = Decimal('15.0')    # 15%
-            
+            ingredient_pct = Decimal('30.0')
+            labor_pct = Decimal('25.0')
+            overhead_pct = Decimal('15.0')
             self.ingredient_cost = (base_price * ingredient_pct / 100) * self.quantity_wasted
             self.labor_cost = (base_price * labor_pct / 100) * self.quantity_wasted
             self.overhead_cost = (base_price * overhead_pct / 100) * self.quantity_wasted
-        
         self.total_cost = self.ingredient_cost + self.labor_cost + self.overhead_cost
     
     def save(self, *args, **kwargs):
@@ -100,7 +100,8 @@ class FoodWasteLog(models.Model):
         ]
     
     def __str__(self):
-        return f"Waste: {self.quantity_wasted}x {self.product.name} - ${self.total_cost} ({self.get_waste_reason_display()})"
+        product_name = self.product.name if self.product else '[deleted product]'
+        return f"Waste: {self.quantity_wasted}x {product_name} - ${self.total_cost} ({self.get_waste_reason_display()})"
 
 
 class OrderCostBreakdown(models.Model):
