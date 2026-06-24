@@ -48,9 +48,10 @@ export default function RestaurantSelectorScreen({ navigation }) {
     load();
   }, []);  // only run once on mount
 
-  const handleSelect = async (restaurant) => {
-    await setRestaurant(restaurant.id);
-    navigation.replace('TableSelection');
+  const handleSelect = (restaurant) => {
+    // Remote-order restaurants go to order type selection (delivery / pickup).
+    // QR-scanned restaurants go straight to table selection.
+    navigation.navigate('OrderType', { restaurant });
   };
 
   // ── QR scan handler ───────────────────────────────────────────────────
@@ -91,9 +92,13 @@ export default function RestaurantSelectorScreen({ navigation }) {
     }
   };
 
+  // Only show restaurants that allow remote ordering in the list.
+  // QR scan (inside restaurant) is the path for dine-in.
   const filtered = restaurants.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.address.toLowerCase().includes(search.toLowerCase())
+    r.allow_remote_orders && (
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.address.toLowerCase().includes(search.toLowerCase())
+    )
   );
 
   if (loading) {
@@ -110,8 +115,8 @@ export default function RestaurantSelectorScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <MaterialCommunityIcons name="silverware-fork-knife" size={32} color="#2c3e50" />
-        <Text variant="headlineSmall" style={styles.title}>Choose a Restaurant</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>Select where you'd like to order from</Text>
+        <Text variant="headlineSmall" style={styles.title}>Order from Anywhere</Text>
+        <Text variant="bodyMedium" style={styles.subtitle}>Browse restaurants that accept delivery &amp; pickup orders</Text>
 
         {/* QR Scan button */}
         <Button
@@ -148,7 +153,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
           <View style={styles.center}>
             <MaterialCommunityIcons name="store-off-outline" size={52} color="#ccc" />
             <Text variant="bodyLarge" style={styles.emptyText}>
-              {search ? 'No restaurants match your search' : 'No restaurants available'}
+              {search ? 'No restaurants match your search' : 'No restaurants accepting remote orders right now'}
             </Text>
           </View>
         )}
@@ -183,6 +188,10 @@ export default function RestaurantSelectorScreen({ navigation }) {
                     {item.description}
                   </Text>
                 ) : null}
+                <View style={styles.badgeRow}>
+                  <View style={styles.badge}><Text style={styles.badgeText}>Delivery</Text></View>
+                  <View style={styles.badge}><Text style={styles.badgeText}>Pickup</Text></View>
+                </View>
               </View>
 
               <MaterialCommunityIcons name="chevron-right" size={24} color="#2c3e50" />
@@ -265,6 +274,9 @@ const styles = StyleSheet.create({
   addressRow:      { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   address:         { color: '#888', marginLeft: 3, flex: 1 },
   description:     { color: '#666', marginTop: 3, fontFamily: 'Poppins_400Regular' },
+  badgeRow:        { flexDirection: 'row', gap: 6, marginTop: 6 },
+  badge:           { backgroundColor: '#E8F5E9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  badgeText:       { color: '#2E7D32', fontSize: 11, fontFamily: 'Poppins_600SemiBold' },
   emptyText:       { color: '#999', marginTop: 12, textAlign: 'center', fontFamily: 'Poppins_400Regular' },
 
   // ── Scanner ────────────────────────────────────────────────────────────

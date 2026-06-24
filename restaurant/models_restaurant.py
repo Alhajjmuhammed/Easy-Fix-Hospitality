@@ -256,6 +256,12 @@ class Restaurant(models.Model):
         help_text="WiFi password for customers"
     )
     
+    # Remote Ordering
+    allow_remote_orders = models.BooleanField(
+        default=False,
+        help_text="Allow customers to place delivery/pickup orders from outside the restaurant (without scanning a QR code)"
+    )
+
     # Status and Settings
     is_active = models.BooleanField(
         default=True,

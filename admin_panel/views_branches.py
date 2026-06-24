@@ -127,6 +127,7 @@ def add_branch(request):
                 name = sanitize_input(request.POST.get('name', ''), max_length=200)
                 description = sanitize_input(request.POST.get('description', ''), max_length=1000)
                 address = sanitize_input(request.POST.get('address', ''), max_length=500)
+                allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
                 branch_owner_username = request.POST.get('branch_owner_username', '').strip()
                 branch_owner_email = request.POST.get('branch_owner_email', '').strip()
                 branch_owner_name = sanitize_input(request.POST.get('branch_owner_name', ''), max_length=200)
@@ -219,6 +220,7 @@ def add_branch(request):
                     tax_rate=main_restaurant.tax_rate if main_restaurant else 0.0800,
                     auto_print_kot=main_restaurant.auto_print_kot if main_restaurant else True,
                     auto_print_bot=main_restaurant.auto_print_bot if main_restaurant else True,
+                    allow_remote_orders=allow_remote_orders,
                 )
                 
                 success_message = f'Branch "{name}" created successfully!'
@@ -286,6 +288,7 @@ def edit_branch(request, restaurant_id):
             restaurant.kitchen_printer_name = request.POST.get('kitchen_printer_name', '').strip()
             restaurant.bar_printer_name = request.POST.get('bar_printer_name', '').strip()
             restaurant.receipt_printer_name = request.POST.get('receipt_printer_name', '').strip()
+            restaurant.allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
             
             # Update branch owner details if they exist
             if restaurant.branch_owner:

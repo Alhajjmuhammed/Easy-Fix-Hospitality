@@ -10,9 +10,15 @@ export const useCartStore = create(
       tableName: '',
       restaurantId: null,
       existingOrderId: null,  // set when adding items to an existing order
+      orderType: 'dine-in',   // 'dine-in' | 'delivery' | 'pickup'
+      deliveryAddress: '',
+      deliveryPhone: '',
 
       setTable: (tableId, tableName, restaurantId) =>
-        set({ tableId, tableName, restaurantId, existingOrderId: null }),
+        set({ tableId, tableName, restaurantId, existingOrderId: null, orderType: 'dine-in', deliveryAddress: '', deliveryPhone: '' }),
+
+      setRemoteOrder: (restaurantId, orderType, deliveryAddress = '', deliveryPhone = '') =>
+        set({ restaurantId, tableId: null, tableName: '', existingOrderId: null, orderType, deliveryAddress, deliveryPhone }),
 
       setExistingOrder: (orderId) =>
         set({ existingOrderId: orderId }),
@@ -57,7 +63,7 @@ export const useCartStore = create(
           ),
         }),
 
-      clearCart: () => set({ items: [], tableId: null, tableName: '', restaurantId: null, existingOrderId: null }),
+      clearCart: () => set({ items: [], tableId: null, tableName: '', restaurantId: null, existingOrderId: null, orderType: 'dine-in', deliveryAddress: '', deliveryPhone: '' }),
 
       getSubtotal: () =>
         get().items.reduce((sum, i) => sum + i.product.current_price * i.quantity, 0),
@@ -75,6 +81,9 @@ export const useCartStore = create(
         tableName:       state.tableName,
         restaurantId:    state.restaurantId,
         existingOrderId: state.existingOrderId,
+        orderType:       state.orderType,
+        deliveryAddress: state.deliveryAddress,
+        deliveryPhone:   state.deliveryPhone,
       }),
     }
   )

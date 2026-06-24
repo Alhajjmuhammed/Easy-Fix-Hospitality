@@ -60,6 +60,7 @@ def restaurant_by_qr(request):
             'description': restaurant_obj.description or '',
             'address': restaurant_obj.address or '',
             'logo_url': logo_url,
+            'allow_remote_orders': restaurant_obj.allow_remote_orders,
         }
     })
 
@@ -114,6 +115,7 @@ def restaurants_list(request):
             'description': r.description or '',
             'address': r.address or '',
             'logo_url': logo_url,
+            'allow_remote_orders': r.allow_remote_orders,
         })
 
     return Response({'restaurants': data})

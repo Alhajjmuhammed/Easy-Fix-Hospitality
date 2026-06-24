@@ -340,6 +340,19 @@
                             </div>
                         </div>
 
+                        <!-- Remote Ordering -->
+                        <div class="mb-4">
+                            <h6 class="mb-3"><i class="fas fa-globe me-2"></i>Remote Ordering</h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="allow_remote_orders" name="allow_remote_orders"
+                                       {% if restaurant.allow_remote_orders %}checked{% endif %}>
+                                <label class="form-check-label" for="allow_remote_orders">
+                                    <strong>Allow Orders from Anywhere</strong>
+                                    <small class="d-block text-muted">Customers can see this branch in the mobile app and place delivery or pickup orders without scanning a QR code.</small>
+                                </label>
+                            </div>
+                        </div>
+
                         <!-- Submit Buttons -->
                         <div class="d-flex justify-content-end mt-4">
                             <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-secondary mr-3">

@@ -254,6 +254,23 @@
                         </div>
                     </div>
                     
+                    <!-- Remote Ordering -->
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3">
+                                <i class="fas fa-globe me-2"></i>Remote Ordering
+                            </h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="allow_remote_orders"
+                                       name="allow_remote_orders" {% if current_restaurant.allow_remote_orders %}checked{% endif %}>
+                                <label class="form-check-label" for="allow_remote_orders">
+                                    <strong>Allow Orders from Anywhere</strong>
+                                    <small class="d-block text-muted">Customers can browse your restaurant in the app and place delivery or pickup orders without scanning a QR code.</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Auto-Print Settings -->
                     <div class="card bg-light border-0 mb-3">
                         <div class="card-body">

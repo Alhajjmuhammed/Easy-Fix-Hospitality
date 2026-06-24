@@ -4013,8 +4013,10 @@ def profile(request):
                     models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
                 )
                 logger.info(f"UPDATE_RESTAURANT: Found {user_restaurants.count()} restaurants for user")
+                allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
                 for restaurant in user_restaurants:
                     restaurant.tax_rate = tax_rate_decimal
+                    restaurant.allow_remote_orders = allow_remote_orders
                     restaurant.save()
                     logger.info(f"UPDATE_RESTAURANT: Updated restaurant {restaurant.name} tax_rate to {tax_rate_decimal}")
                 
@@ -4133,6 +4135,7 @@ def profile(request):
                 # Add WiFi settings to context
                 context['wifi_ssid'] = restaurant.wifi_ssid or ''
                 context['wifi_password'] = restaurant.wifi_password or ''
+                context['current_restaurant'] = restaurant
         except:
             pass
     

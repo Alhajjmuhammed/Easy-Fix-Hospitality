@@ -280,6 +280,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_number', 'table_info', 'table_number',
             'ordered_by_name', 'confirmed_by_name', 'status', 'payment_status',
+            'order_type', 'delivery_address', 'delivery_phone',
             'total_amount', 'subtotal', 'tax_amount', 'discount_amount', 'total',
             'total_paid', 'balance_due', 'items_count',
             'special_instructions', 'reason_if_cancelled',
@@ -392,11 +393,18 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class PlaceOrderSerializer(serializers.Serializer):
-    table_id = serializers.IntegerField()
+    table_id = serializers.IntegerField(required=False, allow_null=True)
     items = serializers.ListField(child=serializers.DictField(), min_length=1)
     special_instructions = serializers.CharField(allow_blank=True, required=False, default='')
     offline_id = serializers.CharField(allow_blank=True, required=False, default='')
     restaurant_id = serializers.IntegerField(required=False, allow_null=True)
+    order_type = serializers.ChoiceField(
+        choices=['dine-in', 'delivery', 'pickup'],
+        required=False,
+        default='dine-in',
+    )
+    delivery_address = serializers.CharField(allow_blank=True, required=False, default='')
+    delivery_phone = serializers.CharField(allow_blank=True, required=False, default='', max_length=30)
 
 
 # ---------------------------------------------------------------------------

@@ -24,7 +24,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 
 export default function PlaceOrderScreen({ navigation }) {
   const theme = useTheme();
-  const { items, tableId, tableName, clearCart, getSubtotal, existingOrderId } = useCartStore();
+  const { items, tableId, tableName, clearCart, getSubtotal, existingOrderId, orderType, deliveryAddress, deliveryPhone } = useCartStore();
   const { user, restaurantId } = useAuthStore();
   const { refreshPendingCount } = useSyncStore();
   const localKotBot = usePrinterStore((s) => s.localKotBot);
@@ -59,8 +59,9 @@ export default function PlaceOrderScreen({ navigation }) {
     setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      const isRemote = orderType === 'delivery' || orderType === 'pickup';
       const orderData = {
-        table_id: tableId,
+        ...(isRemote ? {} : { table_id: tableId }),
         items: items.map((i) => ({
           product_id: i.product.id,
           quantity: i.quantity,
@@ -68,6 +69,9 @@ export default function PlaceOrderScreen({ navigation }) {
         })),
         special_instructions: notes.trim(),
         restaurant_id: restaurantId,
+        order_type: orderType || 'dine-in',
+        delivery_address: deliveryAddress || '',
+        delivery_phone: deliveryPhone || '',
       };
 
       if (net.isConnected) {
@@ -126,7 +130,8 @@ export default function PlaceOrderScreen({ navigation }) {
 
         clearCart();
         setSnack('Order saved – will sync when online');
-        setTimeout(() => navigation.navigate('TableSelection'), 1500);
+        const backScreen = (orderType === 'delivery' || orderType === 'pickup') ? 'RestaurantSelector' : 'TableSelection';
+        setTimeout(() => navigation.navigate(backScreen), 1500);
       }
     } catch (err) {
       setSnack(err.message || 'Something went wrong.');
@@ -155,7 +160,11 @@ export default function PlaceOrderScreen({ navigation }) {
         <Text variant="bodySmall" style={styles.infoBannerText}>
           {isAddingToExisting
             ? `${tableName || 'Unknown table'} • Adding items to existing order`
-            : `${tableName || 'Unknown table'} • Please review your order before confirming`}
+            : orderType === 'delivery'
+              ? `Delivery to: ${deliveryAddress || 'your address'}`
+              : orderType === 'pickup'
+                ? 'Pickup order • Please review before confirming'
+                : `${tableName || 'Unknown table'} • Please review your order before confirming`}
         </Text>
       </Surface>
 

@@ -213,12 +213,43 @@ def _place_order(request):
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
 
+    order_type = data.get('order_type', 'dine-in')
+
     _tq_place = (
         Q(owner=owner) |
         Q(restaurant__main_owner=owner) |
         Q(restaurant__branch_owner=owner)
     )
-    table = get_object_or_404(TableInfo.objects.filter(_tq_place).distinct(), id=data['table_id'])
+
+    # Delivery and pickup orders do not require a table.
+    # Dine-in orders (default) still require a valid table_id.
+    table = None
+    if order_type == 'dine-in':
+        if not data.get('table_id'):
+            return Response({'error': 'table_id is required for dine-in orders.'}, status=400)
+        table = get_object_or_404(TableInfo.objects.filter(_tq_place).distinct(), id=data['table_id'])
+    elif data.get('table_id'):
+        # Optional table for delivery/pickup — ignore silently if provided
+        table = TableInfo.objects.filter(_tq_place, id=data['table_id']).first()
+
+    # For delivery/pickup get tax rate from the Restaurant model
+    if table is None:
+        from restaurant.models_restaurant import Restaurant as _Restaurant
+        _rq = Q(main_owner=owner) | Q(branch_owner=owner)
+        _rid = (
+            request.headers.get('X-Restaurant-ID')
+            or (request.data.get('restaurant_id') if hasattr(request, 'data') else None)
+        )
+        if _rid:
+            try:
+                _rq = _rq & Q(id=int(_rid))
+            except (TypeError, ValueError):
+                pass
+        _rest_obj = _Restaurant.objects.filter(_rq).first()
+        from decimal import Decimal as _D
+        _delivery_tax_rate = _rest_obj.tax_rate if _rest_obj else getattr(owner, 'tax_rate', _D('0.08'))
+    else:
+        _delivery_tax_rate = None  # will use table.get_tax_rate() below
 
     # ── Phase 1: validate all items BEFORE opening the transaction ────────────
     # This ensures no return/error response happens inside the atomic block,
@@ -319,7 +350,7 @@ def _place_order(request):
 
         from decimal import Decimal as _Dec
         total_amount = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated_items)
-        tax_rate = table.get_tax_rate()
+        tax_rate = table.get_tax_rate() if table is not None else _delivery_tax_rate
         total_amount = total_amount * (_Dec('1') + tax_rate)
 
         order = Order.objects.create(
@@ -329,6 +360,9 @@ def _place_order(request):
             status='pending',
             total_amount=total_amount,
             special_instructions=special,
+            order_type=order_type,
+            delivery_address=data.get('delivery_address', '') or '',
+            delivery_phone=data.get('delivery_phone', '') or '',
         )
 
         for item in validated_items:
@@ -342,6 +376,10 @@ def _place_order(request):
             if p.available_in_stock is not None:
                 p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
                 p.save(update_fields=['available_in_stock'])
+        # Mark table unavailable only for dine-in orders
+        if table is not None:
+            table.is_available = False
+            table.save(update_fields=['is_available'])
         # --- transaction commits here ---
 
     # ── Phase 3: outside transaction — WebSocket + print ─────────────────
