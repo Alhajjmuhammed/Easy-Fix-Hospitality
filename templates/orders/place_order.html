@@ -34,12 +34,12 @@
                             <option value="">— My own order —</option>
                             {% for staff in customer_care_staff %}
                             <option value="{{ staff.id }}">
-                                {% if staff.first_name %}{{ staff.first_name }}{% if staff.last_name %} {{ staff.last_name }}{% endif %}{% else %}{{ staff.username }}{% endif %}
+                                {% if staff.first_name %}{{ staff.first_name }}{% if staff.last_name %} {{ staff.last_name }}{% endif %}{% else %}{{ staff.username }}{% endif %} ({{ staff.role_display }})
                             </option>
                             {% endfor %}
                         </select>
                         <div class="form-text text-muted">
-                            If selected, the order will show as placed by that customer care staff member, entered by you (cashier).
+                            If selected, the order will be attributed to that staff member. You (cashier) will be recorded as the one who entered it.
                         </div>
                     </div>
                     {% endif %}

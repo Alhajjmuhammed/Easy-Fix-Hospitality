@@ -582,7 +582,8 @@ def place_order(request):
                         form.cleaned_data['special_instructions']
                     )
 
-                    # Cashier entering on behalf of a customer care staff member
+                    # Cashier entering on behalf of another staff member
+                    _STAFF_ROLES_FOR_ENTRY = ['customer_care', 'kitchen', 'bar', 'buffet', 'service']
                     _order_placed_by = request.user
                     _order_entered_by = None
                     if request.user.is_cashier():
@@ -592,7 +593,7 @@ def place_order(request):
                                 _cc_owner = request.user.get_owner()
                                 _cc_user = User.objects.get(
                                     id=entered_for_id,
-                                    role__name='customer_care',
+                                    role__name__in=_STAFF_ROLES_FOR_ENTRY,
                                     owner=_cc_owner,
                                     is_active=True,
                                 )
@@ -839,18 +840,21 @@ def place_order(request):
     else:
         base_template = 'base.html'
 
-    # Cashier-only: list customer care staff that can be "ordered for"
+    # Cashier-only: list all staff who can have an order entered on their behalf
+    _STAFF_ROLES_FOR_ENTRY = ['customer_care', 'kitchen', 'bar', 'buffet', 'service']
     customer_care_staff = []
     if request.user.is_cashier():
         _cashier_owner = request.user.get_owner()
         if _cashier_owner:
-            customer_care_staff = list(
-                User.objects.filter(
-                    owner=_cashier_owner,
-                    role__name='customer_care',
-                    is_active=True,
-                ).values('id', 'first_name', 'last_name', 'username')
-            )
+            _staff_qs = User.objects.filter(
+                owner=_cashier_owner,
+                role__name__in=_STAFF_ROLES_FOR_ENTRY,
+                is_active=True,
+            ).values('id', 'first_name', 'last_name', 'username', 'role__name')
+            customer_care_staff = [
+                {**s, 'role_display': s['role__name'].replace('_', ' ').title()}
+                for s in _staff_qs
+            ]
 
     context = {
         'form': form,
