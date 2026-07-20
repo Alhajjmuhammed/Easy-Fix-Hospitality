@@ -782,6 +782,11 @@ document.getElementById('updateOrderStatusForm').addEventListener('submit', asyn
             body: JSON.stringify(formData)
         });
         
+        if (response.status === 403) {
+            showAlert('danger', 'Session expired. Please refresh the page and try again.');
+            setTimeout(() => location.reload(), 2000);
+            return;
+        }
         const result = await response.json();
         if (result.success) {
             showAlert('success', result.message);
@@ -791,7 +796,7 @@ document.getElementById('updateOrderStatusForm').addEventListener('submit', asyn
             showAlert('danger', result.message);
         }
     } catch (error) {
-        showAlert('danger', 'Error updating order status: ' + error.message);
+        showAlert('danger', 'Connection error. Please refresh the page and try again.');
     }
 });
 
@@ -835,6 +840,11 @@ document.getElementById('updatePaymentStatusForm').addEventListener('submit', as
             body: JSON.stringify(formData)
         });
         
+        if (response.status === 403) {
+            showAlert('danger', 'Session expired. Please refresh the page and try again.');
+            setTimeout(() => location.reload(), 2000);
+            return;
+        }
         const result = await response.json();
         if (result.success) {
             showAlert('success', result.message);
@@ -844,7 +854,7 @@ document.getElementById('updatePaymentStatusForm').addEventListener('submit', as
             showAlert('danger', result.message);
         }
     } catch (error) {
-        showAlert('danger', 'Error updating payment status: ' + error.message);
+        showAlert('danger', 'Connection error. Please refresh the page and try again.');
     }
 });
 

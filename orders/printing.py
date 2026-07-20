@@ -1587,13 +1587,13 @@ def _generate_kot_content(order):
     lines.append("KITCHEN ITEMS:")
     lines.append("-" * width)
     
-    kitchen_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'kitchen']
-    
+    kitchen_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'kitchen']
+
     for item in kitchen_items:
         # Item name and quantity - left aligned
         qty_text = f"{item.quantity}x"
         lines.append(f"{qty_text:4} {item.product.name}")
-        
+
         # Special instructions if any
         if order.special_instructions:
             wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
@@ -1661,7 +1661,7 @@ def _generate_bot_content(order):
     lines.append("BAR ITEMS:")
     lines.append("-" * width)
     
-    bar_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'bar']
+    bar_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'bar']
     
     for item in bar_items:
         # Item name and quantity - left aligned
@@ -1735,7 +1735,7 @@ def _generate_buffet_content(order):
     lines.append("BUFFET ITEMS:")
     lines.append("-" * width)
     
-    buffet_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'buffet']
+    buffet_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'buffet']
     
     for item in buffet_items:
         # Item name and quantity - left aligned
@@ -1809,7 +1809,7 @@ def _generate_service_content(order):
     lines.append("SERVICE ITEMS:")
     lines.append("-" * width)
     
-    service_items = [item for item in order.order_items.select_related('product').all() if item.product.station == 'service']
+    service_items = [item for item in order.order_items.select_related('product').all() if item.product and item.product.station == 'service']
     
     for item in service_items:
         # Item name and quantity - left aligned
@@ -2024,7 +2024,7 @@ def _generate_buffet_content_for_items(order, items_list):
     lines.append("NEW BUFFET ITEMS:")
     lines.append("-" * width)
     
-    buffet_items = [item for item in items_list if item.product.station == 'buffet']
+    buffet_items = [item for item in items_list if item.product and item.product.station == 'buffet']
     
     for item in buffet_items:
         # Item name and quantity - left aligned
@@ -2094,7 +2094,7 @@ def _generate_service_content_for_items(order, items_list):
     lines.append("NEW SERVICE ITEMS:")
     lines.append("-" * width)
     
-    service_items = [item for item in items_list if item.product.station == 'service']
+    service_items = [item for item in items_list if item.product and item.product.station == 'service']
     
     for item in service_items:
         # Item name and quantity - left aligned

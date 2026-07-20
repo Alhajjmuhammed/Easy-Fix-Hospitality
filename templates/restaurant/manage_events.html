@@ -575,13 +575,19 @@ function approvePayment(eventId, eventTitle) {
                 'X-Requested-With': 'XMLHttpRequest'
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (response.status === 403) {
+                alert('Session expired. Please refresh the page and try again.');
+                location.reload();
+                return null;
+            }
+            return response.json();
+        })
         .then(data => {
+            if (data === null) return;
             if (data.success) {
                 // Save success message to show after reload
                 sessionStorage.setItem('paymentSuccess', data.message);
-                
-                // Reload page immediately
                 location.reload();
             } else {
                 alert(data.message || 'Error approving payment');
@@ -592,7 +598,7 @@ function approvePayment(eventId, eventTitle) {
             }
         })
         .catch(() => {
-            alert('Error approving payment');
+            alert('Connection error. Please refresh the page and try again.');
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-check"></i> Approve';
@@ -691,17 +697,15 @@ document.getElementById('confirmPaymentBtn').addEventListener('click', function(
         })
     })
     .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            console.error('HTTP error:', response.status, response.statusText);
+        if (response.status === 403) {
+            alert('Session expired. Please refresh the page and try again.');
+            location.reload();
+            return null;
         }
         return response.json();
     })
     .then(data => {
-        console.log('Response data:', data);
-        console.log('data.success:', data.success);
-        console.log('data.message:', data.message);
-        
+        if (data === null) return;
         if (data.success) {
             // Save success message to show after reload
             sessionStorage.setItem('paymentSuccess', data.message);
