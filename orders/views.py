@@ -1387,9 +1387,10 @@ def kitchen_reports(request):
     # Get date range filter
     period = request.GET.get('period', 'today')
     from datetime import timedelta
-    
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
+    from django.utils.timezone import localtime
+
+    today_start = localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+
     if period == 'today':
         start_date = today_start
         end_date = today_start + timedelta(days=1)
@@ -1408,7 +1409,7 @@ def kitchen_reports(request):
         start_date = today_start
         end_date = today_start + timedelta(days=1)
         period_label = 'Today'
-    
+
     # Get all orders with kitchen items — filter at DB level, then prefetch for in-Python stats
     base_queryset = Order.objects.filter(
         created_at__gte=start_date,
@@ -1501,9 +1502,10 @@ def bar_reports(request):
     # Get date range filter
     period = request.GET.get('period', 'today')
     from datetime import timedelta
-    
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
+    from django.utils.timezone import localtime
+
+    today_start = localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+
     if period == 'today':
         start_date = today_start
         end_date = today_start + timedelta(days=1)
@@ -1522,7 +1524,7 @@ def bar_reports(request):
         start_date = today_start
         end_date = today_start + timedelta(days=1)
         period_label = 'Today'
-    
+
     # Get all orders with bar items — filter at DB level, then prefetch for in-Python stats
     base_queryset = Order.objects.filter(
         created_at__gte=start_date,
@@ -1614,8 +1616,9 @@ def buffet_reports(request):
 
     period = request.GET.get('period', 'today')
     from datetime import timedelta
+    from django.utils.timezone import localtime
 
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
 
     if period == 'today':
         start_date = today_start
@@ -1724,8 +1727,9 @@ def service_reports(request):
 
     period = request.GET.get('period', 'today')
     from datetime import timedelta
+    from django.utils.timezone import localtime
 
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
 
     if period == 'today':
         start_date = today_start
@@ -2381,8 +2385,9 @@ def customer_care_payments(request):
     
     # Apply period filter
     from django.utils import timezone
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
+    from django.utils.timezone import localtime
+    today_start = localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+
     _oq_ccp = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
