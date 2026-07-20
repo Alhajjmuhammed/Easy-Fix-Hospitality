@@ -52,7 +52,11 @@ def cashier_dashboard(request):
     
     # Base queryset for orders with period filter
     from datetime import timedelta
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    from django.utils.timezone import localtime
+    # Use local timezone (Africa/Nairobi) so that midnight means local midnight,
+    # not UTC midnight — otherwise Monday EAT orders stored as Sunday UTC are invisible.
+    local_now = localtime(timezone.now())
+    today_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     _oq_dash = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
@@ -163,7 +167,7 @@ def my_orders(request):
     
     owner = get_owner_filter(request.user)
     
-    # Get only orders created by this cashier
+    # Get orders created by or entered by this cashier
     _oq_mo = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
@@ -173,7 +177,7 @@ def my_orders(request):
     )
     orders = Order.objects.filter(
         _oq_mo,
-        ordered_by=request.user
+        Q(ordered_by=request.user) | Q(entered_by=request.user)
     ).select_related('table_info', 'ordered_by').prefetch_related(
         Prefetch('order_items', queryset=OrderItem.objects.select_related('product')),
         'payments'
