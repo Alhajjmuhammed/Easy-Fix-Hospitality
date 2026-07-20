@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
 
 from orders.models import Order, OrderItem
@@ -68,11 +68,13 @@ def cc_reports(request):
         except ValueError:
             pass
 
-    # Base queryset – CC sees only their own orders
+    # Base queryset – CC sees only their own orders (all order types including delivery/pickup)
     _tq = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     orders = Order.objects.filter(
         _tq,
@@ -198,10 +200,16 @@ def owner_reports(request):
     if restaurant_obj:
         table_q = (
             Q(table_info__restaurant=restaurant_obj) |
-            Q(table_info__owner=owner, table_info__restaurant__isnull=True)
+            Q(table_info__owner=owner, table_info__restaurant__isnull=True) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
         )
     else:
-        table_q = Q(table_info__owner=owner)
+        table_q = (
+            Q(table_info__owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        )
 
     orders = Order.objects.filter(
         table_q,
@@ -233,10 +241,16 @@ def owner_reports(request):
     if restaurant_obj:
         cashier_table_q = (
             Q(order__table_info__restaurant=restaurant_obj) |
-            Q(order__table_info__owner=owner, order__table_info__restaurant__isnull=True)
+            Q(order__table_info__owner=owner, order__table_info__restaurant__isnull=True) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
         )
     else:
-        cashier_table_q = Q(order__table_info__owner=owner)
+        cashier_table_q = (
+            Q(order__table_info__owner=owner) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+        )
     cashier_totals = (
         Payment.objects.filter(
             cashier_table_q,
@@ -333,11 +347,13 @@ def cashier_reports(request):
         except ValueError:
             pass
 
-    # --- Restaurant-wide orders for the period ---
+    # --- Restaurant-wide orders for the period (all order types) ---
     _tq = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     orders = Order.objects.filter(
         _tq,
@@ -371,7 +387,9 @@ def cashier_reports(request):
     _ptq = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     my_payments = Payment.objects.filter(
         _ptq,
@@ -400,7 +418,7 @@ def cashier_reports(request):
     top_products = list(
         OrderItem.objects.filter(order__in=orders)
         .values('product__name')
-        .annotate(qty=Sum('quantity'), revenue=Sum('unit_price'))
+        .annotate(qty=Sum('quantity'), revenue=Sum(F('unit_price') * F('quantity')))
         .order_by('-qty')[:5]
     )
 

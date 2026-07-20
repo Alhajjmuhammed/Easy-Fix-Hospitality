@@ -147,16 +147,22 @@ export const saveOfflineOrder = async (orderData) => {
   const createdAt = now();
   await dbExec(
     `INSERT INTO offline_orders
-      (offline_id, table_id, items_json, special_instructions, restaurant_id, total_amount, created_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      (offline_id, table_id, items_json, special_instructions, restaurant_id, total_amount, created_at, sync_status,
+       order_type, delivery_address, delivery_phone, delivery_lat, delivery_lng)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
     [
       offlineId,
-      orderData.table_id,
+      orderData.table_id ?? null,
       JSON.stringify(orderData.items),
       orderData.special_instructions || '',
       orderData.restaurant_id || null,
       orderData.total_amount || 0,
       createdAt,
+      orderData.order_type || 'dine-in',
+      orderData.delivery_address || '',
+      orderData.delivery_phone || '',
+      orderData.delivery_lat ?? null,
+      orderData.delivery_lng ?? null,
     ],
   );
   return offlineId;

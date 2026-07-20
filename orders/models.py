@@ -12,6 +12,8 @@ class Order(models.Model):
         ('preparing', 'Preparing'),
         ('ready', 'Ready'),
         ('served', 'Served'),
+        ('out_for_delivery', 'Out for Delivery'),
+        ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
         ('customer_refused', 'Customer Refused'),
         ('kitchen_error', 'Kitchen Error'),
@@ -39,6 +41,8 @@ class Order(models.Model):
     order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES, default='dine-in')
     delivery_address = models.TextField(blank=True, default='')
     delivery_phone = models.CharField(max_length=30, blank=True, default='')
+    delivery_lat = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    delivery_lng = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     payment_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid')
@@ -87,21 +91,36 @@ class Order(models.Model):
         tax = self.total_amount - self.get_subtotal()
         return max(Decimal('0.00'), tax)
     
+    def _get_tax_rate_decimal(self):
+        """Resolve applicable tax rate for dine-in, delivery, and pickup orders."""
+        if self.table_info:
+            return self.table_info.get_tax_rate()
+        # Delivery/pickup: look up the restaurant linked to the ordering customer.
+        if self.ordered_by and self.ordered_by.owner:
+            from restaurant.models_restaurant import Restaurant as _Restaurant
+            from django.db.models import Q as _Q
+            _owner = self.ordered_by.owner
+            _r = _Restaurant.objects.filter(
+                _Q(main_owner=_owner) | _Q(branch_owner=_owner)
+            ).first()
+            if _r and _r.tax_rate:
+                return _r.tax_rate
+        return Decimal('0')
+
     @property
     def tax_rate(self):
         """Tax rate as percentage for display"""
-        tax_rate_decimal = self.table_info.get_tax_rate() if self.table_info else Decimal('0')
-        return float(tax_rate_decimal * 100)
-    
+        return float(self._get_tax_rate_decimal() * 100)
+
     def get_total(self):
         """Get final total including tax"""
         subtotal = self.get_subtotal()
         tax = self.get_tax_amount()
         return subtotal + tax
-    
+
     def calculate_total(self):
         subtotal = sum(item.get_subtotal() for item in self.order_items.all())
-        tax_rate = self.table_info.get_tax_rate() if self.table_info else 0
+        tax_rate = self._get_tax_rate_decimal()
         self.total_amount = subtotal * (1 + tax_rate)
         return self.total_amount
     
@@ -217,3 +236,63 @@ class BillRequest(models.Model):
 
 # Import PrintJob model
 from .models_printjob import PrintJob
+
+
+class DeliveryRider(models.Model):
+    VEHICLE_CHOICES = [
+        ('motorcycle', 'Motorcycle'),
+        ('bicycle', 'Bicycle'),
+        ('car', 'Car'),
+        ('foot', 'On Foot'),
+    ]
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='rider_profile'
+    )
+    owner = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='delivery_riders',
+        limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']},
+        null=True, blank=True,
+    )
+    vehicle_type = models.CharField(max_length=20, choices=VEHICLE_CHOICES, default='motorcycle')
+    is_available = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    # Last known GPS position — updated by rider's phone every ~5 s during active delivery
+    current_lat = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    current_lng = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    last_location_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        name = self.user.get_full_name() or self.user.username
+        return f"{name} ({self.get_vehicle_type_display()})"
+
+    class Meta:
+        ordering = ['user__first_name', 'user__username']
+
+
+class DeliveryAssignment(models.Model):
+    STATUS_CHOICES = [
+        ('assigned', 'Assigned'),
+        ('picked_up', 'Picked Up'),
+        ('delivered', 'Delivered'),
+        ('failed', 'Failed'),
+    ]
+
+    order = models.OneToOneField(
+        Order, on_delete=models.CASCADE, related_name='delivery_assignment'
+    )
+    rider = models.ForeignKey(
+        DeliveryRider, on_delete=models.PROTECT, related_name='assignments'
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='assigned')
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    picked_up_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Delivery #{self.order.order_number} → {self.rider}"
+
+    class Meta:
+        ordering = ['-assigned_at']

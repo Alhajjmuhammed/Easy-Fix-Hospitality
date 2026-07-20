@@ -95,12 +95,34 @@ def _sync_order(user, owner, data):
         if existing:
             return {'status': 'duplicate', 'order_id': existing.id, 'order_number': existing.order_number}
 
+    # All DB writes are in the atomic block; _notify_ws (async_to_sync) is called after.
+    with transaction.atomic():
+        result = _sync_order_atomic(user, owner, data, offline_id)
+
+    if result.get('status') == 'created':
+        try:
+            from orders.models import Order as _Ord
+            _order = _Ord.objects.get(id=result['order_id'])
+            _notify_ws(_order, user, event_type='new_order')
+        except Exception as e:
+            logger.warning('WS notify failed for synced order %s: %s', result.get('order_number'), e)
+
+    return result
+
+
+def _sync_order_atomic(user, owner, data, offline_id):
+    order_type = data.get('order_type', 'dine-in')
+    is_remote = order_type in ('delivery', 'pickup')
+
     table_id = data.get('table_id')
-    table = TableInfo.objects.filter(
-        Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
-        id=table_id,
-    ).first()
-    if table is None:
+    table = None
+    if table_id:
+        table = TableInfo.objects.filter(
+            Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
+            id=table_id,
+        ).first()
+
+    if table is None and not is_remote:
         return {'status': 'error', 'error': f'Table {table_id} not found.'}
 
     items = data.get('items', [])
@@ -115,7 +137,18 @@ def _sync_order(user, owner, data):
         Decimal(str(i.get('unit_price', 0))) * int(i.get('quantity', 1))
         for i in items
     )
-    tax_rate = table.get_tax_rate()
+
+    if table is not None:
+        tax_rate = table.get_tax_rate()
+    else:
+        from restaurant.models_restaurant import Restaurant as _Restaurant
+        _rq = Q(main_owner=owner) | Q(branch_owner=owner)
+        _rid = data.get('restaurant_id') or 0
+        _r = _Restaurant.objects.filter(_rq, id=_rid).first() or _Restaurant.objects.filter(_rq).first()
+        tax_rate = Decimal(str(_r.tax_rate)) if _r and _r.tax_rate else Decimal('0')
+
+    _dlat = data.get('delivery_lat')
+    _dlng = data.get('delivery_lng')
 
     order = Order.objects.create(
         order_number=f'ORD-{uuid.uuid4().hex[:8].upper()}',
@@ -124,6 +157,11 @@ def _sync_order(user, owner, data):
         status='pending',
         total_amount=total * (Decimal('1') + tax_rate),
         special_instructions=special,
+        order_type=order_type,
+        delivery_address=data.get('delivery_address', '') or '',
+        delivery_phone=data.get('delivery_phone', '') or '',
+        delivery_lat=Decimal(str(_dlat)) if _dlat is not None else None,
+        delivery_lng=Decimal(str(_dlng)) if _dlng is not None else None,
     )
 
     for i in items:
@@ -131,11 +169,8 @@ def _sync_order(user, owner, data):
             qty = int(i.get('quantity', 1))
         except (TypeError, ValueError):
             qty = 1
-        qty = max(1, min(qty, 100))  # clamp to valid range — mirrors _place_order bounds check
-        # NOTE: select_for_update() requires an active transaction (with transaction.atomic()).
-        # _sync_order runs outside any transaction so we use a plain filter here.
-        # Concurrency risk on offline sync is acceptable — stock is clamped to max(0, ...).
-        product = Product.objects.filter(
+        qty = max(1, min(qty, 100))
+        product = Product.objects.select_for_update().filter(
             Q(main_category__owner=owner) |
             Q(main_category__restaurant__main_owner=owner) |
             Q(main_category__restaurant__branch_owner=owner)
@@ -143,9 +178,6 @@ def _sync_order(user, owner, data):
         if product is None:
             pass  # Skip unknown products rather than failing whole import
         else:
-            # Always use the authoritative server-side price — never trust the client.
-            # An offline client may send a stale or manipulated price; the server
-            # price (including any active happy-hour promotion) is the source of truth.
             fn = getattr(product, 'get_current_price', None)
             server_price = float(fn()) if fn else float(product.price)
             OrderItem.objects.create(
@@ -154,9 +186,6 @@ def _sync_order(user, owner, data):
                 quantity=qty,
                 unit_price=server_price,
             )
-            # Decrement stock (best-effort; offline orders may arrive after stock changed).
-            # Use `is not None` — mirrors _place_order — to avoid TypeError when stock
-            # tracking is disabled (available_in_stock = NULL in the DB).
             if product.available_in_stock is not None:
                 product.available_in_stock = max(0, product.available_in_stock - qty)
                 product.save(update_fields=['available_in_stock'])
@@ -171,16 +200,9 @@ def _sync_order(user, owner, data):
     order.total_amount = actual_subtotal * (Decimal('1') + tax_rate)
     order.save(update_fields=['total_amount'])
 
-    table.is_available = False
-    table.save(update_fields=['is_available'])
-
-    # _notify_ws uses async_to_sync which must NOT run inside @transaction.atomic
-    # on PostgreSQL — call it after the decorated function returns (already outside).
-    # Since _sync_order is called from sync_push (no transaction), this is safe here.
-    try:
-        _notify_ws(order, user, event_type='new_order')
-    except Exception as e:
-        logger.warning('WS notify failed for synced order %s: %s', order.order_number, e)
+    if table is not None:
+        table.is_available = False
+        table.save(update_fields=['is_available'])
 
     return {'status': 'created', 'order_id': order.id, 'order_number': order.order_number}
 
@@ -205,7 +227,9 @@ def _sync_payment(user, owner, data):
     restaurant_q = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     if not is_privileged:
         restaurant_q = restaurant_q & Q(ordered_by=user)
@@ -234,24 +258,25 @@ def _sync_payment(user, owner, data):
     if amount > remaining:
         return {'status': 'error', 'error': f'Payment amount ({amount}) exceeds remaining balance ({remaining}).'}
 
-    payment = Payment.objects.create(
-        order=order,
-        amount=amount,
-        payment_method=data.get('payment_method', 'cash'),
-        processed_by=user,
-        reference_number=data.get('reference_number', ''),
-        notes=notes,
-        is_voided=False,
-    )
+    with transaction.atomic():
+        payment = Payment.objects.create(
+            order=order,
+            amount=amount,
+            payment_method=data.get('payment_method', 'cash'),
+            processed_by=user,
+            reference_number=data.get('reference_number', ''),
+            notes=notes,
+            is_voided=False,
+        )
 
-    from django.db.models import Sum
-    total_paid = order.payments.filter(is_voided=False).aggregate(t=Sum('amount'))['t'] or Decimal('0.00')
-    if total_paid >= order.total_amount:
-        order.payment_status = 'paid'
-        order.release_table()
-    elif total_paid > 0:
-        order.payment_status = 'partial'
-    order.save(update_fields=['payment_status', 'updated_at'])
+        from django.db.models import Sum
+        total_paid = order.payments.select_for_update().filter(is_voided=False).aggregate(t=Sum('amount'))['t'] or Decimal('0.00')
+        if total_paid >= order.total_amount:
+            order.payment_status = 'paid'
+            order.release_table()
+        elif total_paid > 0:
+            order.payment_status = 'partial'
+        order.save(update_fields=['payment_status', 'updated_at'])
 
     # _notify_ws uses async_to_sync — must not run inside @transaction.atomic.
     try:
@@ -319,7 +344,7 @@ def sync_pull(request):
         Q(restaurant__branch_owner=owner)
     )
     categories = MainCategory.objects.filter(_cat_q).distinct().prefetch_related(
-        'products__sub_category'
+        'subcategories__products'
     ).order_by('name')
 
     pull_table_q = (
@@ -332,7 +357,9 @@ def sync_pull(request):
     order_table_q = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     orders_qs = Order.objects.filter(
         order_table_q,
@@ -343,10 +370,16 @@ def sync_pull(request):
     if user.is_customer() or user.is_customer_care():
         orders_qs = orders_qs.filter(ordered_by=user)
 
+    # Bill requests are always dine-in (require a table), so use the table-only filter.
+    bill_table_q = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner)
+    )
     pending_brs = []
     if not user.is_customer():
         br_qs = BillRequest.objects.filter(
-            order_table_q, status='pending',
+            bill_table_q, status='pending',
         ).distinct().select_related('table_info', 'requested_by')
         pending_brs = BillRequestSerializer(br_qs, many=True).data
 

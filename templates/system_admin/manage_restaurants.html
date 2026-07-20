@@ -49,6 +49,58 @@
     background-color: #f57c00 !important;
     color: white !important;
 }
+
+/* ── Delivery & Pickup toggle (Bootstrap-style) ── */
+.del-toggle {
+    position: relative;
+    display: inline-block;
+    width: 68px;
+    height: 26px;
+    border-radius: 26px;
+    background: rgba(0,0,0,.25);
+    cursor: pointer;
+    transition: background .25s ease;
+    flex-shrink: 0;
+    user-select: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.1);
+}
+.del-toggle.on {
+    background: #0d6efd;
+}
+.del-toggle.loading {
+    opacity: .55;
+    pointer-events: none;
+}
+/* sliding knob */
+.del-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    transition: transform .25s ease;
+    pointer-events: none;
+}
+.del-toggle.on .del-knob {
+    transform: translateX(42px);
+}
+/* text inside the pill */
+.del-text {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .07em;
+    color: #fff;
+    pointer-events: none;
+    line-height: 1;
+}
+.del-toggle:not(.on) .del-text { right: 8px; }
+.del-toggle.on        .del-text { left: 7px; }
 </style>
 {% endblock %}
 
@@ -175,6 +227,7 @@
                                     <th>Contact & Location</th>
                                     <th>Days Remaining</th>
                                     <th>Status</th>
+                                    <th>Delivery &amp; Pickup</th>
                                     <th>Subscription</th>
                                     <th>Actions</th>
                                 </tr>
@@ -277,6 +330,16 @@
                                         {% else %}
                                             <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Inactive</span>
                                         {% endif %}
+                                    </td>
+                                    <!-- Delivery & Pickup toggle -->
+                                    <td class="text-center align-middle">
+                                        <div class="del-toggle {% if restaurant.allow_remote_orders %}on{% endif %}"
+                                             id="remote-toggle-{{ restaurant.id }}"
+                                             data-restaurant-id="{{ restaurant.id }}"
+                                             data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}">
+                                            <span class="del-knob"></span>
+                                            <span class="del-text">{% if restaurant.allow_remote_orders %}ON{% else %}OFF{% endif %}</span>
+                                        </div>
                                     </td>
                                     <td>
                                         {% if restaurant.parent_restaurant %}
@@ -795,6 +858,35 @@
                         </div>
                     </div>
 
+                    <!-- Remote Ordering Option -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-globe text-success me-1"></i>
+                                    Remote Ordering
+                                </label>
+                                <div class="card border-success">
+                                    <div class="card-body p-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input form-check-input-lg" type="checkbox"
+                                                   name="allow_remote_orders" id="allow_remote_orders">
+                                            <label class="form-check-label fw-semibold" for="allow_remote_orders">
+                                                <i class="fas fa-globe text-success me-2"></i>
+                                                Allow Orders from Anywhere (Delivery &amp; Pickup)
+                                            </label>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                When enabled, this restaurant appears in the mobile app's remote ordering list. Customers can place delivery or pickup orders without scanning a QR code.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Custom Date Fields (Hidden by default) -->
                     <div id="custom_date_fields" class="row gx-3" style="display: none;">
                         <div class="col-6 d-flex">
@@ -1251,11 +1343,40 @@
                     </div>
                     <!-- End Subscription Management Section -->
 
+                    <!-- Remote Ordering Option -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-globe text-success me-1"></i>
+                                    Remote Ordering
+                                </label>
+                                <div class="card border-success">
+                                    <div class="card-body p-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input form-check-input-lg" type="checkbox"
+                                                   name="allow_remote_orders" id="edit_allow_remote_orders">
+                                            <label class="form-check-label fw-semibold" for="edit_allow_remote_orders">
+                                                <i class="fas fa-globe text-success me-2"></i>
+                                                Allow Orders from Anywhere (Delivery &amp; Pickup)
+                                            </label>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                When enabled, this restaurant appears in the mobile app's remote ordering list.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Branch Info Notice - Only for Branches -->
                     <div id="edit_branch_notice" style="display: none;">
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Branch Restaurant:</strong> This is a branch managed by the main restaurant owner. 
+                            <strong>Branch Restaurant:</strong> This is a branch managed by the main restaurant owner.
                             Owner information and subscription settings are controlled at the main restaurant level.
                         </div>
                     </div>
@@ -1469,6 +1590,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const restaurantName = this.getAttribute('data-restaurant-name');
             const currentStatus = this.getAttribute('data-current-status') === 'true';
             toggleRestaurantStatus(restaurantId, restaurantName, currentStatus);
+        });
+    });
+
+    // Toggle remote orders
+    document.querySelectorAll('.del-toggle').forEach(function(toggle) {
+        toggle.addEventListener('click', function() {
+            const restaurantId   = this.getAttribute('data-restaurant-id');
+            const restaurantName = this.getAttribute('data-restaurant-name');
+            const currentlyOn    = this.classList.contains('on');
+            toggleRemoteOrders(restaurantId, restaurantName, !currentlyOn, this);
         });
     });
 
@@ -1864,7 +1995,10 @@ function editRestaurant(restaurantId) {
             
             // Account Status
             document.getElementById('edit_is_active').value = data.is_active ? 'true' : 'false';
-            
+
+            // Remote Ordering
+            document.getElementById('edit_allow_remote_orders').checked = data.allow_remote_orders || false;
+
             // Show/hide sections based on restaurant type
             if (data.is_main_restaurant) {
                 // Main restaurant - show owner and subscription sections
@@ -2326,15 +2460,15 @@ function showBranchDeletionConfirmation(restaurantId, newPlan, data) {
 
 function toggleRestaurantStatus(restaurantId, restaurantName, currentStatus) {
     const action = currentStatus ? 'deactivate' : 'activate';
-    
+
     if (!confirm(`Are you sure you want to ${action} "${restaurantName}"?`)) {
         return;
     }
-    
+
     const formData = new FormData();
     formData.append('restaurant_id', restaurantId);
     formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
-    
+
     fetch('{% url "system_admin:toggle_restaurant_status" %}', {
         method: 'POST',
         body: formData
@@ -2343,13 +2477,49 @@ function toggleRestaurantStatus(restaurantId, restaurantName, currentStatus) {
     .then(data => {
         if (data.success) {
             showMessage(data.message, 'success');
-            setTimeout(() => location.reload(), 1500); // Reload to show changes
+            setTimeout(() => location.reload(), 1500);
         } else {
             showMessage(data.error || 'Error changing restaurant status', 'error');
         }
     })
     .catch(error => {
         showMessage(`Error: ${error.message}`, 'error');
+    });
+}
+
+function toggleRemoteOrders(restaurantId, restaurantName, wantEnabled, toggleEl) {
+    const action  = wantEnabled ? 'enable' : 'disable';
+    const textEl  = toggleEl.querySelector('.del-text');
+
+    if (!confirm('Are you sure you want to ' + action + ' Delivery & Pickup for "' + restaurantName + '"?')) {
+        return;
+    }
+
+    toggleEl.classList.add('loading');
+
+    const formData = new FormData();
+    formData.append('restaurant_id', restaurantId);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('{% url "system_admin:toggle_remote_orders" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        toggleEl.classList.remove('loading');
+        if (data.success) {
+            const enabled = data.allow_remote_orders;
+            toggleEl.classList.toggle('on', enabled);
+            if (textEl) textEl.textContent = enabled ? 'ON' : 'OFF';
+            showMessage(data.message, 'success');
+        } else {
+            showMessage(data.error || 'Error updating setting', 'error');
+        }
+    })
+    .catch(function(error) {
+        toggleEl.classList.remove('loading');
+        showMessage('Network error: ' + error.message, 'error');
     });
 }
 </script>

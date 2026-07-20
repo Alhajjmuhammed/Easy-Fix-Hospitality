@@ -47,6 +47,26 @@ logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
 
 
+def _resolve_order_owner(order, request):
+    """Return the restaurant owner for an order, safely handling delivery/pickup orders."""
+    if order.table_info:
+        return order.table_info.owner
+    if order.ordered_by and order.ordered_by.owner:
+        return order.ordered_by.owner
+    try:
+        return get_owner_filter(request.user)
+    except PermissionDenied:
+        return None
+
+
+@login_required
+def scan_qr(request):
+    """Web QR code scanner for dine-in ordering."""
+    if validate_session_restaurant_id(request.session):
+        return redirect('orders:select_table')
+    return render(request, 'orders/scan_qr.html')
+
+
 @require_restaurant_context
 def select_table(request):
     """Customer selects table from available tables in restaurant"""
@@ -220,7 +240,8 @@ def browse_menu(request):
 @ajax_restaurant_required
 def add_to_cart(request):
     """Add item to cart via AJAX"""
-    if 'selected_table' not in request.session:
+    order_type = request.session.get('order_type', 'dine-in')
+    if 'selected_table' not in request.session and order_type not in ('delivery', 'pickup'):
         return JsonResponse({'success': False, 'message': 'Please select a table first.'})
     
     # Validate restaurant context
@@ -505,10 +526,12 @@ def view_cart(request):
         'tax_rate': tax_rate,
         'tax_percentage': int(tax_rate * 100),  # For display purposes
         'final_total': final_total,
-        'table_number': request.session['selected_table'],
+        'table_number': request.session.get('selected_table', ''),
+        'order_type': request.session.get('order_type', 'dine-in'),
+        'delivery_address': request.session.get('delivery_address', ''),
         'base_template': base_template,
     }
-    
+
     return render(request, 'orders/view_cart.html', context)
 
 @login_required
@@ -532,7 +555,9 @@ def place_order(request):
         return handle_add_to_existing_order(request, add_to_order_id, cart)
     
     # Creating new order - continue with normal flow
-    
+    order_type_session = request.session.get('order_type', 'dine-in')
+    is_remote_order = order_type_session in ('delivery', 'pickup')
+
     if request.method == 'POST':
         form = OrderForm(request.POST)
         if form.is_valid():
@@ -540,51 +565,76 @@ def place_order(request):
                 with transaction.atomic():
                     # Get current restaurant from validated session
                     current_restaurant = validate_session_restaurant_id(request.session)
-                    
+
                     # For staff users, use their assigned restaurant
                     if request.user.is_customer_care() or request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_buffet_staff() or request.user.is_service_staff() or request.user.is_cashier():
                         current_restaurant = request.user.get_owner()
                         if not current_restaurant:
                             messages.error(request, 'You are not assigned to any restaurant. Please contact your administrator.')
                             return redirect('orders:select_table')
-                    
+
                     if not current_restaurant:
                         messages.error(request, 'Restaurant context not found. Please scan QR code again.')
                         return redirect('orders:select_table')
-                    
-                    # Validate table
-                    table_number, table_id = validate_session_table(request.session, current_restaurant)
-                    if not table_number:
-                        messages.error(request, 'Invalid table selection.')
-                        return redirect('orders:select_table')
-                    
-                    # Get table for the specific restaurant
-                    _tq_pt = (
-                        Q(owner=current_restaurant) |
-                        Q(restaurant__main_owner=current_restaurant) |
-                        Q(restaurant__branch_owner=current_restaurant)
-                    )
-                    table = TableInfo.objects.filter(
-                        _tq_pt, tbl_no=table_number
-                    ).first()
-                    if not table:
-                        messages.error(request, f'Table {table_number} not found in {current_restaurant.restaurant_name}.')
-                        return redirect('orders:select_table')
-                    
+
                     # Sanitize special instructions
                     special_instructions = sanitize_special_instructions(
                         form.cleaned_data['special_instructions']
                     )
-                    
-                    # Create order
-                    order = Order.objects.create(
-                        order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
-                        table_info=table,
-                        ordered_by=request.user,
-                        special_instructions=special_instructions,
-                        status='pending'
-                    )
-                    
+
+                    if is_remote_order:
+                        # Delivery / Pickup — no table required
+                        delivery_address = request.session.get('delivery_address', '')
+                        delivery_phone = request.session.get('delivery_phone', '')
+
+                        # Get tax rate from Restaurant model
+                        from restaurant.models_restaurant import Restaurant as RestaurantModel
+                        _rq = (
+                            Q(main_owner=current_restaurant) |
+                            Q(branch_owner=current_restaurant)
+                        )
+                        rest_obj = RestaurantModel.objects.filter(_rq).first()
+                        remote_tax_rate = Decimal(str(rest_obj.tax_rate)) if rest_obj else Decimal('0.08')
+
+                        order = Order.objects.create(
+                            order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
+                            table_info=None,
+                            ordered_by=request.user,
+                            special_instructions=special_instructions,
+                            status='pending',
+                            order_type=order_type_session,
+                            delivery_address=delivery_address,
+                            delivery_phone=delivery_phone,
+                        )
+                        table = None
+                    else:
+                        # Dine-in — table is required
+                        table_number, table_id = validate_session_table(request.session, current_restaurant)
+                        if not table_number:
+                            messages.error(request, 'Invalid table selection.')
+                            return redirect('orders:select_table')
+
+                        _tq_pt = (
+                            Q(owner=current_restaurant) |
+                            Q(restaurant__main_owner=current_restaurant) |
+                            Q(restaurant__branch_owner=current_restaurant)
+                        )
+                        table = TableInfo.objects.filter(
+                            _tq_pt, tbl_no=table_number
+                        ).first()
+                        if not table:
+                            messages.error(request, f'Table {table_number} not found in {current_restaurant.restaurant_name}.')
+                            return redirect('orders:select_table')
+
+                        order = Order.objects.create(
+                            order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
+                            table_info=table,
+                            ordered_by=request.user,
+                            special_instructions=special_instructions,
+                            status='pending',
+                            order_type='dine-in',
+                        )
+
                     # Create order items - verify each product belongs to restaurant
                     total_amount = 0
                     for product_id, item in cart.items():
@@ -594,20 +644,17 @@ def place_order(request):
                             Q(main_category__restaurant__branch_owner=current_restaurant),
                             id=product_id,
                         ).first()
-                        
+
                         if not product:
                             raise Exception(f'Product not available')
-                        
+
                         # Check stock again
                         if product.available_in_stock < item['quantity']:
                             raise Exception(f'Insufficient stock for {product.name}')
-                        
+
                         # SECURITY: always re-fetch the authoritative price from the database.
-                        # Never trust the client-supplied session cart price — it can be tampered.
-                        # get_current_price() returns the promotional price when one is active,
-                        # or the regular price otherwise.
                         unit_price_paid = product.get_current_price()
-                        
+
                         # Create order item with authoritative price
                         OrderItem.objects.create(
                             order=order,
@@ -615,30 +662,34 @@ def place_order(request):
                             quantity=item['quantity'],
                             unit_price=unit_price_paid
                         )
-                        
+
                         # Update stock
                         product.available_in_stock -= item['quantity']
                         product.save()
-                        
+
                         total_amount += float(unit_price_paid) * item['quantity']
-                    
-                    # Update order total — include tax so cashier balance and reports are correct
-                    tax_rate = table.get_tax_rate()
+
+                    # Update order total — include tax
+                    if is_remote_order:
+                        tax_rate = remote_tax_rate
+                    else:
+                        tax_rate = table.get_tax_rate()
                     order.total_amount = Decimal(str(total_amount)) * (1 + tax_rate)
                     order.save()
                     # --- transaction ends here, order is committed to DB ---
 
                 # Log the order placement (outside transaction so it never breaks order)
+                table_ref = table.tbl_no if table else order_type_session
                 try:
                     log_security_event(
                         event_type='order_placed',
                         user=request.user,
-                        description=f"Order {order.order_number} placed for table {table.tbl_no}",
+                        description=f"Order {order.order_number} placed ({table_ref})",
                         ip_address=get_client_ip(request),
                         extra_data={
                             'order_id': order.id,
                             'order_number': order.order_number,
-                            'table': table.tbl_no,
+                            'table': table_ref,
                             'total': str(total_amount),
                             'items_count': len(cart)
                         }
@@ -655,11 +706,11 @@ def place_order(request):
                             'type': 'new_order',
                             'order_id': str(order.id),
                             'order_number': order.order_number,
-                            'table_number': str(table.tbl_no),
+                            'table_number': str(table_ref),
                             'customer_name': request.user.get_full_name() or request.user.username,
                             'items_count': len(cart),
                             'total_amount': str(total_amount),
-                            'message': f'New order #{order.order_number} from Table {table.tbl_no}',
+                            'message': f'New order #{order.order_number} ({table_ref})',
                             'timestamp': order.created_at.isoformat()
                         }
                     )
@@ -680,10 +731,11 @@ def place_order(request):
                     # WebSocket notification failure shouldn't break order placement
                     logger.warning(f"WebSocket notification failed (non-critical): {ws_error}")
 
-                # Clear cart but KEEP table selection for adding more orders
+                # Clear cart. Keep table for dine-in (allows adding more items); clear remote order state.
                 del request.session['cart']
-                # Do NOT clear selected_table - allows customer to order more at same table
-                # del request.session['selected_table']  # COMMENTED OUT
+                if is_remote_order:
+                    for key in ('order_type', 'delivery_address', 'delivery_phone'):
+                        request.session.pop(key, None)
                 request.session.modified = True
 
                 # ✨ SERVER-SIDE AUTO-PRINT (NO BROWSER DIALOG!)
@@ -774,10 +826,13 @@ def place_order(request):
         'tax_rate': tax_rate,
         'tax_percentage': int(tax_rate * 100),  # For display purposes
         'final_total': final_total,
-        'table_number': request.session['selected_table'],
+        'table_number': request.session.get('selected_table', ''),
+        'order_type': order_type_session,
+        'delivery_address': request.session.get('delivery_address', ''),
+        'is_remote_order': is_remote_order,
         'base_template': base_template,
     }
-    
+
     return render(request, 'orders/place_order.html', context)
 
 @login_required
@@ -842,18 +897,20 @@ def my_orders(request):
     orders_query = Order.objects.filter(ordered_by=request.user)
     
     if request.user.is_customer() and restaurant:
-        # For universal customers, only show orders from current restaurant
+        # Show orders from current restaurant + all remote orders (delivery/pickup have no table)
         orders_query = orders_query.filter(
             Q(table_info__owner=restaurant) |
             Q(table_info__restaurant__main_owner=restaurant) |
-            Q(table_info__restaurant__branch_owner=restaurant)
+            Q(table_info__restaurant__branch_owner=restaurant) |
+            Q(table_info__isnull=True)
         )
     elif request.user.is_customer() and request.user.owner:
-        # For legacy customers tied to specific restaurant
+        # For legacy customers tied to specific restaurant + remote orders
         orders_query = orders_query.filter(
             Q(table_info__owner=request.user.owner) |
             Q(table_info__restaurant__main_owner=request.user.owner) |
-            Q(table_info__restaurant__branch_owner=request.user.owner)
+            Q(table_info__restaurant__branch_owner=request.user.owner) |
+            Q(table_info__isnull=True)
         )
     elif request.user.is_customer_care():
         # For customer care users, show only their orders from their assigned restaurant
@@ -863,7 +920,9 @@ def my_orders(request):
                 orders_query = orders_query.filter(
                     Q(table_info__owner=owner_filter) |
                     Q(table_info__restaurant__main_owner=owner_filter) |
-                    Q(table_info__restaurant__branch_owner=owner_filter)
+                    Q(table_info__restaurant__branch_owner=owner_filter) |
+                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
                 )
             # If no restaurant assignment, show all their orders
         except PermissionDenied:
@@ -873,14 +932,24 @@ def my_orders(request):
     orders = orders_query.select_related(
         'table_info', 'table_info__owner', 'confirmed_by'
     ).prefetch_related('order_items__product').order_by('-created_at')
-    
+
+    active_statuses = {'pending', 'confirmed', 'preparing', 'ready'}
+
+    # Count active orders across ALL pages for the badge
+    total_active_count = orders.filter(status__in=active_statuses).count()
+
+    paginator = Paginator(orders, 10)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
     context = {
-        'orders': orders,
+        'orders': page_obj,
+        'page_obj': page_obj,
+        'active_count': total_active_count,
         'restaurant_name': request.session.get('selected_restaurant_name', 'Restaurant'),
         'current_restaurant': restaurant,
-        'is_customer_care': request.user.is_customer_care()
+        'is_customer_care': request.user.is_customer_care(),
     }
-    
+
     return render(request, 'orders/my_orders.html', context)
 
 @login_required
@@ -893,23 +962,43 @@ def order_detail(request, order_id):
         _oq_ord = (
             Q(table_info__owner=owner) |
             Q(table_info__restaurant__main_owner=owner) |
-            Q(table_info__restaurant__branch_owner=owner)
+            Q(table_info__restaurant__branch_owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
         )
         order = get_object_or_404(_order_qs.filter(_oq_ord), id=order_id)
     else:
         # Regular customers can only view their own orders
         order = get_object_or_404(_order_qs, id=order_id, ordered_by=request.user)
     
-    # Define order progress steps with tracking information
-    status_progress = [
-        {'status': 'pending', 'label': 'Order Placed', 'icon': 'bi-receipt', 'description': 'Your order has been received'},
-        {'status': 'confirmed', 'label': 'Order Confirmed', 'icon': 'bi-check-circle', 'description': 'Order confirmed by staff'},
-        {'status': 'preparing', 'label': 'Preparing', 'icon': 'bi-hourglass-split', 'description': 'Kitchen is preparing your order'},
-        {'status': 'ready', 'label': 'Ready', 'icon': 'bi-bell', 'description': 'Your order is ready for pickup'},
-        {'status': 'served', 'label': 'Served', 'icon': 'bi-check2-all', 'description': 'Order has been served'},
-    ]
-    
-    # Determine current step and completion status
+    is_remote_order = order.order_type in ('delivery', 'pickup')
+
+    # Build progress steps based on order type
+    if order.order_type == 'delivery':
+        status_progress = [
+            {'status': 'pending',   'label': 'Order Placed',      'icon': 'bi-receipt',       'description': 'Your order has been received'},
+            {'status': 'confirmed', 'label': 'Confirmed',          'icon': 'bi-check-circle',  'description': 'Restaurant confirmed your order'},
+            {'status': 'preparing', 'label': 'Being Prepared',     'icon': 'bi-hourglass-split','description': 'Kitchen is cooking your order'},
+            {'status': 'ready',     'label': 'Out for Delivery',   'icon': 'bi-bicycle',       'description': 'Your order is on the way'},
+            {'status': 'served',    'label': 'Delivered',          'icon': 'bi-check2-all',    'description': 'Order delivered successfully'},
+        ]
+    elif order.order_type == 'pickup':
+        status_progress = [
+            {'status': 'pending',   'label': 'Order Placed',       'icon': 'bi-receipt',       'description': 'Your order has been received'},
+            {'status': 'confirmed', 'label': 'Confirmed',           'icon': 'bi-check-circle',  'description': 'Restaurant confirmed your order'},
+            {'status': 'preparing', 'label': 'Being Prepared',      'icon': 'bi-hourglass-split','description': 'Kitchen is preparing your order'},
+            {'status': 'ready',     'label': 'Ready for Pickup',    'icon': 'bi-bag-check',     'description': 'Come pick up your order now'},
+            {'status': 'served',    'label': 'Picked Up',           'icon': 'bi-check2-all',    'description': 'Order picked up successfully'},
+        ]
+    else:
+        status_progress = [
+            {'status': 'pending',   'label': 'Order Placed',  'icon': 'bi-receipt',        'description': 'Your order has been received'},
+            {'status': 'confirmed', 'label': 'Confirmed',      'icon': 'bi-check-circle',   'description': 'Order confirmed by staff'},
+            {'status': 'preparing', 'label': 'Preparing',      'icon': 'bi-hourglass-split','description': 'Kitchen is preparing your order'},
+            {'status': 'ready',     'label': 'Ready',          'icon': 'bi-bell',           'description': 'Your order is ready to be served'},
+            {'status': 'served',    'label': 'Served',         'icon': 'bi-check2-all',     'description': 'Enjoy your meal!'},
+        ]
+
     status_order = ['pending', 'confirmed', 'preparing', 'ready', 'served']
     try:
         current_step = status_order.index(order.status)
@@ -917,23 +1006,21 @@ def order_detail(request, order_id):
     except ValueError:
         current_step = -1
         completed_steps = 0
-    
-    # Payment status info
+
     payment_progress = {
-        'unpaid': {'label': 'Payment Pending', 'icon': 'bi-credit-card', 'class': 'warning'},
-        'partial': {'label': 'Partial Payment', 'icon': 'bi-credit-card-2-front', 'class': 'info'},
-        'paid': {'label': 'Payment Complete', 'icon': 'bi-check-circle-fill', 'class': 'success'},
+        'unpaid':  {'label': 'Payment Pending',   'icon': 'bi-credit-card',         'class': 'warning'},
+        'partial': {'label': 'Partial Payment',   'icon': 'bi-credit-card-2-front', 'class': 'info'},
+        'paid':    {'label': 'Payment Complete',  'icon': 'bi-check-circle-fill',   'class': 'success'},
     }
-    
-    # Check for pending bill request for this table
+
+    # Bill request only makes sense for dine-in orders at a table
     pending_bill_request = None
-    if order.table_info and request.user.is_customer():
+    if order.table_info and not is_remote_order and request.user.is_customer():
         pending_bill_request = BillRequest.objects.filter(
             table_info=order.table_info,
             status='pending'
         ).first()
-    
-    # Determine base template based on user role
+
     if request.user.is_authenticated:
         if request.user.is_cashier() or request.user.is_customer_care():
             base_template = 'cashier_base.html'
@@ -941,9 +1028,10 @@ def order_detail(request, order_id):
             base_template = 'base.html'
     else:
         base_template = 'base.html'
-    
+
     context = {
         'order': order,
+        'is_remote_order': is_remote_order,
         'status_progress': status_progress,
         'current_step': current_step,
         'completed_steps': completed_steps,
@@ -976,7 +1064,9 @@ def order_list(request):
             orders = Order.objects.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             ).distinct()
         else:
             # Only system admin (no owner) can see all orders
@@ -1017,14 +1107,16 @@ def kitchen_dashboard(request):
             base_queryset = base_queryset.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
         # If administrator or no owner filter, show all orders
-        
+
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
-    
+
     # Only include orders that have at least one kitchen item (DB-level filter, no N+1)
     base_queryset = base_queryset.filter(order_items__product__station='kitchen').distinct()
 
@@ -1076,7 +1168,9 @@ def bar_dashboard(request):
             base_queryset = base_queryset.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
@@ -1134,9 +1228,11 @@ def buffet_dashboard(request):
             base_queryset = base_queryset.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
-        
+
         # Filter to only include orders with buffet items (database-level)
         base_queryset = base_queryset.filter(order_items__product__station='buffet').distinct()
     except PermissionDenied:
@@ -1192,9 +1288,11 @@ def service_dashboard(request):
             base_queryset = base_queryset.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
-        
+
         # Filter to only include orders with service items (database-level)
         base_queryset = base_queryset.filter(order_items__product__station='service').distinct()
     except PermissionDenied:
@@ -1280,7 +1378,9 @@ def kitchen_reports(request):
         base_queryset = base_queryset.filter(
             Q(table_info__owner=owner_filter) |
             Q(table_info__restaurant__main_owner=owner_filter) |
-            Q(table_info__restaurant__branch_owner=owner_filter)
+            Q(table_info__restaurant__branch_owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
         )
 
     orders_with_kitchen_items = list(base_queryset)
@@ -1392,7 +1492,9 @@ def bar_reports(request):
         base_queryset = base_queryset.filter(
             Q(table_info__owner=owner_filter) |
             Q(table_info__restaurant__main_owner=owner_filter) |
-            Q(table_info__restaurant__branch_owner=owner_filter)
+            Q(table_info__restaurant__branch_owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
         )
 
     orders_with_bar_items = list(base_queryset)
@@ -1503,7 +1605,9 @@ def buffet_reports(request):
         base_queryset = base_queryset.filter(
             Q(table_info__owner=owner_filter) |
             Q(table_info__restaurant__main_owner=owner_filter) |
-            Q(table_info__restaurant__branch_owner=owner_filter)
+            Q(table_info__restaurant__branch_owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
         )
 
     orders_with_buffet_items = list(base_queryset)
@@ -1611,7 +1715,9 @@ def service_reports(request):
         base_queryset = base_queryset.filter(
             Q(table_info__owner=owner_filter) |
             Q(table_info__restaurant__main_owner=owner_filter) |
-            Q(table_info__restaurant__branch_owner=owner_filter)
+            Q(table_info__restaurant__branch_owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
         )
 
     orders_with_service_items = list(base_queryset)
@@ -1688,24 +1794,29 @@ def confirm_order(request, order_id):
             _oq_ko = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(kitchen_orders.filter(_oq_ko), id=order_id, status='pending')
         else:
             order = get_object_or_404(kitchen_orders, id=order_id, status='pending')
-        
+
         order.status = 'confirmed'
         order.confirmed_by = request.user
         order.save()
-        
-        # Mark table as occupied when order is confirmed
-        table = order.table_info
-        table.is_available = False
-        table.save()
-        
+
+        # Mark table as occupied when order is confirmed (delivery/pickup have no table)
+        if order.table_info:
+            order.table_info.is_available = False
+            order.table_info.save(update_fields=['is_available'])
+            table_msg = f' Table {order.table_info.tbl_no} is now occupied.'
+        else:
+            table_msg = ''
+
         return JsonResponse({
             'success': True,
-            'message': f'Order {order.order_number} confirmed successfully! Table {table.tbl_no} is now occupied.',
+            'message': f'Order {order.order_number} confirmed successfully!{table_msg}',
             'new_status': order.get_status_display()
         })
         
@@ -1741,7 +1852,9 @@ def update_order_status(request, order_id):
             _oq_uos3 = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(Order.objects.filter(_oq_uos3), id=order_id)
         else:
@@ -1900,7 +2013,9 @@ def cancel_order(request, order_id):
             _oq_cobk = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(
                 Order.objects.prefetch_related('order_items__product').filter(_oq_cobk),
@@ -1937,25 +2052,26 @@ def cancel_order(request, order_id):
                     # Restore product stock
                     for item in order.order_items.select_related('product').all():
                         product = item.product
-                        product.available_in_stock += item.quantity
-                        product.save()
-                    
+                        if product and product.available_in_stock is not None:
+                            product.available_in_stock += item.quantity
+                            product.save()
+
                     # Update order
                     order.status = 'cancelled'
                     order.reason_if_cancelled = reason
                     # Release the table when order is cancelled
                     order.release_table()
                     order.save()
-                    
+
                     return JsonResponse({
                         'success': True,
                         'message': f'Order {order.order_number} cancelled successfully.'
                     })
-                    
+
             except Exception as e:
                 logger.error(f"Error cancelling order (AJAX): {e}", exc_info=True)
                 return JsonResponse({'success': False, 'message': 'An error occurred while cancelling the order.'})
-        
+
         # Handle regular form submission
         form = CancelOrderForm(request.POST)
         if form.is_valid():
@@ -1963,8 +2079,9 @@ def cancel_order(request, order_id):
                 # Restore product stock
                 for item in order.order_items.select_related('product').all():
                     product = item.product
-                    product.available_in_stock += item.quantity
-                    product.save()
+                    if product and product.available_in_stock is not None:
+                        product.available_in_stock += item.quantity
+                        product.save()
                 
                 # Update order
                 order.status = 'cancelled'
@@ -1998,7 +2115,9 @@ def customer_cancel_order(request, order_id):
                 _oq_cco = (
                     Q(table_info__owner=owner_filter) |
                     Q(table_info__restaurant__main_owner=owner_filter) |
-                    Q(table_info__restaurant__branch_owner=owner_filter)
+                    Q(table_info__restaurant__branch_owner=owner_filter) |
+                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
                 )
                 order = get_object_or_404(_order_qs.filter(_oq_cco), id=order_id)
             else:
@@ -2028,35 +2147,37 @@ def customer_cancel_order(request, order_id):
                     # Restore product stock
                     for item in order.order_items.select_related('product').all():
                         product = item.product
-                        product.available_in_stock += item.quantity
-                        product.save()
-                    
+                        if product and product.available_in_stock is not None:
+                            product.available_in_stock += item.quantity
+                            product.save()
+
                     # Update order
                     order.status = 'cancelled'
                     order.reason_if_cancelled = reason
                     # Release the table when order is cancelled
                     order.release_table()
                     order.save()
-                    
+
                     return JsonResponse({
                         'success': True,
                         'message': f'Order {order.order_number} cancelled successfully.'
                     })
-                    
+
             except Exception as e:
                 logger.error(f"Error cancelling order (customer AJAX): {e}", exc_info=True)
                 return JsonResponse({'success': False, 'message': 'An error occurred while cancelling the order.'})
-        
+
         # Handle regular form submission
         reason = request.POST.get('reason', 'Cancelled by customer').strip()
-        
+
         try:
             with transaction.atomic():
                 # Restore product stock
                 for item in order.order_items.select_related('product').all():
                     product = item.product
-                    product.available_in_stock += item.quantity
-                    product.save()
+                    if product and product.available_in_stock is not None:
+                        product.available_in_stock += item.quantity
+                        product.save()
                 
                 # Update order
                 order.status = 'cancelled'
@@ -2094,7 +2215,9 @@ def kitchen_order_detail(request, order_id):
             _oq_kod = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(
                 Order.objects.prefetch_related('order_items__product').filter(_oq_kod),
@@ -2133,7 +2256,9 @@ def customer_care_dashboard(request):
             user_orders = Order.objects.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter),
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter),
                 ordered_by=request.user,
             ).distinct()
         else:
@@ -2219,18 +2344,22 @@ def customer_care_payments(request):
     _oq_ccp = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     if period_filter == 'weekly':
         # Start of week (Monday)
+        from datetime import timedelta as _td
         days_since_monday = today_start.weekday()
-        week_start = today_start - timezone.timedelta(days=days_since_monday)
+        week_start = today_start - _td(days=days_since_monday)
         orders = Order.objects.filter(
             _oq_ccp,
             created_at__gte=week_start
         )
     else:  # today
-        today_end = today_start + timezone.timedelta(days=1)
+        from datetime import timedelta as _td
+        today_end = today_start + _td(days=1)
         orders = Order.objects.filter(
             _oq_ccp,
             created_at__gte=today_start,
@@ -2312,7 +2441,9 @@ def customer_care_receipt(request, payment_id):
     _pq_ccr = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     payment = get_object_or_404(Payment.objects.filter(_pq_ccr), id=payment_id)
     
@@ -2351,7 +2482,9 @@ def customer_care_reprint_receipt(request, payment_id):
     _pq_ccrr = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     payment = get_object_or_404(Payment.objects.filter(_pq_ccrr), id=payment_id)
     
@@ -2402,7 +2535,9 @@ def customer_care_receipt_management(request):
     _pq_ccpm = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     payments = Payment.objects.filter(
         _pq_ccpm,
@@ -2458,7 +2593,9 @@ def view_receipt(request, order_id):
                 _oq_ccod = (
                     Q(table_info__owner=owner_filter) |
                     Q(table_info__restaurant__main_owner=owner_filter) |
-                    Q(table_info__restaurant__branch_owner=owner_filter)
+                    Q(table_info__restaurant__branch_owner=owner_filter) |
+                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
                 )
                 order = get_object_or_404(_order_qs.filter(_oq_ccod), id=order_id)
             else:
@@ -2483,9 +2620,9 @@ def view_receipt(request, order_id):
     tax_amount = order.get_tax_amount()
     discount_amount = order.get_total_discount()
     total_amount = order.total_amount
-    
+
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         # For branch owners, show the main restaurant name
         from restaurant.models import Restaurant
@@ -2542,15 +2679,27 @@ def print_kot(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
-                messages.error(request, 'Access denied. This order belongs to a different restaurant.')
-                return redirect('orders:kitchen_dashboard')
+            if owner_filter:
+                if order.table_info:
+                    if (order.table_info.owner != owner_filter and
+                            not getattr(order.table_info.restaurant, 'main_owner', None) == owner_filter and
+                            not getattr(order.table_info.restaurant, 'branch_owner', None) == owner_filter):
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:kitchen_dashboard')
+                elif order.order_type in ('delivery', 'pickup'):
+                    ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                    if ordered_by_owner != owner_filter:
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:kitchen_dashboard')
+                else:
+                    messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                    return redirect('orders:kitchen_dashboard')
     except Exception:
         messages.error(request, 'Permission error. Please contact administrator.')
         return redirect('orders:kitchen_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -2600,14 +2749,16 @@ def reprint_kot(request, order_id):
             _oq_rk = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(_order_qs.filter(_oq_rk), id=order_id)
         else:
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -2662,15 +2813,27 @@ def print_bot(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
-                messages.error(request, 'Access denied. This order belongs to a different restaurant.')
-                return redirect('orders:bar_dashboard')
+            if owner_filter:
+                if order.table_info:
+                    if (order.table_info.owner != owner_filter and
+                            not getattr(order.table_info.restaurant, 'main_owner', None) == owner_filter and
+                            not getattr(order.table_info.restaurant, 'branch_owner', None) == owner_filter):
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:bar_dashboard')
+                elif order.order_type in ('delivery', 'pickup'):
+                    ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                    if ordered_by_owner != owner_filter:
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:bar_dashboard')
+                else:
+                    messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                    return redirect('orders:bar_dashboard')
     except Exception:
         messages.error(request, 'Permission error. Please contact administrator.')
         return redirect('orders:bar_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -2719,14 +2882,16 @@ def reprint_bot(request, order_id):
             _oq_rb = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(_order_qs.filter(_oq_rb), id=order_id)
         else:
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -2781,15 +2946,27 @@ def print_buffet(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
-                messages.error(request, 'Access denied. This order belongs to a different restaurant.')
-                return redirect('orders:buffet_dashboard')
+            if owner_filter:
+                if order.table_info:
+                    if (order.table_info.owner != owner_filter and
+                            not getattr(order.table_info.restaurant, 'main_owner', None) == owner_filter and
+                            not getattr(order.table_info.restaurant, 'branch_owner', None) == owner_filter):
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:buffet_dashboard')
+                elif order.order_type in ('delivery', 'pickup'):
+                    ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                    if ordered_by_owner != owner_filter:
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:buffet_dashboard')
+                else:
+                    messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                    return redirect('orders:buffet_dashboard')
     except Exception:
         messages.error(request, 'Permission error. Please contact administrator.')
         return redirect('orders:buffet_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -2838,14 +3015,16 @@ def reprint_buffet(request, order_id):
             _oq_rbuf = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(_order_qs.filter(_oq_rbuf), id=order_id)
         else:
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -2900,15 +3079,27 @@ def print_service(request, order_id):
     try:
         if not request.user.is_administrator():
             owner_filter = get_owner_filter(request.user)
-            if owner_filter and order.table_info and order.table_info.owner != owner_filter:
-                messages.error(request, 'Access denied. This order belongs to a different restaurant.')
-                return redirect('orders:service_dashboard')
+            if owner_filter:
+                if order.table_info:
+                    if (order.table_info.owner != owner_filter and
+                            not getattr(order.table_info.restaurant, 'main_owner', None) == owner_filter and
+                            not getattr(order.table_info.restaurant, 'branch_owner', None) == owner_filter):
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:service_dashboard')
+                elif order.order_type in ('delivery', 'pickup'):
+                    ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                    if ordered_by_owner != owner_filter:
+                        messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                        return redirect('orders:service_dashboard')
+                else:
+                    messages.error(request, 'Access denied. This order belongs to a different restaurant.')
+                    return redirect('orders:service_dashboard')
     except Exception:
         messages.error(request, 'Permission error. Please contact administrator.')
         return redirect('orders:service_dashboard')
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -2957,14 +3148,16 @@ def reprint_service(request, order_id):
             _oq_rsvc = (
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
             order = get_object_or_404(_order_qs.filter(_oq_rsvc), id=order_id)
         else:
             order = get_object_or_404(_order_qs, id=order_id)
     
     # Get restaurant name - use main restaurant name for branch staff
-    owner = order.table_info.owner if order.table_info else get_owner_filter(request.user)
+    owner = _resolve_order_owner(order, request)
     if owner and owner.is_branch_owner():
         from restaurant.models import Restaurant
         branch_restaurant = Restaurant.objects.filter(
@@ -3459,7 +3652,9 @@ def customer_care_reports(request):
     orders = Order.objects.filter(
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner),
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner),
         ordered_by=request.user,
     ).distinct()
     
@@ -3759,7 +3954,9 @@ def cancel_order_item(request, item_id):
         _oiq = (
             Q(order__table_info__owner=owner) |
             Q(order__table_info__restaurant__main_owner=owner) |
-            Q(order__table_info__restaurant__branch_owner=owner)
+            Q(order__table_info__restaurant__branch_owner=owner) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
         )
         item = OrderItem.objects.filter(_oiq, id=item_id).first()
         if item is None:
@@ -3789,30 +3986,39 @@ def cancel_order_item(request, item_id):
         item_quantity = item.quantity
         item_price = item.unit_price
         item_total = item.get_subtotal()
-        
-        # Restore stock if product stock tracking is enabled
-        if item.product:
-            from restaurant.models import Product
-            product = Product.objects.select_for_update().get(id=item.product.id)
-            if product.available_in_stock is not None:
-                product.available_in_stock += item.quantity
-                product.save(update_fields=['available_in_stock'])
-                logger.info(f"Restored {item.quantity} units of {product.name} to stock")
-        
-        # Delete the item (this will trigger OrderItem's save method on Order)
-        item.delete()
-        
-        # Recalculate order total including tax after item cancellation
-        subtotal = sum(oi.get_subtotal() for oi in order.order_items.select_related('product').all())
-        tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
-        order.total_amount = subtotal * (1 + tax_rate)
-        order.save(update_fields=['total_amount'])
+
+        with transaction.atomic():
+            # Restore stock if product stock tracking is enabled
+            if item.product:
+                from restaurant.models import Product
+                product = Product.objects.select_for_update().get(id=item.product.id)
+                if product.available_in_stock is not None:
+                    product.available_in_stock += item.quantity
+                    product.save(update_fields=['available_in_stock'])
+                    logger.info(f"Restored {item.quantity} units of {product.name} to stock")
+
+            # Compute tax_rate BEFORE deleting the item so we can back-calculate it for delivery/pickup
+            if order.table_info:
+                tax_rate = order.table_info.get_tax_rate()
+            else:
+                from decimal import Decimal as _D
+                pre_subtotal = sum(oi.get_subtotal() for oi in order.order_items.all())
+                tax_rate = (order.total_amount / pre_subtotal - 1) if pre_subtotal else 0
+
+            # Delete the item
+            item.delete()
+
+            # Recalculate order total including tax after item cancellation
+            subtotal = sum(oi.get_subtotal() for oi in order.order_items.select_related('product').all())
+            order.total_amount = subtotal * (1 + tax_rate)
+            order.save(update_fields=['total_amount'])
+
         logger.info(
             f"Item cancelled: {item_name} x{item_quantity} (${item_total}) "
             f"from Order #{order.order_number} by {request.user.username}. "
             f"Reason: {reason}"
         )
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Item "{item_name}" cancelled successfully',

@@ -28,6 +28,9 @@ urlpatterns = [
     path('', views.order_list, name='order_list'),
     path('create/', views.create_order, name='create_order'),
     
+    # QR code scanner for dine-in
+    path('scan/', views.scan_qr, name='scan_qr'),
+
     # Customer ordering flow
     path('table/', views.select_table, name='select_table'),
     path('table/choose-action/', views.choose_order_action, name='choose_order_action'),

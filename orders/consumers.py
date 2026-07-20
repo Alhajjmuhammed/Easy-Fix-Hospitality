@@ -3,8 +3,9 @@ import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
-from orders.models import Order
+from orders.models import Order, DeliveryAssignment, DeliveryRider
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -347,4 +348,187 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
             return None
         except Exception as e:
             logger.error(f"Error getting user restaurant ID: {str(e)}")
+            return None
+
+
+class DeliveryConsumer(AsyncWebsocketConsumer):
+    """
+    Real-time delivery tracking WebSocket.
+
+    Group: delivery_{order_id}
+    - Rider connects and pushes GPS pings every ~5 s.
+    - Customer connects and receives live location updates.
+    - Both see delivery-status changes (picked_up / delivered).
+    """
+
+    async def connect(self):
+        try:
+            self.order_id = self.scope['url_route']['kwargs']['order_id']
+            self.group_name = f'delivery_{self.order_id}'
+
+            user = self.scope.get('user')
+            if not user or user == AnonymousUser() or not user.is_authenticated:
+                await self.close(code=4001)
+                return
+
+            allowed = await self.check_permission(user, self.order_id)
+            if not allowed:
+                await self.close(code=4003)
+                return
+
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+            await self.accept()
+
+            # Send current tracking snapshot so the client can render immediately
+            snapshot = await self.get_tracking_snapshot(self.order_id)
+            if snapshot:
+                await self.send(text_data=json.dumps({'type': 'snapshot', **snapshot}))
+
+            logger.info(f"Delivery WS connected: order {self.order_id} user {user.username}")
+        except Exception as e:
+            logger.error(f"DeliveryConsumer connect error: {e}")
+            await self.close(code=4002)
+
+    async def disconnect(self, close_code):
+        try:
+            if hasattr(self, 'group_name'):
+                await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        except Exception as e:
+            logger.error(f"DeliveryConsumer disconnect error: {e}")
+
+    async def receive(self, text_data):
+        """
+        Accepts messages from the rider's phone:
+          { type: 'location_update', lat: float, lng: float }
+          { type: 'ping' }
+        """
+        try:
+            data = json.loads(text_data)
+            msg_type = data.get('type')
+
+            if msg_type == 'location_update':
+                lat = data.get('lat')
+                lng = data.get('lng')
+                if lat is None or lng is None:
+                    return
+
+                user = self.scope.get('user')
+                is_rider = await self.is_assigned_rider(user, self.order_id)
+                if not is_rider:
+                    return
+
+                # Persist location to DB so REST GET /track/ always has fresh data
+                await self.save_rider_location(user, self.order_id, lat, lng)
+
+                # Broadcast to everyone in the group (customer + any monitors)
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {
+                        'type': 'location_broadcast',
+                        'lat': lat,
+                        'lng': lng,
+                        'timestamp': timezone.now().isoformat(),
+                    }
+                )
+
+            elif msg_type == 'ping':
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+
+        except json.JSONDecodeError:
+            pass
+        except Exception as e:
+            logger.error(f"DeliveryConsumer receive error: {e}")
+
+    # ── Channel layer event handlers ──────────────────────────────────────────
+
+    async def location_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'location_update',
+            'lat': event['lat'],
+            'lng': event['lng'],
+            'timestamp': event['timestamp'],
+        }))
+
+    async def delivery_status_update(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'delivery_status',
+            'status': event['status'],
+            'status_display': event['status_display'],
+            'timestamp': event['timestamp'],
+        }))
+
+    # ── DB helpers ────────────────────────────────────────────────────────────
+
+    @database_sync_to_async
+    def check_permission(self, user, order_id):
+        try:
+            order = Order.objects.select_related(
+                'ordered_by', 'table_info__owner'
+            ).get(id=order_id)
+
+            if user.is_administrator():
+                return True
+            if order.ordered_by == user:
+                return True
+            # Restaurant staff
+            owner = order.table_info.owner if order.table_info else None
+            if owner:
+                if owner == user:
+                    return True
+                if hasattr(user, 'owner') and user.owner == owner:
+                    return True
+            # The assigned rider
+            try:
+                assignment = order.delivery_assignment
+                if assignment.rider.user == user:
+                    return True
+            except DeliveryAssignment.DoesNotExist:
+                pass
+            return False
+        except Order.DoesNotExist:
+            return False
+        except Exception as e:
+            logger.error(f"DeliveryConsumer permission check error: {e}")
+            return False
+
+    @database_sync_to_async
+    def is_assigned_rider(self, user, order_id):
+        try:
+            assignment = DeliveryAssignment.objects.select_related('rider__user').get(
+                order_id=order_id
+            )
+            return assignment.rider.user == user
+        except DeliveryAssignment.DoesNotExist:
+            return False
+
+    @database_sync_to_async
+    def save_rider_location(self, user, order_id, lat, lng):
+        try:
+            rider = user.rider_profile
+            rider.current_lat = lat
+            rider.current_lng = lng
+            rider.last_location_at = timezone.now()
+            rider.save(update_fields=['current_lat', 'current_lng', 'last_location_at'])
+        except Exception as e:
+            logger.error(f"save_rider_location error: {e}")
+
+    @database_sync_to_async
+    def get_tracking_snapshot(self, order_id):
+        try:
+            assignment = DeliveryAssignment.objects.select_related(
+                'rider__user', 'order'
+            ).get(order_id=order_id)
+            rider = assignment.rider
+            return {
+                'status': assignment.status,
+                'rider_name': rider.user.get_full_name() or rider.user.username,
+                'vehicle': rider.get_vehicle_type_display(),
+                'lat': float(rider.current_lat) if rider.current_lat else None,
+                'lng': float(rider.current_lng) if rider.current_lng else None,
+                'delivery_address': assignment.order.delivery_address,
+            }
+        except DeliveryAssignment.DoesNotExist:
+            return None
+        except Exception as e:
+            logger.error(f"get_tracking_snapshot error: {e}")
             return None

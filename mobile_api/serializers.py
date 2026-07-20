@@ -274,13 +274,15 @@ class OrderSerializer(serializers.ModelSerializer):
     confirmed_by_name = serializers.SerializerMethodField()
     pending_bill_requested = serializers.SerializerMethodField()
     pending_bill_requested_at = serializers.SerializerMethodField()
+    delivery_lat = serializers.SerializerMethodField()
+    delivery_lng = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'table_info', 'table_number',
             'ordered_by_name', 'confirmed_by_name', 'status', 'payment_status',
-            'order_type', 'delivery_address', 'delivery_phone',
+            'order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng',
             'total_amount', 'subtotal', 'tax_amount', 'discount_amount', 'total',
             'total_paid', 'balance_due', 'items_count',
             'special_instructions', 'reason_if_cancelled',
@@ -291,10 +293,18 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_table_number(self, obj):
         return obj.table_info.tbl_no if obj.table_info else 'N/A'
 
+    def get_delivery_lat(self, obj):
+        return float(obj.delivery_lat) if obj.delivery_lat is not None else None
+
+    def get_delivery_lng(self, obj):
+        return float(obj.delivery_lng) if obj.delivery_lng is not None else None
+
     def get_items_count(self, obj):
         return obj.order_items.count()
 
     def get_ordered_by_name(self, obj):
+        if not obj.ordered_by:
+            return 'Unknown'
         return obj.ordered_by.get_full_name() or obj.ordered_by.username
 
     def get_subtotal(self, obj):
@@ -395,16 +405,35 @@ class OrderSerializer(serializers.ModelSerializer):
 class PlaceOrderSerializer(serializers.Serializer):
     table_id = serializers.IntegerField(required=False, allow_null=True)
     items = serializers.ListField(child=serializers.DictField(), min_length=1)
-    special_instructions = serializers.CharField(allow_blank=True, required=False, default='')
-    offline_id = serializers.CharField(allow_blank=True, required=False, default='')
+    special_instructions = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='')
+    offline_id = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='')
     restaurant_id = serializers.IntegerField(required=False, allow_null=True)
     order_type = serializers.ChoiceField(
         choices=['dine-in', 'delivery', 'pickup'],
         required=False,
         default='dine-in',
+        allow_null=True,
     )
-    delivery_address = serializers.CharField(allow_blank=True, required=False, default='')
-    delivery_phone = serializers.CharField(allow_blank=True, required=False, default='', max_length=30)
+    delivery_address = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='')
+    delivery_phone = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='', max_length=30)
+    delivery_lat = serializers.FloatField(required=False, allow_null=True, default=None)
+    delivery_lng = serializers.FloatField(required=False, allow_null=True, default=None)
+
+    def validate_order_type(self, value):
+        if value is None:
+            return 'dine-in'
+        return value
+
+    def validate_special_instructions(self, value):
+        return value or ''
+
+    def validate_delivery_address(self, value):
+        return value or ''
+
+    def validate_delivery_phone(self, value):
+        if value is None:
+            return ''
+        return value[:30]  # truncate silently if somehow > 30 chars
 
 
 # ---------------------------------------------------------------------------

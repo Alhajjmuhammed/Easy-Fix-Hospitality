@@ -82,7 +82,7 @@
                                                 <small class="text-muted">{{ payment.created_at|date:"H:i" }}</small>
                                             </td>
                                             <td>
-                                                <span class="badge bg-secondary">Table {{ payment.order.table_info.tbl_no }}</span>
+                                                <span class="badge bg-secondary">{% if payment.order.table_info %}Table {{ payment.order.table_info.tbl_no }}{% else %}{{ payment.order.get_order_type_display }}{% endif %}</span>
                                             </td>
                                             <td>
                                                 <strong>{% currency_symbol %}{{ payment.amount|floatformat:2 }}</strong>

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@expo-google-fonts/poppins": "^0.4.1",
+    "expo-font": "^55.0.6"
+  }
+}

@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Scan QR Code — Dine-In{% endblock %}
+
+{% block extra_css %}
+<style>
+.scan-hero {
+    background: linear-gradient(135deg, #fff0f6 0%, #fce4ef 100%);
+    border-bottom: 1px solid #f5c6dc;
+    padding: 3rem 1.5rem 2rem;
+    text-align: center;
+}
+.scan-hero h1 { font-size: 1.8rem; font-weight: 800; color: #1a1a2e; }
+.scan-hero p  { color: #6c757d; max-width: 440px; margin: 0.5rem auto 0; }
+
+#qr-reader {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 3px solid #d63384;
+}
+#qr-reader video { width: 100%; }
+
+.status-box {
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-top: 1rem;
+    font-weight: 600;
+}
+.steps-list li { margin-bottom: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-hero">
+    <h1><i class="bi bi-qr-code-scan me-2" style="color:#d63384"></i>Scan Your Table QR</h1>
+    <p>Point your camera at the QR code on your table to start ordering.</p>
+</div>
+
+<div class="container" style="max-width:600px; padding:2rem 1rem;">
+
+    <div id="qr-reader"></div>
+
+    <div id="qr-status" class="status-box alert d-none"></div>
+
+    <hr class="my-4">
+
+    <h6 class="fw-bold text-muted text-uppercase small mb-3">How it works</h6>
+    <ol class="steps-list text-muted small">
+        <li>Find the QR code card on your table</li>
+        <li>Allow camera access when prompted</li>
+        <li>Hold the QR code in front of your camera</li>
+        <li>You'll be taken straight to the menu!</li>
+    </ol>
+
+    <div class="text-center mt-4">
+        <p class="text-muted small">Ordering delivery or pickup instead?</p>
+        <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-bicycle me-1"></i> Order from Anywhere
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function () {
+    const statusEl = document.getElementById('qr-status');
+    let scanning = true;
+
+    function showStatus(msg, type) {
+        statusEl.className = 'status-box alert alert-' + type;
+        statusEl.textContent = msg;
+        statusEl.classList.remove('d-none');
+    }
+
+    function isRestaurantQR(text) {
+        try {
+            const url = new URL(text);
+            return url.pathname.match(/^\/r\/[^/]+\/?$/);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function onScanSuccess(decodedText) {
+        if (!scanning) return;
+        scanning = false;
+
+        if (isRestaurantQR(decodedText)) {
+            showStatus('QR code detected! Loading your table…', 'success');
+            setTimeout(function () {
+                window.location.href = decodedText;
+            }, 600);
+        } else {
+            showStatus('That QR code doesn\'t look like a restaurant table code. Please scan the QR on your table.', 'warning');
+            setTimeout(function () { scanning = true; }, 2000);
+        }
+    }
+
+    const html5QrCode = new Html5QrcodeScanner(
+        'qr-reader',
+        { fps: 10, qrbox: { width: 280, height: 280 }, rememberLastUsedCamera: true },
+        false
+    );
+
+    html5QrCode.render(onScanSuccess, function (errorMsg) {
+        // ignore scan errors silently
+    });
+})();
+</script>
+{% endblock %}

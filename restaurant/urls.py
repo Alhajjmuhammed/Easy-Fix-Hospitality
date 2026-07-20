@@ -6,6 +6,9 @@ app_name = 'restaurant'
 urlpatterns = [
     path('', views.home, name='home'),
     path('menu/', views.menu, name='menu'),
+    path('browse/', views.browse_restaurants, name='browse_restaurants'),
+    path('browse/<int:restaurant_id>/order-type/', views.select_order_type, name='select_order_type'),
+    path('browse/<int:restaurant_id>/delivery/', views.delivery_info, name='delivery_info'),
     path('owner-dashboard/', views.owner_dashboard, name='owner_dashboard'),
     
     # Happy Hour Management

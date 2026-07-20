@@ -57,7 +57,7 @@
                             {% for item in recent_orders %}
                             <tr>
                                 <td>{{ item.order.order_number }}</td>
-                                <td>Table {{ item.order.table_info.tbl_no }}</td>
+                                <td>{% if item.order.table_info %}Table {{ item.order.table_info.tbl_no }}{% else %}{{ item.order.get_order_type_display }}{% endif %}</td>
                                 <td>{{ item.quantity }}</td>
                                 <td>{% currency_symbol %}{{ item.unit_price }}</td>
                                 <td>{% currency_symbol %}{{ item.get_subtotal|floatformat:2 }}</td>

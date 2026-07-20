@@ -1,318 +1,447 @@
 {% extends 'base.html' %}
 {% load restaurant_tags %}
 
-{% block title %}My Orders - Restaurant System{% endblock %}
+{% block title %}My Orders{% endblock %}
 
 {% block extra_css %}
 <style>
-    /* Force buttons to stay horizontal on mobile */
-    .card-footer {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        gap: 0.5rem !important;
+/* ── Hero ── */
+.orders-hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    padding: 1.6rem 1.4rem 1.3rem;
+    border-radius: 16px;
+    margin-bottom: 1.4rem;
+}
+.orders-hero h2 { font-size: 1.4rem; font-weight: 800; margin: 0 0 0.15rem; }
+.orders-hero p  { color: rgba(255,255,255,.55); font-size: 0.82rem; margin: 0; }
+
+.new-order-btn {
+    background: linear-gradient(135deg, #d63384, #b02a6a);
+    color: #fff; border: none; border-radius: 50px;
+    padding: 0.4rem 1rem; font-weight: 600; font-size: 0.8rem;
+    display: inline-flex; align-items: center; gap: 5px;
+    white-space: nowrap; flex-shrink: 0;
+}
+.new-order-btn:hover { color: #fff; opacity: .9; }
+
+/* ── Tab bar ── */
+.tab-bar {
+    display: flex; border-bottom: 2px solid #e9ecef;
+    margin-bottom: 1rem;
+}
+.tab-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600; color: #6c757d;
+    padding: 0.5rem 1.1rem; border-bottom: 2px solid transparent;
+    margin-bottom: -2px; transition: color .15s, border-color .15s;
+    white-space: nowrap;
+}
+.tab-btn.active { color: #d63384; border-bottom-color: #d63384; }
+
+/* ── Order card ── */
+.order-card {
+    border: none; border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.07);
+    overflow: hidden; margin-bottom: 0.85rem; cursor: pointer;
+    transition: box-shadow .2s, transform .18s;
+}
+.order-card:hover { box-shadow: 0 6px 22px rgba(0,0,0,.13); transform: translateY(-2px); }
+.order-card-inner { display: flex; align-items: stretch; }
+
+/* Active pulse */
+@keyframes activePulse {
+    0%,100% { box-shadow: 0 2px 10px rgba(214,51,132,.08); }
+    50%      { box-shadow: 0 4px 18px rgba(214,51,132,.25); }
+}
+.order-card.is-active { animation: activePulse 2.5s ease-in-out infinite; border-left: 3px solid #d63384; }
+.order-card.is-active.is-del    { border-left-color: #2e7d32; }
+.order-card.is-active.is-pickup { border-left-color: #1565c0; }
+
+/* Left icon strip */
+.order-icon-col {
+    width: 48px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; border-radius: 14px 0 0 14px;
+}
+.icon-dine   { background: #fff0f6; color: #d63384; }
+.icon-del    { background: #e8f5e9; color: #2e7d32; }
+.icon-pickup { background: #e3f2fd; color: #1565c0; }
+
+/* Card body */
+.order-body { flex: 1; padding: 0.8rem 0.9rem; min-width: 0; }
+
+/* Status pill */
+.sp {
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .04em; padding: 3px 8px; border-radius: 20px;
+    white-space: nowrap;
+}
+.sp-pending   { background:#fff3cd; color:#856404; }
+.sp-confirmed { background:#cff4fc; color:#055160; }
+.sp-preparing { background:#cfe2ff; color:#084298; }
+.sp-ready     { background:#d1e7dd; color:#0a3622; }
+.sp-served    { background:#e2e3e5; color:#41464b; }
+.sp-cancelled { background:#f8d7da; color:#842029; }
+
+/* Meta text */
+.order-meta { font-size: 0.73rem; color: #6c757d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Mini progress dots */
+.mini-track { display: flex; align-items: center; margin: 0.4rem 0 0.25rem; }
+.md { width: 8px; height: 8px; border-radius: 50%; background: #dee2e6; flex-shrink: 0; }
+.md.done { background: #198754; }
+.md.now  { background: #d63384; box-shadow: 0 0 0 3px rgba(214,51,132,.2); }
+.ml { flex: 1; height: 2px; background: #dee2e6; min-width: 6px; }
+.ml.done { background: #198754; }
+
+/* Amount column (desktop) */
+.order-amount-col {
+    display: flex; flex-direction: column; align-items: flex-end;
+    justify-content: center; padding: 0.8rem 0.9rem 0.8rem 0.4rem;
+    flex-shrink: 0;
+}
+.order-total { font-size: 0.95rem; font-weight: 800; color: #198754; white-space: nowrap; }
+.pay-chip {
+    font-size: 0.65rem; font-weight: 600; padding: 2px 7px;
+    border-radius: 20px; margin-top: 3px;
+}
+.pay-paid { background: #d1e7dd; color: #0a3622; }
+.pay-pend { background: #fff3cd; color: #856404; }
+.view-arrow { font-size: .68rem; color: #adb5bd; margin-top: 6px; }
+
+/* Active notice banner */
+.active-notice {
+    background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 10px;
+    padding: 0.6rem 1rem; font-size: 0.8rem; color: #1b5e20; margin-bottom: 1rem;
+}
+
+/* Badge */
+.active-badge {
+    background: #d63384; color: #fff; border-radius: 10px;
+    font-size: 0.68rem; font-weight: 700; padding: 1px 7px; margin-left: 5px;
+}
+
+/* Hidden by default — only shown on tiny screens via media query */
+.order-body-total { display: none; }
+
+/* Pagination */
+.pg-nav { display: flex; justify-content: center; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 1.2rem; }
+.pg-btn { border-radius: 50px; font-size: 0.82rem; padding: 0.35rem 0.9rem; }
+.pg-info { font-size: 0.82rem; font-weight: 600; color: #495057; background: #f1f3f5; padding: 0.35rem 0.9rem; border-radius: 50px; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 3rem 1rem; color: #6c757d; }
+.empty-state i { font-size: 3rem; opacity: .2; display: block; margin-bottom: 1rem; }
+
+/* ── Mobile ── */
+@media (max-width: 480px) {
+    .orders-hero { border-radius: 12px; padding: 1.2rem 1rem; }
+    .orders-hero h2 { font-size: 1.15rem; }
+
+    .order-icon-col { width: 42px; font-size: 1.05rem; }
+    .order-body { padding: 0.65rem 0.7rem; }
+    .order-total { font-size: 0.85rem; }
+    .order-amount-col { padding: 0.65rem 0.7rem 0.65rem 0.3rem; }
+    .pay-chip { font-size: 0.6rem; padding: 1px 5px; }
+    .view-arrow { display: none; }
+
+    /* Stack total below body on very narrow screens */
+    .order-card-inner { flex-wrap: nowrap; }
+    .sp { font-size: 0.6rem; padding: 2px 6px; }
+    .order-meta { font-size: 0.68rem; }
+}
+
+@media (max-width: 360px) {
+    /* On tiny phones, put total inside body instead of separate column */
+    .order-amount-col { display: none; }
+    .order-body-total {
+        display: flex; justify-content: space-between; align-items: center; margin-top: 0.3rem;
     }
-    
-    .card-footer .btn {
-        flex-shrink: 0 !important;
-        margin: 0 !important;
-    }
-    
-    /* LARGE SCREEN ONLY - Fix header layout for desktop/tablet */
-    @media (min-width: 577px) {
-        .page-header {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            gap: 1rem !important;
-        }
-        
-        .page-header .flex-grow-1 {
-            flex-grow: 1 !important;
-        }
-        
-        .page-header .btn {
-            flex-shrink: 0 !important;
-            min-width: auto !important;
-            width: auto !important;
-        }
-    }
-    
-    /* MOBILE ONLY IMPROVEMENTS - Only affects screens 576px and below */
-    @media (max-width: 576px) {
-        /* Card styling improvements for mobile - MORE COMPACT */
-        .card {
-            border-radius: 8px;
-            overflow: hidden;
-            margin-bottom: 0.6rem;
-            font-size: 0.85rem;
-        }
-        
-        .card-header {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            padding: 0.5rem;
-        }
-        
-        .card-body {
-            padding: 0.5rem;
-        }
-        
-        .card-footer {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: wrap !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            gap: 0.3rem !important;
-            background: #fff;
-            border-top: 1px solid #e9ecef;
-            padding: 0.5rem;
-        }
-        
-        .card-footer .btn {
-            margin: 0 !important;
-            flex-shrink: 0 !important;
-            border-radius: 6px;
-            font-weight: 500;
-            font-size: 0.8rem;
-            padding: 0.3rem 0.6rem;
-        }
-        
-        /* Improve order number styling - SMALLER */
-        .card-header h5, .card-header h6 {
-            font-size: 0.85rem;
-            color: #495057;
-            margin-bottom: 0;
-            line-height: 1.3;
-        }
-        
-        /* Better badge styling - SMALLER */
-        .badge {
-            font-size: 0.7rem;
-            padding: 0.25em 0.5em;
-        }
-        
-        /* Enhance information layout - MORE COMPACT */
-        .card-body .row > div {
-            margin-bottom: 0.3rem;
-        }
-        
-        .card-body small.text-muted {
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            margin-bottom: 0.15rem;
-            display: block;
-            line-height: 1.2;
-        }
-        
-        .card-body p.fw-bold {
-            font-weight: 600;
-            color: #212529;
-            margin-bottom: 0.15rem;
-            font-size: 0.85rem;
-            line-height: 1.3;
-        }
-        
-        /* Highlight the total price - SLIGHTLY SMALLER */
-        .text-success {
-            font-size: 0.95rem !important;
-            font-weight: 700 !important;
-        }
-        
-        /* Better button styling - SMALLER */
-        .btn-primary {
-            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
-            border: none;
-            flex-grow: 1;
-            font-size: 0.8rem;
-            padding: 0.3rem 0.6rem;
-        }
-        
-        .btn-outline-danger {
-            border-radius: 6px;
-            font-size: 0.8rem;
-            padding: 0.3rem 0.6rem;
-        }
-        
-        /* Add subtle shadows and spacing - MINIMAL */
-        .card {
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        
-        .card:active {
-            transform: translateY(0.5px);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.12);
-        }
-        
-        /* Improve date and time display - SMALLER */
-        .card-body p:not(.fw-bold) {
-            font-size: 0.8rem;
-            color: #6c757d;
-            margin-bottom: 0.1rem;
-            line-height: 1.3;
-        }
-        
-        /* Special instructions styling - COMPACT */
-        .card-body p.text-truncate {
-            background: #f8f9fa;
-            padding: 0.3rem;
-            border-radius: 4px;
-            border-left: 2px solid #0d6efd;
-            font-size: 0.8rem;
-            line-height: 1.3;
-        }
-        
-        /* Reduce row spacing */
-        .row {
-            margin-bottom: 0.2rem;
-        }
-        
-        .row:last-child {
-            margin-bottom: 0;
-        }
-        
-        /* Smaller icons */
-        .bi {
-            font-size: 0.85em;
-        }
-    }
+    .order-body-total .order-total { font-size: 0.85rem; font-weight: 800; color: #198754; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-3 page-header">
-            <div class="flex-grow-1">
-                <h2 class="mb-0 h3 h-sm-2">
-                    <i class="bi bi-receipt text-primary"></i> My Orders
-                </h2>
-                {% if is_customer_care %}
-                <p class="text-muted mb-0 small">
-                    <i class="bi bi-headset"></i> Customer Care - All my orders from all restaurants
-                </p>
-                {% else %}
-                <p class="text-muted mb-0 small">
-                    <i class="bi bi-building"></i> Orders from {{ restaurant_name }}
-                </p>
-                {% endif %}
-            </div>
-            <a href="{% url 'orders:select_table' %}" class="btn btn-primary btn-sm w-100 w-sm-auto">
-                <i class="bi bi-plus-circle"></i> <span class="d-none d-sm-inline">New </span>Order
-            </a>
+
+<!-- Hero -->
+<div class="orders-hero">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+        <div style="min-width:0">
+            <h2><i class="bi bi-receipt me-2"></i>My Orders</h2>
+            <p>Dine-in, delivery &amp; pickup — all in one place.</p>
+        </div>
+        <div class="dropdown flex-shrink-0">
+            <button class="new-order-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-plus-circle"></i> New Order
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li>
+                    <a class="dropdown-item py-2" href="{% url 'orders:scan_qr' %}">
+                        <i class="bi bi-qr-code-scan me-2" style="color:#d63384"></i>
+                        <strong>Dine-In</strong>
+                        <div class="text-muted small ms-4">Scan table QR code</div>
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                    <a class="dropdown-item py-2" href="{% url 'restaurant:browse_restaurants' %}">
+                        <i class="bi bi-bicycle me-2 text-success"></i>
+                        <strong>Delivery / Pickup</strong>
+                        <div class="text-muted small ms-4">Order from anywhere</div>
+                    </a>
+                </li>
+            </ul>
         </div>
     </div>
 </div>
 
-{% if orders %}
-    <div class="row">
-        {% for order in orders %}
-            <div class="col-12 col-md-6 col-xl-4 mb-4">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header">
-                        <div class="d-flex justify-content-between align-items-start gap-2">
-                            <h6 class="mb-0 fw-bold">
-                                <i class="bi bi-hash"></i> Order #{{ order.order_number }}
-                            </h6>
-                            <div class="d-flex flex-column align-items-end gap-1">
-                                <span class="badge
-                                    {% if order.status == 'pending' %}bg-warning
-                                    {% elif order.status == 'confirmed' %}bg-info
-                                    {% elif order.status == 'preparing' %}bg-primary
-                                    {% elif order.status == 'ready' %}bg-success
-                                    {% elif order.status == 'served' %}bg-secondary
-                                    {% elif order.status == 'cancelled' %}bg-danger
-                                    {% endif %}">
-                                    {{ order.get_status_display }}
-                                </span>
-                                <small class="badge
-                                    {% if order.payment_status == 'unpaid' %}bg-warning
-                                    {% elif order.payment_status == 'partial' %}bg-info
-                                    {% elif order.payment_status == 'paid' %}bg-success
-                                    {% endif %}">
-                                    {% if order.payment_status == 'unpaid' %}Payment Pending
-                                    {% elif order.payment_status == 'partial' %}Partial Payment
-                                    {% elif order.payment_status == 'paid' %}Paid
-                                    {% endif %}
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body p-3">
-                        {% if is_customer_care %}
-                        <div class="mb-2">
-                            <small class="text-muted d-block">Restaurant</small>
-                            <p class="mb-1 fw-bold small">
-                                <i class="bi bi-building me-1"></i>{{ order.table_info.owner.restaurant_name|default:"Restaurant" }}
-                            </p>
-                            <small class="text-muted">{{ order.table_info.owner.get_full_name|default:order.table_info.owner.username }}</small>
-                        </div>
-                        {% endif %}
-                        <div class="row mb-2">
-                            <div class="col-6">
-                                <small class="text-muted d-block">Table</small>
-                                <p class="mb-0 fw-bold">
-                                    <i class="bi bi-table me-1"></i>{{ order.table_info.tbl_no }}
-                                </p>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted d-block">Total</small>
-                                <p class="mb-0 fw-bold text-success">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</p>
-                            </div>
-                        </div>
-                        <div class="mb-2">
-                            <small class="text-muted d-block">Ordered on</small>
-                            <p class="mb-0 small">{{ order.created_at|date:"M d, Y H:i" }}</p>
-                        </div>
-                        {% if order.special_instructions %}
-                            <div class="mb-2">
-                                <small class="text-muted d-block">Special Instructions</small>
-                                <p class="mb-0 small text-truncate" title="{{ order.special_instructions }}">{{ order.special_instructions }}</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="card-footer p-2 bg-light">
-                        <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-primary btn-sm flex-grow-1 flex-sm-grow-0">
-                                <i class="bi bi-eye"></i> <span class="d-none d-sm-inline">Track </span>Order
-                            </a>
-                            {% if order.payment_status == 'paid' %}
-                                <a href="{% url 'orders:view_receipt' order.id %}" class="btn btn-success btn-sm">
-                                    <i class="bi bi-receipt"></i> <span class="d-none d-sm-inline">View </span>Receipt
-                                </a>
-                            {% endif %}
-                            {% if order.status == 'pending' %}
-                                <a href="{% url 'orders:customer_cancel_order' order.id %}" class="btn btn-outline-danger btn-sm"
-                                   onclick="return confirm('Are you sure you want to cancel order #{{ order.order_number }}?')">
-                                    <i class="bi bi-x-circle"></i> <span class="d-none d-sm-inline">Cancel</span>
-                                </a>
-                            {% endif %}
-                            {% if order.status == 'served' and order.payment_status != 'paid' %}
-                                <button class="btn btn-success btn-sm">
-                                    <i class="bi bi-credit-card"></i> <span class="d-none d-sm-inline">Pay </span>Now
-                                </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+{% if page_obj.paginator.count %}
+
+<!-- Tab bar -->
+<div class="tab-bar">
+    <button class="tab-btn" id="tab-active-btn" onclick="switchTab('active', this)">
+        Active {% if active_count %}<span class="active-badge">{{ active_count }}</span>{% endif %}
+    </button>
+    <button class="tab-btn" id="tab-all-btn" onclick="switchTab('all', this)">
+        All Orders
+    </button>
+</div>
+
+<!-- Cross-page active notice (shown by JS when needed) -->
+{% if active_count %}
+<div class="active-notice d-none" id="cross-page-notice">
+    <i class="bi bi-info-circle me-1"></i>
+    You have <strong>{{ active_count }} active order{% if active_count > 1 %}s{% endif %}</strong>.
+    Switch to <strong>All Orders</strong> and browse pages to find them.
+</div>
+{% endif %}
+
+<!-- Order cards -->
+<div id="orders-container">
+{% for order in orders %}
+<div class="order-card {% if order.status == 'pending' or order.status == 'confirmed' or order.status == 'preparing' or order.status == 'ready' %}is-active{% if order.order_type == 'delivery' %} is-del{% elif order.order_type == 'pickup' %} is-pickup{% endif %}{% endif %}"
+     data-status="{{ order.status }}"
+     data-active="{% if order.status == 'pending' or order.status == 'confirmed' or order.status == 'preparing' or order.status == 'ready' %}1{% else %}0{% endif %}"
+     onclick="window.location='{% url 'orders:order_detail' order.id %}'">
+    <div class="order-card-inner">
+
+        <!-- Icon -->
+        <div class="order-icon-col {% if order.order_type == 'delivery' %}icon-del{% elif order.order_type == 'pickup' %}icon-pickup{% else %}icon-dine{% endif %}">
+            {% if order.order_type == 'delivery' %}<i class="bi bi-bicycle"></i>
+            {% elif order.order_type == 'pickup' %}<i class="bi bi-bag-check"></i>
+            {% else %}<i class="bi bi-table"></i>{% endif %}
+        </div>
+
+        <!-- Body -->
+        <div class="order-body">
+            <!-- Row 1: order number + status -->
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                <span class="fw-bold" style="font-size:.82rem">#{{ order.order_number }}</span>
+                <span class="sp sp-{{ order.status }}">{{ order.get_status_display }}</span>
             </div>
-        {% endfor %}
+
+            <!-- Row 2: type/location -->
+            <div class="order-meta mb-1">
+                {% if order.order_type == 'delivery' %}
+                    <i class="bi bi-geo-alt me-1"></i>{% if order.delivery_address %}{{ order.delivery_address|truncatechars:40 }}{% else %}Delivery{% endif %}
+                {% elif order.order_type == 'pickup' %}
+                    <i class="bi bi-bag-check me-1"></i>Pickup order
+                {% else %}
+                    <i class="bi bi-table me-1"></i>Table {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}—{% endif %}{% if is_customer_care and order.table_info %} · {{ order.table_info.owner.restaurant_name|default:"Restaurant"|truncatechars:20 }}{% endif %}
+                {% endif %}
+            </div>
+
+            <!-- Row 3: mini progress dots -->
+            {% if order.status != 'cancelled' %}
+            <div class="mini-track">
+                {% with s=order.status %}
+                <div class="md {% if s == 'pending' %}now{% else %}done{% endif %}"></div>
+                <div class="ml {% if s == 'confirmed' or s == 'preparing' or s == 'ready' or s == 'served' %}done{% endif %}"></div>
+                <div class="md {% if s == 'confirmed' %}now{% elif s == 'preparing' or s == 'ready' or s == 'served' %}done{% endif %}"></div>
+                <div class="ml {% if s == 'preparing' or s == 'ready' or s == 'served' %}done{% endif %}"></div>
+                <div class="md {% if s == 'preparing' %}now{% elif s == 'ready' or s == 'served' %}done{% endif %}"></div>
+                <div class="ml {% if s == 'ready' or s == 'served' %}done{% endif %}"></div>
+                <div class="md {% if s == 'ready' %}now{% elif s == 'served' %}done{% endif %}"></div>
+                <div class="ml {% if s == 'served' %}done{% endif %}"></div>
+                <div class="md {% if s == 'served' %}done{% endif %}"></div>
+                {% endwith %}
+            </div>
+            {% endif %}
+
+            <!-- Row 4: date -->
+            <div class="order-meta">{{ order.created_at|date:"M d, Y · H:i" }}</div>
+
+            <!-- Tiny screens only: total shown inside body -->
+            <div class="order-body-total">
+                <span class="order-total">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</span>
+                {% if order.payment_status == 'paid' %}
+                <span class="pay-chip pay-paid"><i class="bi bi-check-circle-fill"></i> Paid</span>
+                {% else %}
+                <span class="pay-chip pay-pend">Unpaid</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Amount col (hidden on ≤360px via CSS) -->
+        <div class="order-amount-col">
+            <div class="order-total">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</div>
+            {% if order.payment_status == 'paid' %}
+            <span class="pay-chip pay-paid"><i class="bi bi-check-circle-fill me-1"></i>Paid</span>
+            {% else %}
+            <span class="pay-chip pay-pend">Unpaid</span>
+            {% endif %}
+            <span class="view-arrow">View ›</span>
+        </div>
+
     </div>
-{% else %}
-    <div class="text-center py-5">
-        <i class="bi bi-receipt display-4 text-muted mb-3"></i>
-        <h4 class="h5">No Orders Yet</h4>
-        {% if is_customer_care %}
-        <p class="text-muted mb-4 px-3">You haven't placed any orders yet as a customer care representative. Start by selecting a restaurant and table.</p>
-        {% else %}
-        <p class="text-muted mb-4 px-3">You haven't placed any orders yet. Start by browsing our menu!</p>
-        {% endif %}
-        <a href="{% url 'orders:select_table' %}" class="btn btn-primary">
-            <i class="bi bi-menu-button-wide"></i> Browse Menu
+</div>
+{% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="pg-nav" id="pagination-nav">
+    {% if page_obj.has_previous %}
+    <a href="?page=1" class="btn btn-sm btn-outline-secondary pg-btn" data-page="1">
+        <i class="bi bi-chevron-double-left"></i>
+    </a>
+    <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-sm btn-outline-secondary pg-btn" data-page="{{ page_obj.previous_page_number }}">
+        <i class="bi bi-chevron-left"></i> Prev
+    </a>
+    {% endif %}
+
+    <span class="pg-info">
+        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        <span class="text-muted fw-normal">&middot; {{ page_obj.paginator.count }} orders</span>
+    </span>
+
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-sm btn-outline-secondary pg-btn" data-page="{{ page_obj.next_page_number }}">
+        Next <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="?page={{ page_obj.paginator.num_pages }}" class="btn btn-sm btn-outline-secondary pg-btn" data-page="{{ page_obj.paginator.num_pages }}">
+        <i class="bi bi-chevron-double-right"></i>
+    </a>
+    {% endif %}
+</nav>
+{% endif %}
+
+<!-- Empty active state (shown by JS) -->
+<div class="empty-state d-none" id="no-active-msg">
+    <i class="bi bi-moon-stars"></i>
+    <h5 class="h6">No active orders on this page</h5>
+    {% if active_count %}
+    <p class="small mb-3">Your {{ active_count }} active order{% if active_count > 1 %}s{% endif %} are on another page.</p>
+    <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="switchTab('all', document.getElementById('tab-all-btn'))">
+        <i class="bi bi-list-ul me-1"></i>Show All Orders
+    </button>
+    {% else %}
+    <p class="small mb-3">All your orders are complete. Ready for another?</p>
+    <div class="d-flex gap-2 justify-content-center flex-wrap">
+        <a href="{% url 'orders:scan_qr' %}" class="btn btn-sm btn-outline-danger rounded-pill">
+            <i class="bi bi-qr-code-scan me-1"></i>Dine-In
+        </a>
+        <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-sm btn-outline-success rounded-pill">
+            <i class="bi bi-bicycle me-1"></i>Delivery / Pickup
         </a>
     </div>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- Zero orders -->
+<div class="empty-state">
+    <i class="bi bi-receipt"></i>
+    <h5 class="h6">No orders yet</h5>
+    <p class="small mb-3">Your order history will appear here once you start ordering.</p>
+    <div class="d-flex gap-3 justify-content-center flex-wrap">
+        <a href="{% url 'orders:scan_qr' %}" class="btn btn-danger rounded-pill px-4">
+            <i class="bi bi-qr-code-scan me-1"></i>Dine-In
+        </a>
+        <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-success rounded-pill px-4">
+            <i class="bi bi-bicycle me-1"></i>Delivery / Pickup
+        </a>
+    </div>
+</div>
 {% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var cards       = Array.from(document.querySelectorAll('.order-card[data-active]'));
+    var noActiveMsg = document.getElementById('no-active-msg');
+    var pgNav       = document.getElementById('pagination-nav');
+    var crossNotice = document.getElementById('cross-page-notice');
+    var currentTab  = 'active';
+    var currentPage = {{ page_obj.number }};
+
+    /* ── Tab switch ── */
+    function switchTab(tab, btn) {
+        currentTab = tab;
+
+        // Update button styles
+        document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+
+        // Show/hide cards
+        var activeOnPage = 0;
+        cards.forEach(function (c) {
+            if (tab === 'active') {
+                var show = c.dataset.active === '1';
+                c.style.display = show ? '' : 'none';
+                if (show) activeOnPage++;
+            } else {
+                c.style.display = '';
+            }
+        });
+
+        // Empty-state message
+        if (noActiveMsg) {
+            noActiveMsg.classList.toggle('d-none', tab !== 'active' || activeOnPage > 0);
+        }
+
+        // Cross-page notice: show on active tab if badge > 0 but nothing on this page
+        if (crossNotice) {
+            crossNotice.classList.toggle(
+                'd-none',
+                !(tab === 'active' && activeOnPage === 0 && {{ active_count }} > 0)
+            );
+        }
+
+        // Pagination: only show on All tab
+        if (pgNav) {
+            pgNav.style.display = tab === 'all' ? '' : 'none';
+        }
+
+        // Update pagination links to carry ?tab= parameter
+        if (pgNav) {
+            pgNav.querySelectorAll('a').forEach(function (a) {
+                var url = new URL(a.href, window.location.href);
+                url.searchParams.set('tab', tab);
+                a.href = url.toString();
+            });
+        }
+
+        // Persist tab in URL without reload
+        var url = new URL(window.location.href);
+        url.searchParams.set('tab', tab);
+        history.replaceState({}, '', url.toString());
+    }
+
+    /* ── Restore tab from URL (or default to All on pages > 1) ── */
+    var params   = new URLSearchParams(window.location.search);
+    var initTab  = params.get('tab') || (currentPage > 1 ? 'all' : 'active');
+    var initBtn  = initTab === 'all'
+        ? document.getElementById('tab-all-btn')
+        : document.getElementById('tab-active-btn');
+    if (initBtn) switchTab(initTab, initBtn);
+
+    /* Expose for onclick attributes */
+    window.switchTab = switchTab;
+})();
+</script>
 {% endblock %}

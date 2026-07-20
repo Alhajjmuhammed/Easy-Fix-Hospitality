@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}How would you like to order? - {{ restaurant.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.ot-hero {
+    background: linear-gradient(135deg, #fff0f6 0%, #fce4ef 100%);
+    border-bottom: 1px solid #f5c6dc;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+}
+.ot-hero h1 { font-size: 1.6rem; font-weight: 800; color: #1a1a2e; }
+.ot-hero p  { color: #6c757d; margin: 0.3rem 0 0; }
+
+.order-type-card {
+    border: 2px solid #e9ecef;
+    border-radius: 16px;
+    padding: 1.8rem 1.5rem;
+    cursor: pointer;
+    transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+    background: #fff;
+}
+.order-type-card:hover {
+    border-color: #d63384;
+    box-shadow: 0 6px 20px rgba(214,51,132,0.15);
+    transform: translateY(-3px);
+}
+.ot-icon {
+    width: 64px; height: 64px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem;
+    margin: 0 auto 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ot-hero">
+    <div style="font-size:2.2rem; color:#d63384; margin-bottom:0.5rem">
+        <i class="bi bi-shop"></i>
+    </div>
+    <h1>{{ restaurant.name }}</h1>
+    {% if restaurant.address %}
+    <p><i class="bi bi-geo-alt me-1"></i>{{ restaurant.address }}</p>
+    {% endif %}
+</div>
+
+<div class="container" style="max-width:560px; padding: 2.5rem 1rem;">
+    <h5 class="fw-bold mb-4 text-center" style="color:#1a1a2e">How would you like to receive your order?</h5>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="row g-3 mb-4">
+            <!-- Delivery -->
+            <div class="col-12">
+                <button type="submit" name="order_type" value="delivery"
+                        class="order-type-card w-100 text-start d-flex align-items-center gap-3 border-0">
+                    <div class="ot-icon" style="background:#fff3e0; color:#e65100">
+                        <i class="bi bi-bicycle"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold fs-6" style="color:#e65100">Delivery</div>
+                        <div class="text-muted small">Order now and get it delivered to your door</div>
+                    </div>
+                    <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                </button>
+            </div>
+
+            <!-- Pickup -->
+            <div class="col-12">
+                <button type="submit" name="order_type" value="pickup"
+                        class="order-type-card w-100 text-start d-flex align-items-center gap-3 border-0">
+                    <div class="ot-icon" style="background:#e3f2fd; color:#1565c0">
+                        <i class="bi bi-bag-check"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold fs-6" style="color:#1565c0">Pickup</div>
+                        <div class="text-muted small">Order ahead and collect at the restaurant</div>
+                    </div>
+                    <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div class="text-center">
+        <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to Restaurants
+        </a>
+    </div>
+</div>
+{% endblock %}

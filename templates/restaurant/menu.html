@@ -1049,7 +1049,13 @@
         <h2 class="mb-2">
             <i class="bi bi-menu-button-wide"></i> {{ restaurant_name|default:"Restaurant" }} Menu
         </h2>
+        {% if order_type == 'delivery' %}
+        <p class="mb-3"><i class="bi bi-bicycle me-1"></i>Delivery{% if delivery_address %} &bull; {{ delivery_address|truncatechars:45 }}{% endif %}</p>
+        {% elif order_type == 'pickup' %}
+        <p class="mb-3"><i class="bi bi-bag-check me-1"></i>Pickup order &bull; Collect at the restaurant</p>
+        {% else %}
         <p class="mb-3">Table {{ table_number }} &bull; Discover our amazing culinary creations</p>
+        {% endif %}
         
         <!-- Search Bar -->
         <div class="search-container mb-3" style="position: relative; z-index: 1060;">
@@ -1076,9 +1082,15 @@
             <a href="{% url 'orders:view_cart' %}" class="btn btn-light rounded-pill px-3 py-2" id="viewCartBtn">
                 <i class="bi bi-cart3"></i> View Cart (<span id="cartCount">{{ cart_count|default:0 }}</span>)
             </a>
+            {% if is_remote_order %}
+            <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-light rounded-pill px-3 py-2">
+                <i class="bi bi-arrow-left"></i> Change Restaurant
+            </a>
+            {% else %}
             <a href="{% url 'orders:select_table' %}" class="btn btn-outline-light rounded-pill px-3 py-2">
                 <i class="bi bi-arrow-left"></i> Change Table
             </a>
+            {% endif %}
         </div>
     </div>
 </div>

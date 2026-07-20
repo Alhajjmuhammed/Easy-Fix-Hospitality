@@ -110,8 +110,12 @@ export default function ReceiptScreen({ route }) {
             <Text style={{ fontFamily: P400 }}>#{order.order_number || order.id}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P600 }}>Table</Text>
-            <Text style={{ fontFamily: P400 }}>Table {order.table_number}</Text>
+            <Text style={{ fontFamily: P600 }}>
+              {order.order_type === 'delivery' || order.order_type === 'pickup' ? 'Type' : 'Table'}
+            </Text>
+            <Text style={{ fontFamily: P400 }}>
+              {order.order_type === 'delivery' ? 'Delivery' : order.order_type === 'pickup' ? 'Pickup' : `Table ${order.table_number}`}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={{ fontFamily: P600 }}>Date & Time</Text>
@@ -124,7 +128,7 @@ export default function ReceiptScreen({ route }) {
           <View style={styles.infoRow}>
             <Text style={{ fontFamily: P600 }}>Status</Text>
             <Text style={{ fontFamily: P600, color: '#2E7D32' }}>
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—'}
             </Text>
           </View>
           <View style={styles.infoRow}>

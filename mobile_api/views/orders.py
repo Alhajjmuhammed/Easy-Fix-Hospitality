@@ -44,7 +44,10 @@ def _notify_ws(order, updated_by_user, event_type='order_status_update'):
     # ── Capture all data now, before handing off to on_commit ────────────────
     _order_id       = order.id
     _order_number   = order.order_number
-    _owner_id       = order.table_info.owner_id if order.table_info else None
+    _owner_id       = (
+        order.table_info.owner_id if order.table_info
+        else (order.ordered_by.owner_id if order.ordered_by else None)
+    )
     _table_no       = str(order.table_info.tbl_no) if order.table_info else 'N/A'
     _status         = order.status
     _status_display = order.get_status_display()
@@ -64,7 +67,7 @@ def _notify_ws(order, updated_by_user, event_type='order_status_update'):
             if channel_layer is None:
                 return
 
-            if _event_type == 'new_order':
+            if _event_type == 'new_order' and _owner_id is not None:
                 async_to_sync(channel_layer.group_send)(
                     f'restaurant_{_owner_id}',
                     {
@@ -127,6 +130,21 @@ def _notify_ws(order, updated_by_user, event_type='order_status_update'):
     transaction.on_commit(_send)
 
 
+def _customer_order_qs(user):
+    """
+    Base queryset for a customer accessing their own orders.
+    Customers can have null table_info (delivery/pickup) and null owner,
+    so the restaurant-scoped _tq filter would silently exclude their orders.
+    We bypass it entirely and filter only by ordered_by.
+    """
+    return (
+        Order.objects
+        .filter(ordered_by=user)
+        .select_related('table_info', 'ordered_by')
+        .prefetch_related('order_items__product', 'payments')
+    )
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
 def orders(request):
@@ -137,6 +155,18 @@ def orders(request):
 
 def _list_orders(request):
     """List orders filtered by role."""
+    user = request.user
+
+    # Customers always see all their own orders directly — no restaurant filter needed.
+    # Their orders may have null table_info (delivery/pickup) so the table-based _tq
+    # would silently exclude them.
+    if user.is_customer():
+        qs = Order.objects.filter(ordered_by=user).select_related(
+            'table_info', 'ordered_by'
+        ).prefetch_related('order_items__product', 'payments')
+        qs = qs.order_by('-created_at')[:100]
+        return Response({'orders': OrderSerializer(qs, many=True, context={'request': request}).data})
+
     owner = get_restaurant_owner(request)
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
@@ -144,16 +174,16 @@ def _list_orders(request):
     _tq = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     qs = Order.objects.filter(_tq).distinct().select_related('table_info', 'ordered_by').prefetch_related(
         'order_items__product', 'payments'
     )
 
-    user = request.user
-    # Customers and customer-care staff only see orders they placed themselves.
-    # This matches the web behaviour and ensures CC staff cannot see/modify each other's orders.
-    if user.is_customer() or user.is_customer_care():
+    # Customer-care staff only see orders they placed themselves.
+    if user.is_customer_care():
         qs = qs.filter(ordered_by=user)
 
     # my_orders=true  → show only orders placed by the requesting user (cashier "My Orders")
@@ -191,6 +221,8 @@ def _place_order(request):
     """Create a new order. Supports offline de-duplication via offline_id."""
     s = PlaceOrderSerializer(data=request.data)
     if not s.is_valid():
+        logger.warning('PlaceOrder validation failed for user %s: %s | raw data: %s',
+                       request.user, s.errors, request.data)
         return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
 
     data = s.validated_data
@@ -363,6 +395,8 @@ def _place_order(request):
             order_type=order_type,
             delivery_address=data.get('delivery_address', '') or '',
             delivery_phone=data.get('delivery_phone', '') or '',
+            delivery_lat=round(data['delivery_lat'], 7) if data.get('delivery_lat') is not None else None,
+            delivery_lng=round(data['delivery_lng'], 7) if data.get('delivery_lng') is not None else None,
         )
 
         for item in validated_items:
@@ -409,6 +443,12 @@ def _place_order(request):
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
 def order_detail(request, order_id):
     """Retrieve a single order."""
+    user = request.user
+
+    if user.is_customer():
+        order = get_object_or_404(_customer_order_qs(user), id=order_id)
+        return Response({'order': OrderSerializer(order, context={'request': request}).data})
+
     owner = get_restaurant_owner(request)
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
@@ -416,7 +456,9 @@ def order_detail(request, order_id):
     _tq = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(
         Order.objects.filter(_tq).distinct().select_related('table_info', 'ordered_by').prefetch_related(
@@ -425,8 +467,7 @@ def order_detail(request, order_id):
         id=order_id,
     )
 
-    user = request.user
-    if (user.is_customer() or user.is_customer_care()) and order.ordered_by != user:
+    if user.is_customer_care() and order.ordered_by != user:
         return Response({'error': 'Access denied.'}, status=403)
 
     return Response({'order': OrderSerializer(order, context={'request': request}).data})
@@ -488,7 +529,9 @@ def update_order_status(request, order_id):
     _tq = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(
         Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
@@ -576,7 +619,9 @@ def print_bill(request, order_id):
     _tq = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(
         Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
@@ -625,13 +670,17 @@ def transfer_table(request, order_id):
     _tq = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(Order.objects.filter(_tq).distinct(), id=order_id)
 
     if user.is_customer_care() and order.ordered_by != user:
         return Response({'error': 'Access denied.'}, status=403)
 
+    if order.order_type in ('delivery', 'pickup'):
+        return Response({'error': 'Delivery and pickup orders cannot be transferred to a table.'}, status=400)
     if order.status == 'cancelled':
         return Response({'error': 'Cannot transfer a cancelled order.'}, status=400)
     if order.payment_status == 'paid':
@@ -694,22 +743,30 @@ def cancel_order(request, order_id):
     if not (user.is_customer() or user.is_customer_care() or is_privileged):
         return Response({'error': 'Access denied.'}, status=403)
 
-    owner = get_restaurant_owner(request)
-    if owner is None:
-        return Response({'error': 'Restaurant not found.'}, status=404)
+    if user.is_customer():
+        order = get_object_or_404(
+            _customer_order_qs(user).prefetch_related('order_items__product'),
+            id=order_id,
+        )
+    else:
+        owner = get_restaurant_owner(request)
+        if owner is None:
+            return Response({'error': 'Restaurant not found.'}, status=404)
 
-    _tq = (
-        Q(table_info__owner=owner) |
-        Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
-    )
-    order = get_object_or_404(
-        Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
-        id=order_id,
-    )
+        _tq = (
+            Q(table_info__owner=owner) |
+            Q(table_info__restaurant__main_owner=owner) |
+            Q(table_info__restaurant__branch_owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        )
+        order = get_object_or_404(
+            Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
+            id=order_id,
+        )
 
-    # Customers and CC can only cancel their own orders.
-    if (user.is_customer() or user.is_customer_care()) and order.ordered_by != user:
+    # CC can only cancel their own orders.
+    if user.is_customer_care() and order.ordered_by != user:
         return Response({'error': 'Access denied.'}, status=403)
 
     # Status guard: customers/CC → pending only; privileged staff → anything not served/cancelled.
@@ -771,24 +828,35 @@ def add_items_to_order(request, order_id):
     if not (is_staff or user.is_customer()):
         return Response({'error': 'Access denied.'}, status=403)
 
-    owner = get_restaurant_owner(request)
-    if owner is None:
-        return Response({'error': 'Restaurant not found.'}, status=404)
+    owner = None
 
-    _tq = (
-        Q(table_info__owner=owner) |
-        Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
-    )
-    order = get_object_or_404(
-        Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
-        id=order_id,
-    )
+    if user.is_customer():
+        order = get_object_or_404(
+            _customer_order_qs(user).prefetch_related('order_items__product'),
+            id=order_id,
+        )
+        # Derive owner for product validation: use table owner for dine-in,
+        # or None for delivery/pickup (product lookup falls back to ID-only below).
+        owner = order.table_info.owner if order.table_info else None
+    else:
+        owner = get_restaurant_owner(request)
+        if owner is None:
+            return Response({'error': 'Restaurant not found.'}, status=404)
 
-    # Customers and CC staff can only add to orders they placed themselves.
-    # This mirrors the web's handle_add_to_existing_order which fetches the order
-    # with ordered_by=request.user for all non-owner/manager roles.
-    if (user.is_customer() or user.is_customer_care()) and order.ordered_by != user:
+        _tq = (
+            Q(table_info__owner=owner) |
+            Q(table_info__restaurant__main_owner=owner) |
+            Q(table_info__restaurant__branch_owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        )
+        order = get_object_or_404(
+            Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
+            id=order_id,
+        )
+
+    # CC staff can only add to their own orders.
+    if user.is_customer_care() and order.ordered_by != user:
         return Response({'error': 'Access denied.'}, status=403)
 
     # Block cancelled orders only.
@@ -820,11 +888,19 @@ def add_items_to_order(request, order_id):
                 status=400,
             )
         try:
-            product = Product.objects.filter(
-                Q(main_category__owner=owner) |
-                Q(main_category__restaurant__main_owner=owner) |
-                Q(main_category__restaurant__branch_owner=owner)
-            ).filter(id=product_id).first()
+            if owner is not None:
+                product = Product.objects.filter(
+                    Q(main_category__owner=owner) |
+                    Q(main_category__restaurant__main_owner=owner) |
+                    Q(main_category__restaurant__branch_owner=owner),
+                    id=product_id,
+                ).first()
+            else:
+                # Customer with delivery/pickup order — no owner context available.
+                # Restrict to products that already appear in this order to prevent
+                # cross-restaurant injection.
+                allowed_ids = order.order_items.values_list('product_id', flat=True)
+                product = Product.objects.filter(id=product_id, id__in=allowed_ids).first()
             if product is None:
                 raise Product.DoesNotExist
         except Product.DoesNotExist:
@@ -844,6 +920,20 @@ def add_items_to_order(request, order_id):
     if not validated:
         return Response({'error': 'No valid items to add.'}, status=400)
 
+    from decimal import Decimal as _Dec
+    # Capture effective tax rate BEFORE the transaction mutates order_items.
+    # For delivery/pickup (table_info=None) reverse-calculate from the stored total.
+    if order.table_info:
+        _add_tax_rate = order.table_info.get_tax_rate()
+    else:
+        _orig_subtotal = sum(
+            oi.get_subtotal() for oi in order.order_items.select_related('product').all()
+        )
+        _add_tax_rate = (
+            _Dec(str(order.total_amount)) / _Dec(str(_orig_subtotal)) - _Dec('1')
+            if _orig_subtotal else _Dec('0')
+        )
+
     with transaction.atomic():
         for item in validated:
             OrderItem.objects.create(
@@ -856,10 +946,8 @@ def add_items_to_order(request, order_id):
             if p.available_in_stock is not None:
                 p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
                 p.save(update_fields=['available_in_stock'])
-        from decimal import Decimal as _Dec
         added = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated)
-        tax_rate = order.table_info.get_tax_rate() if order.table_info else _Dec('0')
-        order.total_amount = _Dec(str(order.total_amount)) + added * (_Dec('1') + tax_rate)
+        order.total_amount = _Dec(str(order.total_amount)) + added * (_Dec('1') + _add_tax_rate)
         extra_notes = sanitize_special_instructions(
             (request.data.get('special_instructions', '') or '').strip()
         )
@@ -982,7 +1070,9 @@ def cancel_order_item(request, item_id):
     _itq = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     item = get_object_or_404(
         OrderItem.objects.filter(_itq).distinct().select_related('order', 'product'),
@@ -1001,6 +1091,20 @@ def cancel_order_item(request, item_id):
     item_name = item.product.name if item.product else 'Item'
 
     with transaction.atomic():
+        from decimal import Decimal as _Dec
+        # Recover effective tax rate BEFORE deleting the item.
+        # For delivery/pickup orders (table_info=None) reverse-calculate from
+        # the stored total so the original tax rate is preserved.
+        if order.table_info:
+            tax_rate = order.table_info.get_tax_rate()
+        else:
+            pre_subtotal = sum(
+                oi.get_subtotal() for oi in order.order_items.select_related('product').all()
+            )
+            tax_rate = (
+                _Dec(str(order.total_amount)) / _Dec(str(pre_subtotal)) - _Dec('1')
+                if pre_subtotal else _Dec('0')
+            )
         p = item.product
         if p and p.available_in_stock is not None:
             p.available_in_stock += item.quantity
@@ -1009,8 +1113,6 @@ def cancel_order_item(request, item_id):
         subtotal = sum(
             oi.get_subtotal() for oi in order.order_items.select_related('product').all()
         )
-        from decimal import Decimal as _Dec
-        tax_rate = order.table_info.get_tax_rate() if order.table_info else _Dec('0')
         order.total_amount = subtotal * (_Dec('1') + tax_rate)
         order.save(update_fields=['total_amount', 'updated_at'])
         # --- transaction commits here ---

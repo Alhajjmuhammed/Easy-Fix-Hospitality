@@ -33,14 +33,12 @@ export async function getPendingCount() {
  * Returns true if any items have been in error state.
  */
 export async function hasErrors() {
-  const [orders, payments] = await Promise.all([
-    getPendingOrders(),
-    getPendingPayments(),
+  const { dbQuery } = await import('../database/db');
+  const [errOrders, errPayments] = await Promise.all([
+    dbQuery("SELECT 1 FROM offline_orders WHERE sync_status='error' LIMIT 1"),
+    dbQuery("SELECT 1 FROM offline_payments WHERE sync_status='error' LIMIT 1"),
   ]);
-  return (
-    orders.some((o) => o.sync_status === 'error') ||
-    payments.some((p) => p.sync_status === 'error')
-  );
+  return errOrders.length > 0 || errPayments.length > 0;
 }
 
 /**
@@ -50,10 +48,10 @@ export async function hasErrors() {
 export async function resetErrors() {
   const { dbExec } = await import('../database/db');
   await dbExec(
-    "UPDATE offline_orders SET sync_status='pending', sync_error=NULL WHERE sync_status='error'",
+    "UPDATE offline_orders SET sync_status='pending', error_message=NULL WHERE sync_status='error'",
   );
   await dbExec(
-    "UPDATE offline_payments SET sync_status='pending', sync_error=NULL WHERE sync_status='error'",
+    "UPDATE offline_payments SET sync_status='pending', error_message=NULL WHERE sync_status='error'",
   );
 }
 

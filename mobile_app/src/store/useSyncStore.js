@@ -62,10 +62,15 @@ export const useSyncStore = create((set, get) => ({
         const payload = {
           orders: pendingOrders.map((o) => ({
             offline_id: o.offline_id,
-            table_id: o.table_id,
+            table_id: o.table_id ?? null,
             items: JSON.parse(o.items_json),
             special_instructions: o.special_instructions || '',
             restaurant_id: o.restaurant_id,
+            order_type: o.order_type || 'dine-in',
+            delivery_address: o.delivery_address || '',
+            delivery_phone: o.delivery_phone || '',
+            delivery_lat: o.delivery_lat ?? null,
+            delivery_lng: o.delivery_lng ?? null,
           })),
           payments: pendingPayments.map((p) => ({
             offline_id: p.offline_id,
@@ -81,7 +86,7 @@ export const useSyncStore = create((set, get) => ({
           })),
         };
 
-        const { results } = await apiSyncPush(payload);
+        const { results = {} } = await apiSyncPush(payload);
 
         for (const r of results.orders || []) {
           if (r.status === 'created' || r.status === 'duplicate') {

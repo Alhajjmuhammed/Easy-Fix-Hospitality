@@ -18,7 +18,7 @@
                 </tr>
                 <tr>
                     <td><strong>Table:</strong></td>
-                    <td>{{ order.table_info.tbl_no }} (Capacity: {{ order.table_info.capacity }})</td>
+                    <td>{% if order.table_info %}{{ order.table_info.tbl_no }} (Capacity: {{ order.table_info.capacity }}){% else %}{{ order.get_order_type_display }}{% endif %}</td>
                 </tr>
                 <tr>
                     <td><strong>Customer:</strong></td>

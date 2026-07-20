@@ -44,6 +44,10 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Don't recurse: if logout itself returns 401 (no token), just reject.
+      if (error.config?.url?.includes('/auth/logout/')) {
+        return Promise.reject(error);
+      }
       // Token expired or invalid — clear in-memory cache immediately so no
       // further requests go out with a bad token.
       clearClientAuth();

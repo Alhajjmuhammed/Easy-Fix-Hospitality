@@ -131,9 +131,13 @@
                                         <br><small class="text-muted">{{ order.created_at|date:"M d, H:i" }}</small>
                                     </td>
                                     <td>
+                                        {% if order.table_info %}
                                         <i class="bi bi-table me-1"></i>Table {{ order.table_info.tbl_no }}
-                                        {% if order.table_info.seating_capacity %}
-                                        <br><small class="text-muted">{{ order.table_info.seating_capacity }} seats</small>
+                                        {% if order.table_info.capacity %}
+                                        <br><small class="text-muted">{{ order.table_info.capacity }} seats</small>
+                                        {% endif %}
+                                        {% else %}
+                                        <span class="text-muted">{{ order.get_order_type_display }}</span>
                                         {% endif %}
                                     </td>
                                     <td>

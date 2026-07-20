@@ -249,7 +249,7 @@
             </div>
             <div class="kot-info-row">
                 <span class="kot-info-label">Table:</span>
-                <span>{{ order.table_info.tbl_no }}</span>
+                <span>{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span>
             </div>
             <div class="kot-info-row">
                 <span class="kot-info-label">Date:</span>

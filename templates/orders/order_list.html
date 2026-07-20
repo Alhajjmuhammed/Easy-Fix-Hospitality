@@ -50,7 +50,7 @@
                         <tr>
                             <td><strong>{{ order.order_number }}</strong></td>
                             <td>
-                                <i class="bi bi-table me-1"></i>{{ order.table_info.tbl_no }}
+                                <i class="bi bi-table me-1"></i>{{ order.table_info.tbl_no|default:order.get_order_type_display }}
                             </td>
                             {% if not is_customer_care %}
                             <td>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</td>

@@ -24,7 +24,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 
 export default function PlaceOrderScreen({ navigation }) {
   const theme = useTheme();
-  const { items, tableId, tableName, clearCart, getSubtotal, existingOrderId, orderType, deliveryAddress, deliveryPhone } = useCartStore();
+  const { items, tableId, tableName, clearCart, getSubtotal, existingOrderId, orderType, deliveryAddress, deliveryPhone, deliveryLat, deliveryLng } = useCartStore();
   const { user, restaurantId } = useAuthStore();
   const { refreshPendingCount } = useSyncStore();
   const localKotBot = usePrinterStore((s) => s.localKotBot);
@@ -72,6 +72,8 @@ export default function PlaceOrderScreen({ navigation }) {
         order_type: orderType || 'dine-in',
         delivery_address: deliveryAddress || '',
         delivery_phone: deliveryPhone || '',
+        delivery_lat: deliveryLat != null ? parseFloat(deliveryLat.toFixed(7)) : null,
+        delivery_lng: deliveryLng != null ? parseFloat(deliveryLng.toFixed(7)) : null,
       };
 
       if (net.isConnected) {
@@ -104,7 +106,15 @@ export default function PlaceOrderScreen({ navigation }) {
               setSnack(err.response.data?.detail || 'Order failed. Please try again.');
             }
           } else {
-            setSnack(err.response?.data?.error || err.message || 'Something went wrong.');
+            const data = err.response?.data;
+            let errMsg = data?.error || data?.detail;
+            if (!errMsg && data && typeof data === 'object') {
+              // DRF serializer validation error: { field: ['msg'] }
+              const firstKey = Object.keys(data)[0];
+              const val = data[firstKey];
+              errMsg = `${firstKey}: ${Array.isArray(val) ? val[0] : val}`;
+            }
+            setSnack(errMsg || err.message || 'Something went wrong.');
           }
         }
       } else {
@@ -130,8 +140,16 @@ export default function PlaceOrderScreen({ navigation }) {
 
         clearCart();
         setSnack('Order saved – will sync when online');
-        const backScreen = (orderType === 'delivery' || orderType === 'pickup') ? 'RestaurantSelector' : 'TableSelection';
-        setTimeout(() => navigation.navigate(backScreen), 1500);
+        const isRemoteOffline = orderType === 'delivery' || orderType === 'pickup';
+        setTimeout(async () => {
+          if (isRemoteOffline) {
+            const { setRestaurant } = useAuthStore.getState();
+            try { await setRestaurant(null); } catch { /* ignore */ }
+            navigation.reset({ index: 0, routes: [{ name: 'RestaurantSelector' }] });
+          } else {
+            navigation.reset({ index: 0, routes: [{ name: 'TableSelection' }] });
+          }
+        }, 1500);
       }
     } catch (err) {
       setSnack(err.message || 'Something went wrong.');

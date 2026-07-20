@@ -179,7 +179,7 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': [REDIS_URL],
+            'hosts': [{'address': REDIS_URL, 'protocol': 2}],
             'capacity': 1500,
             'expiry': 10,
         },
@@ -377,7 +377,7 @@ AUTHENTICATION_BACKENDS = [
 AXES_ENABLED = True
 AXES_FAILURE_LIMIT = 10  # Allow 10 failed attempts before lockout (reasonable for busy restaurants)
 AXES_COOLOFF_TIME = timedelta(minutes=30)  # 30-minute cooldown (not too long, not too short)
-AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]  # Lock by username+IP (prevents bypass via agent rotation)
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]  # Lock by username+IP combination (list-of-lists required by django-axes)
 AXES_RESET_ON_SUCCESS = True  # Reset counter on successful login
 AXES_LOCKOUT_TEMPLATE = 'accounts/account_locked.html'  # Custom lockout page
 AXES_LOCKOUT_URL = None  # Use template instead of redirect

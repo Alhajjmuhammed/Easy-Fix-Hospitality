@@ -333,7 +333,7 @@
                                         <span class="restaurant-badge">{{ order.table_info.display_restaurant_name }}</span>
                                     </div>
                                     <div class="table-info">
-                                        <i class="fas fa-chair"></i> Table {{ order.table_info.tbl_no }}
+                                        <i class="fas fa-chair"></i> Table {{ order.table_info.tbl_no|default:order.get_order_type_display }}
                                         • {{ order.ordered_by.get_full_name|default:order.ordered_by.username }}
                                     </div>
                                 </div>
@@ -442,7 +442,7 @@
                                 </td>
                                 <td>{{ order.table_info.display_restaurant_name }}</td>
                                 <td>
-                                    <i class="fas fa-chair"></i> {{ order.table_info.tbl_no }}
+                                    <i class="fas fa-chair"></i> {{ order.table_info.tbl_no|default:order.get_order_type_display }}
                                 </td>
                                 <td>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</td>
                                 <td>

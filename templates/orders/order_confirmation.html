@@ -11,26 +11,38 @@
                 <div class="text-success mb-4">
                     <i class="bi bi-check-circle display-1"></i>
                 </div>
-                
+
                 <h2 class="text-success mb-3">Order Confirmed!</h2>
                 <p class="lead mb-4">Thank you for your order. We're preparing it now.</p>
-                
+
                 <div class="card bg-light mb-4">
                     <div class="card-body">
                         <h5>Order Details</h5>
                         <p class="mb-1"><strong>Order Number:</strong> {{ order.order_number }}</p>
-                        <p class="mb-1"><strong>Table:</strong> {{ order.table_info.tbl_no }}</p>
+                        {% if order.order_type == 'delivery' %}
+                        <p class="mb-1"><strong>Type:</strong> <i class="bi bi-bicycle me-1"></i>Delivery{% if order.delivery_address %} — {{ order.delivery_address }}{% endif %}</p>
+                        {% elif order.order_type == 'pickup' %}
+                        <p class="mb-1"><strong>Type:</strong> <i class="bi bi-bag-check me-1"></i>Pickup</p>
+                        {% else %}
+                        <p class="mb-1"><strong>Table:</strong> {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}—{% endif %}</p>
+                        {% endif %}
                         <p class="mb-1"><strong>Total:</strong> {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</p>
-                        <p class="mb-0"><strong>Status:</strong> 
+                        <p class="mb-0"><strong>Status:</strong>
                             <span class="badge bg-warning">{{ order.get_status_display }}</span>
                         </p>
                     </div>
                 </div>
-                
+
                 <div class="d-grid gap-2">
+                    {% if order.order_type == 'delivery' or order.order_type == 'pickup' %}
+                    <a href="{% url 'restaurant:home' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-house-fill me-1"></i> Back to Home
+                    </a>
+                    {% else %}
                     <a href="{% url 'orders:select_table' %}" class="btn btn-primary btn-lg">
                         <i class="bi bi-arrow-left-circle"></i> Back to Tables
                     </a>
+                    {% endif %}
                     <a href="{% url 'orders:my_orders' %}" class="btn btn-outline-primary">
                         <i class="bi bi-list-ul"></i> View My Orders
                     </a>
@@ -45,7 +57,7 @@
                         </a>
                     {% endif %}
                 </div>
-                
+
                 <div class="mt-4">
                     <small class="text-muted">
                         <i class="bi bi-clock"></i>
@@ -58,36 +70,36 @@
 </div>
 
 <script>
-    // Auto-redirect to table selection after 2 seconds
+    {% if order.order_type == 'delivery' or order.order_type == 'pickup' %}
+    setTimeout(function() {
+        window.location.href = "{% url 'restaurant:home' %}";
+    }, 3000);
+    {% else %}
     setTimeout(function() {
         window.location.href = "{% url 'orders:select_table' %}";
     }, 2000);
-    
+    {% endif %}
+
     {% if should_print_kot or should_print_bot %}
-    // Auto-open KOT and/or BOT in new windows when order is placed
     window.addEventListener('load', function() {
         {% if should_print_kot %}
-        // Open KOT in new window for automatic printing
         const kotWindow = window.open(
-            "{% url 'orders:print_kot' order.id %}", 
+            "{% url 'orders:print_kot' order.id %}",
             'KOT_Window',
             'width=800,height=900,scrollbars=yes,resizable=yes'
         );
-        
         if (!kotWindow) {
             alert('Please allow pop-ups to automatically print Kitchen Order Ticket (KOT)');
         }
         {% endif %}
-        
+
         {% if should_print_bot %}
-        // Open BOT in new window for automatic printing (slight delay to avoid popup blocker)
         setTimeout(function() {
             const botWindow = window.open(
-                "{% url 'orders:print_bot' order.id %}", 
+                "{% url 'orders:print_bot' order.id %}",
                 'BOT_Window',
                 'width=800,height=900,scrollbars=yes,resizable=yes'
             );
-            
             if (!botWindow) {
                 alert('Please allow pop-ups to automatically print Bar Order Ticket (BOT)');
             }

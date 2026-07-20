@@ -243,29 +243,42 @@ def require_restaurant_context(view_func):
         # Validate restaurant from session
         restaurant = validate_session_restaurant_id(request.session)
         if not restaurant:
+            if request.user.is_authenticated:
+                # Authenticated customer with no restaurant session — redirect home silently
+                return redirect('restaurant:home')
+            # Unauthenticated user — redirect to login
             messages.warning(request, 'Please scan a restaurant QR code to start ordering.')
             return redirect('accounts:login')
-        
+
         return view_func(request, *args, **kwargs)
-    
+
     return wrapper
 
 
 def require_table_selection(view_func):
     """
     Decorator that ensures a valid table is selected in session.
+    Skipped for delivery/pickup remote orders (no table needed).
     """
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
+        # Remote orders (delivery/pickup) don't need a table
+        order_type = request.session.get('order_type', 'dine-in')
+        if order_type in ('delivery', 'pickup'):
+            return view_func(request, *args, **kwargs)
+
         restaurant = validate_session_restaurant_id(request.session)
         table_number, table_id = validate_session_table(request.session, restaurant)
-        
+
         if not table_number:
-            messages.warning(request, 'Please select your table number first.')
+            if not restaurant:
+                # No restaurant context either — go home silently
+                return redirect('restaurant:home')
+            # Have restaurant but no table — send to table selection (no warning)
             return redirect('orders:select_table')
-        
+
         return view_func(request, *args, **kwargs)
-    
+
     return wrapper
 
 

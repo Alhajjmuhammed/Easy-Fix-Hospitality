@@ -39,6 +39,7 @@ urlpatterns = [
     # New Admin Functions
     path('toggle-subscription-plan/', views.toggle_restaurant_subscription_plan, name='toggle_subscription_plan'),
     path('toggle-restaurant-status/', views.toggle_restaurant_status, name='toggle_restaurant_status'),
+    path('toggle-remote-orders/', views.toggle_remote_orders, name='toggle_remote_orders'),
     path('delete-restaurant-admin/', views.delete_restaurant_admin, name='delete_restaurant_admin'),
     path('restaurant-details-admin/<int:restaurant_id>/', views.restaurant_details_admin, name='restaurant_details_admin'),
     
@@ -65,6 +66,14 @@ urlpatterns = [
     path('edit-table/<int:table_id>/', views.edit_table, name='edit_table'),
     path('delete-table/<int:table_id>/', views.delete_table, name='delete_table'),
     
+    # Delivery Rider Management
+    path('riders/', views.manage_riders, name='manage_riders'),
+    path('riders/create/', views.create_rider, name='create_rider'),
+    path('riders/create-form/', views.create_rider_form, name='create_rider_form'),
+    path('riders/toggle-status/', views.toggle_rider_status, name='toggle_rider_status'),
+    path('riders/<int:rider_id>/delete/', views.delete_rider, name='delete_rider'),
+    path('riders/<int:rider_id>/details/', views.rider_details, name='rider_details'),
+
     # Orders Management
     path('order-details/<int:order_id>/', views.order_details, name='order_details'),
     path('update-order-status/<int:order_id>/', views.update_order_status, name='update_order_status'),

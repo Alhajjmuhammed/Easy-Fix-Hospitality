@@ -56,7 +56,9 @@ def cashier_dashboard(request):
     _oq_dash = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     if period == 'today':
         orders = Order.objects.filter(
@@ -165,7 +167,9 @@ def my_orders(request):
     _oq_mo = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     orders = Order.objects.filter(
         _oq_mo,
@@ -210,7 +214,9 @@ def process_payment(request, order_id):
     _oq_pp = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     # Use select_for_update() on POST to prevent concurrent payment race conditions.
     # GET uses a plain queryset (no lock needed for read-only data).
@@ -399,7 +405,9 @@ def void_payment(request, payment_id):
     _pq_vp = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     # select_for_update prevents concurrent void of the same payment
     payment = get_object_or_404(Payment.objects.select_for_update(of=('self',)).filter(_pq_vp), id=payment_id)
@@ -493,7 +501,9 @@ def transfer_table(request, order_id):
     _oq_tt = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(Order.objects.filter(_oq_tt), id=order_id)
 
@@ -565,7 +575,9 @@ def cancel_order(request, order_id):
     _oq_co = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(Order.objects.filter(_oq_co), id=order_id)
     
@@ -609,7 +621,9 @@ def payment_history(request, order_id):
     _oq_ph = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(Order.objects.filter(_oq_ph), id=order_id)
     
@@ -654,7 +668,9 @@ def generate_receipt(request, payment_id):
     _pq_gr = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     payment = get_object_or_404(Payment.objects.filter(_pq_gr), id=payment_id)
     
@@ -688,7 +704,9 @@ def reprint_receipt(request, payment_id):
     _pq_rr = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     payment = get_object_or_404(Payment.objects.filter(_pq_rr), id=payment_id)
     
@@ -733,7 +751,9 @@ def receipt_management(request):
     _pq_rm = (
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
-        Q(order__table_info__restaurant__branch_owner=owner)
+        Q(order__table_info__restaurant__branch_owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     payments = Payment.objects.filter(
         _pq_rm,
@@ -787,7 +807,9 @@ def print_bill(request, order_id):
     _oq_pb = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(
         Order.objects.prefetch_related('order_items__product').filter(_oq_pb),
@@ -856,7 +878,9 @@ def cashier_reports(request):
     _oq_cr = (
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
-        Q(table_info__restaurant__branch_owner=owner)
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     orders = Order.objects.filter(_oq_cr)
     

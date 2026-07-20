@@ -360,7 +360,7 @@
                         <td>{{ forloop.counter }}</td>
                         <td><strong>{{ order.order_number }}</strong></td>
                         <td>{{ order.created_at|date:"M d, Y" }}<br><small class="text-muted">{{ order.created_at|date:"h:i A" }}</small></td>
-                        <td><span class="badge bg-secondary">{{ order.table_info.tbl_no }}</span></td>
+                        <td><span class="badge bg-secondary">{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span></td>
                         <td>
                             {% for item in order.order_items.all %}
                                 {{ item.product.product_name }} x{{ item.quantity }}{% if not forloop.last %},<br>{% endif %}

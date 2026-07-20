@@ -31,18 +31,125 @@ def home(request):
         return redirect('admin_panel:admin_dashboard')
     return render(request, 'restaurant/home.html')
 
+
+def browse_restaurants(request):
+    """List restaurants that allow remote ordering (delivery & pickup)."""
+    from restaurant.models_restaurant import Restaurant as RestaurantModel
+
+    # If user explicitly wants to switch, clear current remote session
+    if request.GET.get('switch') == '1':
+        for key in ('selected_restaurant_id', 'selected_restaurant_name',
+                    'order_type', 'delivery_address', 'delivery_phone',
+                    'selected_table', 'selected_table_id', 'cart'):
+            request.session.pop(key, None)
+        request.session.modified = True
+        return redirect('restaurant:browse_restaurants')
+
+    # Detect active remote-order session so we can show a "continue or switch" prompt
+    active_restaurant_name = None
+    active_order_type = request.session.get('order_type', 'dine-in')
+    if active_order_type in ('delivery', 'pickup') and request.session.get('selected_restaurant_id'):
+        active_restaurant_name = request.session.get('selected_restaurant_name', 'your restaurant')
+
+    search = request.GET.get('q', '').strip()
+    qs = RestaurantModel.objects.filter(allow_remote_orders=True, is_active=True).select_related('main_owner')
+    if search:
+        qs = qs.filter(
+            Q(name__icontains=search) |
+            Q(address__icontains=search)
+        )
+    return render(request, 'restaurant/browse_restaurants.html', {
+        'restaurants': qs,
+        'search': search,
+        'active_restaurant_name': active_restaurant_name,
+        'active_order_type': active_order_type,
+    })
+
+
+@login_required
+def select_order_type(request, restaurant_id):
+    """Choose Delivery or Pickup for a remote-order restaurant."""
+    from restaurant.models_restaurant import Restaurant as RestaurantModel
+    restaurant_obj = get_object_or_404(
+        RestaurantModel,
+        id=restaurant_id,
+        allow_remote_orders=True,
+        is_active=True,
+    )
+    owner = restaurant_obj.main_owner
+
+    if request.method == 'POST':
+        chosen_type = request.POST.get('order_type', 'pickup')
+        request.session['selected_restaurant_id'] = owner.id
+        request.session['selected_restaurant_name'] = restaurant_obj.name
+        request.session['order_type'] = chosen_type
+        # Clear old table data so it doesn't interfere
+        request.session.pop('selected_table', None)
+        request.session.pop('selected_table_id', None)
+
+        if chosen_type == 'delivery':
+            return redirect('restaurant:delivery_info', restaurant_id=restaurant_obj.id)
+        else:
+            request.session['delivery_address'] = ''
+            request.session['delivery_phone'] = ''
+            return redirect('restaurant:menu')
+
+    return render(request, 'restaurant/select_order_type.html', {
+        'restaurant': restaurant_obj,
+    })
+
+
+@login_required
+def delivery_info(request, restaurant_id):
+    """Enter delivery address and phone for a delivery order."""
+    from restaurant.models_restaurant import Restaurant as RestaurantModel
+    restaurant_obj = get_object_or_404(
+        RestaurantModel,
+        id=restaurant_id,
+        allow_remote_orders=True,
+        is_active=True,
+    )
+    owner = restaurant_obj.main_owner
+
+    if request.method == 'POST':
+        address = request.POST.get('delivery_address', '').strip()
+        phone = request.POST.get('delivery_phone', '').strip()
+        if not address:
+            messages.error(request, 'Please enter your delivery address.')
+        elif not phone:
+            messages.error(request, 'Please enter your phone number so the rider can contact you.')
+        else:
+            request.session['selected_restaurant_id'] = owner.id
+            request.session['selected_restaurant_name'] = restaurant_obj.name
+            request.session['order_type'] = 'delivery'
+            request.session['delivery_address'] = address
+            request.session['delivery_phone'] = phone
+            request.session.pop('selected_table', None)
+            request.session.pop('selected_table_id', None)
+            return redirect('restaurant:menu')
+
+    return render(request, 'restaurant/delivery_info.html', {
+        'restaurant': restaurant_obj,
+        'delivery_address': request.session.get('delivery_address', ''),
+        'delivery_phone': request.session.get('delivery_phone', ''),
+    })
+
+
 def menu(request):
     """Display menu with cart functionality"""
     # Initialize logger at the start
     import logging
     logger = logging.getLogger(__name__)
     
-    # Check if table is selected
-    if 'selected_table' not in request.session:
+    # Allow delivery/pickup remote orders to skip table selection
+    order_type = request.session.get('order_type', 'dine-in')
+    is_remote_order = order_type in ('delivery', 'pickup')
+
+    if 'selected_table' not in request.session and not is_remote_order:
         messages.warning(request, 'Please select your table number first.')
         return redirect('orders:select_table')
 
-    table_number = request.session['selected_table']
+    table_number = request.session.get('selected_table', '')
     
     # Get current restaurant for filtering menu
     current_restaurant = None
@@ -287,6 +394,9 @@ def menu(request):
         'restaurant_name': restaurant_name,
         'current_restaurant': current_restaurant,
         'base_template': base_template,
+        'order_type': order_type,
+        'is_remote_order': is_remote_order,
+        'delivery_address': request.session.get('delivery_address', ''),
     }
 
     return render(request, 'restaurant/menu.html', context)
@@ -313,7 +423,9 @@ def owner_dashboard(request):
             _order_counts = Order.objects.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             ).distinct().aggregate(
                 total=Count('id'),
                 pending=Count('id', filter=Q(status='pending')),
@@ -326,7 +438,9 @@ def owner_dashboard(request):
             recent_orders = Order.objects.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
-                Q(table_info__restaurant__branch_owner=owner_filter)
+                Q(table_info__restaurant__branch_owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             ).distinct().select_related('table_info', 'ordered_by').order_by('-created_at')[:5]
         else:
             # Administrator sees all data

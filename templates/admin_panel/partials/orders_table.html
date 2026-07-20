@@ -30,7 +30,7 @@
                         <strong>#{{ order.order_number }}</strong>
                     </td>
                     <td>
-                        <span class="badge bg-secondary" style="font-size: 0.7rem;">{{ order.table_info.tbl_no }}</span>
+                        <span class="badge bg-secondary" style="font-size: 0.7rem;">{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
                     </td>
                     <td>
                         <small style="font-size: 0.75rem;">{{ order.created_at|date:"M d, H:i" }}</small>

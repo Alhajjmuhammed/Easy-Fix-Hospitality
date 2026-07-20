@@ -64,7 +64,7 @@ export const initDatabase = async () => {
     CREATE TABLE IF NOT EXISTS offline_orders (
       id                   INTEGER PRIMARY KEY AUTOINCREMENT,
       offline_id           TEXT    UNIQUE NOT NULL,
-      table_id             INTEGER NOT NULL,
+      table_id             INTEGER,
       items_json           TEXT    NOT NULL,
       special_instructions TEXT,
       restaurant_id        INTEGER,
@@ -73,7 +73,12 @@ export const initDatabase = async () => {
       sync_status          TEXT    DEFAULT 'pending',
       server_order_id      INTEGER,
       server_order_number  TEXT,
-      error_message        TEXT
+      error_message        TEXT,
+      order_type           TEXT    DEFAULT 'dine-in',
+      delivery_address     TEXT,
+      delivery_phone       TEXT,
+      delivery_lat         REAL,
+      delivery_lng         REAL
     );
 
     CREATE TABLE IF NOT EXISTS offline_payments (
@@ -141,6 +146,17 @@ export const initDatabase = async () => {
   try {
     await db.runAsync(`ALTER TABLE products ADD COLUMN station TEXT DEFAULT 'kitchen'`);
   } catch (_) {}
+
+  // Migration: delivery/pickup fields for offline orders
+  for (const stmt of [
+    `ALTER TABLE offline_orders ADD COLUMN order_type TEXT DEFAULT 'dine-in'`,
+    `ALTER TABLE offline_orders ADD COLUMN delivery_address TEXT`,
+    `ALTER TABLE offline_orders ADD COLUMN delivery_phone TEXT`,
+    `ALTER TABLE offline_orders ADD COLUMN delivery_lat REAL`,
+    `ALTER TABLE offline_orders ADD COLUMN delivery_lng REAL`,
+  ]) {
+    try { await db.runAsync(stmt); } catch (_) {}
+  }
 
   // Migration: add orders cache table for existing installs that pre-date this feature.
   // CREATE TABLE IF NOT EXISTS in the block above already handles fresh installs;

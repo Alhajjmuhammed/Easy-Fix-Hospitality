@@ -3,19 +3,20 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import RestaurantSelectorScreen from '../screens/customer/RestaurantSelectorScreen';
-import TableSelectionScreen     from '../screens/customer/TableSelectionScreen';
-import OrderTypeScreen          from '../screens/customer/OrderTypeScreen';
-import DeliveryInfoScreen       from '../screens/customer/DeliveryInfoScreen';
-import MenuScreen               from '../screens/customer/MenuScreen';
-import CartScreen               from '../screens/customer/CartScreen';
-import PlaceOrderScreen         from '../screens/customer/PlaceOrderScreen';
-import OrderTrackingScreen      from '../screens/customer/OrderTrackingScreen';
-import OrderConfirmationScreen  from '../screens/customer/OrderConfirmationScreen';
-import MyOrdersScreen           from '../screens/customer/MyOrdersScreen';
-import ReceiptScreen            from '../screens/customer/ReceiptScreen';
-import ProfileScreen            from '../screens/customer/ProfileScreen';
-import CustomerHeader           from '../components/CustomerHeader';
+import RestaurantSelectorScreen  from '../screens/customer/RestaurantSelectorScreen';
+import TableSelectionScreen      from '../screens/customer/TableSelectionScreen';
+import OrderTypeScreen           from '../screens/customer/OrderTypeScreen';
+import DeliveryInfoScreen        from '../screens/customer/DeliveryInfoScreen';
+import MenuScreen                from '../screens/customer/MenuScreen';
+import CartScreen                from '../screens/customer/CartScreen';
+import PlaceOrderScreen          from '../screens/customer/PlaceOrderScreen';
+import OrderTrackingScreen       from '../screens/customer/OrderTrackingScreen';
+import OrderConfirmationScreen   from '../screens/customer/OrderConfirmationScreen';
+import MyOrdersScreen            from '../screens/customer/MyOrdersScreen';
+import ReceiptScreen             from '../screens/customer/ReceiptScreen';
+import ProfileScreen             from '../screens/customer/ProfileScreen';
+import DeliveryTrackingScreen    from '../screens/customer/DeliveryTrackingScreen';
+import CustomerHeader            from '../components/CustomerHeader';
 
 const Tab            = createBottomTabNavigator();
 const OrderStack     = createNativeStackNavigator();
@@ -49,8 +50,9 @@ function OrderStackNavigator() {
         component={OrderConfirmationScreen}
         options={{ headerShown: false }}
       />
-      <OrderStack.Screen name="OrderTracking"  component={OrderTrackingScreen} />
-      <OrderStack.Screen name="Receipt"        component={ReceiptScreen} />
+      <OrderStack.Screen name="OrderTracking"     component={OrderTrackingScreen} />
+      <OrderStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: 'Track Delivery' }} />
+      <OrderStack.Screen name="Receipt"          component={ReceiptScreen} />
     </OrderStack.Navigator>
   );
 }
@@ -67,9 +69,10 @@ function MyOrdersStackNavigator() {
         ),
       })}
     >
-      <MyOrdersStack.Screen name="MyOrdersList"   component={MyOrdersScreen} />
-      <MyOrdersStack.Screen name="OrderTracking"  component={OrderTrackingScreen} />
-      <MyOrdersStack.Screen name="Receipt"        component={ReceiptScreen} />
+      <MyOrdersStack.Screen name="MyOrdersList"     component={MyOrdersScreen} />
+      <MyOrdersStack.Screen name="OrderTracking"   component={OrderTrackingScreen} />
+      <MyOrdersStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: 'Track Delivery' }} />
+      <MyOrdersStack.Screen name="Receipt"         component={ReceiptScreen} />
     </MyOrdersStack.Navigator>
   );
 }

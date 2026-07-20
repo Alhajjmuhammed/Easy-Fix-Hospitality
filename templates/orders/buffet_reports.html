@@ -261,7 +261,7 @@
                             {% for order in orders|slice:":20" %}
                             <tr>
                                 <td><strong>{{ order.order_number }}</strong></td>
-                                <td>{{ order.table_info.tbl_no }}</td>
+                                <td>{{ order.table_info.tbl_no|default:order.get_order_type_display }}</td>
                                 <td>
                                     {% for item in order.order_items.all %}
                                         {% if item.product.station == 'buffet' %}

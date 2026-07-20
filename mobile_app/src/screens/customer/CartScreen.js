@@ -115,7 +115,7 @@ export default function CartScreen({ navigation }) {
         </View>
         {taxRate > 0 && (
           <View style={styles.totalRow}>
-            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Tax ({taxRate}%)</Text>
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Tax ({parseFloat((taxRate * 100).toFixed(2))}%)</Text>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{format(taxAmount)}</Text>
           </View>
         )}

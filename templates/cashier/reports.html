@@ -229,7 +229,7 @@
                                 {{ order.created_at|date:"Y-m-d" }}<br>
                                 <small class="text-muted">{{ order.created_at|time:"H:i:s" }}</small>
                             </td>
-                            <td>{{ order.table_info.tbl_no }}</td>
+                            <td>{{ order.table_info.tbl_no|default:order.get_order_type_display }}</td>
                             <td>
                                 {% for item in order.order_items.all %}
                                     {{ item.quantity }}x {{ item.product.name }}{% if not forloop.last %}, {% endif %}

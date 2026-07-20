@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants
+from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants, delivery
 
 app_name = 'mobile_api'
 
@@ -56,4 +56,15 @@ urlpatterns = [
     # ── Restaurants (customer discovery) ─────────────────────────────────
     path('restaurants/',      restaurants.restaurants_list, name='restaurants_list'),
     path('restaurants/scan/', restaurants.restaurant_by_qr, name='restaurant_by_qr'),
+
+    # ── Delivery ──────────────────────────────────────────────────────────
+    path('delivery/riders/',                       delivery.riders_list,         name='delivery_riders'),
+    path('delivery/assign/',                       delivery.assign_rider,        name='delivery_assign'),
+    path('delivery/auto-assign/',                  delivery.auto_assign_rider,   name='delivery_auto_assign'),
+    path('delivery/location/',                     delivery.update_location,     name='delivery_location'),
+    path('delivery/assignments/',                  delivery.my_assignments,      name='delivery_assignments'),
+    path('delivery/availability/',                 delivery.toggle_availability, name='delivery_availability'),
+    path('delivery/<int:order_id>/track/',         delivery.track_order,         name='delivery_track'),
+    path('delivery/<int:order_id>/pickup/',        delivery.mark_picked_up,      name='delivery_pickup'),
+    path('delivery/<int:order_id>/complete/',      delivery.mark_delivered,      name='delivery_complete'),
 ]

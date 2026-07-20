@@ -62,8 +62,9 @@ export default function TableSelectionScreen({ navigation }) {
   }, [loadTables]);
 
   const goToMenu = (table) => {
-    setTable(table.id, `Table ${table.table_number}`, null);
-    navigation.navigate('Menu', { tableId: table.id, tableName: `Table ${table.table_number}` });
+    const tNum = table.table_number ?? table.tbl_no;
+    setTable(table.id, `Table ${tNum}`, null);
+    navigation.navigate('Menu', { tableId: table.id, tableName: `Table ${tNum}` });
   };
 
   const handleSelect = (table) => {
@@ -88,7 +89,7 @@ export default function TableSelectionScreen({ navigation }) {
       const orders = await apiActiveOrdersForTable(occupiedTable.id);
       if (!orders || orders.length === 0) {
         // No orders belong to this user at this table — same as web: show error, stay on table screen.
-        setSnack(`You have no active orders at Table ${occupiedTable.table_number}. Choose "New Order" to start one.`);
+        setSnack(`You have no active orders at Table ${occupiedTable.table_number ?? occupiedTable.tbl_no}. Choose "New Order" to start one.`);
         return;
       }
       // Always show picker — even for a single order (matches web behaviour).
@@ -104,7 +105,7 @@ export default function TableSelectionScreen({ navigation }) {
   const handlePickOrder = (order) => {
     setShowOrderPicker(false);
     // Clear stale cart items before entering add-to-existing flow
-    const tableName = `Table ${occupiedTable.table_number}`;
+    const tableName = `Table ${occupiedTable.table_number ?? occupiedTable.tbl_no}`;
     clearCart();
     setTable(occupiedTable.id, tableName, null);
     setExistingOrder(order.id);
@@ -156,7 +157,7 @@ export default function TableSelectionScreen({ navigation }) {
           >
             <Card.Content style={styles.cardContent}>
               <Text variant="titleLarge" style={[styles.tableNum, { color: accent }]}>
-                {item.table_number}
+                {item.table_number ?? item.tbl_no}
               </Text>
               <Chip
                 mode="flat"
@@ -184,7 +185,7 @@ export default function TableSelectionScreen({ navigation }) {
           <Dialog.Title>Table Occupied</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>
-              Table {occupiedTable?.table_number} is currently occupied. What would you like to do?
+              Table {occupiedTable?.table_number ?? occupiedTable?.tbl_no} is currently occupied. What would you like to do?
             </Text>
           </Dialog.Content>
           <Dialog.Actions style={styles.dialogActions}>
@@ -198,7 +199,7 @@ export default function TableSelectionScreen({ navigation }) {
       {/* Order picker dialog — always shown when adding to existing (matches web) */}
       <Portal>
         <Dialog visible={showOrderPicker} onDismiss={() => setShowOrderPicker(false)}>
-          <Dialog.Title>Your Orders at Table {occupiedTable?.table_number}</Dialog.Title>
+          <Dialog.Title>Your Orders at Table {occupiedTable?.table_number ?? occupiedTable?.tbl_no}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 8, opacity: 0.7, fontFamily: 'Poppins_400Regular' }}>
               Select the order you want to add items to:

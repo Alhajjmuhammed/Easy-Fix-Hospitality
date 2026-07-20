@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Count, Q, Subquery, OuterRef
+from django.db.models import Count, Q, Subquery, OuterRef, F
 from django.db import transaction
 from django.utils import timezone
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from accounts.models import User, Role, RestaurantSubscription, SubscriptionLog
 from restaurant.models import MainCategory, SubCategory, Product, TableInfo
 from restaurant.models_restaurant import Restaurant
-from orders.models import Order, OrderItem
+from orders.models import Order, OrderItem, DeliveryRider, DeliveryAssignment
 from django.contrib.auth.hashers import make_password
 from datetime import date, timedelta, datetime
 import json
@@ -485,8 +485,11 @@ def view_all_orders(request):
         orders = orders.filter(status=status_filter)
     
     if restaurant_filter != 'all':
-        orders = orders.filter(table_info__owner__id=restaurant_filter)
-    
+        orders = orders.filter(
+            Q(table_info__owner__id=restaurant_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__id=restaurant_filter)
+        )
+
     # Get filter options - Updated for new role system
     restaurant_owners = User.objects.filter(
         role__name__in=['owner', 'main_owner', 'branch_owner'], 
@@ -606,6 +609,7 @@ def create_restaurant_owner(request):
             
             # Subscription plan field
             subscription_plan = 'PRO' if request.POST.get('subscription_plan') == 'PRO' else 'SINGLE'
+            allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
             
             # Handle subscription dates based on quick_period or custom dates
             if quick_period and quick_period != 'custom':
@@ -723,7 +727,8 @@ def create_restaurant_owner(request):
                 branch_owner=new_owner,  # For main restaurant, main_owner is also branch_owner
                 is_main_restaurant=True,
                 parent_restaurant=None,
-                is_active=True
+                is_active=True,
+                allow_remote_orders=allow_remote_orders
             )
             
             # Calculate subscription duration
@@ -817,7 +822,9 @@ def get_restaurant_details(request, restaurant_id):
             'orders': Order.objects.filter(
                 Q(table_info__owner=main_owner) |
                 Q(table_info__restaurant__main_owner=main_owner) |
-                Q(table_info__restaurant__branch_owner=main_owner)
+                Q(table_info__restaurant__branch_owner=main_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=main_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=main_owner)
             ).distinct().count(),
             'staff': User.objects.filter(owner=main_owner).count(),
         }
@@ -848,6 +855,7 @@ def get_restaurant_details(request, restaurant_id):
             'address': restaurant.address or '',
             'date_joined': main_owner.date_joined.strftime('%B %d, %Y'),
             'is_active': restaurant.is_active,
+            'allow_remote_orders': restaurant.allow_remote_orders,
             'subscription_plan': restaurant.get_subscription_display(),
             'is_main_restaurant': restaurant.is_main_restaurant,
             'branch_count': restaurant.branches.count() if restaurant.is_main_restaurant else 0,
@@ -897,6 +905,7 @@ def edit_restaurant(request, restaurant_id):
             
             # Account status field
             is_active = request.POST.get('is_active', 'true') == 'true'
+            allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
             
             # Validation
             errors = []
@@ -972,7 +981,8 @@ def edit_restaurant(request, restaurant_id):
             restaurant_model.description = enhanced_description.strip()
             restaurant_model.address = address
             restaurant_model.is_active = is_active
-            restaurant_model.save(update_fields=['name', 'description', 'address', 'is_active', 'updated_at'])
+            restaurant_model.allow_remote_orders = allow_remote_orders
+            restaurant_model.save(update_fields=['name', 'description', 'address', 'is_active', 'allow_remote_orders', 'updated_at'])
             
             # Update main_owner User model
             main_owner.username = username
@@ -3085,6 +3095,33 @@ def toggle_restaurant_status(request):
 
 
 @login_required
+def toggle_remote_orders(request):
+    """Admin function to allow/disallow delivery & pickup (remote orders) for a restaurant"""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+
+    if request.method == 'POST':
+        try:
+            restaurant_id = request.POST.get('restaurant_id')
+            restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+
+            restaurant.allow_remote_orders = not restaurant.allow_remote_orders
+            restaurant.save(update_fields=['allow_remote_orders', 'updated_at'])
+
+            state = 'enabled' if restaurant.allow_remote_orders else 'disabled'
+            return JsonResponse({
+                'success': True,
+                'message': f'Delivery & Pickup {state} for {restaurant.name}.',
+                'allow_remote_orders': restaurant.allow_remote_orders,
+            })
+        except Exception as e:
+            logger.error(f'Error toggling remote orders: {str(e)}')
+            return JsonResponse({'success': False, 'error': 'Error updating setting. Please try again.'})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
+
+@login_required
 def delete_restaurant_admin(request):
     """Admin function to delete restaurants"""
     if not request.user.is_administrator():
@@ -3179,3 +3216,319 @@ def restaurant_details_admin(request, restaurant_id):
     except Exception as e:
         logger.error(f'Error getting restaurant details: {str(e)}')
         return JsonResponse({'success': False, 'error': 'Error getting restaurant details. Please try again.'})
+
+
+# ── Delivery Rider Management ─────────────────────────────────────────────────
+
+@login_required
+def manage_riders(request):
+    """List all delivery riders across all restaurants (admin) or per restaurant."""
+    if not request.user.is_administrator():
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
+
+    search = request.GET.get('q', '').strip()
+    restaurant_filter = request.GET.get('restaurant', '').strip()
+
+    qs = DeliveryRider.objects.select_related('user', 'owner').order_by(
+        F('owner__restaurant_name').asc(nulls_last=True), 'user__username'
+    )
+
+    if search:
+        qs = qs.filter(
+            Q(user__username__icontains=search) |
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(user__phone_number__icontains=search)
+        )
+    if restaurant_filter == 'global':
+        qs = qs.filter(owner__isnull=True)
+    elif restaurant_filter:
+        qs = qs.filter(owner_id=restaurant_filter)
+
+    # All restaurant owners for filter dropdown
+    restaurant_owners = User.objects.filter(
+        role__name__in=['owner', 'main_owner', 'branch_owner'], is_active=True
+    ).order_by('restaurant_name')
+
+    paginator = Paginator(qs, 20)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'system_admin/manage_riders.html', {
+        'page_obj': page_obj,
+        'riders': page_obj.object_list,
+        'search': search,
+        'restaurant_filter': restaurant_filter,
+        'restaurant_owners': restaurant_owners,
+        'total_count': qs.count(),
+    })
+
+
+@login_required
+def create_rider_form(request):
+    """Handle traditional HTML form POST to create a delivery rider."""
+    if not request.user.is_administrator():
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:manage_riders')
+
+    if request.method != 'POST':
+        return redirect('system_admin:manage_riders')
+
+    owner_id     = request.POST.get('owner_id', '').strip() or None
+    first_name   = request.POST.get('first_name', '').strip()
+    last_name    = request.POST.get('last_name', '').strip()
+    username     = request.POST.get('username', '').strip()
+    password     = request.POST.get('password', '').strip()
+    phone        = request.POST.get('phone', '').strip()
+    vehicle_type = request.POST.get('vehicle_type', 'motorcycle')
+
+    # Preserve form data if error
+    form_data = {
+        'first_name': first_name, 'last_name': last_name,
+        'username': username, 'phone': phone,
+    }
+
+    def show_error(msg):
+        # Re-render page with error + preserved form data so modal re-opens
+        search = request.GET.get('q', '').strip()
+        restaurant_filter = request.GET.get('restaurant', '').strip()
+        qs = DeliveryRider.objects.select_related('user', 'owner').order_by(
+            F('owner__restaurant_name').asc(nulls_last=True), 'user__username'
+        )
+        restaurant_owners = User.objects.filter(
+            role__name__in=['owner', 'main_owner', 'branch_owner'], is_active=True
+        ).order_by('restaurant_name')
+        paginator = Paginator(qs, 20)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        return render(request, 'system_admin/manage_riders.html', {
+            'page_obj': page_obj,
+            'riders': page_obj.object_list,
+            'search': search,
+            'restaurant_filter': restaurant_filter,
+            'restaurant_owners': restaurant_owners,
+            'total_count': qs.count(),
+            'rider_error': msg,
+            'form_data': form_data,
+        })
+
+    if not username or not password:
+        return show_error('Username and password are required.')
+
+    if User.objects.filter(username=username).exists():
+        return show_error(f'Username "{username}" is already taken.')
+
+    owner = None
+    if owner_id:
+        try:
+            owner = User.objects.get(id=owner_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
+        except User.DoesNotExist:
+            return show_error('Selected restaurant not found.')
+
+    try:
+        rider_role = Role.objects.get(name='delivery_rider')
+    except Role.DoesNotExist:
+        return show_error('delivery_rider role not found. Run migrations first.')
+
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                phone_number=phone,
+                role=rider_role,
+                owner=owner,
+                is_active_staff=True,
+            )
+            DeliveryRider.objects.create(
+                user=user,
+                owner=owner,
+                vehicle_type=vehicle_type,
+                is_available=True,
+                is_active=True,
+            )
+    except Exception as e:
+        logger.error(f'create_rider_form error: {e}', exc_info=True)
+        return show_error(str(e))
+
+    scope = owner.restaurant_name if owner else 'Global'
+    messages.success(request, f'Rider "{user.get_full_name() or username}" created for {scope}.')
+    return redirect('system_admin:manage_riders')
+
+
+@login_required
+def create_rider(request):
+    """Create a new delivery rider account for a restaurant."""
+    print(f"\n[CREATE_RIDER] ===== REQUEST RECEIVED =====")
+    print(f"[CREATE_RIDER] Method: {request.method}")
+    print(f"[CREATE_RIDER] User: {request.user} | Is admin: {request.user.is_administrator()}")
+
+    if not request.user.is_administrator():
+        print("[CREATE_RIDER] DENIED: not admin")
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+
+    if request.method != 'POST':
+        print("[CREATE_RIDER] DENIED: not POST")
+        return JsonResponse({'success': False, 'error': 'POST required.'})
+
+    try:
+        raw_body = request.body
+        print(f"[CREATE_RIDER] Raw body: {raw_body[:500]}")
+        data = json.loads(raw_body)
+        print(f"[CREATE_RIDER] Parsed data: {data}")
+
+        owner_id     = data.get('owner_id') or None
+        first_name   = data.get('first_name', '').strip()
+        last_name    = data.get('last_name', '').strip()
+        username     = data.get('username', '').strip()
+        password     = data.get('password', '').strip()
+        phone        = data.get('phone', '').strip()
+        vehicle_type = data.get('vehicle_type', 'motorcycle')
+
+        print(f"[CREATE_RIDER] username={username!r} owner_id={owner_id!r} vehicle={vehicle_type!r}")
+
+        if not username or not password:
+            print("[CREATE_RIDER] FAIL: missing username or password")
+            return JsonResponse({'success': False, 'error': 'Username and password are required.'})
+
+        owner = None
+        if owner_id:
+            owner = get_object_or_404(User, id=owner_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
+            print(f"[CREATE_RIDER] owner resolved: {owner}")
+
+        if User.objects.filter(username=username).exists():
+            print(f"[CREATE_RIDER] FAIL: username {username!r} already taken")
+            return JsonResponse({'success': False, 'error': f'Username "{username}" is already taken.'})
+
+        rider_role = Role.objects.get(name='delivery_rider')
+        print(f"[CREATE_RIDER] rider_role: {rider_role}")
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                phone_number=phone,
+                role=rider_role,
+                owner=owner,
+                is_active_staff=True,
+            )
+            print(f"[CREATE_RIDER] User created: {user.id}")
+            rider = DeliveryRider.objects.create(
+                user=user,
+                owner=owner,
+                vehicle_type=vehicle_type,
+                is_available=True,
+                is_active=True,
+            )
+            print(f"[CREATE_RIDER] Rider created: {rider.id}")
+
+        scope_label = owner.restaurant_name if owner else 'Global'
+        result = {
+            'success': True,
+            'message': f'Rider "{user.get_full_name() or username}" created for {scope_label}.',
+            'rider_id': rider.id,
+        }
+        print(f"[CREATE_RIDER] SUCCESS: {result}")
+        return JsonResponse(result)
+
+    except Role.DoesNotExist:
+        print("[CREATE_RIDER] FAIL: delivery_rider role not found")
+        return JsonResponse({'success': False, 'error': 'delivery_rider role not found. Run migrations first.'})
+    except Exception as e:
+        import traceback
+        print(f"[CREATE_RIDER] EXCEPTION: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        logger.error(f'create_rider error: {e}', exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def toggle_rider_status(request):
+    """Toggle a rider's is_active flag."""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required.'})
+
+    try:
+        data     = json.loads(request.body)
+        rider_id = data.get('rider_id')
+        rider    = get_object_or_404(DeliveryRider, id=rider_id)
+
+        rider.is_active = not rider.is_active
+        rider.save(update_fields=['is_active'])
+
+        # Also deactivate/reactivate the linked user account
+        rider.user.is_active = rider.is_active
+        rider.user.save(update_fields=['is_active'])
+
+        state = 'activated' if rider.is_active else 'deactivated'
+        return JsonResponse({
+            'success': True,
+            'is_active': rider.is_active,
+            'message': f'Rider {rider.user.get_full_name() or rider.user.username} {state}.',
+        })
+    except Exception as e:
+        logger.error(f'toggle_rider_status error: {e}')
+        return JsonResponse({'success': False, 'error': 'Could not update rider status.'})
+
+
+@login_required
+def delete_rider(request, rider_id):
+    """Permanently delete a delivery rider."""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required.'})
+
+    rider = get_object_or_404(DeliveryRider, id=rider_id)
+    name  = rider.user.get_full_name() or rider.user.username
+
+    with transaction.atomic():
+        rider.assignments.all().delete()
+        rider.user.delete()
+
+    return JsonResponse({'success': True, 'message': f'Rider "{name}" deleted.'})
+
+
+@login_required
+def rider_details(request, rider_id):
+    """Return rider details as JSON for the admin modal."""
+    if not request.user.is_administrator():
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+
+    rider = get_object_or_404(
+        DeliveryRider.objects.select_related('user', 'owner'), id=rider_id
+    )
+    recent = DeliveryAssignment.objects.filter(rider=rider).select_related('order').order_by('-assigned_at')[:5]
+
+    return JsonResponse({
+        'success': True,
+        'rider': {
+            'id': rider.id,
+            'name': rider.user.get_full_name() or rider.user.username,
+            'username': rider.user.username,
+            'phone': rider.user.phone_number,
+            'vehicle': rider.vehicle_type,
+            'vehicle_display': rider.get_vehicle_type_display(),
+            'is_active': rider.is_active,
+            'is_available': rider.is_available,
+            'restaurant': (rider.owner.restaurant_name or rider.owner.username) if rider.owner_id else 'Global (Any Restaurant)',
+            'created_at': rider.created_at.strftime('%Y-%m-%d'),
+            'deliveries_total': rider.assignments.count(),
+            'deliveries_completed': rider.assignments.filter(status='delivered').count(),
+            'recent': [
+                {
+                    'order_number': a.order.order_number,
+                    'status': a.get_status_display(),
+                    'date': a.assigned_at.strftime('%Y-%m-%d %H:%M'),
+                }
+                for a in recent
+            ],
+        },
+    })

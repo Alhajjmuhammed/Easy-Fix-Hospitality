@@ -245,7 +245,7 @@
             </div>
             <div class="SERVICE-info-row">
                 <span class="SERVICE-info-label">Table:</span>
-                <span>{{ order.table_info.table_number }}</span>
+                <span>{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
             </div>
             <div class="SERVICE-info-row">
                 <span class="SERVICE-info-label">Customer:</span>

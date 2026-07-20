@@ -440,7 +440,7 @@
                             {% for order in pending_orders %}
                                 <tr>
                                     <td><strong>#{{ order.order_number }}</strong></td>
-                                    <td><span class="badge bg-primary">{{ order.table_info.tbl_no }}</span></td>
+                                    <td><span class="badge bg-primary">{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span></td>
                                     <td>{{ order.ordered_by }}</td>
                                     <td>{{ order.created_at|date:"H:i" }}</td>
                                     <td>
@@ -498,7 +498,7 @@
                             {% for order in confirmed_orders %}
                                 <tr>
                                     <td><strong>#{{ order.order_number }}</strong></td>
-                                    <td><span class="badge bg-warning">{{ order.table_info.tbl_no }}</span></td>
+                                    <td><span class="badge bg-warning">{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span></td>
                                     <td>{{ order.ordered_by }}</td>
                                     <td>{{ order.created_at|date:"H:i" }}</td>
                                     <td>
@@ -562,7 +562,7 @@
                             {% for order in preparing_orders %}
                                 <tr>
                                     <td><strong>#{{ order.order_number }}</strong></td>
-                                    <td><span class="badge bg-info">{{ order.table_info.tbl_no }}</span></td>
+                                    <td><span class="badge bg-info">{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span></td>
                                     <td>{{ order.ordered_by }}</td>
                                     <td>{{ order.created_at|date:"H:i" }}</td>
                                     <td>
@@ -626,7 +626,7 @@
                             {% for order in ready_orders %}
                                 <tr class="table-success">
                                     <td><strong>#{{ order.order_number }}</strong></td>
-                                    <td><span class="badge bg-success">{{ order.table_info.tbl_no }}</span></td>
+                                    <td><span class="badge bg-success">{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span></td>
                                     <td>{{ order.ordered_by }}</td>
                                     <td>{{ order.created_at|date:"H:i" }}</td>
                                     <td>
@@ -689,7 +689,7 @@
                             {% for order in served_orders %}
                                 <tr class="table-light">
                                     <td><strong>#{{ order.order_number }}</strong></td>
-                                    <td><span class="badge bg-secondary">{{ order.table_info.tbl_no }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span></td>
                                     <td>{{ order.ordered_by }}</td>
                                     <td>{{ order.created_at|date:"H:i" }}</td>
                                     <td><span class="badge bg-success">{{ order.served_at|date:"H:i" }}</span></td>

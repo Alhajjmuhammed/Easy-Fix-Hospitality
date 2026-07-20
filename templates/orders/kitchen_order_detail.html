@@ -7,7 +7,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2>Order {{ order.order_number }}</h2>
-        <p class="text-muted mb-0">Table {{ order.table_info.tbl_no }} • {{ order.created_at|date:"M d, Y H:i" }}</p>
+        <p class="text-muted mb-0">Table {{ order.table_info.tbl_no|default:order.get_order_type_display }} • {{ order.created_at|date:"M d, Y H:i" }}</p>
     </div>
     <a href="{% url 'orders:kitchen_dashboard' %}" class="btn btn-outline-primary">
         <i class="bi bi-arrow-left"></i> Back to Kitchen
@@ -80,7 +80,7 @@
                     </span>
                 </p>
                 <p><strong>Customer:</strong> {{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</p>
-                <p><strong>Table:</strong> {{ order.table_info.tbl_no }}</p>
+                <p><strong>Table:</strong> {{ order.table_info.tbl_no|default:order.get_order_type_display }}</p>
                 <p><strong>Order Time:</strong> {{ order.created_at|date:"M d, Y H:i" }}</p>
                 {% if order.confirmed_by %}
                     <p><strong>Confirmed By:</strong> {{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</p>

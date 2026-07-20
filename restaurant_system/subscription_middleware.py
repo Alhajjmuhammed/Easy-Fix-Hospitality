@@ -59,7 +59,7 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
             owner_roles = ['owner', 'main_owner', 'branch_owner']
             
             # Define all staff roles
-            staff_roles = ['manager', 'customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']
+            staff_roles = ['manager', 'customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier', 'delivery_rider']
             
             if role_name in owner_roles or role_name in staff_roles:
                 # Log this for debugging
@@ -114,8 +114,8 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                     restaurant_owner = request.user
                     logger.debug(f"Branch owner {request.user.username} - no parent, checking own subscription")
                     
-            elif role_name in ['manager', 'customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']:
-                # Staff member (including managers) - check their owner's subscription
+            elif role_name in ['manager', 'customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier', 'delivery_rider']:
+                # Staff member (including managers and delivery riders) - check their owner's subscription
                 if request.user.owner:
                     direct_owner = request.user.owner
                     

@@ -50,6 +50,7 @@ class Role(models.Model):
         ('buffet', 'Buffet'),
         ('service', 'Service'),
         ('cashier', 'Cashier'),
+        ('delivery_rider', 'Delivery Rider'),
         ('customer', 'Customer'),
     ]
     
@@ -194,7 +195,10 @@ class User(AbstractUser):
     
     def is_cashier(self):
         return self.role and self.role.name == 'cashier'
-    
+
+    def is_delivery_rider(self):
+        return self.role and self.role.name == 'delivery_rider'
+
     def is_manager(self):
         return self.role and self.role.name == 'manager'
     
@@ -654,6 +658,7 @@ class RestaurantSubscription(models.Model):
     
     def block_restaurant(self, reason="Blocked by administrator", blocked_by=None):
         """Block restaurant access"""
+        old_status = self.subscription_status
         self.is_blocked_by_admin = True
         self.block_reason = reason
         self.subscription_status = 'blocked'
@@ -673,7 +678,7 @@ class RestaurantSubscription(models.Model):
             subscription=self,
             action='blocked',
             description=f"Restaurant blocked: {reason}",
-            old_status=self.subscription_status,
+            old_status=old_status,
             new_status='blocked',
             performed_by=blocked_by
         )

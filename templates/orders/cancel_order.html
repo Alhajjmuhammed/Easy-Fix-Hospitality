@@ -13,7 +13,7 @@
             <div class="card-body">
                 <div class="alert alert-warning">
                     <i class="bi bi-exclamation-triangle"></i>
-                    <strong>Warning:</strong> You are about to cancel order {{ order.order_number }} for Table {{ order.table_info.tbl_no }}.
+                    <strong>Warning:</strong> You are about to cancel order {{ order.order_number }}{% if order.table_info %} for Table {{ order.table_info.tbl_no }}{% endif %}.
                     This action will restore the product stock.
                 </div>
                 
@@ -23,7 +23,7 @@
                     </div>
                     <div class="card-body">
                         <p><strong>Order Number:</strong> {{ order.order_number }}</p>
-                        <p><strong>Table:</strong> {{ order.table_info.tbl_no }}</p>
+                        <p><strong>{% if order.table_info %}Table{% else %}Type{% endif %}:</strong> {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</p>
                         <p><strong>Customer:</strong> {{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</p>
                         <p><strong>Total:</strong> {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</p>
                         <p><strong>Status:</strong> {{ order.get_status_display }}</p>

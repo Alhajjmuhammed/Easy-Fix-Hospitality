@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl, ScrollView } from 'react-native';
 import {
   Text, Card, Button, TextInput, Dialog, Portal, Chip,
   ActivityIndicator, Snackbar, useTheme, SegmentedButtons, FAB, Divider, Menu,
+  List, RadioButton,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
+import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -25,12 +27,14 @@ const STATUS_NEXT = {
 };
 
 const STATUS_COLORS = {
-  pending:   '#FFA000',
-  confirmed: '#2c3e50',
-  preparing: '#6A1B9A',
-  ready:     '#2E7D32',
-  served:    '#00796B',
-  cancelled: '#B71C1C',
+  pending:          '#FFA000',
+  confirmed:        '#2c3e50',
+  preparing:        '#6A1B9A',
+  ready:            '#2E7D32',
+  served:           '#00796B',
+  out_for_delivery: '#1565C0',
+  delivered:        '#2E7D32',
+  cancelled:        '#B71C1C',
 };
 
 export default function CashierMyOrdersScreen({ navigation }) {
@@ -67,6 +71,13 @@ export default function CashierMyOrdersScreen({ navigation }) {
   const [targetTable,        setTargetTable]       = useState(null);
   const [transferring,       setTransferring]      = useState(false);
   const [tableMenuVisible,   setTableMenuVisible]  = useState(false);
+
+  // Assign rider dialog
+  const [assignDialog,    setAssignDialog]    = useState(null);
+  const [riderOptions,    setRiderOptions]    = useState([]);
+  const [selectedRider,   setSelectedRider]   = useState(null);
+  const [assigning,       setAssigning]       = useState(false);
+  const [autoAssigning,   setAutoAssigning]   = useState(false);
 
   // Per-card action menus
   const [menuOpenId, setMenuOpenId] = useState(null);
@@ -216,6 +227,52 @@ export default function CashierMyOrdersScreen({ navigation }) {
     }
   };
 
+  // ── Assign rider ────────────────────────────────────────────────────────────
+  const openAssignRider = async (order) => {
+    setAssignDialog(order);
+    setSelectedRider(null);
+    try {
+      const riders = await apiRidersList(true, true);
+      setRiderOptions(riders || []);
+    } catch {
+      setSnack('Could not load riders');
+      setAssignDialog(null);
+    }
+  };
+
+  const handleAutoAssign = async () => {
+    if (!assignDialog) return;
+    setAutoAssigning(true);
+    try {
+      const res = await apiAutoAssign(assignDialog.id);
+      setAssignDialog(null);
+      const label = res.is_cross_restaurant
+        ? `Assigned to ${res.rider_name} (${res.rider_restaurant}) from global pool`
+        : `Assigned to ${res.rider_name}`;
+      setSnack(label);
+      fetchOrders(true);
+    } catch (err) {
+      setSnack(err.response?.data?.error || 'Auto-assign failed');
+    } finally {
+      setAutoAssigning(false);
+    }
+  };
+
+  const handleAssignRider = async () => {
+    if (!assignDialog || !selectedRider) return;
+    setAssigning(true);
+    try {
+      await apiAssignRider(assignDialog.id, selectedRider);
+      setAssignDialog(null);
+      setSnack('Rider assigned!');
+      fetchOrders(true);
+    } catch (err) {
+      setSnack(err.response?.data?.error || 'Could not assign rider');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" /></View>;
   }
@@ -246,12 +303,15 @@ export default function CashierMyOrdersScreen({ navigation }) {
           </View>
         )}
         renderItem={({ item: order }) => {
-          const statusColor = STATUS_COLORS[order.status] || theme.colors.primary;
-          const nextStatus  = STATUS_NEXT[order.status];
-          const isPaid      = order.payment_status === 'paid';
-          const hasPay      = order.balance_due > 0 || (!isPaid && order.status !== 'cancelled');
-          const hasPayment  = order.payments && order.payments.length > 0;
-          const isMenuOpen  = menuOpenId === order.id;
+          const isDelivery    = order.order_type === 'delivery';
+          const statusColor   = STATUS_COLORS[order.status] || theme.colors.primary;
+          const nextStatus    = STATUS_NEXT[order.status];
+          const showAssign    = isDelivery && order.status === 'ready';
+          const effectiveNext = showAssign ? null : nextStatus;
+          const isPaid        = order.payment_status === 'paid';
+          const hasPay        = order.balance_due > 0 || (!isPaid && order.status !== 'cancelled');
+          const hasPayment    = order.payments && order.payments.length > 0;
+          const isMenuOpen    = menuOpenId === order.id;
 
           return (
             <Card style={styles.card}>
@@ -284,7 +344,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                   </View>
                 </View>
                 <Text variant="bodySmall" style={styles.meta}>
-                  Table {order.table_number} · {order.items_count} item{order.items_count !== 1 ? 's' : ''} · Total: {format(order.total)}
+                  {isDelivery ? '🚴 Delivery' : `Table ${order.table_number}`} · {order.items_count} item{order.items_count !== 1 ? 's' : ''} · Total: {format(order.total)}
                 </Text>
                 {order.balance_due > 0 && (
                   <Text variant="bodySmall" style={{ color: theme.colors.error, fontFamily: 'Poppins_600SemiBold' }}>
@@ -296,10 +356,15 @@ export default function CashierMyOrdersScreen({ navigation }) {
                 )}
               </Card.Content>
               <Card.Actions>
-                {nextStatus && (
+                {effectiveNext && (
                   <Button mode="outlined" compact loading={updatingStatus === order.id}
                     disabled={updatingStatus === order.id} onPress={() => handleStatusAdvance(order)}>
-                    → {nextStatus}
+                    → {effectiveNext}
+                  </Button>
+                )}
+                {showAssign && (
+                  <Button mode="outlined" compact icon="moped" onPress={() => openAssignRider(order)}>
+                    Assign Rider
                   </Button>
                 )}
                 {hasPay && !isPaid && order.status !== 'cancelled' && (
@@ -389,7 +454,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
             >
               {tables.length === 0 && <Menu.Item title="No available tables" disabled />}
               {tables.map((t) => (
-                <Menu.Item key={t.id} title={`Table ${t.table_number} — ${t.name || ''}`}
+                <Menu.Item key={t.id} title={`Table ${t.table_number ?? t.tbl_no}`}
                   onPress={() => { setTargetTable(t); setTableMenuVisible(false); }} />
               ))}
             </Menu>
@@ -397,6 +462,78 @@ export default function CashierMyOrdersScreen({ navigation }) {
           <Dialog.Actions>
             <Button onPress={() => setTransferDialog(null)}>Cancel</Button>
             <Button mode="contained" loading={transferring} disabled={!targetTable || transferring} onPress={handleTransfer}>Transfer</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* ── Assign Rider Dialog ─────────────────────────────────────────── */}
+        <Dialog visible={!!assignDialog} onDismiss={() => setAssignDialog(null)}>
+          <Dialog.Title>Assign Delivery Rider</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodySmall" style={{ marginBottom: 10, opacity: 0.7 }}>
+              Order #{assignDialog?.order_number || assignDialog?.id}
+            </Text>
+
+            <Button
+              mode="contained"
+              icon="auto-fix"
+              loading={autoAssigning}
+              disabled={autoAssigning || assigning}
+              onPress={handleAutoAssign}
+              style={{ marginBottom: 12, borderRadius: 8 }}
+              buttonColor="#1565C0"
+            >
+              Auto-Assign Best Available
+            </Button>
+
+            <Text variant="labelSmall" style={{ textAlign: 'center', color: '#9E9E9E', marginBottom: 8 }}>
+              — or choose manually —
+            </Text>
+
+            {riderOptions.length === 0 ? (
+              <Text variant="bodyMedium" style={{ color: '#757575', marginVertical: 4 }}>
+                No available riders right now.
+              </Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 220 }}>
+                <RadioButton.Group
+                  onValueChange={(v) => setSelectedRider(Number(v))}
+                  value={selectedRider ? String(selectedRider) : ''}
+                >
+                  {riderOptions.map((r) => (
+                    <List.Item
+                      key={r.id}
+                      title={r.name}
+                      description={
+                        r.is_local
+                          ? `${r.vehicle_display} · ${r.phone || 'No phone'}`
+                          : `${r.vehicle_display} · ${r.restaurant}`
+                      }
+                      left={() => <RadioButton value={String(r.id)} />}
+                      right={() =>
+                        !r.is_local ? (
+                          <Text style={{ fontSize: 10, color: '#1565C0', alignSelf: 'center', marginRight: 4 }}>
+                            🌐 Global
+                          </Text>
+                        ) : null
+                      }
+                      onPress={() => setSelectedRider(r.id)}
+                      style={{ paddingLeft: 0 }}
+                    />
+                  ))}
+                </RadioButton.Group>
+              </ScrollView>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setAssignDialog(null)}>Cancel</Button>
+            <Button
+              mode="outlined"
+              loading={assigning}
+              disabled={assigning || autoAssigning || !selectedRider}
+              onPress={handleAssignRider}
+            >
+              Assign Selected
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

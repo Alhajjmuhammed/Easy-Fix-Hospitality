@@ -107,7 +107,10 @@ export default function MyOrdersScreen() {
     }
     setReorderingId(order.id);
     clearCart();
-    setTable(order.table_info, `Table ${order.table_number}`, null);
+    // Only set table for dine-in orders — delivery/pickup have no table
+    if (order.order_type !== 'delivery' && order.order_type !== 'pickup' && order.table_info) {
+      setTable(order.table_info, `Table ${order.table_number}`, null);
+    }
     order.items.forEach((item) => {
       addItem(
         {
@@ -120,7 +123,6 @@ export default function MyOrdersScreen() {
     });
     setReorderingId(null);
     setSnack('Items added to cart!');
-    // Navigate to Cart in the Order tab
     navigation.navigate('Order', { screen: 'Cart' });
   }, [clearCart, setTable, addItem, navigation]);
 
@@ -244,7 +246,13 @@ export default function MyOrdersScreen() {
                 </View>
 
                 <Text variant="bodySmall" style={styles.meta}>
-                  Table {order.table_number} · {order.items_count} item{order.items_count !== 1 ? 's' : ''} · Total: {order.total}
+                  {order.order_type === 'delivery'
+                    ? `📦 Delivery${order.delivery_address ? ` · ${order.delivery_address}` : ''}`
+                    : order.order_type === 'pickup'
+                      ? '🛍 Pickup'
+                      : `Table ${order.table_number}`
+                  }
+                  {` · ${order.items_count} item${order.items_count !== 1 ? 's' : ''} · Total: ${order.total}`}
                 </Text>
                 {order.created_at ? (
                   <Text variant="bodySmall" style={styles.date}>

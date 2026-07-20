@@ -13,12 +13,14 @@ export const useCartStore = create(
       orderType: 'dine-in',   // 'dine-in' | 'delivery' | 'pickup'
       deliveryAddress: '',
       deliveryPhone: '',
+      deliveryLat: null,
+      deliveryLng: null,
 
       setTable: (tableId, tableName, restaurantId) =>
-        set({ tableId, tableName, restaurantId, existingOrderId: null, orderType: 'dine-in', deliveryAddress: '', deliveryPhone: '' }),
+        set({ tableId, tableName, restaurantId, existingOrderId: null, orderType: 'dine-in', deliveryAddress: '', deliveryPhone: '', deliveryLat: null, deliveryLng: null }),
 
-      setRemoteOrder: (restaurantId, orderType, deliveryAddress = '', deliveryPhone = '') =>
-        set({ restaurantId, tableId: null, tableName: '', existingOrderId: null, orderType, deliveryAddress, deliveryPhone }),
+      setRemoteOrder: (restaurantId, orderType, deliveryAddress = '', deliveryPhone = '', deliveryLat = null, deliveryLng = null) =>
+        set({ restaurantId, tableId: null, tableName: '', existingOrderId: null, orderType, deliveryAddress, deliveryPhone, deliveryLat, deliveryLng }),
 
       setExistingOrder: (orderId) =>
         set({ existingOrderId: orderId }),
@@ -63,7 +65,7 @@ export const useCartStore = create(
           ),
         }),
 
-      clearCart: () => set({ items: [], tableId: null, tableName: '', restaurantId: null, existingOrderId: null, orderType: 'dine-in', deliveryAddress: '', deliveryPhone: '' }),
+      clearCart: () => set({ items: [], tableId: null, tableName: '', restaurantId: null, existingOrderId: null, orderType: 'dine-in', deliveryAddress: '', deliveryPhone: '', deliveryLat: null, deliveryLng: null }),
 
       getSubtotal: () =>
         get().items.reduce((sum, i) => sum + i.product.current_price * i.quantity, 0),
@@ -84,6 +86,8 @@ export const useCartStore = create(
         orderType:       state.orderType,
         deliveryAddress: state.deliveryAddress,
         deliveryPhone:   state.deliveryPhone,
+        deliveryLat:     state.deliveryLat,
+        deliveryLng:     state.deliveryLng,
       }),
     }
   )

@@ -185,25 +185,50 @@ SESSION_SAVE_EVERY_REQUEST = True  # Update last activity on every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Don't expire when browser closes (honor timeout instead)
 
 # Try Redis first, fall back to in-memory channels for development
-def _redis_available(host='127.0.0.1', port=6379, timeout=0.2):
-    """Fast TCP probe - no redis client, no retry logic, no blocking."""
+def _redis_available(host='127.0.0.1', port=6379, timeout=0.5):
+    """
+    Probe Redis via raw TCP and verify the server is >= 5.0.
+    channels-redis 4.x uses BZPOPMIN (Redis 5.0+) and redis-py 8+ sends
+    HELLO (Redis 6.0+). Both are avoided for old servers by falling back
+    to InMemoryChannelLayer.
+    """
     import socket as _sock
     s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
     s.settimeout(timeout)
     try:
         s.connect((host, port))
-        return True
+        # Raw RESP: INFO server
+        s.sendall(b"*2\r\n$4\r\nINFO\r\n$6\r\nserver\r\n")
+        data = b''
+        for _ in range(20):          # read up to 20 chunks
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+            if b'redis_version:' in data:
+                break
+        text = data.decode('utf-8', errors='ignore')
+        for line in text.splitlines():
+            if line.startswith('redis_version:'):
+                major = int(line.split(':')[1].strip().split('.')[0])
+                return major >= 5   # BZPOPMIN needs Redis 5.0+
+        return False
     except Exception:
         return False
     finally:
-        s.close()
+        try:
+            s.close()
+        except Exception:
+            pass
 
 if _redis_available():
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                'hosts': [('127.0.0.1', 6379)],
+                # protocol=2 forces RESP2 so redis-py 8+ doesn't send HELLO,
+                # which requires Redis server 6.0+ and breaks older Redis versions.
+                'hosts': [{'host': '127.0.0.1', 'port': 6379, 'protocol': 2}],
             },
         },
     }

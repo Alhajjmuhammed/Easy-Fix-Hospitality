@@ -23,12 +23,14 @@ import NetInfo from '@react-native-community/netinfo';
 import { useSyncStore } from '../../store/useSyncStore';
 
 const STATUS_COLORS = {
-  pending: '#FFA000',
-  confirmed: '#2c3e50',
-  preparing: '#6A1B9A',
-  ready: '#2E7D32',
-  served: '#00796B',
-  cancelled: '#B71C1C',
+  pending:          '#FFA000',
+  confirmed:        '#2c3e50',
+  preparing:        '#6A1B9A',
+  ready:            '#2E7D32',
+  served:           '#00796B',
+  out_for_delivery: '#1565C0',
+  delivered:        '#2E7D32',
+  cancelled:        '#B71C1C',
 };
 
 const PAYMENT_INFO = {
@@ -37,8 +39,8 @@ const PAYMENT_INFO = {
   paid:    { color: '#2E7D32', bg: '#E8F5E9', label: 'Paid',             icon: '✅' },
 };
 
-// Order progress steps (matches web's status_progress)
-const PROGRESS_STEPS = [
+// Order progress steps — delivery orders use a different final step
+const DINE_IN_STEPS = [
   { key: 'pending',    label: 'Order Placed',     desc: 'Your order has been received' },
   { key: 'confirmed',  label: 'Confirmed',         desc: 'Kitchen has confirmed your order' },
   { key: 'preparing',  label: 'Preparing',         desc: 'Your food is being prepared' },
@@ -46,7 +48,17 @@ const PROGRESS_STEPS = [
   { key: 'served',     label: 'Served',            desc: 'Your order has been delivered' },
 ];
 
-const STEP_ORDER = ['pending','confirmed','preparing','ready','served'];
+const DELIVERY_STEPS = [
+  { key: 'pending',          label: 'Order Placed',     desc: 'Your order has been received' },
+  { key: 'confirmed',        label: 'Confirmed',         desc: 'Kitchen has confirmed your order' },
+  { key: 'preparing',        label: 'Preparing',         desc: 'Your food is being prepared' },
+  { key: 'ready',            label: 'Ready',             desc: 'Order is ready for pickup by rider' },
+  { key: 'out_for_delivery', label: 'On the Way',        desc: 'Rider is delivering your order' },
+  { key: 'delivered',        label: 'Delivered',         desc: 'Your order has arrived!' },
+];
+
+const DINE_IN_ORDER   = ['pending','confirmed','preparing','ready','served'];
+const DELIVERY_ORDER  = ['pending','confirmed','preparing','ready','out_for_delivery','delivered'];
 
 const POLL_INTERVAL = 60_000; // 60-second safety-net; WebSocket delivers live updates faster
 
@@ -183,9 +195,16 @@ export default function OrderTrackingScreen({ route }) {
   const P600 = 'Poppins_600SemiBold';
   const P400 = 'Poppins_400Regular';
 
+  // Delivery vs dine-in progress
+  const isDelivery     = order.order_type === 'delivery';
+  const PROGRESS_STEPS = isDelivery ? DELIVERY_STEPS : DINE_IN_STEPS;
+  const STEP_ORDER     = isDelivery ? DELIVERY_ORDER  : DINE_IN_ORDER;
+
   // Progress tracking
   const currentStepIdx = STEP_ORDER.indexOf(order.status);
   const isCancelled = order.status === 'cancelled';
+  const isOutForDelivery = order.status === 'out_for_delivery';
+  const isDelivered      = order.status === 'delivered';
   const fmt = (v) => (v != null ? String(v) : '0.00');
 
   return (
@@ -210,7 +229,7 @@ export default function OrderTrackingScreen({ route }) {
               style={[styles.statusChip, { backgroundColor: statusColor + '22' }]}
               textStyle={{ color: statusColor, fontFamily: P600 }}
             >
-              {order.status.toUpperCase()}
+              {order.status?.toUpperCase() ?? ''}
             </Chip>
             <View style={[styles.payBadge, { backgroundColor: payInfo.bg }]}>
               <Text style={{ color: payInfo.color, fontSize: 12, fontFamily: P600 }}>
@@ -366,6 +385,20 @@ export default function OrderTrackingScreen({ route }) {
       ) : null}
 
       {/* ── Action buttons ── */}
+
+      {/* Track Delivery – live map button for delivery orders */}
+      {isDelivery && (isOutForDelivery || isDelivered) && (
+        <Button
+          mode="contained"
+          buttonColor="#1565C0"
+          onPress={() => navigation.navigate('DeliveryTracking', { orderId: order.id })}
+          style={styles.actionBtn}
+          icon="map-marker-radius"
+          labelStyle={{ fontFamily: P600 }}
+        >
+          {isDelivered ? 'View Delivery Map' : 'Track Live on Map'}
+        </Button>
+      )}
 
       {/* Bill request – when served, not yet paid */}
       {order.status === 'served' && order.payment_status !== 'paid' && (

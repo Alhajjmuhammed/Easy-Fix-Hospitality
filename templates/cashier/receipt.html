@@ -287,7 +287,7 @@
                 <div>Order: {{ order.order_number }}</div>
                 <div>Date: {{ payment.created_at|date:"M d, Y" }}</div>
                 <div>Time: {{ payment.created_at|date:"H:i" }}</div>
-                <div>Table: {{ order.table_info.tbl_no|default:"Takeaway" }}</div>
+                <div>{% if order.table_info %}Table: {{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</div>
                 <div>
                     {% if payment.processed_by.is_cashier %}
                         Cashier: {{ payment.processed_by.first_name }} {{ payment.processed_by.last_name }}

@@ -240,7 +240,7 @@
                             {% for order in recent_orders %}
                             <tr>
                                 <td><strong>{{ order.order_number }}</strong></td>
-                                <td>{{ order.table_info.tbl_no }}</td>
+                                <td>{{ order.table_info.tbl_no|default:order.get_order_type_display }}</td>
                                 <td>
                                     <span class="badge 
                                         {% if order.status == 'pending' %}bg-warning text-dark

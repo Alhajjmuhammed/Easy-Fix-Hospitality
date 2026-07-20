@@ -169,19 +169,29 @@ def branch_reports(request):
     if selected_restaurant and selected_restaurant != 'all':
         try:
             selected_rest = restaurants.get(id=selected_restaurant)
-            query = Q(table_info__restaurant=selected_rest) | Q(table_info__owner=selected_rest.branch_owner)
+            query = (
+                Q(table_info__restaurant=selected_rest) |
+                Q(table_info__owner=selected_rest.branch_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_rest.branch_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_rest.branch_owner)
+            )
             restaurant_filter = restaurants.filter(id=selected_restaurant)
         except Restaurant.DoesNotExist:
             pass
     else:
         # All restaurants
         for restaurant in restaurants:
-            restaurant_query = Q(table_info__restaurant=restaurant) | Q(table_info__owner=restaurant.branch_owner)
+            restaurant_query = (
+                Q(table_info__restaurant=restaurant) |
+                Q(table_info__owner=restaurant.branch_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
+            )
             if query:
                 query |= restaurant_query
             else:
                 query = restaurant_query
-    
+
     orders = Order.objects.filter(query)
     
     # Apply date filters
@@ -260,12 +270,17 @@ def view_all_orders(request):
     # Build query for all orders from owned restaurants
     query = Q()
     for restaurant in restaurants:
-        restaurant_query = Q(table_info__restaurant=restaurant) | Q(table_info__owner=restaurant.branch_owner)
+        restaurant_query = (
+            Q(table_info__restaurant=restaurant) |
+            Q(table_info__owner=restaurant.branch_owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
+        )
         if query:
             query |= restaurant_query
         else:
             query = restaurant_query
-    
+
     orders = Order.objects.filter(query).select_related('table_info', 'ordered_by').prefetch_related('order_items').order_by('-created_at')
     
     # Filters
@@ -280,7 +295,9 @@ def view_all_orders(request):
             selected_restaurant = restaurants.get(id=restaurant_filter)
             orders = orders.filter(
                 Q(table_info__restaurant=selected_restaurant) |
-                Q(table_info__owner=selected_restaurant.branch_owner)
+                Q(table_info__owner=selected_restaurant.branch_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_restaurant.branch_owner) |
+                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_restaurant.branch_owner)
             )
         except Restaurant.DoesNotExist:
             pass
@@ -321,7 +338,10 @@ def branch_detail(request, restaurant_id):
     
     # Branch statistics
     orders = Order.objects.filter(
-        Q(table_info__restaurant=restaurant) | Q(table_info__owner=restaurant.branch_owner)
+        Q(table_info__restaurant=restaurant) |
+        Q(table_info__owner=restaurant.branch_owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
     )
     
     total_orders = orders.count()

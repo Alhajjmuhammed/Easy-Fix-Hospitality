@@ -30,7 +30,7 @@
                         <div class="col-md-6">
                             <h6 class="text-muted">Order Information</h6>
                             <p><strong>Order Number:</strong> #{{ order.order_number }}</p>
-                            <p><strong>Table:</strong> {{ order.table_info.tbl_no }}</p>
+                            <p><strong>{% if order.table_info %}Table{% else %}Type{% endif %}:</strong> {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</p>
                             <p><strong>Status:</strong> 
                                 <span class="badge bg-warning">{{ order.get_status_display }}</span>
                             </p>

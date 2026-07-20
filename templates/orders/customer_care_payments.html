@@ -168,7 +168,7 @@
                                         </td>
                                         <td>
                                             <span class="badge table-badge bg-secondary">
-                                                <i class="bi bi-table"></i> T{{ order.table_info.tbl_no }}
+                                                <i class="bi bi-table"></i> {% if order.table_info %}T{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}
                                             </span>
                                         </td>
                                         <td>
@@ -223,7 +223,7 @@
                                                         <i class="bi bi-printer"></i> Receipt
                                                     </button>
                                                     {% endif %}
-                                                {% endif %}                                                {% if order.status != 'cancelled' and order.payment_status != 'paid' %}
+                                                {% endif %}                                                {% if order.status != 'cancelled' and order.payment_status != 'paid' and order.table_info %}
                                                 <button class="btn btn-warning btn-sm mt-1"
                                                         onclick="openTransferModal({{ order.id }}, '{{ order.order_number|escapejs }}', '{{ order.table_info.tbl_no|escapejs }}')">
                                                     <i class="bi bi-arrow-left-right"></i> Transfer

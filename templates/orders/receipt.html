@@ -172,7 +172,7 @@
                 <div class="row">
                     <div class="col-md-6">
                         <p><strong>Order Number:</strong> {{ order.order_number }}</p>
-                        <p><strong>Table:</strong> {{ order.table_info.tbl_no }}</p>
+                        <p><strong>Table:</strong> {{ order.table_info.tbl_no|default:order.get_order_type_display }}</p>
                         <p><strong>Date & Time:</strong> {{ order.created_at|date:"M d, Y - g:i A" }}</p>
                     </div>
                     <div class="col-md-6">

@@ -13,7 +13,13 @@
             <div class="card-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
+                    {% if order_type == 'delivery' %}
+                    <strong><i class="bi bi-bicycle me-1"></i>Delivery</strong>{% if delivery_address %} to {{ delivery_address|truncatechars:50 }}{% endif %} • Please review your order before confirming.
+                    {% elif order_type == 'pickup' %}
+                    <strong><i class="bi bi-bag-check me-1"></i>Pickup order</strong> • Please review your order before confirming.
+                    {% else %}
                     <strong>Table {{ table_number }}</strong> • Please review your order before confirming.
+                    {% endif %}
                 </div>
                 
                 <form method="post">

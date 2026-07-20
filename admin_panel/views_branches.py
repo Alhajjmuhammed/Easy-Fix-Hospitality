@@ -404,7 +404,9 @@ def delete_branch(request, restaurant_id):
             Q(restaurant_id=restaurant_id) | Q(owner=branch_owner)
         ).count()
         dependent_orders = Order.objects.filter(
-            Q(table_info__restaurant_id=restaurant_id) | Q(table_info__owner=branch_owner)
+            Q(table_info__restaurant_id=restaurant_id) | Q(table_info__owner=branch_owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner)
         ).count()
         
         # Warning if there is dependent data
@@ -452,7 +454,9 @@ def delete_branch(request, restaurant_id):
         # 4. Delete bill requests
         bill_requests = BillRequest.objects.filter(
             Q(table_info__restaurant_id=restaurant_id) |
-            Q(table_info__owner=branch_owner)
+            Q(table_info__owner=branch_owner) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=branch_owner) |
+            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=branch_owner)
         )
         bill_count = bill_requests.count()
         bill_requests.delete()
@@ -461,7 +465,9 @@ def delete_branch(request, restaurant_id):
         # 5. Delete orders (this will cascade to order items)
         orders = Order.objects.filter(
             Q(table_info__restaurant_id=restaurant_id) |
-            Q(table_info__owner=branch_owner)
+            Q(table_info__owner=branch_owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner)
         )
         order_count = orders.count()
         orders.delete()
