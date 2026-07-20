@@ -997,9 +997,12 @@ def my_orders(request):
 @login_required
 def order_detail(request, order_id):
     """View order details with tracking information"""
-    # Allow Customer Care, Owner, Manager and Kitchen Staff to view any order from their restaurant
+    # Allow staff with restaurant-level access to view any order from their restaurant
     _order_qs = Order.objects.prefetch_related('order_items__product')
-    if request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager() or request.user.is_kitchen_staff():
+    if (request.user.is_customer_care() or request.user.is_cashier() or
+            request.user.is_owner() or request.user.is_main_owner() or
+            request.user.is_branch_owner() or request.user.is_manager() or
+            request.user.is_kitchen_staff()):
         owner = get_owner_filter(request.user)
         _oq_ord = (
             Q(table_info__owner=owner) |
@@ -1088,7 +1091,11 @@ def order_detail(request, order_id):
 @login_required
 def track_order(request, order_number):
     """Track order by order number - for customer use"""
-    order = get_object_or_404(Order, order_number=order_number, ordered_by=request.user)
+    order = get_object_or_404(
+        Order,
+        Q(ordered_by=request.user) | Q(entered_by=request.user),
+        order_number=order_number,
+    )
     
     # Redirect to the detailed order tracking view
     return redirect('orders:order_detail', order_id=order.id)
