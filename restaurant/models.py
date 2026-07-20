@@ -705,21 +705,21 @@ class Event(models.Model):
     @property
     def is_upcoming(self):
         """Check if event is upcoming"""
-        from django.utils import timezone
-        today = timezone.now().date()
+        from django.utils.timezone import localtime, now
+        today = localtime(now()).date()
         return self.event_date >= today and self.status not in ['completed', 'cancelled']
-    
+
     @property
     def is_today(self):
         """Check if event is today"""
-        from django.utils import timezone
-        return self.event_date == timezone.now().date()
-    
+        from django.utils.timezone import localtime, now
+        return self.event_date == localtime(now()).date()
+
     @property
     def is_past(self):
         """Check if event date has passed"""
-        from django.utils import timezone
-        return self.event_date < timezone.now().date()
+        from django.utils.timezone import localtime, now
+        return self.event_date < localtime(now()).date()
     
     def get_status_color(self):
         """Get Bootstrap color class for status"""

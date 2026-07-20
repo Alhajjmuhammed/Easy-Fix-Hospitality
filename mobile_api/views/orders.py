@@ -576,9 +576,9 @@ def update_order_status(request, order_id):
             order.confirmed_by = user
             order.save(update_fields=['status', 'confirmed_by', 'updated_at'])
         elif new_status == 'cancelled':
-            for item in order.order_items.all():
+            for item in order.order_items.select_related('product').all():
                 p = item.product
-                if p.available_in_stock is not None:
+                if p and p.available_in_stock is not None:
                     p.available_in_stock += item.quantity
                     p.save(update_fields=['available_in_stock'])
             order.release_table()
@@ -801,7 +801,7 @@ def cancel_order(request, order_id):
     with transaction.atomic():
         for item in order.order_items.select_related('product').all():
             p = item.product
-            if p.available_in_stock is not None:
+            if p and p.available_in_stock is not None:
                 p.available_in_stock += item.quantity
                 p.save(update_fields=['available_in_stock'])
         order.status = 'cancelled'
