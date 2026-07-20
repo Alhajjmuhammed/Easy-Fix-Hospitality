@@ -840,7 +840,9 @@ def place_order(request):
     else:
         base_template = 'base.html'
 
-    # Cashier-only: list all staff who can have an order entered on their behalf
+    # Cashier-only: list all staff who can have an order entered on their behalf.
+    # Scoped to the same tenant (owner) as the cashier — cross-restaurant access
+    # is impossible because each restaurant's staff has a different owner FK.
     _STAFF_ROLES_FOR_ENTRY = ['customer_care', 'kitchen', 'bar', 'buffet', 'service']
     customer_care_staff = []
     if request.user.is_cashier():
@@ -850,7 +852,7 @@ def place_order(request):
                 owner=_cashier_owner,
                 role__name__in=_STAFF_ROLES_FOR_ENTRY,
                 is_active=True,
-            ).values('id', 'first_name', 'last_name', 'username', 'role__name')
+            ).exclude(id=request.user.id).values('id', 'first_name', 'last_name', 'username', 'role__name')
             customer_care_staff = [
                 {**s, 'role_display': s['role__name'].replace('_', ' ').title()}
                 for s in _staff_qs
