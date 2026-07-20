@@ -24,6 +24,17 @@
                     <td><strong>Customer:</strong></td>
                     <td>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</td>
                 </tr>
+                {% if order.entered_by %}
+                <tr>
+                    <td><strong>Entered By:</strong></td>
+                    <td>
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-person-check me-1"></i>{{ order.entered_by.get_full_name|default:order.entered_by.username }}
+                        </span>
+                        <small class="text-muted ms-1">(Cashier)</small>
+                    </td>
+                </tr>
+                {% endif %}
                 <tr>
                     <td><strong>Total Amount:</strong></td>
                     <td><strong>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong></td>

@@ -582,6 +582,25 @@ def place_order(request):
                         form.cleaned_data['special_instructions']
                     )
 
+                    # Cashier entering on behalf of a customer care staff member
+                    _order_placed_by = request.user
+                    _order_entered_by = None
+                    if request.user.is_cashier():
+                        entered_for_id = request.POST.get('entered_for_id', '').strip()
+                        if entered_for_id:
+                            try:
+                                _cc_owner = request.user.get_owner()
+                                _cc_user = User.objects.get(
+                                    id=entered_for_id,
+                                    role__name='customer_care',
+                                    owner=_cc_owner,
+                                    is_active=True,
+                                )
+                                _order_placed_by = _cc_user
+                                _order_entered_by = request.user
+                            except User.DoesNotExist:
+                                pass
+
                     if is_remote_order:
                         # Delivery / Pickup — no table required
                         delivery_address = request.session.get('delivery_address', '')
@@ -599,7 +618,8 @@ def place_order(request):
                         order = Order.objects.create(
                             order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
                             table_info=None,
-                            ordered_by=request.user,
+                            ordered_by=_order_placed_by,
+                            entered_by=_order_entered_by,
                             special_instructions=special_instructions,
                             status='pending',
                             order_type=order_type_session,
@@ -629,7 +649,8 @@ def place_order(request):
                         order = Order.objects.create(
                             order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
                             table_info=table,
-                            ordered_by=request.user,
+                            ordered_by=_order_placed_by,
+                            entered_by=_order_entered_by,
                             special_instructions=special_instructions,
                             status='pending',
                             order_type='dine-in',
@@ -817,7 +838,20 @@ def place_order(request):
         base_template = 'cashier_base.html'
     else:
         base_template = 'base.html'
-    
+
+    # Cashier-only: list customer care staff that can be "ordered for"
+    customer_care_staff = []
+    if request.user.is_cashier():
+        _cashier_owner = request.user.get_owner()
+        if _cashier_owner:
+            customer_care_staff = list(
+                User.objects.filter(
+                    owner=_cashier_owner,
+                    role__name='customer_care',
+                    is_active=True,
+                ).values('id', 'first_name', 'last_name', 'username')
+            )
+
     context = {
         'form': form,
         'cart': cart,
@@ -831,6 +865,7 @@ def place_order(request):
         'delivery_address': request.session.get('delivery_address', ''),
         'is_remote_order': is_remote_order,
         'base_template': base_template,
+        'customer_care_staff': customer_care_staff,
     }
 
     return render(request, 'orders/place_order.html', context)
@@ -840,8 +875,8 @@ def order_confirmation(request, order_id):
     """Order confirmation page"""
     order = get_object_or_404(
         Order.objects.prefetch_related('order_items__product'),
+        Q(ordered_by=request.user) | Q(entered_by=request.user),
         id=order_id,
-        ordered_by=request.user,
     )
 
     # Check if we should auto-print KOT and/or BOT

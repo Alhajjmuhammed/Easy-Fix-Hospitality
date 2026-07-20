@@ -37,6 +37,7 @@ class Order(models.Model):
     table_info = models.ForeignKey(TableInfo, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     ordered_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='orders_placed')
     confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders_confirmed')
+    entered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders_entered')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES, default='dine-in')
     delivery_address = models.TextField(blank=True, default='')

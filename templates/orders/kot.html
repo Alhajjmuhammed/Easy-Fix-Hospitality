@@ -263,6 +263,12 @@
                 <span class="kot-info-label">Ordered By:</span>
                 <span>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</span>
             </div>
+            {% if order.entered_by %}
+            <div class="kot-info-row">
+                <span class="kot-info-label">Entered By:</span>
+                <span>{{ order.entered_by.get_full_name|default:order.entered_by.username }} (Cashier)</span>
+            </div>
+            {% endif %}
             <div class="kot-info-row">
                 <span class="kot-info-label">Status:</span>
                 <span class="order-status">{{ order.get_status_display|upper }}</span>

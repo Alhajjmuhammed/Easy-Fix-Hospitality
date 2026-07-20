@@ -272,6 +272,7 @@ class OrderSerializer(serializers.ModelSerializer):
     balance_due = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
     confirmed_by_name = serializers.SerializerMethodField()
+    entered_by_name = serializers.SerializerMethodField()
     pending_bill_requested = serializers.SerializerMethodField()
     pending_bill_requested_at = serializers.SerializerMethodField()
     delivery_lat = serializers.SerializerMethodField()
@@ -281,7 +282,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'order_number', 'table_info', 'table_number',
-            'ordered_by_name', 'confirmed_by_name', 'status', 'payment_status',
+            'ordered_by_name', 'confirmed_by_name', 'entered_by_name', 'status', 'payment_status',
             'order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng',
             'total_amount', 'subtotal', 'tax_amount', 'discount_amount', 'total',
             'total_paid', 'balance_due', 'items_count',
@@ -335,6 +336,14 @@ class OrderSerializer(serializers.ModelSerializer):
         try:
             if obj.confirmed_by:
                 return obj.confirmed_by.get_full_name() or obj.confirmed_by.username
+            return None
+        except Exception:
+            return None
+
+    def get_entered_by_name(self, obj):
+        try:
+            if obj.entered_by:
+                return obj.entered_by.get_full_name() or obj.entered_by.username
             return None
         except Exception:
             return None
