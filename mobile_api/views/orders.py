@@ -186,17 +186,19 @@ def _list_orders(request):
     if user.is_customer_care():
         qs = qs.filter(ordered_by=user)
 
-    # my_orders=true  → show only orders placed by the requesting user (cashier "My Orders")
+    # my_orders=true  → show only orders placed or entered by the requesting user (cashier "My Orders")
     if request.GET.get('my_orders') == 'true':
-        qs = qs.filter(ordered_by=user)
+        qs = qs.filter(Q(ordered_by=user) | Q(entered_by=user))
 
-    # Period filter: today | week
+    # Period filter: today | week — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
     period = request.GET.get('period', '')
     if period == 'today':
-        today = timezone.now().date()
+        today = localtime(timezone.now()).date()
         qs = qs.filter(created_at__date=today)
     elif period == 'week':
-        week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
+        today = localtime(timezone.now()).date()
+        week_start = today - timedelta(days=today.weekday())
         qs = qs.filter(created_at__date__gte=week_start)
 
     # Payment status filter — supports comma-separated values (e.g. "unpaid,partial")
@@ -1034,7 +1036,8 @@ def active_orders_for_table(request, table_id):
     )
     table = get_object_or_404(TableInfo.objects.filter(_tq_aots).distinct(), id=table_id)
 
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     # Always filter by the requesting user and unpaid status — mirrors the web's
     # add_to_existing_order: ordered_by=request.user, payment_status__in=['unpaid','partial']
     # 'served' is included because the web allows adding to a served-but-unpaid order.

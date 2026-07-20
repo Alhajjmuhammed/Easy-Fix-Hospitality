@@ -188,7 +188,8 @@ def waste_dashboard(request):
         waste_logs = FoodWasteLog.objects.none()
     
     # Apply period filter
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if period == 'today':
         waste_logs = waste_logs.filter(created_at__date=today)
     elif period == 'weekly':
@@ -461,7 +462,8 @@ def export_waste_csv(request):
         waste_logs = FoodWasteLog.objects.none()
     
     # Apply same filters as dashboard
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if period == 'today':
         waste_logs = waste_logs.filter(created_at__date=today)
     elif period == 'weekly':
@@ -691,7 +693,8 @@ def export_waste_pdf(request):
         waste_logs = FoodWasteLog.objects.none()
     
     # Apply filters (same as CSV)
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if period == 'today':
         waste_logs = waste_logs.filter(created_at__date=today)
     elif period == 'weekly':
@@ -1128,8 +1131,9 @@ def waste_reports(request):
             target_restaurant = None
     
     # Set default dates based on period
+    from django.utils.timezone import localtime
     if not date_from or not date_to:
-        today = timezone.now().date()
+        today = localtime(timezone.now()).date()
         if period_type == 'daily':
             date_from = today
             date_to = today

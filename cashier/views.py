@@ -897,8 +897,9 @@ def cashier_reports(request):
     elif staff_role == 'cashier':
         orders = orders.filter(ordered_by__role__name='cashier')
     
-    # Apply period filter (only today and weekly)
-    today = timezone.now().date()
+    # Apply period filter (only today and weekly) — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if period == 'today':
         orders = orders.filter(created_at__date=today)
     elif period == 'weekly':

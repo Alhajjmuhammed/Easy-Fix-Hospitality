@@ -345,8 +345,9 @@ def admin_dashboard(request):
                     raise PermissionDenied("No restaurant access found.")
         
         # Calculate time-based statistics
+        from django.utils.timezone import localtime as _localtime
         seven_days_ago = timezone.now() - timedelta(days=7)
-        today = timezone.now().date()
+        today = _localtime(timezone.now()).date()
         
         if current_restaurant and not view_all_restaurants:
             # Single restaurant stats — 1 aggregate instead of 3 queries
@@ -874,7 +875,7 @@ def manage_orders(request):
         
         # Eager-load related objects once — prevents N+1 queries in the template
         base_orders = base_orders.select_related(
-            'table_info', 'table_info__owner', 'ordered_by', 'confirmed_by'
+            'table_info', 'table_info__owner', 'ordered_by', 'confirmed_by', 'entered_by'
         ).prefetch_related('order_items__product')
 
         # Apply search filter
@@ -892,8 +893,10 @@ def manage_orders(request):
             base_orders = base_orders.filter(payment_status=payment_status_filter)
 
         # Apply period filter (takes priority over manual dates when set)
+        # Use local EAT date so midnight-to-3am orders aren't lost
         from django.utils import timezone as _tz
-        _today = _tz.now().date()
+        from django.utils.timezone import localtime as _localtime, make_aware as _make_aware
+        _today = _localtime(_tz.now()).date()
         if period == 'today':
             base_orders = base_orders.filter(created_at__date=_today)
         elif period == 'week':
@@ -910,12 +913,11 @@ def manage_orders(request):
             # 'all' — apply manual date range if provided
             if date_from:
                 from datetime import datetime
-                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                date_from_obj = _make_aware(datetime.strptime(date_from, '%Y-%m-%d'))
                 base_orders = base_orders.filter(created_at__gte=date_from_obj)
             if date_to:
                 from datetime import datetime, timedelta
-                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
-                date_to_obj = date_to_obj + timedelta(days=1)
+                date_to_obj = _make_aware(datetime.strptime(date_to, '%Y-%m-%d')) + timedelta(days=1)
                 base_orders = base_orders.filter(created_at__lt=date_to_obj)
 
     except PermissionDenied:

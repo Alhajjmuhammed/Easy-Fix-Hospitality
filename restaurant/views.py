@@ -1127,7 +1127,8 @@ def manage_events(request):
         )
     
     # Date filters
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if date_filter == 'today':
         events = events.filter(event_date=today)
     elif date_filter == 'week':
@@ -1401,8 +1402,9 @@ def event_reports(request):
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
     # Date range filter
+    from django.utils.timezone import localtime
     period = request.GET.get('period', 'month')
-    today = timezone.now().date()
+    today = localtime(timezone.now()).date()
     
     if period == 'week':
         start_date = today - timedelta(days=7)
@@ -1650,7 +1652,8 @@ def export_events_csv(request):
         )
     
     # Date filters
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if date_filter == 'today':
         events = events.filter(event_date=today)
     elif date_filter == 'week':
@@ -1768,7 +1771,8 @@ def export_events_pdf(request):
         )
     
     # Date filters
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if date_filter == 'today':
         events = events.filter(event_date=today)
     elif date_filter == 'week':

@@ -1858,10 +1858,11 @@ def money_flow(request):
     currency_symbol = User.CURRENCY_SYMBOLS.get(request.user.currency_code, '$')
 
     # ── Period filter ────────────────────────────────────────────────────────
+    from django.utils.timezone import localtime
     period = request.GET.get('period', 'today')
     date_from_raw = request.GET.get('date_from', '')
     date_to_raw = request.GET.get('date_to', '')
-    today = timezone.now().date()
+    today = localtime(timezone.now()).date()
 
     if period == 'today':
         date_from = date_to = today

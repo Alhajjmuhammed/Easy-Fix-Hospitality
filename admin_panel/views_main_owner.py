@@ -66,7 +66,8 @@ def main_owner_dashboard(request):
     
     # Build per-restaurant stats using DB-level annotations — avoids 6 queries per restaurant
     from django.db.models import Case, When, DecimalField
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
 
     # Annotate directly on the restaurants queryset
     restaurant_ids = [r.id for r in restaurants]
@@ -348,7 +349,8 @@ def branch_detail(request, restaurant_id):
     total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
     
     # Today's stats
-    today = timezone.now().date()
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     today_orders = orders.filter(created_at__date=today)
     _today = today_orders.aggregate(total=Sum('total_amount'), count=Count('id'))
     today_revenue = _today['total'] or 0

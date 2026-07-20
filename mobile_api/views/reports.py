@@ -33,9 +33,10 @@ def cc_reports(request):
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
 
-    # --- Period filter ---
+    # --- Period filter — use local EAT date so midnight-to-3am orders aren't lost ---
+    from django.utils.timezone import localtime
     period = request.GET.get('period', 'today')
-    today = timezone.now().date()
+    today = localtime(timezone.now()).date()
 
     if period == 'today':
         date_from = today
@@ -155,9 +156,10 @@ def owner_reports(request):
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
 
-    # --- Period filter ---
+    # --- Period filter — use local EAT date so midnight-to-3am orders aren't lost ---
+    from django.utils.timezone import localtime
     period = request.GET.get('period', 'today')
-    today = timezone.now().date()
+    today = localtime(timezone.now()).date()
 
     if period == 'today':
         date_from = today
@@ -313,9 +315,10 @@ def cashier_reports(request):
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
 
-    # --- Period filter ---
+    # --- Period filter — use local EAT date so midnight-to-3am orders aren't lost ---
+    from django.utils.timezone import localtime
     period = request.GET.get('period', 'today')
-    today = timezone.now().date()
+    today = localtime(timezone.now()).date()
 
     if period == 'today':
         date_from = today

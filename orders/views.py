@@ -1162,8 +1162,9 @@ def kitchen_dashboard(request):
     # Only include orders that have at least one kitchen item (DB-level filter, no N+1)
     base_queryset = base_queryset.filter(order_items__product__station='kitchen').distinct()
 
-    # Filter to today's orders only
-    today = timezone.now().date()
+    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     base_queryset = base_queryset.filter(created_at__date=today)
 
     # Get orders by status
@@ -1221,8 +1222,9 @@ def bar_dashboard(request):
     # Only include orders that have at least one bar item (DB-level filter, no N+1)
     base_queryset = base_queryset.filter(order_items__product__station='bar').distinct()
 
-    # Filter to today's orders only
-    today = timezone.now().date()
+    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     base_queryset = base_queryset.filter(created_at__date=today)
 
     # Get orders by status
@@ -1281,8 +1283,9 @@ def buffet_dashboard(request):
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
-    # Filter to today's orders only
-    today = timezone.now().date()
+    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     base_queryset = base_queryset.filter(created_at__date=today)
 
     # Get orders by status
@@ -1341,8 +1344,9 @@ def service_dashboard(request):
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
-    # Filter to today's orders only
-    today = timezone.now().date()
+    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     base_queryset = base_queryset.filter(created_at__date=today)
 
     # Get orders by status
@@ -2315,8 +2319,9 @@ def customer_care_dashboard(request):
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
     
-    # Calculate statistics for today
-    today = timezone.now().date()
+    # Calculate statistics for today — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     today_orders = user_orders.filter(created_at__date=today)
     
     _stats = today_orders.aggregate(
@@ -3706,8 +3711,9 @@ def customer_care_reports(request):
         ordered_by=request.user,
     ).distinct()
     
-    # Apply period filter
-    today = timezone.now().date()
+    # Apply period filter — use local EAT date so midnight-to-3am orders aren't lost
+    from django.utils.timezone import localtime
+    today = localtime(timezone.now()).date()
     if period == 'today':
         orders = orders.filter(created_at__date=today)
     elif period == 'weekly':
