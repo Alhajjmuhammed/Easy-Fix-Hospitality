@@ -539,6 +539,9 @@ def view_cart(request):
 @require_table_selection
 def place_order(request):
     """Place order from cart - handles both new orders and adding to existing"""
+    # Roles whose staff can be "ordered for" by a cashier (defined once — used in both POST and GET)
+    _STAFF_ROLES_FOR_ENTRY = ['customer_care', 'kitchen', 'bar', 'buffet', 'service']
+
     # Validate cart
     cart = validate_cart_data(request.session.get('cart', {}))
     request.session['cart'] = cart
@@ -583,7 +586,6 @@ def place_order(request):
                     )
 
                     # Cashier entering on behalf of another staff member
-                    _STAFF_ROLES_FOR_ENTRY = ['customer_care', 'kitchen', 'bar', 'buffet', 'service']
                     _order_placed_by = request.user
                     _order_entered_by = None
                     if request.user.is_cashier():
@@ -599,7 +601,7 @@ def place_order(request):
                                 )
                                 _order_placed_by = _cc_user
                                 _order_entered_by = request.user
-                            except User.DoesNotExist:
+                            except (User.DoesNotExist, ValueError, TypeError):
                                 pass
 
                     if is_remote_order:
@@ -843,7 +845,6 @@ def place_order(request):
     # Cashier-only: list all staff who can have an order entered on their behalf.
     # Scoped to the same tenant (owner) as the cashier — cross-restaurant access
     # is impossible because each restaurant's staff has a different owner FK.
-    _STAFF_ROLES_FOR_ENTRY = ['customer_care', 'kitchen', 'bar', 'buffet', 'service']
     customer_care_staff = []
     if request.user.is_cashier():
         _cashier_owner = request.user.get_owner()
