@@ -728,7 +728,7 @@ def place_order(request):
                             'order_id': str(order.id),
                             'order_number': order.order_number,
                             'table_number': str(table_ref),
-                            'customer_name': request.user.get_full_name() or request.user.username,
+                            'customer_name': _order_placed_by.get_full_name() or _order_placed_by.username,
                             'items_count': len(cart),
                             'total_amount': str(total_amount),
                             'message': f'New order #{order.order_number} ({table_ref})',

@@ -34,7 +34,7 @@
                             <option value="">— My own order —</option>
                             {% for staff in customer_care_staff %}
                             <option value="{{ staff.id }}">
-                                {{ staff.first_name }} {{ staff.last_name }}{% if not staff.first_name %} {{ staff.username }}{% endif %}
+                                {% if staff.first_name %}{{ staff.first_name }}{% if staff.last_name %} {{ staff.last_name }}{% endif %}{% else %}{{ staff.username }}{% endif %}
                             </option>
                             {% endfor %}
                         </select>

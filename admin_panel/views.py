@@ -3511,7 +3511,7 @@ def view_order(request, order_id):
     
     try:
         owner_filter = get_owner_filter(request.user)
-        order_qs = Order.objects.select_related('ordered_by', 'table_info').prefetch_related('order_items__product')
+        order_qs = Order.objects.select_related('ordered_by', 'entered_by', 'confirmed_by', 'table_info').prefetch_related('order_items__product')
         if owner_filter:
             _oq_vod = (
                 Q(table_info__owner=owner_filter) |
