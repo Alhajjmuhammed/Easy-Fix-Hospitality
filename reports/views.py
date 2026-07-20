@@ -1770,7 +1770,7 @@ def export_pdf(request):
             # No filter - show all items
             filtered_items = all_items
 
-        items_list = ', '.join([f"{item.product.name} x{item.quantity}" for item in filtered_items][:3])  # Limit items for PDF
+        items_list = ', '.join([f"{item.product.name if item.product else '[deleted]'} x{item.quantity}" for item in filtered_items][:3])
         if len(filtered_items) > 3:
             items_list += "..."
         
