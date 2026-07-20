@@ -392,19 +392,31 @@ function submitPayment() {
             notes: formData.get('notes')
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (response.status === 403) {
+            alert('Session expired or access denied. Please refresh the page and try again.');
+            window.location.reload();
+            return null;
+        }
+        return response.json();
+    })
     .then(data => {
+        if (data === null) return;
         if (data.success) {
             paymentModal.hide();
             alert('Payment processed successfully!');
             window.location.reload();
         } else {
-            alert('Error: ' + (data.error || 'Payment processing failed'));
+            alert(data.error || 'Payment processing failed. Please try again.');
+            if (data.error && data.error.toLowerCase().includes('already fully paid')) {
+                paymentModal.hide();
+                window.location.reload();
+            }
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while processing the payment');
+        alert('Connection error. Please refresh the page and try again.');
     });
 }
 

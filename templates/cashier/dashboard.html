@@ -639,19 +639,29 @@ function submitPayment() {
             selected_items: selectedItems
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (response.status === 403) {
+            alert('Session expired or access denied. Please refresh the page and try again.');
+            location.reload();
+            return null;
+        }
+        return response.json();
+    })
     .then(data => {
+        if (data === null) return;
         if (data.success) {
-            // Show success message and reload (receipt auto-prints in background)
             alert('Payment processed successfully!');
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            alert(data.error || 'Payment processing failed. Please try again.');
+            if (data.error && data.error.toLowerCase().includes('already fully paid')) {
+                location.reload();
+            }
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error processing payment');
+        alert('Connection error. Please refresh the page and try again.');
     });
 }
 

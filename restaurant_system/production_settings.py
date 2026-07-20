@@ -292,6 +292,16 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        'cashier': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'mobile_api': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 

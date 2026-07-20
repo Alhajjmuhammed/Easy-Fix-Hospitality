@@ -392,7 +392,7 @@ def process_payment(request, order_id):
         })
         
     except Exception as e:
-        logger.error(f'Error processing payment: {str(e)}')
+        logger.error(f'Error processing payment for order {order_id}: {str(e)}', exc_info=True)
         return JsonResponse({'error': 'Error processing payment. Please try again.'}, status=400)
 
 
