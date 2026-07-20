@@ -3382,11 +3382,12 @@ def choose_order_action(request):
         # Get all active orders at this table
         active_orders = table.get_active_orders()
         
-        # Get current customer's active orders at this table
-        customer_orders = active_orders.filter(ordered_by=request.user)
-        
+        # Get current user's active orders at this table (including orders they entered for CC)
+        _mine_q = Q(ordered_by=request.user) | Q(entered_by=request.user)
+        customer_orders = active_orders.filter(_mine_q)
+
         # Get other customers' orders at this table
-        other_orders_count = active_orders.exclude(ordered_by=request.user).count()
+        other_orders_count = active_orders.exclude(_mine_q).count()
         
         if request.method == 'POST':
             action = request.POST.get('action')
@@ -3457,9 +3458,9 @@ def add_to_existing_order(request):
             messages.error(request, 'Table not found.')
             return redirect('orders:select_table')
         
-        # Get customer's active orders at this table
+        # Get customer's active orders at this table (include orders entered on behalf of CC)
         customer_orders = Order.objects.filter(
-            ordered_by=request.user,
+            Q(ordered_by=request.user) | Q(entered_by=request.user),
             table_info=table,
             status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
             payment_status__in=['unpaid', 'partial']
@@ -3508,13 +3509,13 @@ def handle_add_to_existing_order(request, order_id, cart):
     
     try:
         with transaction.atomic():
-            # Get the order
-            order = Order.objects.select_for_update().get(
+            # Get the order — accept orders placed by OR entered by this user
+            order = Order.objects.select_for_update().filter(
+                Q(ordered_by=request.user) | Q(entered_by=request.user),
                 id=order_id,
-                ordered_by=request.user,
                 status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
                 payment_status__in=['unpaid', 'partial']
-            )
+            ).get()
             
             order_number = order.order_number  # Store for later use
             
