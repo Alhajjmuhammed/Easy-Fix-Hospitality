@@ -12,7 +12,7 @@ import {
 } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
-import { getOfflinePendingOrders } from '../../database/operations';
+import { getOfflinePendingOrders, getSyncMeta, setSyncMeta } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -36,8 +36,9 @@ export default function CCReportsScreen() {
   const [refreshing, setRefreshing]     = useState(false);
   const [data, setData]                 = useState(null);
   const [snack, setSnack]               = useState('');
-  const [isOffline, setIsOffline]       = useState(false);
-  const [offlineOrders, setOfflineOrders] = useState([]);
+  const [isOffline,      setIsOffline]      = useState(false);
+  const [offlineOrders,  setOfflineOrders]  = useState([]);
+  const [cacheTimestamp, setCacheTimestamp] = useState(null);
   const { format } = useCurrency();
 
   const fetchReport = useCallback(async (silent = false) => {
@@ -45,25 +46,46 @@ export default function CCReportsScreen() {
     try {
       const net = await NetInfo.fetch();
       if (!net.isConnected) {
-        const pending = await getOfflinePendingOrders();
+        const [cached, cachedTs, pending] = await Promise.all([
+          getSyncMeta('cc_report_cache'),
+          getSyncMeta('cc_report_cache_ts'),
+          getOfflinePendingOrders(),
+        ]);
+        setData(cached ? JSON.parse(cached) : null);
+        setCacheTimestamp(cachedTs || null);
         setOfflineOrders(pending);
         setIsOffline(true);
-        setData(null);
+        if (!cached) setSnack('No cached report – connect to load data');
       } else {
         const res = await client.get('/reports/cc/', { params: { period: 'today' } });
         setData(res.data);
         setIsOffline(false);
+        setCacheTimestamp(null);
         const pending = await getOfflinePendingOrders();
         setOfflineOrders(pending);
+        await Promise.all([
+          setSyncMeta('cc_report_cache', JSON.stringify(res.data)),
+          setSyncMeta('cc_report_cache_ts', new Date().toISOString()),
+        ]);
       }
     } catch {
       try {
-        const pending = await getOfflinePendingOrders();
+        const [cached, cachedTs, pending] = await Promise.all([
+          getSyncMeta('cc_report_cache'),
+          getSyncMeta('cc_report_cache_ts'),
+          getOfflinePendingOrders(),
+        ]);
+        setData(cached ? JSON.parse(cached) : null);
+        setCacheTimestamp(cachedTs || null);
         setOfflineOrders(pending);
-      } catch { setOfflineOrders([]); }
+        if (cached) setSnack('Using cached data – could not reach server');
+        else setSnack('Could not load report');
+      } catch {
+        setOfflineOrders([]);
+        setData(null);
+        setSnack('Could not load report');
+      }
       setIsOffline(true);
-      setData(null);
-      setSnack('Could not load report – showing offline orders only');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -101,7 +123,9 @@ export default function CCReportsScreen() {
         style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 12 }}
       >
         {isOffline
-          ? `Offline – ${pendingOrders.length} queued, ${errorOrders.length} failed to sync. Connect for full report.`
+          ? cacheTimestamp
+            ? `Offline – cached report from ${new Date(cacheTimestamp).toLocaleTimeString()}. Pull to refresh when connected.`
+            : `Offline – no cached data. Connect to load the full report.`
           : `${pendingOrders.length} queued for sync · ${errorOrders.length} failed – check below.`}
       </Banner>
 
@@ -188,17 +212,17 @@ export default function CCReportsScreen() {
         </>
       )}
 
-      {/* Server report (online only) */}
-      {isOffline ? (
+      {/* Report — shows cached data offline, live data online */}
+      {isOffline && !data ? (
         <Card style={styles.card}>
           <Card.Content style={styles.emptyContent}>
             <MaterialCommunityIcons name="wifi-off" size={40} color="#ccc" />
             <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8, textAlign: 'center' }}>
-              Connect to internet to see full revenue report
+              Connect to internet to load the report
             </Text>
           </Card.Content>
         </Card>
-      ) : (
+      ) : data ? (
         <>
           {/* Stats cards */}
           <View style={styles.statsRow}>
@@ -278,7 +302,7 @@ export default function CCReportsScreen() {
             ))
           )}
         </>
-      )}
+      ) : null}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
         {snack}

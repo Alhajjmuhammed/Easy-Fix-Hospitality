@@ -31,7 +31,7 @@ import { apiOrders, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
-import { saveOfflinePayment, getOrders } from '../../database/operations';
+import { saveOfflinePayment, getOrders, getOfflinePendingOrders } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 
 const PAYMENT_METHODS = [
@@ -100,10 +100,14 @@ export default function CCPaymentsScreen({ navigation }) {
     try {
       const net = await NetInfo.fetch();
       if (!net.isConnected) {
-        const cached = await getOrders(null);
+        const [offlinePending, cached] = await Promise.all([
+          getOfflinePendingOrders(),
+          getOrders(null),
+        ]);
+        const allOrders = [...offlinePending, ...cached];
         const filtered = statusFilter
-          ? cached.filter((o) => o.payment_status === statusFilter)
-          : cached;
+          ? allOrders.filter((o) => o.payment_status === statusFilter)
+          : allOrders;
         setOrders(filtered);
         setIsOffline(true);
         return;

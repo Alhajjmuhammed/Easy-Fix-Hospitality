@@ -6,7 +6,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
-import { getOfflinePendingOrders } from '../../database/operations';
+import { getOfflinePendingOrders, getSyncMeta, setSyncMeta } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 
 const PAYMENT_STATUS_COLOR = {
@@ -37,36 +37,60 @@ export default function CashierReportsScreen() {
   const [data,          setData]        = useState(null);
   const [snack,         setSnack]       = useState('');
   const [period,        setPeriod]      = useState('today');
-  const [isOffline,     setIsOffline]   = useState(false);
-  const [offlineOrders, setOfflineOrders] = useState([]);
+  const [isOffline,       setIsOffline]       = useState(false);
+  const [offlineOrders,   setOfflineOrders]   = useState([]);
+  const [cacheTimestamp,  setCacheTimestamp]  = useState(null);
 
   const fetchReport = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const net = await NetInfo.fetch();
       if (!net.isConnected) {
-        // Offline: show locally-queued orders as a fallback summary
-        const pending = await getOfflinePendingOrders();
+        // Load last-cached report so staff see real data offline
+        const [cached, cachedTs, cachedPeriod, pending] = await Promise.all([
+          getSyncMeta('cashier_report_cache'),
+          getSyncMeta('cashier_report_cache_ts'),
+          getSyncMeta('cashier_report_cache_period'),
+          getOfflinePendingOrders(),
+        ]);
+        setData(cached ? JSON.parse(cached) : null);
+        setCacheTimestamp(cachedTs || null);
         setOfflineOrders(pending);
         setIsOffline(true);
-        setData(null);
+        if (!cached) setSnack('No cached report – connect to load data');
       } else {
         const res = await client.get('/reports/cashier/', { params: { period } });
         setData(res.data);
         setIsOffline(false);
-        // Still load offline queue so user sees queued orders alongside server data
+        setCacheTimestamp(null);
         const pending = await getOfflinePendingOrders();
         setOfflineOrders(pending);
+        // Cache for offline use
+        await Promise.all([
+          setSyncMeta('cashier_report_cache', JSON.stringify(res.data)),
+          setSyncMeta('cashier_report_cache_ts', new Date().toISOString()),
+          setSyncMeta('cashier_report_cache_period', period),
+        ]);
       }
     } catch {
-      // Network error — fall back to offline queue
+      // Network error — try cached data before giving up
       try {
-        const pending = await getOfflinePendingOrders();
+        const [cached, cachedTs, pending] = await Promise.all([
+          getSyncMeta('cashier_report_cache'),
+          getSyncMeta('cashier_report_cache_ts'),
+          getOfflinePendingOrders(),
+        ]);
+        setData(cached ? JSON.parse(cached) : null);
+        setCacheTimestamp(cachedTs || null);
         setOfflineOrders(pending);
-      } catch { setOfflineOrders([]); }
+        if (cached) setSnack('Using cached data – could not reach server');
+        else setSnack('Could not load report');
+      } catch {
+        setOfflineOrders([]);
+        setData(null);
+        setSnack('Could not load report');
+      }
       setIsOffline(true);
-      setData(null);
-      setSnack('Could not load report – showing offline orders only');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -103,7 +127,9 @@ export default function CashierReportsScreen() {
         style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 12 }}
       >
         {isOffline
-          ? `Offline – ${pendingOrders.length} queued, ${errorOrders.length} failed to sync. Connect for full report.`
+          ? cacheTimestamp
+            ? `Offline – cached report from ${new Date(cacheTimestamp).toLocaleTimeString()}. Pull to refresh when connected.`
+            : `Offline – no cached data. Connect to load the full report.`
           : `${pendingOrders.length} queued for sync · ${errorOrders.length} failed – check below.`}
       </Banner>
 
@@ -190,17 +216,17 @@ export default function CashierReportsScreen() {
         </>
       )}
 
-      {/* Server report (only when online) */}
-      {isOffline ? (
+      {/* Report — shows cached data when offline, live data when online */}
+      {isOffline && !data ? (
         <Card style={styles.card}>
           <Card.Content style={styles.emptyContent}>
             <MaterialCommunityIcons name="wifi-off" size={40} color="#ccc" />
             <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8, textAlign: 'center' }}>
-              Connect to internet to see full revenue report
+              Connect to internet to load the report
             </Text>
           </Card.Content>
         </Card>
-      ) : (
+      ) : data ? (
         <>
 
       {/* Period selector */}
@@ -339,7 +365,7 @@ export default function CashierReportsScreen() {
       )}
 
         </>
-      )}
+      ) : null}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{snack}</Snackbar>
     </ScrollView>

@@ -8,7 +8,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
 import NetInfo from '@react-native-community/netinfo';
-import { getOrders, getOfflinePendingOrders } from '../../database/operations';
+import { getOrders, getOfflinePendingOrders, saveOfflinePayment } from '../../database/operations';
+import { useSyncStore } from '../../store/useSyncStore';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
@@ -151,6 +152,30 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (isNaN(parsed) || parsed <= 0) { setSnack('Enter a valid amount'); return; }
     setPaying(true);
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        await saveOfflinePayment({
+          order_id:         payDialog.id,
+          order_number:     payDialog.order_number,
+          amount:           parsed,
+          payment_method:   method,
+          reference_number: reference.trim(),
+          notes:            '',
+        });
+        await useSyncStore.getState().refreshPendingCount();
+        setOrders((prev) =>
+          prev.map((o) => {
+            if (o.id !== payDialog.id) return o;
+            const newPaid = (o.total_paid ?? 0) + parsed;
+            const newDue  = Math.max(0, (o.balance_due ?? o.total ?? 0) - parsed);
+            const newStatus = newDue <= 0 ? 'paid' : newPaid > 0 ? 'partial' : o.payment_status;
+            return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
+          })
+        );
+        setPayDialog(null);
+        setSnack('No internet – payment saved and will sync automatically');
+        return;
+      }
       await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });
       setPayDialog(null);
       setSnack('Payment recorded');
@@ -350,7 +375,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                       visible={isMenuOpen}
                       onDismiss={() => setMenuOpenId(null)}
                       anchor={
-                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                        <Button compact icon="dots-vertical" disabled={!!order._is_offline_pending} onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
                       }
                     >
                       <Menu.Item leadingIcon="eye" title="View Order" onPress={() => { setMenuOpenId(null); navigation.navigate('OrderDetail', { orderId: order.id }); }} />
@@ -365,6 +390,27 @@ export default function CashierMyOrdersScreen({ navigation }) {
                     </Menu>
                   </View>
                 </View>
+                {order._is_sync_error && (
+                  <>
+                    <Chip icon="alert-circle" mode="flat" compact
+                      style={{ backgroundColor: '#FFEBEE', alignSelf: 'flex-start', marginBottom: 4 }}
+                      textStyle={{ fontSize: 10, color: '#C62828' }}>
+                      Sync Failed – re-take manually
+                    </Chip>
+                    {!!order.error_message && (
+                      <Text variant="bodySmall" style={{ color: '#C62828', fontSize: 10, opacity: 0.8, marginBottom: 4 }}>
+                        {order.error_message}
+                      </Text>
+                    )}
+                  </>
+                )}
+                {order._is_offline_pending && !order._is_sync_error && (
+                  <Chip icon="cloud-upload" mode="flat" compact
+                    style={{ backgroundColor: '#FFF3E0', alignSelf: 'flex-start', marginBottom: 4 }}
+                    textStyle={{ fontSize: 10, color: '#E65100' }}>
+                    Queued – syncs when online
+                  </Chip>
+                )}
                 <Text variant="bodySmall" style={styles.meta}>
                   {isDelivery ? '🚴 Delivery' : `Table ${order.table_number}`} · {order.items_count} item{order.items_count !== 1 ? 's' : ''} · Total: {format(order.total)}
                 </Text>
@@ -378,19 +424,31 @@ export default function CashierMyOrdersScreen({ navigation }) {
                 )}
               </Card.Content>
               <Card.Actions>
-                {effectiveNext && (
-                  <Button mode="outlined" compact loading={updatingStatus === order.id}
-                    disabled={updatingStatus === order.id} onPress={() => handleStatusAdvance(order)}>
-                    → {effectiveNext}
-                  </Button>
-                )}
-                {showAssign && (
-                  <Button mode="outlined" compact icon="moped" onPress={() => openAssignRider(order)}>
-                    Assign Rider
-                  </Button>
-                )}
-                {hasPay && !isPaid && order.status !== 'cancelled' && (
-                  <Button mode="contained" compact onPress={() => openPayment(order)}>Pay</Button>
+                {order._is_sync_error ? (
+                  <Text variant="bodySmall" style={{ color: '#C62828', opacity: 0.7, paddingHorizontal: 8 }}>
+                    Re-take this order manually
+                  </Text>
+                ) : order._is_offline_pending ? (
+                  <Text variant="bodySmall" style={{ color: '#E65100', opacity: 0.7, paddingHorizontal: 8 }}>
+                    Actions available after sync
+                  </Text>
+                ) : (
+                  <>
+                    {effectiveNext && (
+                      <Button mode="outlined" compact loading={updatingStatus === order.id}
+                        disabled={updatingStatus === order.id} onPress={() => handleStatusAdvance(order)}>
+                        → {effectiveNext}
+                      </Button>
+                    )}
+                    {showAssign && (
+                      <Button mode="outlined" compact icon="moped" onPress={() => openAssignRider(order)}>
+                        Assign Rider
+                      </Button>
+                    )}
+                    {hasPay && !isPaid && order.status !== 'cancelled' && (
+                      <Button mode="contained" compact onPress={() => openPayment(order)}>Pay</Button>
+                    )}
+                  </>
                 )}
               </Card.Actions>
             </Card>
