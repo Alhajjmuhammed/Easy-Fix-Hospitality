@@ -128,6 +128,8 @@ export default function MyOrdersScreen() {
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet – connect to cancel an order'); return; }
     setCancelling(true);
     try {
       const reason = cancelReason.trim() || 'Changed mind / No longer needed';
@@ -313,10 +315,10 @@ export default function MyOrdersScreen() {
                     compact
                     mode="outlined"
                     icon="close-circle-outline"
-                    textColor="#B71C1C"
+                    textColor={isOffline ? '#9E9E9E' : '#B71C1C'}
                     style={styles.cancelBtn}
                     loading={cancelTarget?.id === order.id && cancelling}
-                    disabled={cancelTarget?.id === order.id && cancelling}
+                    disabled={isOffline || (cancelTarget?.id === order.id && cancelling)}
                     onPress={() => handleCancel(order)}
                     labelStyle={{ fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}
                   >
