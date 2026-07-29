@@ -48,6 +48,11 @@ client.interceptors.response.use(
       if (error.config?.url?.includes('/auth/logout/')) {
         return Promise.reject(error);
       }
+      // Login failure (wrong credentials) returns 401 — not a session problem,
+      // so don't wipe state; let the login screen show the error message.
+      if (error.config?.url?.includes('/auth/login/')) {
+        return Promise.reject(error);
+      }
       // Token expired or invalid — clear in-memory cache immediately so no
       // further requests go out with a bad token.
       clearClientAuth();

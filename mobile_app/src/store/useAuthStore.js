@@ -159,14 +159,9 @@ export const useAuthStore = create((set, get) => ({
       // Device is online — reset the 15-day offline grace period clock
       await SecureStore.setItemAsync('last_online_at', String(Date.now()));
       set({ user: freshUser });
-    } catch (err) {
-      // Only log out on 401 if it's a definitive server rejection (not a network error)
-      // A network error has no response — don't log out for that.
-      if (err.response?.status === 401) {
-        // Token is truly invalid on server — log out properly
-        get().logout();
-      }
-      // All other errors (network down, 500, etc.) — ignore silently
+    } catch (_) {
+      // 401 is handled by the client.js response interceptor (triggers full logout).
+      // All other errors (network down, 500, etc.) — ignore silently.
     }
   },
 

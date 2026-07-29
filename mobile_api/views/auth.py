@@ -66,7 +66,11 @@ def login(request):
             except Exception:
                 pass
 
-    token, _ = Token.objects.get_or_create(user=user)
+    # Always create a fresh token on login so the 15-day expiry clock resets.
+    # get_or_create would return a stale token (possibly already expired) which
+    # causes an immediate 401 on the very next API call → instant logout.
+    Token.objects.filter(user=user).delete()
+    token = Token.objects.create(user=user)
     logger.info('Mobile login success: %s', username)
 
     return Response({
