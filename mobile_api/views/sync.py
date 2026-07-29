@@ -170,7 +170,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
         except (TypeError, ValueError):
             qty = 1
         qty = max(1, min(qty, 100))
-        product = Product.objects.select_for_update().filter(
+        product = Product.objects.select_for_update(of=('self',)).filter(
             Q(main_category__owner=owner) |
             Q(main_category__restaurant__main_owner=owner) |
             Q(main_category__restaurant__branch_owner=owner)
@@ -270,7 +270,7 @@ def _sync_payment(user, owner, data):
         )
 
         from django.db.models import Sum
-        total_paid = order.payments.select_for_update().filter(is_voided=False).aggregate(t=Sum('amount'))['t'] or Decimal('0.00')
+        total_paid = order.payments.filter(is_voided=False).aggregate(t=Sum('amount'))['t'] or Decimal('0.00')
         if total_paid >= order.total_amount:
             order.payment_status = 'paid'
             order.release_table()
