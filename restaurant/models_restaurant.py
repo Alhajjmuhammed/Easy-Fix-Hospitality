@@ -240,7 +240,16 @@ class Restaurant(models.Model):
         null=True,
         help_text="Receipt printer name (blank for auto-detect)"
     )
-    
+
+    route_receipt_by_station = models.BooleanField(
+        default=False,
+        help_text=(
+            "When ON, bills and receipts for single-station orders print at "
+            "that station's printer (e.g. bar-only order → bar printer). "
+            "Leave OFF for restaurants with one cashier who handles all payments."
+        )
+    )
+
     # WiFi Settings for customers
     wifi_ssid = models.CharField(
         max_length=100,

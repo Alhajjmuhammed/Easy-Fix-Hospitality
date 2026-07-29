@@ -1372,6 +1372,36 @@
                         </div>
                     </div>
 
+                    <!-- Printing Option -->
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-print text-primary me-1"></i>
+                                    Bill &amp; Receipt Routing
+                                </label>
+                                <div class="card border-primary">
+                                    <div class="card-body p-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input form-check-input-lg" type="checkbox"
+                                                   name="route_receipt_by_station" id="edit_route_receipt_by_station">
+                                            <label class="form-check-label fw-semibold" for="edit_route_receipt_by_station">
+                                                <i class="fas fa-random text-primary me-2"></i>
+                                                Route Bill &amp; Receipt to Station Printer
+                                            </label>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <strong>OFF (default):</strong> All bills and receipts always print at the main cashier/counter printer. Use this for restaurants with <strong>one cashier</strong> who handles all payments.<br>
+                                                <strong>ON:</strong> If an order has items from only one station (e.g. bar only), the bill and receipt print at <strong>that station's printer</strong>. Use this for restaurants with <strong>separate counters</strong>, each with their own cashier (bar counter, kitchen counter, etc.).
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Branch Info Notice - Only for Branches -->
                     <div id="edit_branch_notice" style="display: none;">
                         <div class="alert alert-info">
@@ -1998,6 +2028,9 @@ function editRestaurant(restaurantId) {
 
             // Remote Ordering
             document.getElementById('edit_allow_remote_orders').checked = data.allow_remote_orders || false;
+
+            // Bill & Receipt Routing
+            document.getElementById('edit_route_receipt_by_station').checked = data.route_receipt_by_station || false;
 
             // Show/hide sections based on restaurant type
             if (data.is_main_restaurant) {

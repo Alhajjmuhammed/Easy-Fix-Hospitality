@@ -143,7 +143,14 @@ class User(AbstractUser):
                                           help_text="Specific printer name for Service Order Tickets (leave blank for auto-detect)")
     receipt_printer_name = models.CharField(max_length=200, blank=True, null=True,
                                           help_text="Specific printer name for Payment Receipts (leave blank for auto-detect)")
-    
+    route_receipt_by_station = models.BooleanField(
+        default=False,
+        help_text=(
+            "When ON, bills and receipts for single-station orders print at "
+            "that station's printer. Leave OFF for restaurants with one cashier."
+        )
+    )
+
     phone_number = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
     is_active_staff = models.BooleanField(default=True)

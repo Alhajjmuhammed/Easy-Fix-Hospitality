@@ -134,6 +134,7 @@ def get_restaurant_print_settings(order):
                 'buffet_printer_name': normalize_printer_name(getattr(parent, 'buffet_printer_name', None)),
                 'service_printer_name': normalize_printer_name(getattr(parent, 'service_printer_name', None)),
                 'receipt_printer_name': normalize_printer_name(parent.receipt_printer_name),
+                'route_receipt_by_station': getattr(restaurant, 'route_receipt_by_station', False),
                 'restaurant_obj': parent,
                 'owner': parent.main_owner or parent.branch_owner,
             }
@@ -150,10 +151,11 @@ def get_restaurant_print_settings(order):
             'buffet_printer_name': buffet_printer,
             'service_printer_name': service_printer,
             'receipt_printer_name': receipt_printer,
+            'route_receipt_by_station': getattr(restaurant, 'route_receipt_by_station', False),
             'restaurant_obj': restaurant,
             'owner': restaurant.branch_owner or restaurant.main_owner,
         }
-    
+
     # Fallback to User (owner) settings
     owner = table.owner
     if owner:
@@ -169,10 +171,11 @@ def get_restaurant_print_settings(order):
             'buffet_printer_name': normalize_printer_name(getattr(owner, 'buffet_printer_name', None)),
             'service_printer_name': normalize_printer_name(getattr(owner, 'service_printer_name', None)),
             'receipt_printer_name': normalize_printer_name(owner.receipt_printer_name),
+            'route_receipt_by_station': getattr(owner, 'route_receipt_by_station', False),
             'restaurant_obj': None,
             'owner': owner,
         }
-    
+
     # No settings found
     return {
         'source': None,
@@ -186,6 +189,7 @@ def get_restaurant_print_settings(order):
         'buffet_printer_name': None,
         'service_printer_name': None,
         'receipt_printer_name': None,
+        'route_receipt_by_station': False,
         'restaurant_obj': None,
         'owner': None,
     }
@@ -193,11 +197,18 @@ def get_restaurant_print_settings(order):
 
 def _resolve_receipt_printer(order, print_settings):
     """
-    Route bill/receipt to the station printer when every item in the order
-    belongs to the same station (bar-only → bar_printer, kitchen-only →
-    kitchen_printer, etc.).  Falls back to receipt_printer_name for mixed
-    orders or when the resolved station has no printer configured.
+    Decide which printer receives the bill/receipt for this order.
+
+    - If route_receipt_by_station is OFF (default): always use receipt_printer_name.
+      Correct for restaurants with a single cashier handling all payments.
+    - If route_receipt_by_station is ON and all items belong to one station:
+      use that station's printer (bar-only → bar_printer, etc.).
+      Correct for restaurants with separate counters each having their own cashier.
+    - Falls back to receipt_printer_name for mixed orders or unconfigured station.
     """
+    if not print_settings.get('route_receipt_by_station', False):
+        return print_settings.get('receipt_printer_name')
+
     items = list(order.order_items.select_related('product').all())
     stations = {item.product.station for item in items if item.product and item.product.station}
     if len(stations) == 1:

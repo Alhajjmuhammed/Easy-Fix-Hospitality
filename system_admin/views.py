@@ -856,6 +856,7 @@ def get_restaurant_details(request, restaurant_id):
             'date_joined': main_owner.date_joined.strftime('%B %d, %Y'),
             'is_active': restaurant.is_active,
             'allow_remote_orders': restaurant.allow_remote_orders,
+            'route_receipt_by_station': restaurant.route_receipt_by_station,
             'subscription_plan': restaurant.get_subscription_display(),
             'is_main_restaurant': restaurant.is_main_restaurant,
             'branch_count': restaurant.branches.count() if restaurant.is_main_restaurant else 0,
@@ -906,7 +907,8 @@ def edit_restaurant(request, restaurant_id):
             # Account status field
             is_active = request.POST.get('is_active', 'true') == 'true'
             allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
-            
+            route_receipt_by_station = request.POST.get('route_receipt_by_station') == 'on'
+
             # Validation
             errors = []
             
@@ -982,7 +984,8 @@ def edit_restaurant(request, restaurant_id):
             restaurant_model.address = address
             restaurant_model.is_active = is_active
             restaurant_model.allow_remote_orders = allow_remote_orders
-            restaurant_model.save(update_fields=['name', 'description', 'address', 'is_active', 'allow_remote_orders', 'updated_at'])
+            restaurant_model.route_receipt_by_station = route_receipt_by_station
+            restaurant_model.save(update_fields=['name', 'description', 'address', 'is_active', 'allow_remote_orders', 'route_receipt_by_station', 'updated_at'])
             
             # Update main_owner User model
             main_owner.username = username
