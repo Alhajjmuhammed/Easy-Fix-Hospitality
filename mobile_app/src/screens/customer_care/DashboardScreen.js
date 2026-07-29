@@ -266,6 +266,8 @@ export default function CCDashboardScreen({ navigation }) {
 
   const handleCancel = async () => {
     if (!cancelDialog) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(cancelDialog.id, cancelReason.trim());

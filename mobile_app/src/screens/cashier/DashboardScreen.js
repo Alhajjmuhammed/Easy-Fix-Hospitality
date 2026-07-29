@@ -135,6 +135,8 @@ export default function CashierDashboardScreen({ navigation }) {
   const handleStatusAdvance = async (order) => {
     const next = STATUS_NEXT[order.status];
     if (!next) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to update order status'); return; }
     setUpdatingStatus(order.id);
     try {
       await apiUpdateOrderStatus(order.id, next);
@@ -205,6 +207,8 @@ export default function CashierDashboardScreen({ navigation }) {
 
   const handleVoid = async () => {
     if (!voidDialog) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to void a payment'); setVoidDialog(null); return; }
     setVoiding(true);
     try {
       await apiVoidPayment(voidDialog.paymentId, voidReason.trim());
@@ -226,6 +230,8 @@ export default function CashierDashboardScreen({ navigation }) {
 
   const handleCancel = async () => {
     if (!cancelDialog) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(cancelDialog.id, cancelReason.trim());
