@@ -11,7 +11,7 @@ import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiP
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
-import { getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
+import { getOrders, cacheOrders, getOfflinePendingOrders, deleteOfflineOrder } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 
@@ -253,6 +253,15 @@ export default function CashierDashboardScreen({ navigation }) {
     }
   };
 
+  const handleDismissError = useCallback(async (offlineId) => {
+    try {
+      await deleteOfflineOrder(offlineId);
+      fetchOrders(true);
+    } catch {
+      setSnack('Could not dismiss order');
+    }
+  }, [fetchOrders]);
+
   // ── Assign rider ────────────────────────────────────────────────────────────
   const openAssignRider = async (order) => {
     setAssignDialog(order);
@@ -380,7 +389,25 @@ export default function CashierDashboardScreen({ navigation }) {
                     </Menu>
                   </View>
                 </View>
-                {order._is_offline_pending && (
+                {order._is_sync_error && (
+                  <>
+                    <Chip
+                      icon="alert-circle"
+                      mode="flat"
+                      compact
+                      style={{ backgroundColor: '#FFEBEE', alignSelf: 'flex-start', marginBottom: 4 }}
+                      textStyle={{ fontSize: 10, color: '#C62828' }}
+                    >
+                      Sync Failed – re-take manually
+                    </Chip>
+                    {!!order.error_message && (
+                      <Text variant="bodySmall" style={{ color: '#C62828', fontSize: 10, opacity: 0.8, marginBottom: 4 }}>
+                        {order.error_message}
+                      </Text>
+                    )}
+                  </>
+                )}
+                {order._is_offline_pending && !order._is_sync_error && (
                   <Chip
                     icon="cloud-upload"
                     mode="flat"
@@ -404,7 +431,16 @@ export default function CashierDashboardScreen({ navigation }) {
                 )}
               </Card.Content>
               <Card.Actions>
-                {order._is_offline_pending ? (
+                {order._is_sync_error ? (
+                  <Button
+                    mode="outlined"
+                    compact
+                    textColor="#C62828"
+                    onPress={() => handleDismissError(order.offline_id)}
+                  >
+                    Dismiss
+                  </Button>
+                ) : order._is_offline_pending ? (
                   <Text variant="bodySmall" style={{ color: '#E65100', opacity: 0.7, paddingHorizontal: 8 }}>
                     Actions available after sync
                   </Text>

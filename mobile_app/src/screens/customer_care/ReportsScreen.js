@@ -82,7 +82,9 @@ export default function CCReportsScreen() {
 
   const stats  = data?.stats  || {};
   const orders = data?.orders || [];
-  const offlineTotal = offlineOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+  const pendingOrders = offlineOrders.filter((o) => !o._is_sync_error);
+  const errorOrders   = offlineOrders.filter((o) => o._is_sync_error);
+  const offlineTotal  = pendingOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
     <ScrollView
@@ -99,12 +101,47 @@ export default function CCReportsScreen() {
         style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 12 }}
       >
         {isOffline
-          ? `Offline – showing ${offlineOrders.length} queued order(s) below. Full report available when connected.`
-          : `${offlineOrders.length} order(s) queued for sync and NOT yet in server report totals.`}
+          ? `Offline – ${pendingOrders.length} queued, ${errorOrders.length} failed to sync. Connect for full report.`
+          : `${pendingOrders.length} queued for sync · ${errorOrders.length} failed – check below.`}
       </Banner>
 
+      {/* Sync-failed orders */}
+      {errorOrders.length > 0 && (
+        <>
+          <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#C62828' }]}>
+            Failed to Sync – Re-take Manually
+          </Text>
+          {errorOrders.map((o) => (
+            <Card key={o.offline_id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#C62828' }]}>
+              <Card.Content>
+                <View style={styles.row}>
+                  <Chip icon="alert-circle" mode="flat" compact
+                    style={{ backgroundColor: '#FFEBEE' }} textStyle={{ fontSize: 10, color: '#C62828' }}>
+                    SYNC FAILED
+                  </Chip>
+                  <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
+                    {format(o.total_amount || 0)}
+                  </Text>
+                </View>
+                <Text variant="bodySmall" style={{ opacity: 0.65 }}>
+                  {o.order_type === 'delivery' ? '🚴 Delivery' : `Table ${o.table_number}`}
+                  {' · '}{o.items_count} item{o.items_count !== 1 ? 's' : ''}
+                  {' · '}{new Date(o.created_at).toLocaleTimeString()}
+                </Text>
+                {!!o.error_message && (
+                  <Text variant="bodySmall" style={{ color: '#C62828', fontSize: 10, marginTop: 2 }}>
+                    {o.error_message}
+                  </Text>
+                )}
+              </Card.Content>
+            </Card>
+          ))}
+          <Divider style={styles.divider} />
+        </>
+      )}
+
       {/* Offline queued orders (shown whether online or offline) */}
-      {offlineOrders.length > 0 && (
+      {pendingOrders.length > 0 && (
         <>
           <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#E65100' }]}>
             Queued Orders (Pending Sync)
@@ -114,7 +151,7 @@ export default function CCReportsScreen() {
               <View style={styles.row}>
                 <View style={{ alignItems: 'center', flex: 1 }}>
                   <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
-                    {offlineOrders.length}
+                    {pendingOrders.length}
                   </Text>
                   <Text style={styles.statLabel}>Queued Orders</Text>
                 </View>
@@ -127,7 +164,7 @@ export default function CCReportsScreen() {
               </View>
             </Card.Content>
           </Card>
-          {offlineOrders.map((o) => (
+          {pendingOrders.map((o) => (
             <Card key={o.offline_id} style={[styles.card, { borderLeftWidth: 3, borderLeftColor: '#FFA726' }]}>
               <Card.Content>
                 <View style={styles.row}>

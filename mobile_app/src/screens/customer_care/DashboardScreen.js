@@ -20,7 +20,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiCancelOrder, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiTables } from '../../api/tables';
 import { apiBillRequests, apiCompleteBillRequest } from '../../api/billRequests';
-import { getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
+import { getOrders, cacheOrders, getOfflinePendingOrders, deleteOfflineOrder } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -250,6 +250,15 @@ export default function CCDashboardScreen({ navigation }) {
     }
   };
 
+  const handleDismissError = useCallback(async (offlineId) => {
+    try {
+      await deleteOfflineOrder(offlineId);
+      fetchAll(true);
+    } catch {
+      setSnack('Could not dismiss order');
+    }
+  }, [fetchAll]);
+
   // ── Cancel order ────────────────────────────────────────────────────────────
   const openCancel = (order) => { setCancelDialog(order); setCancelReason(''); };
 
@@ -440,7 +449,25 @@ export default function CCDashboardScreen({ navigation }) {
                     </Menu>
                   </View>
                 </View>
-                {order._is_offline_pending && (
+                {order._is_sync_error && (
+                  <>
+                    <Chip
+                      icon="alert-circle"
+                      mode="flat"
+                      compact
+                      style={{ backgroundColor: '#FFEBEE', alignSelf: 'flex-start', marginBottom: 4 }}
+                      textStyle={{ fontSize: 10, color: '#C62828' }}
+                    >
+                      Sync Failed – re-take manually
+                    </Chip>
+                    {!!order.error_message && (
+                      <Text variant="bodySmall" style={{ color: '#C62828', fontSize: 10, opacity: 0.8, marginBottom: 4 }}>
+                        {order.error_message}
+                      </Text>
+                    )}
+                  </>
+                )}
+                {order._is_offline_pending && !order._is_sync_error && (
                   <Chip
                     icon="cloud-upload"
                     mode="flat"
@@ -464,6 +491,18 @@ export default function CCDashboardScreen({ navigation }) {
                   </Text>
                 </View>
               </Card.Content>
+              {order._is_sync_error && (
+                <Card.Actions>
+                  <Button
+                    mode="outlined"
+                    compact
+                    textColor="#C62828"
+                    onPress={() => handleDismissError(order.offline_id)}
+                  >
+                    Dismiss
+                  </Button>
+                </Card.Actions>
+              )}
             </Card>
           );
         })

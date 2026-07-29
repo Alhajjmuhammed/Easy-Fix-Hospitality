@@ -240,6 +240,9 @@ export const markBillRequestSynced = (offlineId, serverId) =>
     [serverId, offlineId],
   );
 
+export const deleteOfflineOrder = (offlineId) =>
+  dbExec('DELETE FROM offline_orders WHERE offline_id = ?', [offlineId]);
+
 // ── Cached Orders (from server pull) ─────────────────────────────────────────
 
 /**
@@ -445,7 +448,7 @@ export const getOrderById = async (id) => {
  */
 export const getOfflinePendingOrders = async () => {
   const rows = await dbQuery(
-    "SELECT * FROM offline_orders WHERE sync_status = 'pending' ORDER BY created_at DESC"
+    "SELECT * FROM offline_orders WHERE sync_status IN ('pending', 'error') ORDER BY created_at DESC"
   );
   const result = [];
   for (const row of rows) {
@@ -482,6 +485,8 @@ export const getOfflinePendingOrders = async () => {
       updated_at: row.created_at,
       special_instructions: row.special_instructions || '',
       _is_offline_pending: true,
+      _is_sync_error: row.sync_status === 'error',
+      error_message: row.error_message || '',
     });
   }
   return result;

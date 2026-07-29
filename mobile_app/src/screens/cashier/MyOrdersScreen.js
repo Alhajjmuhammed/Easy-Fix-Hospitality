@@ -3,10 +3,12 @@ import { View, FlatList, StyleSheet, RefreshControl, ScrollView } from 'react-na
 import {
   Text, Card, Button, TextInput, Dialog, Portal, Chip,
   ActivityIndicator, Snackbar, useTheme, SegmentedButtons, FAB, Divider, Menu,
-  List, RadioButton,
+  List, RadioButton, Banner,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
+import NetInfo from '@react-native-community/netinfo';
+import { getOrders, getOfflinePendingOrders } from '../../database/operations';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
@@ -81,6 +83,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
 
   // Per-card action menus
   const [menuOpenId, setMenuOpenId] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const buildParams = useCallback(() => {
     const params = { my_orders: 'true' };
@@ -92,8 +95,19 @@ export default function CashierMyOrdersScreen({ navigation }) {
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        const [offlinePending, cached] = await Promise.all([
+          getOfflinePendingOrders(),
+          getOrders(null),
+        ]);
+        setOrders([...offlinePending, ...cached]);
+        setIsOffline(true);
+        return;
+      }
       const data = await apiOrders(buildParams());
       setOrders(Array.isArray(data) ? data : data.results || []);
+      setIsOffline(false);
     } catch {
       setSnack('Could not load orders');
     } finally {
@@ -279,6 +293,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1' }}
+      >
+        Offline – showing cached orders. Connect to see your personal order history.
+      </Banner>
       <SegmentedButtons
         value={period}
         onValueChange={setPeriod}

@@ -23,6 +23,7 @@ import {
   SegmentedButtons,
   Divider,
   TouchableRipple,
+  Banner,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
@@ -30,7 +31,7 @@ import { apiOrders, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
-import { saveOfflinePayment } from '../../database/operations';
+import { saveOfflinePayment, getOrders } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 
 const PAYMENT_METHODS = [
@@ -92,14 +93,26 @@ export default function CCPaymentsScreen({ navigation }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
 
   const [snack, setSnack] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        const cached = await getOrders(null);
+        const filtered = statusFilter
+          ? cached.filter((o) => o.payment_status === statusFilter)
+          : cached;
+        setOrders(filtered);
+        setIsOffline(true);
+        return;
+      }
       const params = { period: 'today' };
       if (statusFilter) params.payment_status = statusFilter;
       const data = await apiOrders(params);
       setOrders(Array.isArray(data) ? data : []);
+      setIsOffline(false);
     } catch {
       setSnack('Could not load orders');
     } finally {
@@ -244,6 +257,14 @@ export default function CCPaymentsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1', marginHorizontal: -16, marginTop: -16, marginBottom: 8 }}
+      >
+        Offline – showing cached orders. Payments saved offline will sync when connected.
+      </Banner>
       {/* Filters */}
       <View style={styles.filterBox}>
         <Menu
