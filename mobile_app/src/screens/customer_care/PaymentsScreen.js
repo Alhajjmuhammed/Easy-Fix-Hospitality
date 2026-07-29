@@ -224,11 +224,12 @@ export default function CCPaymentsScreen({ navigation }) {
   const openTransfer = async (order) => {
     setTransferDialog(order);
     setSelectedTableId('');
+    setTables([]);
     try {
       const data = await apiTables();
       setTables(Array.isArray(data) ? data : []);
     } catch {
-      setSnack('Could not load tables');
+      setSnack('Could not load tables — connect to internet to transfer');
     }
   };
 
@@ -492,7 +493,9 @@ export default function CCPaymentsScreen({ navigation }) {
               Moving {transferDialog?.order_number} from Table {transferDialog?.table_number}
             </Text>
             {tables.length === 0 ? (
-              <ActivityIndicator />
+              <Text variant="bodyMedium" style={{ color: '#757575', marginVertical: 8 }}>
+                No tables available — connect to internet to load tables.
+              </Text>
             ) : (
               <>
                 <Text variant="labelMedium" style={styles.methodLabel}>Select destination table:</Text>

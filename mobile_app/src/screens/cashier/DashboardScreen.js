@@ -269,6 +269,8 @@ export default function CashierDashboardScreen({ navigation }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to print the bill'); return; }
     try {
       await apiPrintBill(order.id);
       setSnack('Bill sent to printer');

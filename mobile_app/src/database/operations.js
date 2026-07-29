@@ -501,7 +501,9 @@ export const clearAllUserData = async () => {
   await dbExec('DELETE FROM offline_payments');
   await dbExec('DELETE FROM offline_bill_requests');
   // Clear cached server data — next user may belong to a different restaurant
-  await dbExec("DELETE FROM sync_meta WHERE key IN ('menu_json', 'menu_last_synced', 'tables_last_synced', 'last_sync')");
+  await dbExec(
+    "DELETE FROM sync_meta WHERE key IN ('menu_json', 'menu_last_synced', 'tables_last_synced', 'last_sync', 'cashier_report_cache', 'cashier_report_cache_ts', 'cashier_report_cache_period', 'cc_report_cache', 'cc_report_cache_ts')"
+  );
   await dbExec('DELETE FROM categories');
   await dbExec('DELETE FROM products');
   await dbExec('DELETE FROM tables');
