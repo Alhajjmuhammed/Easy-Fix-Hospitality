@@ -118,6 +118,190 @@
     </div>
 </div>
 
+<!-- ── Mobile App Distribution ──────────────────────────────────────── -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center"
+                 style="background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); color: #fff;">
+                <h5 class="mb-0">
+                    <i class="fas fa-mobile-alt me-2"></i>
+                    Mobile App Distribution
+                </h5>
+                {% if app_release %}
+                    <span class="badge bg-light text-dark fw-semibold">
+                        v{{ app_release.version }} &nbsp;·&nbsp;
+                        {{ app_release.created_at|date:"M j, Y" }}
+                    </span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">No release yet</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        {% if app_release %}
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div style="width:52px;height:52px;border-radius:14px;
+                                            background:linear-gradient(135deg,#27ae60,#2ecc71);
+                                            display:flex;align-items:center;justify-content:center;">
+                                    <i class="fas fa-android text-white" style="font-size:26px;"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">EasyFix Restaurant App</h5>
+                                    <small class="text-muted">
+                                        Version {{ app_release.version }} &nbsp;·&nbsp;
+                                        Released {{ app_release.created_at|date:"F j, Y" }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% if app_release.release_notes %}
+                                <p class="text-muted small mb-0">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    {{ app_release.release_notes }}
+                                </p>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-muted">
+                                <i class="fas fa-upload me-2"></i>
+                                No APK uploaded yet. Upload the first release to enable downloads.
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                        <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                            {% if app_release %}
+                                <!-- Download APK -->
+                                <a href="{{ app_release.apk_file.url }}"
+                                   download="EasyFix-v{{ app_release.version }}.apk"
+                                   class="btn btn-success">
+                                    <i class="fas fa-download me-1"></i> Download APK
+                                </a>
+                                <!-- Copy download link -->
+                                <button class="btn btn-outline-secondary"
+                                        onclick="copyDownloadLink('{{ request.scheme }}://{{ request.get_host }}{{ app_release.apk_file.url }}')"
+                                        title="Copy link to share with clients">
+                                    <i class="fas fa-link me-1"></i> Copy Link
+                                </button>
+                            {% endif %}
+                            <!-- Upload new version -->
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadApkModal">
+                                <i class="fas fa-upload me-1"></i>
+                                {% if app_release %}Update App{% else %}Upload APK{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload APK Modal -->
+<div class="modal fade" id="uploadApkModal" tabindex="-1" aria-labelledby="uploadApkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadApkModalLabel">
+                    <i class="fas fa-upload me-2 text-primary"></i>
+                    {% if app_release %}Update{% else %}Upload{% endif %} Mobile App Release
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'system_admin:upload_app_release' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    {% if app_release %}
+                        <div class="alert alert-warning py-2">
+                            <small>
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                This will <strong>replace</strong> the current v{{ app_release.version }} release.
+                                The old APK file will be deleted.
+                            </small>
+                        </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Version Number <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="version" class="form-control"
+                               placeholder="e.g. 1.0.0" required
+                               value="{% if app_release %}{{ app_release.version }}{% endif %}">
+                        <div class="form-text">Use semantic versioning: 1.0.0, 1.1.0, 2.0.0 …</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            APK File <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" name="apk_file" class="form-control"
+                               accept=".apk" required id="apkFileInput">
+                        <div class="form-text">Android APK file only (.apk). Typical size: 30–80 MB.</div>
+                        <div id="apkFileFeedback" class="small text-muted mt-1"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Release Notes</label>
+                        <textarea name="release_notes" class="form-control" rows="3"
+                                  placeholder="What's new in this version? (optional)">{% if app_release %}{{ app_release.release_notes }}{% endif %}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="uploadSubmitBtn">
+                        <i class="fas fa-upload me-1"></i> Upload Release
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyDownloadLink(url) {
+    navigator.clipboard.writeText(url).then(() => {
+        const btn = event.currentTarget;
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
+        btn.classList.replace('btn-outline-secondary', 'btn-success');
+        setTimeout(() => {
+            btn.innerHTML = original;
+            btn.classList.replace('btn-success', 'btn-outline-secondary');
+        }, 2000);
+    }).catch(() => {
+        prompt('Copy this link:', url);
+    });
+}
+
+// Show selected filename and warn if large
+document.getElementById('apkFileInput')?.addEventListener('change', function () {
+    const file = this.files[0];
+    const feedback = document.getElementById('apkFileFeedback');
+    if (!file) { feedback.textContent = ''; return; }
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    feedback.textContent = `Selected: ${file.name} (${mb} MB)`;
+
+    // Show upload progress note for large files
+    const btn = document.getElementById('uploadSubmitBtn');
+    btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Uploading…';
+    }, { once: true });
+});
+</script>
+
+<!-- ── Recent Restaurants ──────────────────────────────────────────── -->
 <div class="row">
     <div class="col-lg-12 mb-4">
         <div class="card">

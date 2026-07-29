@@ -74,6 +74,9 @@ urlpatterns = [
     path('riders/<int:rider_id>/delete/', views.delete_rider, name='delete_rider'),
     path('riders/<int:rider_id>/details/', views.rider_details, name='rider_details'),
 
+    # Mobile App Release
+    path('app/upload/', views.upload_app_release, name='upload_app_release'),
+
     # Orders Management
     path('order-details/<int:order_id>/', views.order_details, name='order_details'),
     path('update-order-status/<int:order_id>/', views.update_order_status, name='update_order_status'),

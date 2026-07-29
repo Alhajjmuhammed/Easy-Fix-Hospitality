@@ -15,6 +15,7 @@ from restaurant.models_restaurant import Restaurant
 from orders.models import Order, OrderItem, DeliveryRider, DeliveryAssignment
 from django.contrib.auth.hashers import make_password
 from datetime import date, timedelta, datetime
+from .models import MobileAppRelease
 import json
 import logging
 
@@ -117,6 +118,8 @@ def system_dashboard(request):
         is_active=True,
     ).select_related('role').order_by('-date_joined')[:10]
 
+    app_release = MobileAppRelease.objects.filter(is_active=True).first()
+
     context = {
         'total_restaurants': total_restaurants,
         'total_branches': total_branches,
@@ -129,9 +132,52 @@ def system_dashboard(request):
         'recent_orders': recent_orders,
         'recent_users': recent_users,
         'recent_restaurants': recent_restaurants,
+        'app_release': app_release,
     }
-    
+
     return render(request, 'system_admin/dashboard.html', context)
+
+
+@login_required
+def upload_app_release(request):
+    """Upload or replace the current Android APK release."""
+    if not request.user.is_administrator():
+        return JsonResponse({'error': 'Access denied.'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required.'}, status=405)
+
+    version = request.POST.get('version', '').strip()
+    apk_file = request.FILES.get('apk_file')
+    release_notes = request.POST.get('release_notes', '').strip()
+
+    if not version:
+        messages.error(request, 'Version number is required.')
+        return redirect('system_admin:dashboard')
+
+    if not apk_file:
+        messages.error(request, 'APK file is required.')
+        return redirect('system_admin:dashboard')
+
+    if not apk_file.name.lower().endswith('.apk'):
+        messages.error(request, 'Only .apk files are allowed.')
+        return redirect('system_admin:dashboard')
+
+    # Delete the old APK file from disk before replacing
+    old = MobileAppRelease.objects.filter(is_active=True).first()
+    if old:
+        old.delete_apk_file()
+        old.delete()
+
+    release = MobileAppRelease.objects.create(
+        version=version,
+        apk_file=apk_file,
+        release_notes=release_notes,
+        is_active=True,
+    )
+
+    messages.success(request, f'Version {release.version} uploaded successfully.')
+    return redirect('system_admin:dashboard')
 
 
 @login_required

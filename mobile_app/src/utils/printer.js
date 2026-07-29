@@ -258,7 +258,7 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol }
 // ─── Network printing ─────────────────────────────────────────────────────────
 
 async function printNetwork(orderId) {
-  await client.post(`/cashier/print-bill/${orderId}/`);
+  await client.post(`/orders/${orderId}/print-bill/`);
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

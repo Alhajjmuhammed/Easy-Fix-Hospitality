@@ -4,6 +4,11 @@ import { apiLogin, apiLogout, apiMe, apiRegister } from '../api/auth';
 import { setClientAuth, clearClientAuth } from '../api/client';
 import { clearAllUserData } from '../database/operations';
 
+// Device must go online at least once every 15 days to continue working offline.
+// If the grace period lapses, the session is cleared and the user must log in
+// with an internet connection to get a fresh 15-day window.
+const OFFLINE_GRACE_MS = 15 * 24 * 60 * 60 * 1000;
+
 export const useAuthStore = create((set, get) => ({
   token: null,
   user: null,
@@ -16,7 +21,30 @@ export const useAuthStore = create((set, get) => ({
     const token = await SecureStore.getItemAsync('auth_token');
     const userJson = await SecureStore.getItemAsync('auth_user');
     const restaurantId = await SecureStore.getItemAsync('restaurant_id');
+    const lastOnlineAt = await SecureStore.getItemAsync('last_online_at');
+
     if (token && userJson) {
+      // Enforce 15-day offline grace period
+      if (lastOnlineAt && Date.now() - Number(lastOnlineAt) > OFFLINE_GRACE_MS) {
+        clearClientAuth();
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('auth_user');
+        await SecureStore.deleteItemAsync('restaurant_id');
+        await SecureStore.deleteItemAsync('last_online_at');
+        set({
+          error:
+            'Your session has expired after 15 days offline. ' +
+            'Please connect to the internet and sign in again.',
+        });
+        return;
+      }
+
+      // First launch after this feature was added — stamp now so the 15-day
+      // window starts from today rather than retroactively locking everyone out.
+      if (!lastOnlineAt) {
+        await SecureStore.setItemAsync('last_online_at', String(Date.now()));
+      }
+
       // Restore cached data immediately so the app can start
       set({
         token,
@@ -30,6 +58,7 @@ export const useAuthStore = create((set, get) => ({
         const res = await apiMe();
         const freshUser = res.data;
         await SecureStore.setItemAsync('auth_user', JSON.stringify(freshUser));
+        await SecureStore.setItemAsync('last_online_at', String(Date.now()));
         set({ user: freshUser });
       } catch (_) {
         // Offline or token expired — keep cached data, logout will handle expiry
@@ -45,6 +74,7 @@ export const useAuthStore = create((set, get) => ({
 
       await SecureStore.setItemAsync('auth_token', token);
       await SecureStore.setItemAsync('auth_user', JSON.stringify(user));
+      await SecureStore.setItemAsync('last_online_at', String(Date.now()));
 
       setClientAuth(token, null);
       set({ token, user, isLoading: false });
@@ -70,6 +100,7 @@ export const useAuthStore = create((set, get) => ({
       const restaurantId = res.data.restaurant_id ? Number(res.data.restaurant_id) : null;
       await SecureStore.setItemAsync('auth_token', token);
       await SecureStore.setItemAsync('auth_user', JSON.stringify(user));
+      await SecureStore.setItemAsync('last_online_at', String(Date.now()));
       if (restaurantId) await SecureStore.setItemAsync('restaurant_id', String(restaurantId));
       setClientAuth(token, restaurantId);
       set({ token, user, restaurantId, isLoading: false });
@@ -87,6 +118,7 @@ export const useAuthStore = create((set, get) => ({
     await SecureStore.deleteItemAsync('auth_token');
     await SecureStore.deleteItemAsync('auth_user');
     await SecureStore.deleteItemAsync('restaurant_id');
+    await SecureStore.deleteItemAsync('last_online_at');
     // Clear cart from AsyncStorage and in-memory state — prevents next user
     // on this device seeing previous user's cart (data breach fix)
     const { useCartStore } = require('./useCartStore');
@@ -124,6 +156,8 @@ export const useAuthStore = create((set, get) => ({
       const res = await apiMe();
       const freshUser = res.data;
       await SecureStore.setItemAsync('auth_user', JSON.stringify(freshUser));
+      // Device is online — reset the 15-day offline grace period clock
+      await SecureStore.setItemAsync('last_online_at', String(Date.now()));
       set({ user: freshUser });
     } catch (err) {
       // Only log out on 401 if it's a definitive server rejection (not a network error)
