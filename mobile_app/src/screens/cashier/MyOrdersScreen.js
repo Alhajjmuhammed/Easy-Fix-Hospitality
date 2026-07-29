@@ -8,7 +8,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
 import NetInfo from '@react-native-community/netinfo';
-import { getOrders, getOfflinePendingOrders, saveOfflinePayment } from '../../database/operations';
+import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
@@ -106,11 +106,26 @@ export default function CashierMyOrdersScreen({ navigation }) {
         setIsOffline(true);
         return;
       }
-      const data = await apiOrders(buildParams());
-      setOrders(Array.isArray(data) ? data : data.results || []);
+      const [offlinePending, data] = await Promise.all([
+        getOfflinePendingOrders(),
+        apiOrders(buildParams()),
+      ]);
+      const fetched = Array.isArray(data) ? data : data.results || [];
+      setOrders([...offlinePending, ...fetched]);
       setIsOffline(false);
+      try { await cacheOrders(fetched); } catch { /* best-effort */ }
     } catch {
-      setSnack('Could not load orders');
+      try {
+        const [offlinePending, cached] = await Promise.all([
+          getOfflinePendingOrders(),
+          getOrders(null),
+        ]);
+        setOrders([...offlinePending, ...cached]);
+      } catch {
+        setOrders([]);
+      }
+      setIsOffline(true);
+      setSnack('Could not load orders — showing cached data');
     } finally {
       setLoading(false);
       setRefreshing(false);

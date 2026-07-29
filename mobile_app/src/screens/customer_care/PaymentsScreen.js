@@ -31,7 +31,7 @@ import { apiOrders, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
-import { saveOfflinePayment, getOrders, getOfflinePendingOrders } from '../../database/operations';
+import { saveOfflinePayment, getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 
 const PAYMENT_METHODS = [
@@ -114,11 +114,27 @@ export default function CCPaymentsScreen({ navigation }) {
       }
       const params = { period: 'today' };
       if (statusFilter) params.payment_status = statusFilter;
-      const data = await apiOrders(params);
-      setOrders(Array.isArray(data) ? data : []);
+      const [offlinePending, data] = await Promise.all([
+        getOfflinePendingOrders(),
+        apiOrders(params),
+      ]);
+      const fetched = Array.isArray(data) ? data : [];
+      setOrders([...offlinePending, ...fetched]);
       setIsOffline(false);
+      try { await cacheOrders(fetched); } catch { /* best-effort */ }
     } catch {
-      setSnack('Could not load orders');
+      try {
+        const [offlinePending, cached] = await Promise.all([
+          getOfflinePendingOrders(),
+          getOrders(null),
+        ]);
+        const allOrders = [...offlinePending, ...cached];
+        setOrders(statusFilter ? allOrders.filter((o) => o.payment_status === statusFilter) : allOrders);
+      } catch {
+        setOrders([]);
+      }
+      setIsOffline(true);
+      setSnack('Could not load orders — showing cached data');
     } finally {
       setLoading(false);
       setRefreshing(false);
