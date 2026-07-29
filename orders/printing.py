@@ -191,6 +191,33 @@ def get_restaurant_print_settings(order):
     }
 
 
+def _resolve_receipt_printer(order, print_settings):
+    """
+    Route bill/receipt to the station printer when every item in the order
+    belongs to the same station (bar-only → bar_printer, kitchen-only →
+    kitchen_printer, etc.).  Falls back to receipt_printer_name for mixed
+    orders or when the resolved station has no printer configured.
+    """
+    items = list(order.order_items.select_related('product').all())
+    stations = {item.product.station for item in items if item.product and item.product.station}
+    if len(stations) == 1:
+        station = next(iter(stations))
+        station_map = {
+            'kitchen': print_settings.get('kitchen_printer_name'),
+            'bar':     print_settings.get('bar_printer_name'),
+            'buffet':  print_settings.get('buffet_printer_name'),
+            'service': print_settings.get('service_printer_name'),
+        }
+        station_printer = station_map.get(station)
+        if station_printer:
+            logger.info(
+                f" Bill/receipt routed to {station} printer '{station_printer}' "
+                f"(all items are {station}-station)"
+            )
+            return station_printer
+    return print_settings.get('receipt_printer_name')
+
+
 def create_print_job(restaurant, job_type, content, order=None, payment=None, printer_name=None):
     """
     Create a print job for remote printing
@@ -582,15 +609,15 @@ class ThermalPrinter:
         try:
             # Get printer settings for this specific restaurant/branch
             print_settings = get_restaurant_print_settings(payment.order)
-            printer_name = print_settings['receipt_printer_name']
-            
+            printer_name = _resolve_receipt_printer(payment.order, print_settings)
+
             # Determine which printer to use
             if printer_name:
                 # ALWAYS try configured printer if it EXISTS (don't check status - it's unreliable!)
                 if self._printer_exists(printer_name):
                     printer = ThermalPrinter(printer_name=printer_name)
                     status, status_text = self._get_printer_status(printer_name)
-                    logger.info(f" Using configured receipt printer: {printer_name} (status: {status_text})")
+                    logger.info(f" Using receipt printer: {printer_name} (status: {status_text})")
                 else:
                     # Configured printer doesn't exist at all, fall back to auto-detect
                     logger.warning(f" Configured printer '{printer_name}' not found, auto-detecting...")
@@ -1242,7 +1269,7 @@ def auto_print_receipt(payment):
         if use_queue:
             # Queue-based printing for hosted deployment
             content = _generate_receipt_content(payment)
-            printer_name = print_settings['receipt_printer_name']
+            printer_name = _resolve_receipt_printer(payment.order, print_settings)
             job = create_print_job(owner, 'receipt', content, order=payment.order, payment=payment, printer_name=printer_name)
             result['receipt_printed'] = True
             logger.info(f" Queued receipt print job #{job.id} for Payment #{payment.id} (printer: {printer_name or 'auto'})")
@@ -1299,13 +1326,13 @@ def auto_print_bill(order, printed_by=None):
         if use_queue:
             # Queue-based printing for hosted deployment
             content = _generate_bill_content(order, printed_by)
-            printer_name = print_settings['receipt_printer_name']  # Use receipt printer for bills
+            printer_name = _resolve_receipt_printer(order, print_settings)
             job = create_print_job(owner, 'bill', content, order=order, printer_name=printer_name)
             result['bill_printed'] = True
             logger.info(f" Queued bill print job #{job.id} for Order #{order.order_number} (printer: {printer_name or 'auto'})")
         else:
-            # Direct local printing - use receipt printer (SAME as print_receipt method)
-            printer_name = print_settings['receipt_printer_name']
+            # Direct local printing - resolve printer by station routing
+            printer_name = _resolve_receipt_printer(order, print_settings)
             
             # Determine which printer to use - EXACT same logic as print_receipt
             if printer_name:
