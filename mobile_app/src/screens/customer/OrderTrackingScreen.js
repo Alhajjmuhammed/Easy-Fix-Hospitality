@@ -442,17 +442,18 @@ export default function OrderTrackingScreen({ route }) {
         </Button>
       )}
 
-      {/* Cancel Order – only pending */}
+      {/* Cancel Order – only pending; disabled offline */}
       {order.status === 'pending' && (
         <Button
           mode="outlined"
-          textColor="#B71C1C"
+          textColor={isOffline ? '#9E9E9E' : '#B71C1C'}
           style={[styles.actionBtn, styles.cancelBtn]}
           icon="close-circle-outline"
+          disabled={isOffline}
           onPress={() => { setCancelReason(''); setCancelVisible(true); }}
           labelStyle={{ fontFamily: P600 }}
         >
-          Cancel Order
+          {isOffline ? 'Cancel Order (connect first)' : 'Cancel Order'}
         </Button>
       )}
 

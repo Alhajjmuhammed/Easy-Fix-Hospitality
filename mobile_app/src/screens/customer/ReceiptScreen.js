@@ -6,10 +6,13 @@ import {
   Divider,
   ActivityIndicator,
   Button,
+  Banner,
   useTheme,
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { apiOrderDetail } from '../../api/orders';
+import { getOrderById } from '../../database/operations';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 
@@ -29,12 +32,28 @@ export default function ReceiptScreen({ route }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    apiOrderDetail(orderId)
-      .then(setOrder)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const net = await NetInfo.fetch();
+        if (!net.isConnected) {
+          const cached = await getOrderById(orderId);
+          if (cached) { setOrder(cached); setIsOffline(true); }
+        } else {
+          const data = await apiOrderDetail(orderId);
+          setOrder(data);
+        }
+      } catch {
+        try {
+          const cached = await getOrderById(orderId);
+          if (cached) { setOrder(cached); setIsOffline(true); }
+        } catch {}
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [orderId]);
 
   if (loading) {
@@ -87,6 +106,12 @@ export default function ReceiptScreen({ route }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+
+      {isOffline && (
+        <Banner visible icon="wifi-off" actions={[]} style={{ backgroundColor: '#FFF8E1' }}>
+          Offline – showing cached data. Connect to view live receipt details.
+        </Banner>
+      )}
 
       {/* ── Receipt header ── */}
       <View style={[styles.header, { backgroundColor: '#2c3e50' }]}>
