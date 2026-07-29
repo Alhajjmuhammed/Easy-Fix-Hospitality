@@ -118,7 +118,7 @@ export default function PlaceOrderScreen({ navigation }) {
           }
         }
       } else {
-        await saveOfflineOrder({ ...orderData, user_id: user?.id });
+        await saveOfflineOrder({ ...orderData, user_id: user?.id, total_amount: cartTotal });
         await refreshPendingCount();
 
         // Print draft ticket from cart data if localKotBot is enabled.

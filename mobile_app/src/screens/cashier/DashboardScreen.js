@@ -11,7 +11,8 @@ import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiP
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
-import { getOrders, cacheOrders } from '../../database/operations';
+import { getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
+import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 
 const PAYMENT_METHODS = [
@@ -42,6 +43,7 @@ const STATUS_COLORS = {
 export default function CashierDashboardScreen({ navigation }) {
   const theme = useTheme();
   const { format } = useCurrency();
+  const { pendingCount } = useSyncStore();
 
   const [orders,          setOrders]          = useState([]);
   const [loading,         setLoading]         = useState(true);
@@ -89,26 +91,30 @@ export default function CashierDashboardScreen({ navigation }) {
     if (!silent) setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      // Always include locally-queued offline orders (not yet synced to server)
+      const offlinePending = await getOfflinePendingOrders();
+
       if (net.isConnected) {
         const params = filter === 'active'
           ? { status: 'pending,confirmed,preparing,ready' }
           : {};
         const data = await apiOrders(params);
         const fetched = Array.isArray(data) ? data : data.results || [];
-        setOrders(fetched);
+        // Offline pending first so staff see their queued orders at the top
+        setOrders([...offlinePending, ...fetched]);
         setIsOffline(false);
         try { await cacheOrders(fetched); } catch { /* best-effort */ }
       } else {
         const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'served'];
         const cached = await getOrders(filter === 'active' ? activeStatuses : null);
-        setOrders(cached);
+        setOrders([...offlinePending, ...cached]);
         setIsOffline(true);
       }
     } catch {
-      // Network error — fall back to cache
       try {
+        const offlinePending = await getOfflinePendingOrders();
         const cached = await getOrders(['pending', 'confirmed', 'preparing', 'ready', 'served']);
-        setOrders(cached);
+        setOrders([...offlinePending, ...cached]);
       } catch {
         setOrders([]);
       }
@@ -301,12 +307,14 @@ export default function CashierDashboardScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Banner
-        visible={isOffline}
-        icon="wifi-off"
+        visible={isOffline || pendingCount > 0}
+        icon={isOffline ? 'wifi-off' : 'cloud-upload'}
         actions={[]}
-        style={{ backgroundColor: '#FFF8E1' }}
+        style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9' }}
       >
-        You are offline – showing cached orders. Changes require connection.
+        {isOffline
+          ? `Offline – showing cached orders.${pendingCount > 0 ? ` ${pendingCount} order(s) queued for sync.` : ' Changes require connection.'}`
+          : `${pendingCount} order(s) queued – will sync automatically when internet is available.`}
       </Banner>
       <SegmentedButtons
         value={filter}
@@ -357,7 +365,7 @@ export default function CashierDashboardScreen({ navigation }) {
                       visible={isMenuOpen}
                       onDismiss={() => setMenuOpenId(null)}
                       anchor={
-                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                        <Button compact icon="dots-vertical" disabled={!!order._is_offline_pending} onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
                       }
                     >
                       <Menu.Item leadingIcon="eye" title="View Order" onPress={() => { setMenuOpenId(null); navigation.navigate('OrderDetail', { orderId: order.id }); }} />
@@ -372,6 +380,17 @@ export default function CashierDashboardScreen({ navigation }) {
                     </Menu>
                   </View>
                 </View>
+                {order._is_offline_pending && (
+                  <Chip
+                    icon="cloud-upload"
+                    mode="flat"
+                    compact
+                    style={{ backgroundColor: '#FFF3E0', alignSelf: 'flex-start', marginBottom: 4 }}
+                    textStyle={{ fontSize: 10, color: '#E65100' }}
+                  >
+                    Queued – syncs when online
+                  </Chip>
+                )}
                 <Text variant="bodySmall" style={styles.meta}>
                   {isDelivery ? '🚴 Delivery' : `Table ${order.table_number}`} · {order.items_count} item{order.items_count !== 1 ? 's' : ''} · Total: {format(order.total)}
                 </Text>
@@ -385,21 +404,29 @@ export default function CashierDashboardScreen({ navigation }) {
                 )}
               </Card.Content>
               <Card.Actions>
-                {effectiveNext && (
-                  <Button mode="outlined" compact loading={updatingStatus === order.id}
-                    disabled={updatingStatus === order.id} onPress={() => handleStatusAdvance(order)}>
-                    → {effectiveNext}
-                  </Button>
-                )}
-                {showAssign && (
-                  <Button mode="outlined" compact icon="moped" onPress={() => openAssignRider(order)}>
-                    Assign Rider
-                  </Button>
-                )}
-                {hasPay && !isPaid && order.status !== 'cancelled' && (
-                  <Button mode="contained" compact onPress={() => openPayment(order)}>
-                    Pay
-                  </Button>
+                {order._is_offline_pending ? (
+                  <Text variant="bodySmall" style={{ color: '#E65100', opacity: 0.7, paddingHorizontal: 8 }}>
+                    Actions available after sync
+                  </Text>
+                ) : (
+                  <>
+                    {effectiveNext && (
+                      <Button mode="outlined" compact loading={updatingStatus === order.id}
+                        disabled={updatingStatus === order.id} onPress={() => handleStatusAdvance(order)}>
+                        → {effectiveNext}
+                      </Button>
+                    )}
+                    {showAssign && (
+                      <Button mode="outlined" compact icon="moped" onPress={() => openAssignRider(order)}>
+                        Assign Rider
+                      </Button>
+                    )}
+                    {hasPay && !isPaid && order.status !== 'cancelled' && (
+                      <Button mode="contained" compact onPress={() => openPayment(order)}>
+                        Pay
+                      </Button>
+                    )}
+                  </>
                 )}
               </Card.Actions>
             </Card>

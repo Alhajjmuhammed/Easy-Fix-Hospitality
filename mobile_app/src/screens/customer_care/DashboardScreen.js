@@ -20,7 +20,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiCancelOrder, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiTables } from '../../api/tables';
 import { apiBillRequests, apiCompleteBillRequest } from '../../api/billRequests';
-import { getOrders, cacheOrders } from '../../database/operations';
+import { getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
+import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -136,6 +137,7 @@ const STATUS_COLORS = {
 export default function CCDashboardScreen({ navigation }) {
   const theme = useTheme();
   const { format } = useCurrency();
+  const { pendingCount } = useSyncStore();
 
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
@@ -163,45 +165,50 @@ export default function CCDashboardScreen({ navigation }) {
     if (!silent) setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      const offlinePending = await getOfflinePendingOrders();
+
       if (net.isConnected) {
         const [ordersData, billData] = await Promise.all([
           apiOrders({ period: 'today' }),
           apiBillRequests(),
         ]);
         const orders = Array.isArray(ordersData) ? ordersData : [];
+        const allOrders = [...offlinePending, ...orders];
         setBillRequests(billData.bill_requests || []);
-        setRecentOrders(orders.slice(0, 10));
+        setRecentOrders(allOrders.slice(0, 10));
         setStats({
-          total:     orders.length,
-          pending:   orders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
-          completed: orders.filter((o) => o.status === 'served').length,
-          cancelled: orders.filter((o) => o.status === 'cancelled').length,
+          total:     allOrders.length,
+          pending:   allOrders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
+          completed: allOrders.filter((o) => o.status === 'served').length,
+          cancelled: allOrders.filter((o) => o.status === 'cancelled').length,
         });
         setIsOffline(false);
         try { await cacheOrders(orders); } catch { /* best-effort */ }
       } else {
         const cached = await getOrders();
-        setRecentOrders(cached.slice(0, 10));
+        const allOrders = [...offlinePending, ...cached];
+        setRecentOrders(allOrders.slice(0, 10));
         setBillRequests([]);
         setStats({
-          total:     cached.length,
-          pending:   cached.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
-          completed: cached.filter((o) => o.status === 'served').length,
-          cancelled: cached.filter((o) => o.status === 'cancelled').length,
+          total:     allOrders.length,
+          pending:   allOrders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
+          completed: allOrders.filter((o) => o.status === 'served').length,
+          cancelled: allOrders.filter((o) => o.status === 'cancelled').length,
         });
         setIsOffline(true);
       }
     } catch {
-      // Network error — fall back to cache
       try {
+        const offlinePending = await getOfflinePendingOrders();
         const cached = await getOrders();
-        setRecentOrders(cached.slice(0, 10));
+        const allOrders = [...offlinePending, ...cached];
+        setRecentOrders(allOrders.slice(0, 10));
         setBillRequests([]);
         setStats({
-          total:     cached.length,
-          pending:   cached.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
-          completed: cached.filter((o) => o.status === 'served').length,
-          cancelled: cached.filter((o) => o.status === 'cancelled').length,
+          total:     allOrders.length,
+          pending:   allOrders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
+          completed: allOrders.filter((o) => o.status === 'served').length,
+          cancelled: allOrders.filter((o) => o.status === 'cancelled').length,
         });
       } catch {
         setRecentOrders([]);
@@ -304,14 +311,16 @@ export default function CCDashboardScreen({ navigation }) {
         <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(true); }} />
       }
     >
-      {/* Offline banner */}
+      {/* Offline / pending-sync banner */}
       <Banner
-        visible={isOffline}
-        icon="wifi-off"
+        visible={isOffline || pendingCount > 0}
+        icon={isOffline ? 'wifi-off' : 'cloud-upload'}
         actions={[]}
-        style={{ backgroundColor: '#FFF8E1', marginHorizontal: -16, marginTop: -16, marginBottom: 8 }}
+        style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 8 }}
       >
-        You are offline – showing cached orders. Bill requests unavailable.
+        {isOffline
+          ? `Offline – showing cached orders.${pendingCount > 0 ? ` ${pendingCount} item(s) queued for sync.` : ' Bill requests unavailable.'}`
+          : `${pendingCount} order(s) queued – will sync automatically when internet is available.`}
       </Banner>
 
       {/* Restaurant Banner */}
@@ -421,7 +430,7 @@ export default function CCDashboardScreen({ navigation }) {
                       visible={isMenuOpen}
                       onDismiss={() => setMenuOpenId(null)}
                       anchor={
-                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                        <Button compact icon="dots-vertical" disabled={!!order._is_offline_pending} onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
                       }
                     >
                       <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
@@ -431,6 +440,17 @@ export default function CCDashboardScreen({ navigation }) {
                     </Menu>
                   </View>
                 </View>
+                {order._is_offline_pending && (
+                  <Chip
+                    icon="cloud-upload"
+                    mode="flat"
+                    compact
+                    style={{ backgroundColor: '#FFF3E0', alignSelf: 'flex-start', marginBottom: 4 }}
+                    textStyle={{ fontSize: 10, color: '#E65100' }}
+                  >
+                    Queued – syncs when online
+                  </Chip>
+                )}
                 <Text variant="bodySmall" style={styles.meta}>
                   Table {order.table_number} · {order.items_count} item{order.items_count !== 1 ? 's' : ''}
                 </Text>

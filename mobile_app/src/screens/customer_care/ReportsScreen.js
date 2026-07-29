@@ -8,8 +8,11 @@ import {
   Snackbar,
   Divider,
   Surface,
+  Banner,
 } from 'react-native-paper';
+import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
+import { getOfflinePendingOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -29,28 +32,45 @@ const ORDER_STATUS_COLOR = {
 };
 
 export default function CCReportsScreen() {
-  const [loading, setLoading]       = useState(true);
-  const [refreshing, setRefreshing]  = useState(false);
-  const [data, setData]              = useState(null);
-  const [snack, setSnack]            = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [data, setData]                 = useState(null);
+  const [snack, setSnack]               = useState('');
+  const [isOffline, setIsOffline]       = useState(false);
+  const [offlineOrders, setOfflineOrders] = useState([]);
   const { format } = useCurrency();
 
   const fetchReport = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await client.get('/reports/cc/', { params: { period: 'today' } });
-      setData(res.data);
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        const pending = await getOfflinePendingOrders();
+        setOfflineOrders(pending);
+        setIsOffline(true);
+        setData(null);
+      } else {
+        const res = await client.get('/reports/cc/', { params: { period: 'today' } });
+        setData(res.data);
+        setIsOffline(false);
+        const pending = await getOfflinePendingOrders();
+        setOfflineOrders(pending);
+      }
     } catch {
-      setSnack('Could not load report');
+      try {
+        const pending = await getOfflinePendingOrders();
+        setOfflineOrders(pending);
+      } catch { setOfflineOrders([]); }
+      setIsOffline(true);
+      setData(null);
+      setSnack('Could not load report – showing offline orders only');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+  useEffect(() => { fetchReport(); }, [fetchReport]);
 
   if (loading) {
     return (
@@ -62,6 +82,7 @@ export default function CCReportsScreen() {
 
   const stats  = data?.stats  || {};
   const orders = data?.orders || [];
+  const offlineTotal = offlineOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
     <ScrollView
@@ -70,82 +91,156 @@ export default function CCReportsScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchReport(true); }} />
       }
     >
-      {/* Stats cards */}
-      <View style={styles.statsRow}>
-        <StatCard label="Orders"    value={stats.total_orders}             color="#2c3e50" icon="clipboard-list-outline" />
-        <StatCard label="Revenue"   value={format(stats.total_revenue ?? 0)} color="#2E7D32" icon="cash-multiple" />
-        <StatCard label="Items"     value={stats.total_items}             color="#6A1B9A" icon="food-outline" />
-        <StatCard label="Avg Order" value={format(stats.avg_order_value ?? 0)} color="#FF8F00" icon="chart-line" />
-      </View>
+      {/* Offline banner */}
+      <Banner
+        visible={isOffline || offlineOrders.length > 0}
+        icon={isOffline ? 'wifi-off' : 'cloud-upload'}
+        actions={[]}
+        style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 12 }}
+      >
+        {isOffline
+          ? `Offline – showing ${offlineOrders.length} queued order(s) below. Full report available when connected.`
+          : `${offlineOrders.length} order(s) queued for sync and NOT yet in server report totals.`}
+      </Banner>
 
-      {/* Payment breakdown */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <Text variant="titleSmall" style={styles.cardTitle}>Payment Breakdown</Text>
-          <View style={styles.breakdownRow}>
-            <BreakdownChip label="Paid"    value={stats.paid_orders}    color="#2E7D32" />
-            <BreakdownChip label="Partial" value={stats.partial_orders} color="#FF8F00" />
-            <BreakdownChip label="Unpaid"  value={stats.unpaid_orders}  color="#C62828" />
-          </View>
-        </Card.Content>
-      </Card>
-
-      <Divider style={styles.divider} />
-
-      {/* Orders list */}
-      <Text variant="titleSmall" style={styles.sectionTitle}>
-        Orders ({orders.length})
-      </Text>
-
-      {orders.length === 0 ? (
-        <Card style={styles.card}>
-          <Card.Content style={styles.emptyContent}>
-            <Text variant="bodyMedium" style={{ opacity: 0.5 }}>No orders for this period</Text>
-          </Card.Content>
-        </Card>
-      ) : (
-        orders.map((order) => (
-          <Card key={order.id} style={styles.orderCard}>
+      {/* Offline queued orders (shown whether online or offline) */}
+      {offlineOrders.length > 0 && (
+        <>
+          <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#E65100' }]}>
+            Queued Orders (Pending Sync)
+          </Text>
+          <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#E65100' }]}>
             <Card.Content>
               <View style={styles.row}>
-                <Text variant="titleSmall" style={{ fontFamily: 'Poppins_700Bold' }}>
-                  #{order.order_number}
-                </Text>
-                <Chip
-                  mode="flat"
-                  compact
-                  style={{ backgroundColor: (PAYMENT_STATUS_COLOR[order.payment_status] || '#666') + '22' }}
-                  textStyle={{ fontSize: 10, color: PAYMENT_STATUS_COLOR[order.payment_status] || '#666', fontFamily: 'Poppins_700Bold' }}
-                >
-                  {order.payment_status?.toUpperCase() || 'UNPAID'}
-                </Chip>
-              </View>
-
-              <View style={styles.row}>
-                <Text variant="bodySmall" style={{ opacity: 0.65 }}>
-                  Table {order.table_number} · {order.items_count} item{order.items_count !== 1 ? 's' : ''}
-                </Text>
-                <Chip
-                  mode="flat"
-                  compact
-                  style={{ backgroundColor: (ORDER_STATUS_COLOR[order.status] || '#666') + '22' }}
-                  textStyle={{ fontSize: 10, color: ORDER_STATUS_COLOR[order.status] || '#666' }}
-                >
-                  {order.status?.toUpperCase()}
-                </Chip>
-              </View>
-
-              <View style={[styles.row, { marginTop: 6 }]}>
-                <Text variant="bodySmall" style={{ opacity: 0.6 }}>
-                  {new Date(order.created_at).toLocaleString()}
-                </Text>
-                <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
-                  {format(order.total_amount)}
-                </Text>
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
+                    {offlineOrders.length}
+                  </Text>
+                  <Text style={styles.statLabel}>Queued Orders</Text>
+                </View>
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
+                    {format(offlineTotal)}
+                  </Text>
+                  <Text style={styles.statLabel}>Queued Total</Text>
+                </View>
               </View>
             </Card.Content>
           </Card>
-        ))
+          {offlineOrders.map((o) => (
+            <Card key={o.offline_id} style={[styles.card, { borderLeftWidth: 3, borderLeftColor: '#FFA726' }]}>
+              <Card.Content>
+                <View style={styles.row}>
+                  <Chip icon="cloud-upload" mode="flat" compact
+                    style={{ backgroundColor: '#FFF3E0' }} textStyle={{ fontSize: 10, color: '#E65100' }}>
+                    PENDING SYNC
+                  </Chip>
+                  <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
+                    {format(o.total_amount || 0)}
+                  </Text>
+                </View>
+                <Text variant="bodySmall" style={{ opacity: 0.65 }}>
+                  {o.order_type === 'delivery' ? '🚴 Delivery' : `Table ${o.table_number}`}
+                  {' · '}{o.items_count} item{o.items_count !== 1 ? 's' : ''}
+                  {' · '}{new Date(o.created_at).toLocaleTimeString()}
+                </Text>
+              </Card.Content>
+            </Card>
+          ))}
+          {!isOffline && <Divider style={styles.divider} />}
+        </>
+      )}
+
+      {/* Server report (online only) */}
+      {isOffline ? (
+        <Card style={styles.card}>
+          <Card.Content style={styles.emptyContent}>
+            <MaterialCommunityIcons name="wifi-off" size={40} color="#ccc" />
+            <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8, textAlign: 'center' }}>
+              Connect to internet to see full revenue report
+            </Text>
+          </Card.Content>
+        </Card>
+      ) : (
+        <>
+          {/* Stats cards */}
+          <View style={styles.statsRow}>
+            <StatCard label="Orders"    value={stats.total_orders}             color="#2c3e50" icon="clipboard-list-outline" />
+            <StatCard label="Revenue"   value={format(stats.total_revenue ?? 0)} color="#2E7D32" icon="cash-multiple" />
+            <StatCard label="Items"     value={stats.total_items}             color="#6A1B9A" icon="food-outline" />
+            <StatCard label="Avg Order" value={format(stats.avg_order_value ?? 0)} color="#FF8F00" icon="chart-line" />
+          </View>
+
+          {/* Payment breakdown */}
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="titleSmall" style={styles.cardTitle}>Payment Breakdown</Text>
+              <View style={styles.breakdownRow}>
+                <BreakdownChip label="Paid"    value={stats.paid_orders}    color="#2E7D32" />
+                <BreakdownChip label="Partial" value={stats.partial_orders} color="#FF8F00" />
+                <BreakdownChip label="Unpaid"  value={stats.unpaid_orders}  color="#C62828" />
+              </View>
+            </Card.Content>
+          </Card>
+
+          <Divider style={styles.divider} />
+
+          {/* Orders list */}
+          <Text variant="titleSmall" style={styles.sectionTitle}>
+            Orders ({orders.length})
+          </Text>
+
+          {orders.length === 0 ? (
+            <Card style={styles.card}>
+              <Card.Content style={styles.emptyContent}>
+                <Text variant="bodyMedium" style={{ opacity: 0.5 }}>No orders for this period</Text>
+              </Card.Content>
+            </Card>
+          ) : (
+            orders.map((order) => (
+              <Card key={order.id} style={styles.orderCard}>
+                <Card.Content>
+                  <View style={styles.row}>
+                    <Text variant="titleSmall" style={{ fontFamily: 'Poppins_700Bold' }}>
+                      #{order.order_number}
+                    </Text>
+                    <Chip
+                      mode="flat"
+                      compact
+                      style={{ backgroundColor: (PAYMENT_STATUS_COLOR[order.payment_status] || '#666') + '22' }}
+                      textStyle={{ fontSize: 10, color: PAYMENT_STATUS_COLOR[order.payment_status] || '#666', fontFamily: 'Poppins_700Bold' }}
+                    >
+                      {order.payment_status?.toUpperCase() || 'UNPAID'}
+                    </Chip>
+                  </View>
+
+                  <View style={styles.row}>
+                    <Text variant="bodySmall" style={{ opacity: 0.65 }}>
+                      Table {order.table_number} · {order.items_count} item{order.items_count !== 1 ? 's' : ''}
+                    </Text>
+                    <Chip
+                      mode="flat"
+                      compact
+                      style={{ backgroundColor: (ORDER_STATUS_COLOR[order.status] || '#666') + '22' }}
+                      textStyle={{ fontSize: 10, color: ORDER_STATUS_COLOR[order.status] || '#666' }}
+                    >
+                      {order.status?.toUpperCase()}
+                    </Chip>
+                  </View>
+
+                  <View style={[styles.row, { marginTop: 6 }]}>
+                    <Text variant="bodySmall" style={{ opacity: 0.6 }}>
+                      {new Date(order.created_at).toLocaleString()}
+                    </Text>
+                    <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
+                      {format(order.total_amount)}
+                    </Text>
+                  </View>
+                </Card.Content>
+              </Card>
+            ))
+          )}
+        </>
       )}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>

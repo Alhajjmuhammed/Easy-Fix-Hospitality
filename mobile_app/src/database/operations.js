@@ -437,6 +437,56 @@ export const getOrderById = async (id) => {
   return rows.length ? _parseOrder(rows[0]) : null;
 };
 
+/**
+ * Get locally-queued (pending sync) orders as display-ready objects.
+ * These are orders placed while offline that haven't synced to the server yet.
+ * Call this alongside getOrders() and merge the results so staff can see
+ * ALL orders — both cached server orders and unsynced local ones.
+ */
+export const getOfflinePendingOrders = async () => {
+  const rows = await dbQuery(
+    "SELECT * FROM offline_orders WHERE sync_status = 'pending' ORDER BY created_at DESC"
+  );
+  const result = [];
+  for (const row of rows) {
+    let tableNumber = 'N/A';
+    if (row.table_id) {
+      try {
+        const tRows = await dbQuery('SELECT tbl_no FROM tables WHERE id = ?', [row.table_id]);
+        if (tRows.length) tableNumber = String(tRows[0].tbl_no);
+      } catch { /* use default */ }
+    }
+    const items = (() => {
+      try { return JSON.parse(row.items_json || '[]'); } catch { return []; }
+    })();
+    result.push({
+      id: `offline_${row.offline_id}`,
+      offline_id: row.offline_id,
+      order_number: '(offline)',
+      table_number: tableNumber,
+      table_info: row.table_id || null,
+      status: 'pending',
+      payment_status: 'unpaid',
+      total: row.total_amount || 0,
+      total_amount: row.total_amount || 0,
+      subtotal: row.total_amount || 0,
+      balance_due: row.total_amount || 0,
+      total_paid: 0,
+      tax_amount: 0,
+      items_count: items.length,
+      items,
+      payments: [],
+      order_type: row.order_type || 'dine-in',
+      delivery_address: row.delivery_address || '',
+      created_at: row.created_at,
+      updated_at: row.created_at,
+      special_instructions: row.special_instructions || '',
+      _is_offline_pending: true,
+    });
+  }
+  return result;
+};
+
 // ── Security: clear all user-specific local data on logout ───────────────────
 // Must be called every time a user logs out to prevent data leaking to the
 // next user who logs in on the same device (different user, different restaurant).

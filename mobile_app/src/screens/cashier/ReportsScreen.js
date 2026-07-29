@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, StyleSheet, RefreshControl } from 'react-native';
 import {
-  Text, Card, Chip, ActivityIndicator, Snackbar, Divider, Surface, SegmentedButtons,
+  Text, Card, Chip, ActivityIndicator, Snackbar, Divider, Surface, SegmentedButtons, Banner,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
+import { getOfflinePendingOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 
 const PAYMENT_STATUS_COLOR = {
@@ -29,20 +31,42 @@ const PERIODS = [
 ];
 
 export default function CashierReportsScreen() {
-  const { format }                  = useCurrency();
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [data,       setData]       = useState(null);
-  const [snack,      setSnack]      = useState('');
-  const [period,     setPeriod]     = useState('today');
+  const { format }                      = useCurrency();
+  const [loading,       setLoading]     = useState(true);
+  const [refreshing,    setRefreshing]  = useState(false);
+  const [data,          setData]        = useState(null);
+  const [snack,         setSnack]       = useState('');
+  const [period,        setPeriod]      = useState('today');
+  const [isOffline,     setIsOffline]   = useState(false);
+  const [offlineOrders, setOfflineOrders] = useState([]);
 
   const fetchReport = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await client.get('/reports/cashier/', { params: { period } });
-      setData(res.data);
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        // Offline: show locally-queued orders as a fallback summary
+        const pending = await getOfflinePendingOrders();
+        setOfflineOrders(pending);
+        setIsOffline(true);
+        setData(null);
+      } else {
+        const res = await client.get('/reports/cashier/', { params: { period } });
+        setData(res.data);
+        setIsOffline(false);
+        // Still load offline queue so user sees queued orders alongside server data
+        const pending = await getOfflinePendingOrders();
+        setOfflineOrders(pending);
+      }
     } catch {
-      setSnack('Could not load report');
+      // Network error — fall back to offline queue
+      try {
+        const pending = await getOfflinePendingOrders();
+        setOfflineOrders(pending);
+      } catch { setOfflineOrders([]); }
+      setIsOffline(true);
+      setData(null);
+      setSnack('Could not load report – showing offline orders only');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -60,6 +84,8 @@ export default function CashierReportsScreen() {
   const myMethods   = data?.my_payment_methods   || [];
   const topProducts = data?.top_products         || [];
 
+  const offlineTotal   = offlineOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+
   return (
     <ScrollView
       contentContainerStyle={styles.container}
@@ -67,6 +93,79 @@ export default function CashierReportsScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchReport(true); }} />
       }
     >
+      {/* Offline banner */}
+      <Banner
+        visible={isOffline || offlineOrders.length > 0}
+        icon={isOffline ? 'wifi-off' : 'cloud-upload'}
+        actions={[]}
+        style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 12 }}
+      >
+        {isOffline
+          ? `Offline – showing ${offlineOrders.length} queued order(s) below. Full report available when connected.`
+          : `${offlineOrders.length} order(s) queued for sync and NOT yet in server report totals.`}
+      </Banner>
+
+      {/* Offline queued orders summary (shown whether online or offline) */}
+      {offlineOrders.length > 0 && (
+        <>
+          <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#E65100' }]}>
+            Queued Orders (Pending Sync)
+          </Text>
+          <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#E65100' }]}>
+            <Card.Content>
+              <View style={styles.row}>
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
+                    {offlineOrders.length}
+                  </Text>
+                  <Text style={styles.statLabel}>Queued Orders</Text>
+                </View>
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
+                    {format(offlineTotal)}
+                  </Text>
+                  <Text style={styles.statLabel}>Queued Total</Text>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+          {offlineOrders.map((o) => (
+            <Card key={o.offline_id} style={[styles.card, { borderLeftWidth: 3, borderLeftColor: '#FFA726' }]}>
+              <Card.Content>
+                <View style={styles.row}>
+                  <Chip icon="cloud-upload" mode="flat" compact
+                    style={{ backgroundColor: '#FFF3E0' }} textStyle={{ fontSize: 10, color: '#E65100' }}>
+                    PENDING SYNC
+                  </Chip>
+                  <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
+                    {format(o.total_amount || 0)}
+                  </Text>
+                </View>
+                <Text variant="bodySmall" style={styles.meta}>
+                  {o.order_type === 'delivery' ? '🚴 Delivery' : `Table ${o.table_number}`}
+                  {' · '}{o.items_count} item{o.items_count !== 1 ? 's' : ''}
+                  {' · '}{new Date(o.created_at).toLocaleTimeString()}
+                </Text>
+              </Card.Content>
+            </Card>
+          ))}
+          {!isOffline && <Divider style={styles.divider} />}
+        </>
+      )}
+
+      {/* Server report (only when online) */}
+      {isOffline ? (
+        <Card style={styles.card}>
+          <Card.Content style={styles.emptyContent}>
+            <MaterialCommunityIcons name="wifi-off" size={40} color="#ccc" />
+            <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8, textAlign: 'center' }}>
+              Connect to internet to see full revenue report
+            </Text>
+          </Card.Content>
+        </Card>
+      ) : (
+        <>
+
       {/* Period selector */}
       <SegmentedButtons
         value={period}
@@ -200,6 +299,9 @@ export default function CashierReportsScreen() {
             </Card>
           );
         })
+      )}
+
+        </>
       )}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{snack}</Snackbar>
