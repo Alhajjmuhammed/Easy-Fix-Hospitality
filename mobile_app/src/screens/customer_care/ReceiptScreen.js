@@ -7,9 +7,11 @@ import {
   ActivityIndicator,
   Button,
   Snackbar,
+  Banner,
   Chip,
   useTheme,
 } from 'react-native-paper';
+import NetInfo from '@react-native-community/netinfo';
 import { apiPaymentReceipt, apiReprintReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
 import { printReceipt }     from '../../utils/printer';
@@ -28,9 +30,15 @@ export default function ReceiptScreen({ route }) {
   const [printing, setPrinting] = useState(false);
   const [snack, setSnack] = useState('');
   const [data, setData] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const fetchReceipt = useCallback(async () => {
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        setIsOffline(true);
+        return;
+      }
       const result = await apiPaymentReceipt(paymentId);
       setData(result);
     } catch {
@@ -72,8 +80,17 @@ export default function ReceiptScreen({ route }) {
     }
   };
 
-  if (loading) {
+  if (loading && !isOffline) {
     return <View style={styles.center}><ActivityIndicator size="large" /></View>;
+  }
+  if (isOffline) {
+    return (
+      <View style={styles.center}>
+        <Banner visible icon="wifi-off" actions={[]} style={{ backgroundColor: '#FFF8E1', width: '100%' }}>
+          Offline – connect to internet to view this receipt.
+        </Banner>
+      </View>
+    );
   }
   if (!data) {
     return <View style={styles.center}><Text>Receipt not found</Text></View>;

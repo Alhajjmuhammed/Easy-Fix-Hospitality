@@ -9,8 +9,10 @@ import {
   Snackbar,
   Divider,
   Chip,
+  Banner,
   useTheme,
 } from 'react-native-paper';
+import NetInfo from '@react-native-community/netinfo';
 import { apiPayments } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
 
@@ -25,10 +27,18 @@ export default function ReceiptManagementScreen({ navigation }) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [snack, setSnack] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        setIsOffline(true);
+        setPayments([]);
+        return;
+      }
+      setIsOffline(false);
       const params = {};
       if (search.trim()) params.search = search.trim();
       if (dateFrom.trim()) params.date_from = dateFrom.trim();
@@ -75,6 +85,14 @@ export default function ReceiptManagementScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1' }}
+      >
+        Offline – receipts are not available without internet. Connect to search receipts.
+      </Banner>
       {/* Filters */}
       <View style={styles.filterRow}>
         <TextInput

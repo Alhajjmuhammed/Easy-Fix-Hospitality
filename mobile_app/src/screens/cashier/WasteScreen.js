@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import {
   Text, Card, Button, TextInput, ActivityIndicator,
-  Snackbar, useTheme, Divider,
+  Snackbar, Banner, useTheme, Divider,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import NetInfo from '@react-native-community/netinfo';
 import { apiMenu } from '../../api/menu';
 import { apiRecordWaste } from '../../api/waste';
+import { getCategories } from '../../database/operations';
 
 // ── Constants mirroring backend FoodWasteLog choices ───────────────────────
 const WASTE_REASONS = [
@@ -73,13 +75,28 @@ export default function CashierWasteScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [snack,      setSnack]      = useState('');
   const [snackColor, setSnackColor] = useState('#323232');
+  const [isOffline,  setIsOffline]  = useState(false);
 
   // ── Load products once ────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
+        const net = await NetInfo.fetch();
+        if (!net.isConnected) {
+          setIsOffline(true);
+          // Fall back to SQLite cached menu
+          const cached = await getCategories();
+          const flat = [];
+          cached.forEach((cat) => {
+            (cat.subcategories || []).forEach((sub) => {
+              (sub.products || []).forEach((p) => flat.push(p));
+            });
+            (cat.products || []).forEach((p) => flat.push(p));
+          });
+          setProducts(flat);
+          return;
+        }
         const data = await apiMenu();
-        // apiMenu returns { categories: [{products: [...]}, ...] }
         const flat = [];
         const categories = data || [];
         categories.forEach((cat) => {
@@ -87,8 +104,22 @@ export default function CashierWasteScreen() {
         });
         setProducts(flat);
       } catch {
-        setSnack('Could not load menu');
-        setSnackColor('#E53935');
+        // Network error — try SQLite cache
+        try {
+          setIsOffline(true);
+          const cached = await getCategories();
+          const flat = [];
+          cached.forEach((cat) => {
+            (cat.subcategories || []).forEach((sub) => {
+              (sub.products || []).forEach((p) => flat.push(p));
+            });
+            (cat.products || []).forEach((p) => flat.push(p));
+          });
+          setProducts(flat);
+        } catch {
+          setSnack('Could not load menu');
+          setSnackColor('#E53935');
+        }
       } finally {
         setLoadingProducts(false);
       }
@@ -137,6 +168,14 @@ export default function CashierWasteScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1', marginHorizontal: -12, marginTop: -12, marginBottom: 12 }}
+      >
+        Offline – showing cached menu. Connect to internet to submit a waste record.
+      </Banner>
 
       {/* ── Product Selector ─────────────────────────────────────────── */}
       <Card style={styles.card}>
@@ -246,11 +285,11 @@ export default function CashierWasteScreen() {
         icon="check"
         onPress={handleSubmit}
         loading={submitting}
-        disabled={submitting}
+        disabled={submitting || isOffline}
         style={styles.submitBtn}
         contentStyle={{ paddingVertical: 6 }}
       >
-        Record Waste
+        {isOffline ? 'Connect to Submit' : 'Record Waste'}
       </Button>
 
       <Snackbar

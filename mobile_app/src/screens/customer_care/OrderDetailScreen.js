@@ -12,11 +12,14 @@ import {
   Portal,
   TextInput,
   Snackbar,
+  Banner,
   useTheme,
   Menu,
 } from 'react-native-paper';
+import NetInfo from '@react-native-community/netinfo';
 import { apiOrderDetail, apiCancelOrder, apiCancelOrderItem, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiTables } from '../../api/tables';
+import { getOrderById } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 
 const STATUS_COLORS = {
@@ -41,6 +44,7 @@ export default function OrderDetailScreen({ route, navigation }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
   const [cancelDialog, setCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
@@ -63,10 +67,33 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   const fetchOrder = useCallback(async () => {
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        const cached = await getOrderById(orderId);
+        if (cached) {
+          setOrder(cached);
+          setIsOffline(true);
+        } else {
+          setError('Order not available offline.');
+        }
+        return;
+      }
       const data = await apiOrderDetail(orderId);
       setOrder(data);
+      setIsOffline(false);
     } catch {
-      setError('Could not load order.');
+      // Network error — try SQLite cache before giving up
+      try {
+        const cached = await getOrderById(orderId);
+        if (cached) {
+          setOrder(cached);
+          setIsOffline(true);
+        } else {
+          setError('Could not load order.');
+        }
+      } catch {
+        setError('Could not load order.');
+      }
     } finally {
       setLoading(false);
     }
@@ -159,6 +186,16 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Offline banner */}
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1', marginHorizontal: -12, marginTop: -12, marginBottom: 12 }}
+      >
+        Offline – showing cached data. Actions (cancel, transfer, print) require internet.
+      </Banner>
+
       {/* Header */}
       <Card style={styles.card}>
         <Card.Content>
@@ -172,7 +209,7 @@ export default function OrderDetailScreen({ route, navigation }) {
                 visible={menuOpen}
                 onDismiss={() => setMenuOpen(false)}
                 anchor={
-                  <Button compact icon="dots-vertical" onPress={() => setMenuOpen(true)} />
+                  <Button compact icon="dots-vertical" disabled={isOffline} onPress={() => setMenuOpen(true)} />
                 }
               >
                 <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpen(false); handlePrintBill(); }} />
@@ -329,7 +366,7 @@ export default function OrderDetailScreen({ route, navigation }) {
       )}
 
       {/* Action buttons */}
-      {order.status === 'pending' && (
+      {order.status === 'pending' && !isOffline && (
         <Button
           mode="contained"
           icon="cancel"

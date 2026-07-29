@@ -2,9 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import {
   Text, Card, Button, TextInput, Chip, ActivityIndicator,
-  Snackbar, Divider,
+  Snackbar, Divider, Banner,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import NetInfo from '@react-native-community/netinfo';
 import { apiPayments, apiReprintReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
 import { printReceipt } from '../../utils/printer';
@@ -21,10 +22,18 @@ export default function CashierReceiptsScreen() {
   const [snack,         setSnack]         = useState('');
   const [reprinting,    setReprinting]    = useState(null);
   const [localPrinting, setLocalPrinting] = useState(null);
+  const [isOffline,     setIsOffline]     = useState(false);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        setIsOffline(true);
+        setPayments([]);
+        return;
+      }
+      setIsOffline(false);
       const data = await apiPayments({ period: 'today' });
       setPayments(Array.isArray(data) ? data : []);
     } catch {
@@ -91,6 +100,14 @@ export default function CashierReceiptsScreen() {
 
   return (
     <View style={styles.container}>
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1' }}
+      >
+        Offline – receipts are not available without internet. Connect to view your receipts.
+      </Banner>
       <TextInput
         placeholder="Search by receipt # or order #..."
         value={search}
