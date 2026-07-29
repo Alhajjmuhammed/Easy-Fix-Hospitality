@@ -11,7 +11,7 @@ import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiP
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
-import { getOrders, cacheOrders, getOfflinePendingOrders, deleteOfflineOrder } from '../../database/operations';
+import { getOrders, cacheOrders, getOfflinePendingOrders, deleteOfflineOrder, saveOfflinePayment } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 
@@ -160,6 +160,30 @@ export default function CashierDashboardScreen({ navigation }) {
     if (isNaN(parsed) || parsed <= 0) { setSnack('Enter a valid amount'); return; }
     setPaying(true);
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        await saveOfflinePayment({
+          order_id:         payDialog.id,
+          order_number:     payDialog.order_number,
+          amount:           parsed,
+          payment_method:   method,
+          reference_number: reference.trim(),
+          notes:            '',
+        });
+        await useSyncStore.getState().refreshPendingCount();
+        setOrders((prev) =>
+          prev.map((o) => {
+            if (o.id !== payDialog.id) return o;
+            const newPaid = (o.total_paid ?? 0) + parsed;
+            const newDue  = Math.max(0, (o.balance_due ?? o.total ?? 0) - parsed);
+            const newStatus = newDue <= 0 ? 'paid' : newPaid > 0 ? 'partial' : o.payment_status;
+            return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
+          })
+        );
+        setPayDialog(null);
+        setSnack('No internet – payment saved and will sync automatically');
+        return;
+      }
       await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });
       setPayDialog(null);
       setSnack('Payment recorded');

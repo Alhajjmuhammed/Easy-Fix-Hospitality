@@ -400,7 +400,7 @@ export default function CCPaymentsScreen({ navigation }) {
                     visible={isMenuOpen}
                     onDismiss={() => setMenuOpenId(null)}
                     anchor={
-                      <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                      <Button compact icon="dots-vertical" disabled={!!order._is_offline_pending} onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
                     }
                   >
                     {!isCancelled && !isPaid && (
@@ -430,14 +430,20 @@ export default function CCPaymentsScreen({ navigation }) {
 
             {/* View button — only visible action; Pay/Print/Transfer are in the 3-dots menu */}
             <Card.Actions style={styles.actions}>
-              <Button
-                compact
-                mode="outlined"
-                icon="eye"
-                onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
-              >
-                View
-              </Button>
+              {order._is_offline_pending ? (
+                <Text variant="bodySmall" style={{ color: '#E65100', opacity: 0.7, paddingHorizontal: 8 }}>
+                  Actions available after sync
+                </Text>
+              ) : (
+                <Button
+                  compact
+                  mode="outlined"
+                  icon="eye"
+                  onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
+                >
+                  View
+                </Button>
+              )}
             </Card.Actions>
           </Card>
           );
