@@ -12,6 +12,7 @@
       "backgroundColor": "#ffffff"
     },
     "android": {
+      "newArchEnabled": false,
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
