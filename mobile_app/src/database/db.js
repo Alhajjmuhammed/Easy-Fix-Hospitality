@@ -69,6 +69,8 @@ export const initDatabase = async () => {
       special_instructions TEXT,
       restaurant_id        INTEGER,
       total_amount         REAL    DEFAULT 0,
+      total_paid           REAL    DEFAULT 0,
+      payment_status       TEXT    DEFAULT 'unpaid',
       created_at           TEXT    NOT NULL,
       sync_status          TEXT    DEFAULT 'pending',
       server_order_id      INTEGER,
@@ -84,6 +86,7 @@ export const initDatabase = async () => {
     CREATE TABLE IF NOT EXISTS offline_payments (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
       offline_id        TEXT    UNIQUE NOT NULL,
+      offline_order_ref TEXT,
       order_id          INTEGER,
       order_number      TEXT,
       amount            REAL    NOT NULL,
@@ -161,6 +164,14 @@ export const initDatabase = async () => {
   // Migration: offline_order_ref — links a queued payment to a queued order
   // (needed when staff pay an offline-pending order before it syncs)
   try { await db.runAsync(`ALTER TABLE offline_payments ADD COLUMN offline_order_ref TEXT`); } catch (_) {}
+
+  // Migration: payment tracking columns on offline_orders so status survives re-reads
+  for (const stmt of [
+    `ALTER TABLE offline_orders ADD COLUMN total_paid REAL DEFAULT 0`,
+    `ALTER TABLE offline_orders ADD COLUMN payment_status TEXT DEFAULT 'unpaid'`,
+  ]) {
+    try { await db.runAsync(stmt); } catch (_) {}
+  }
 
   // Migration: add orders cache table for existing installs that pre-date this feature.
   // CREATE TABLE IF NOT EXISTS in the block above already handles fresh installs;

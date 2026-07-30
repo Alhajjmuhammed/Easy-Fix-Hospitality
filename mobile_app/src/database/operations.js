@@ -208,6 +208,7 @@ export const saveOfflinePayment = async (paymentData) => {
 /** Save a payment for an offline-pending order (no server order ID yet). */
 export const saveOfflinePaymentForOfflineOrder = async (paymentData) => {
   const offlineId = newOfflineId();
+  // 1. Save the payment record (for later sync to server)
   await dbExec(
     `INSERT INTO offline_payments
       (offline_id, offline_order_ref, order_id, order_number, amount, payment_method, reference_number, notes, created_at, sync_status)
@@ -223,6 +224,26 @@ export const saveOfflinePaymentForOfflineOrder = async (paymentData) => {
       now(),
     ],
   );
+  // 2. Write payment totals directly onto the offline order row so every
+  //    subsequent getOfflinePendingOrders() read returns the correct status
+  //    without needing a cross-table join. Wrapped in try/catch so a step-2
+  //    failure never rolls back the successfully-saved payment record.
+  try {
+    const orderRows = await dbQuery(
+      'SELECT total_amount, total_paid FROM offline_orders WHERE offline_id = ?',
+      [paymentData.offline_order_ref],
+    );
+    if (orderRows.length) {
+      const existing = orderRows[0];
+      const newTotalPaid = (existing.total_paid || 0) + paymentData.amount;
+      const balanceDue = Math.max(0, (existing.total_amount || 0) - newTotalPaid);
+      const paymentStatus = balanceDue <= 0 ? 'paid' : newTotalPaid > 0 ? 'partial' : 'unpaid';
+      await dbExec(
+        'UPDATE offline_orders SET total_paid = ?, payment_status = ? WHERE offline_id = ?',
+        [newTotalPaid, paymentStatus, paymentData.offline_order_ref],
+      );
+    }
+  } catch { /* non-fatal: payment record is saved; status derived from offline_payments at worst */ }
   return offlineId;
 };
 
@@ -492,21 +513,26 @@ export const getOfflinePendingOrders = async () => {
         return { ...item, name: `Item #${item.product_id}` };
       }
     }));
-    // Check if this offline order has any queued payments
-    const pmtRows = await dbQuery(
-      "SELECT * FROM offline_payments WHERE offline_order_ref = ? AND sync_status = 'pending'",
-      [row.offline_id]
-    );
-    const queuedPayments = pmtRows.map((p) => ({
-      id: p.offline_id,
-      amount: p.amount,
-      payment_method: p.payment_method,
-      created_at: p.created_at,
-      _is_offline: true,
-    }));
-    const totalPaid = queuedPayments.reduce((s, p) => s + (p.amount || 0), 0);
+    // Read payment status directly from the offline_orders row — written by
+    // saveOfflinePaymentForOfflineOrder so this always reflects current state.
+    const totalPaid = row.total_paid || 0;
     const balanceDue = Math.max(0, (row.total_amount || 0) - totalPaid);
-    const paymentStatus = balanceDue <= 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+    const paymentStatus = row.payment_status || 'unpaid';
+    // Fetch payment detail records for receipt printing (best-effort — non-fatal)
+    let queuedPayments = [];
+    try {
+      const pmtRows = await dbQuery(
+        "SELECT * FROM offline_payments WHERE offline_order_ref = ? AND sync_status = 'pending'",
+        [row.offline_id],
+      );
+      queuedPayments = pmtRows.map((p) => ({
+        id: p.offline_id,
+        amount: p.amount,
+        payment_method: p.payment_method,
+        created_at: p.created_at,
+        _is_offline: true,
+      }));
+    } catch { /* payment details unavailable — totals already read from offline_orders above */ }
 
     result.push({
       id: `offline_${row.offline_id}`,
