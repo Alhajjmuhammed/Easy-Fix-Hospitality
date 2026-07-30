@@ -6,6 +6,7 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   apiMyAssignments,
@@ -58,6 +59,8 @@ export default function RiderDashboardScreen() {
   }, [load]);
 
   const handleToggleAvail = async () => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to update availability'); return; }
     setTogglingAvail(true);
     try {
       const res = await apiToggleAvailability();

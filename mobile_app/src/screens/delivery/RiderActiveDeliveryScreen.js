@@ -4,6 +4,7 @@ import { Text, Button, Card, Chip, ActivityIndicator, Snackbar } from 'react-nat
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { useNavigation } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { API_BASE_URL } from '../../config';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
@@ -183,6 +184,8 @@ export default function RiderActiveDeliveryScreen({ route }) {
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const handlePickedUp = async () => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to mark as picked up'); return; }
     setActioning(true);
     try {
       await apiMarkPickedUp(assignmentOrderId);
@@ -196,6 +199,8 @@ export default function RiderActiveDeliveryScreen({ route }) {
   };
 
   const handleDelivered = async () => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to mark as delivered'); return; }
     Alert.alert(
       'Confirm Delivery',
       'Mark this order as delivered?',
