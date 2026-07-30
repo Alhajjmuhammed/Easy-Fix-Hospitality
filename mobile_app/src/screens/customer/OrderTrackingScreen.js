@@ -156,6 +156,8 @@ export default function OrderTrackingScreen({ route }) {
   };
 
   const handleCancelConfirm = async () => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to cancel the order'); setCancelVisible(false); return; }
     setCancelling(true);
     try {
       const reason = cancelReason.trim() || 'Changed mind / No longer needed';
