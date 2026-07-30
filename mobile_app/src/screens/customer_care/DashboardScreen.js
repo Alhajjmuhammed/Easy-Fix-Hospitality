@@ -25,6 +25,7 @@ import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
+import { printReceiptLocal } from '../../utils/printReceipt';
 
 function stringToColor(str = '') {
   const PALETTE = ['#2c3e50', '#AD1457', '#6A1B9A', '#00838F', '#2E7D32', '#E65100', '#4527A0', '#37474F'];
@@ -138,6 +139,7 @@ export default function CCDashboardScreen({ navigation }) {
   const theme = useTheme();
   const { format } = useCurrency();
   const { pendingCount, lastSyncTime } = useSyncStore();
+  const { user } = useAuthStore();
 
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
@@ -246,8 +248,18 @@ export default function CCDashboardScreen({ navigation }) {
 
   // ── Print bill ──────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
+    const restaurantName = user?.restaurant_name || 'Restaurant';
+    if (order._is_offline_pending) {
+      try { await printReceiptLocal({ order, restaurantName, currencySymbol: '' }); }
+      catch (err) { setSnack('Print failed: ' + (err.message || 'unknown error')); }
+      return;
+    }
     const net = await NetInfo.fetch();
-    if (!net.isConnected) { setSnack('No internet — connect to print the bill'); return; }
+    if (!net.isConnected) {
+      try { await printReceiptLocal({ order, restaurantName, currencySymbol: '' }); }
+      catch (err) { setSnack('Print failed: ' + (err.message || 'unknown error')); }
+      return;
+    }
     try {
       await apiPrintBill(order.id);
       setSnack('Bill sent to printer');
@@ -449,7 +461,7 @@ export default function CCDashboardScreen({ navigation }) {
                       visible={isMenuOpen}
                       onDismiss={() => setMenuOpenId(null)}
                       anchor={
-                        <Button compact icon="dots-vertical" disabled={!!order._is_offline_pending} onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
                       }
                     >
                       <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
@@ -501,6 +513,12 @@ export default function CCDashboardScreen({ navigation }) {
                   </Text>
                 </View>
               </Card.Content>
+              {order._is_offline_pending && !order._is_sync_error && (
+                <Card.Actions>
+                  <Button compact mode="outlined" icon="printer" onPress={() => handlePrintBill(order)}>Print</Button>
+                  <Button compact mode="text" onPress={() => navigation.navigate('Payments')}>Pay / Manage</Button>
+                </Card.Actions>
+              )}
               {order._is_sync_error && (
                 <Card.Actions>
                   <Button

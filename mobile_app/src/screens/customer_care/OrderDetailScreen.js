@@ -21,6 +21,8 @@ import { apiOrderDetail, apiCancelOrder, apiCancelOrderItem, apiPrintBill, apiTr
 import { apiTables } from '../../api/tables';
 import { getOrderById } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useAuthStore } from '../../store/useAuthStore';
+import { printReceiptLocal } from '../../utils/printReceipt';
 
 const STATUS_COLORS = {
   pending:   '#FFA000',
@@ -64,6 +66,7 @@ export default function OrderDetailScreen({ route, navigation }) {
   const [transferring, setTransferring]             = useState(false);
 
   const { format } = useCurrency();
+  const { user } = useAuthStore();
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -142,8 +145,12 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async () => {
-    const net = await NetInfo.fetch();
-    if (!net.isConnected) { setSnack('No internet — connect to print the bill'); return; }
+    const restaurantName = user?.restaurant_name || 'Restaurant';
+    if (isOffline) {
+      try { await printReceiptLocal({ order, restaurantName, currencySymbol: '' }); }
+      catch (err) { setSnack('Print failed: ' + (err.message || 'unknown error')); }
+      return;
+    }
     try {
       await apiPrintBill(orderId);
       setSnack('Bill sent to printer');
@@ -201,7 +208,7 @@ export default function OrderDetailScreen({ route, navigation }) {
         actions={[]}
         style={{ backgroundColor: '#FFF8E1', marginHorizontal: -12, marginTop: -12, marginBottom: 12 }}
       >
-        Offline – showing cached data. Actions (cancel, transfer, print) require internet.
+        Offline – showing cached data. Cancel and Transfer require internet. Print works via Bluetooth.
       </Banner>
 
       {/* Header */}
@@ -217,7 +224,7 @@ export default function OrderDetailScreen({ route, navigation }) {
                 visible={menuOpen}
                 onDismiss={() => setMenuOpen(false)}
                 anchor={
-                  <Button compact icon="dots-vertical" disabled={isOffline} onPress={() => setMenuOpen(true)} />
+                  <Button compact icon="dots-vertical" onPress={() => setMenuOpen(true)} />
                 }
               >
                 <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpen(false); handlePrintBill(); }} />
