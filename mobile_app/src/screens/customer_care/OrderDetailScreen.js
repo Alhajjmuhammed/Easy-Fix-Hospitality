@@ -252,6 +252,7 @@ export default function OrderDetailScreen({ route, navigation }) {
         <Card.Content>
           {order.items?.map((item, idx) => {
             const canCancelItem =
+              !isOffline &&
               !['cancelled', 'served'].includes(order.status) &&
               order.payment_status !== 'paid' &&
               (order.items?.length ?? 0) > 1;
