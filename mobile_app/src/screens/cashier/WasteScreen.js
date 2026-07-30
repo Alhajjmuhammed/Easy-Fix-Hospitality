@@ -135,6 +135,8 @@ export default function CashierWasteScreen() {
     if (!selectedProduct) { setSnack('Please select a product'); setSnackColor('#E53935'); return; }
     const qty = parseInt(quantity, 10);
     if (!qty || qty <= 0) { setSnack('Enter a valid quantity'); setSnackColor('#E53935'); return; }
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to submit waste record'); setSnackColor('#E53935'); return; }
 
     setSubmitting(true);
     try {

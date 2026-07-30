@@ -51,6 +51,8 @@ export default function ReceiptScreen({ route }) {
   useEffect(() => { fetchReceipt(); }, [fetchReceipt]);
 
   const handleReprint = async () => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to reprint'); return; }
     setReprinting(true);
     try {
       await apiReprintReceipt(paymentId);
