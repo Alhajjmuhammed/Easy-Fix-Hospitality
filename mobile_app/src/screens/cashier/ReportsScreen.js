@@ -6,7 +6,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
-import { getOfflinePendingOrders, getSyncMeta, setSyncMeta } from '../../database/operations';
+import { getOfflinePendingOrders, getSyncMeta, setSyncMeta, getLocalReportStats } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 
 const PAYMENT_STATUS_COLOR = {
@@ -53,11 +53,18 @@ export default function CashierReportsScreen() {
           getSyncMeta('cashier_report_cache_period'),
           getOfflinePendingOrders(),
         ]);
-        setData(cached ? JSON.parse(cached) : null);
-        setCacheTimestamp(cachedTs || null);
+        if (cached) {
+          setData(JSON.parse(cached));
+          setCacheTimestamp(cachedTs || null);
+        } else {
+          // No server cache: compute from local SQLite data so staff see something useful
+          const localStats = await getLocalReportStats();
+          setData(localStats);
+          setCacheTimestamp(null);
+          setSnack('Offline – showing locally computed data');
+        }
         setOfflineOrders(pending);
         setIsOffline(true);
-        if (!cached) setSnack('No cached report – connect to load data');
       } else {
         const res = await client.get('/reports/cashier/', { params: { period } });
         setData(res.data);
@@ -73,18 +80,24 @@ export default function CashierReportsScreen() {
         ]);
       }
     } catch {
-      // Network error — try cached data before giving up
+      // Network error — try cached data, then fall back to local computation
       try {
         const [cached, cachedTs, pending] = await Promise.all([
           getSyncMeta('cashier_report_cache'),
           getSyncMeta('cashier_report_cache_ts'),
           getOfflinePendingOrders(),
         ]);
-        setData(cached ? JSON.parse(cached) : null);
-        setCacheTimestamp(cachedTs || null);
+        if (cached) {
+          setData(JSON.parse(cached));
+          setCacheTimestamp(cachedTs || null);
+          setSnack('Using cached data – could not reach server');
+        } else {
+          const localStats = await getLocalReportStats();
+          setData(localStats);
+          setCacheTimestamp(null);
+          setSnack('Offline – showing locally computed data');
+        }
         setOfflineOrders(pending);
-        if (cached) setSnack('Using cached data – could not reach server');
-        else setSnack('Could not load report');
       } catch {
         setOfflineOrders([]);
         setData(null);
@@ -129,7 +142,7 @@ export default function CashierReportsScreen() {
         {isOffline
           ? cacheTimestamp
             ? `Offline – cached report from ${new Date(cacheTimestamp).toLocaleTimeString()}. Pull to refresh when connected.`
-            : `Offline – no cached data. Connect to load the full report.`
+            : `Offline – showing data from local device. Connect for the full server report.`
           : `${pendingOrders.length} queued for sync · ${errorOrders.length} failed – check below.`}
       </Banner>
 
@@ -216,17 +229,8 @@ export default function CashierReportsScreen() {
         </>
       )}
 
-      {/* Report — shows cached data when offline, live data when online */}
-      {isOffline && !data ? (
-        <Card style={styles.card}>
-          <Card.Content style={styles.emptyContent}>
-            <MaterialCommunityIcons name="wifi-off" size={40} color="#ccc" />
-            <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8, textAlign: 'center' }}>
-              Connect to internet to load the report
-            </Text>
-          </Card.Content>
-        </Card>
-      ) : data ? (
+      {/* Report — shows cached/local data when offline, live data when online */}
+      {data ? (
         <>
 
       {/* Period selector */}

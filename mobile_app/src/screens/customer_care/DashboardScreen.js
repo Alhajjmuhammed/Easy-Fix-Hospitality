@@ -137,7 +137,7 @@ const STATUS_COLORS = {
 export default function CCDashboardScreen({ navigation }) {
   const theme = useTheme();
   const { format } = useCurrency();
-  const { pendingCount } = useSyncStore();
+  const { pendingCount, lastSyncTime } = useSyncStore();
 
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
@@ -226,6 +226,8 @@ export default function CCDashboardScreen({ navigation }) {
     const interval = setInterval(() => fetchAll(true), 30_000);
     return () => clearInterval(interval);
   }, [fetchAll]);
+
+  useEffect(() => { fetchAll(true); }, [pendingCount, lastSyncTime]);
 
   const handleComplete = async (id) => {
     const net = await NetInfo.fetch();

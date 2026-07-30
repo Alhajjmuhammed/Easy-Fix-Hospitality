@@ -12,7 +12,7 @@ import {
 } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
-import { getOfflinePendingOrders, getSyncMeta, setSyncMeta } from '../../database/operations';
+import { getOfflinePendingOrders, getSyncMeta, setSyncMeta, getLocalReportStats } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -51,11 +51,17 @@ export default function CCReportsScreen() {
           getSyncMeta('cc_report_cache_ts'),
           getOfflinePendingOrders(),
         ]);
-        setData(cached ? JSON.parse(cached) : null);
-        setCacheTimestamp(cachedTs || null);
+        if (cached) {
+          setData(JSON.parse(cached));
+          setCacheTimestamp(cachedTs || null);
+        } else {
+          const localStats = await getLocalReportStats();
+          setData(localStats);
+          setCacheTimestamp(null);
+          setSnack('Offline – showing locally computed data');
+        }
         setOfflineOrders(pending);
         setIsOffline(true);
-        if (!cached) setSnack('No cached report – connect to load data');
       } else {
         const res = await client.get('/reports/cc/', { params: { period: 'today' } });
         setData(res.data);
@@ -75,11 +81,17 @@ export default function CCReportsScreen() {
           getSyncMeta('cc_report_cache_ts'),
           getOfflinePendingOrders(),
         ]);
-        setData(cached ? JSON.parse(cached) : null);
-        setCacheTimestamp(cachedTs || null);
+        if (cached) {
+          setData(JSON.parse(cached));
+          setCacheTimestamp(cachedTs || null);
+          setSnack('Using cached data – could not reach server');
+        } else {
+          const localStats = await getLocalReportStats();
+          setData(localStats);
+          setCacheTimestamp(null);
+          setSnack('Offline – showing locally computed data');
+        }
         setOfflineOrders(pending);
-        if (cached) setSnack('Using cached data – could not reach server');
-        else setSnack('Could not load report');
       } catch {
         setOfflineOrders([]);
         setData(null);
@@ -125,7 +137,7 @@ export default function CCReportsScreen() {
         {isOffline
           ? cacheTimestamp
             ? `Offline – cached report from ${new Date(cacheTimestamp).toLocaleTimeString()}. Pull to refresh when connected.`
-            : `Offline – no cached data. Connect to load the full report.`
+            : `Offline – showing data from local device. Connect for the full server report.`
           : `${pendingOrders.length} queued for sync · ${errorOrders.length} failed – check below.`}
       </Banner>
 

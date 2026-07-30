@@ -158,6 +158,10 @@ export const initDatabase = async () => {
     try { await db.runAsync(stmt); } catch (_) {}
   }
 
+  // Migration: offline_order_ref — links a queued payment to a queued order
+  // (needed when staff pay an offline-pending order before it syncs)
+  try { await db.runAsync(`ALTER TABLE offline_payments ADD COLUMN offline_order_ref TEXT`); } catch (_) {}
+
   // Migration: add orders cache table for existing installs that pre-date this feature.
   // CREATE TABLE IF NOT EXISTS in the block above already handles fresh installs;
   // this covers the case where initDatabase was already called once before orders existed.

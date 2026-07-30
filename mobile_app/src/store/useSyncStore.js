@@ -15,6 +15,7 @@ import {
   saveOrders,
   setSyncMeta,
 } from '../database/operations';
+import { dbQuery } from '../database/db';
 
 export const useSyncStore = create((set, get) => ({
   isSyncing: false,
@@ -72,19 +73,45 @@ export const useSyncStore = create((set, get) => ({
             delivery_lat: o.delivery_lat ?? null,
             delivery_lng: o.delivery_lng ?? null,
           })),
-          payments: pendingPayments.map((p) => ({
-            offline_id: p.offline_id,
-            order_id: p.order_id,
-            amount: p.amount,
-            payment_method: p.payment_method,
-            reference_number: p.reference_number || '',
-            notes: p.notes || '',
-          })),
+          payments: [],
           bill_requests: pendingBillRequests.map((b) => ({
             offline_id: b.offline_id,
             table_id: b.table_id,
           })),
         };
+
+        // Resolve payments: regular server-order payments go straight in;
+        // offline_order_ref payments need the server order ID resolved first.
+        for (const p of pendingPayments) {
+          if (!p.offline_order_ref) {
+            // Normal payment for a known server order
+            payload.payments.push({
+              offline_id: p.offline_id,
+              order_id: p.order_id,
+              amount: p.amount,
+              payment_method: p.payment_method,
+              reference_number: p.reference_number || '',
+              notes: p.notes || '',
+            });
+          } else {
+            // Payment for an offline order — resolve server_order_id now
+            const rows = await dbQuery(
+              "SELECT server_order_id FROM offline_orders WHERE offline_id = ? AND sync_status = 'synced'",
+              [p.offline_order_ref]
+            );
+            if (rows.length && rows[0].server_order_id) {
+              payload.payments.push({
+                offline_id: p.offline_id,
+                order_id: rows[0].server_order_id,
+                amount: p.amount,
+                payment_method: p.payment_method,
+                reference_number: p.reference_number || '',
+                notes: p.notes || '',
+              });
+            }
+            // If the order hasn't synced yet, skip this payment — next sync will catch it
+          }
+        }
 
         const { results = {} } = await apiSyncPush(payload);
 

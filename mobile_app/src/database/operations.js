@@ -205,6 +205,27 @@ export const saveOfflinePayment = async (paymentData) => {
   return offlineId;
 };
 
+/** Save a payment for an offline-pending order (no server order ID yet). */
+export const saveOfflinePaymentForOfflineOrder = async (paymentData) => {
+  const offlineId = newOfflineId();
+  await dbExec(
+    `INSERT INTO offline_payments
+      (offline_id, offline_order_ref, order_id, order_number, amount, payment_method, reference_number, notes, created_at, sync_status)
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'pending')`,
+    [
+      offlineId,
+      paymentData.offline_order_ref,
+      paymentData.order_number || '(offline)',
+      paymentData.amount,
+      paymentData.payment_method,
+      paymentData.reference_number || '',
+      paymentData.notes || '',
+      now(),
+    ],
+  );
+  return offlineId;
+};
+
 export const getPendingPayments = () =>
   dbQuery("SELECT * FROM offline_payments WHERE sync_status = 'pending' ORDER BY created_at");
 
@@ -459,9 +480,34 @@ export const getOfflinePendingOrders = async () => {
         if (tRows.length) tableNumber = String(tRows[0].tbl_no);
       } catch { /* use default */ }
     }
-    const items = (() => {
+    const rawItems = (() => {
       try { return JSON.parse(row.items_json || '[]'); } catch { return []; }
     })();
+    // Enrich items with product names from local products table
+    const items = await Promise.all(rawItems.map(async (item) => {
+      try {
+        const pRows = await dbQuery('SELECT name FROM products WHERE id = ?', [item.product_id]);
+        return { ...item, name: pRows.length ? pRows[0].name : `Item #${item.product_id}` };
+      } catch {
+        return { ...item, name: `Item #${item.product_id}` };
+      }
+    }));
+    // Check if this offline order has any queued payments
+    const pmtRows = await dbQuery(
+      "SELECT * FROM offline_payments WHERE offline_order_ref = ? AND sync_status = 'pending'",
+      [row.offline_id]
+    );
+    const queuedPayments = pmtRows.map((p) => ({
+      id: p.offline_id,
+      amount: p.amount,
+      payment_method: p.payment_method,
+      created_at: p.created_at,
+      _is_offline: true,
+    }));
+    const totalPaid = queuedPayments.reduce((s, p) => s + (p.amount || 0), 0);
+    const balanceDue = Math.max(0, (row.total_amount || 0) - totalPaid);
+    const paymentStatus = balanceDue <= 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+
     result.push({
       id: `offline_${row.offline_id}`,
       offline_id: row.offline_id,
@@ -469,16 +515,16 @@ export const getOfflinePendingOrders = async () => {
       table_number: tableNumber,
       table_info: row.table_id || null,
       status: 'pending',
-      payment_status: 'unpaid',
+      payment_status: paymentStatus,
       total: row.total_amount || 0,
       total_amount: row.total_amount || 0,
       subtotal: row.total_amount || 0,
-      balance_due: row.total_amount || 0,
-      total_paid: 0,
+      balance_due: balanceDue,
+      total_paid: totalPaid,
       tax_amount: 0,
       items_count: items.length,
       items,
-      payments: [],
+      payments: queuedPayments,
       order_type: row.order_type || 'dine-in',
       delivery_address: row.delivery_address || '',
       created_at: row.created_at,
@@ -490,6 +536,64 @@ export const getOfflinePendingOrders = async () => {
     });
   }
   return result;
+};
+
+/**
+ * Compute report statistics from locally cached data.
+ * Used when offline and no server cache is available.
+ * Returns an object shaped like the server's /reports/cashier/ response.
+ */
+export const getLocalReportStats = async () => {
+  const [cachedOrders, offlinePending] = await Promise.all([
+    getOrders(null),
+    getOfflinePendingOrders(),
+  ]);
+
+  const allOrders = [...cachedOrders];
+  const pendingOffline = offlinePending.filter((o) => !o._is_sync_error);
+
+  const totalOrders = allOrders.length + pendingOffline.length;
+  const totalRevenue = allOrders.reduce((s, o) => s + (o.total_amount || 0), 0)
+    + pendingOffline.reduce((s, o) => s + (o.total_amount || 0), 0);
+  const totalItems = allOrders.reduce((s, o) => s + (o.items_count || 0), 0)
+    + pendingOffline.reduce((s, o) => s + (o.items_count || 0), 0);
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const paidOrders    = allOrders.filter((o) => o.payment_status === 'paid').length;
+  const partialOrders = allOrders.filter((o) => o.payment_status === 'partial').length;
+  const unpaidOrders  = allOrders.filter((o) => o.payment_status === 'unpaid').length
+    + pendingOffline.length;
+
+  // Build orders list for display (server orders only — offline pending shown separately)
+  const orderList = allOrders.map((o) => ({
+    id: o.id,
+    order_number: o.order_number,
+    table_number: o.table_number,
+    status: o.status,
+    payment_status: o.payment_status,
+    total_amount: o.total_amount,
+    items_count: o.items_count,
+    created_at: o.created_at,
+    ordered_by: o.ordered_by_name || '',
+  }));
+
+  return {
+    stats: {
+      total_orders: totalOrders,
+      total_revenue: totalRevenue,
+      total_items: totalItems,
+      avg_order_value: avgOrderValue,
+      paid_orders: paidOrders,
+      partial_orders: partialOrders,
+      unpaid_orders: unpaidOrders,
+      my_total_collected: 0,
+      my_payment_count: 0,
+    },
+    orders: orderList,
+    my_payment_methods: [],
+    top_products: [],
+    _is_local: true,
+  };
 };
 
 // ── Security: clear all user-specific local data on logout ───────────────────
