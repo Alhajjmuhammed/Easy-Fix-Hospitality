@@ -338,7 +338,7 @@ export default function CCDashboardScreen({ navigation }) {
         style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 8 }}
       >
         {isOffline
-          ? `Offline – showing cached orders.${pendingCount > 0 ? ` ${pendingCount} item(s) queued for sync.` : ' Bill requests unavailable.'}`
+          ? `Offline – showing cached orders.${pendingCount > 0 ? ` ${pendingCount} queued for sync.` : ' Connect to sync latest data.'}`
           : `${pendingCount} order(s) queued – will sync automatically when internet is available.`}
       </Banner>
 

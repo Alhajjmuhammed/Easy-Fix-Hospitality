@@ -72,9 +72,20 @@ export default function MenuScreen({ navigation }) {
     loadMenu();
   }, [loadMenu]);
 
-  // â”€â”€ Build SectionList sections from categories â†’ subcategories â†’ products â”€â”€
-  // Each section = one subcategory; section header shows category name when it's
-  // the first subcategory in its category (matches the web's h3 + h5 layout).
+  // Categories that have at least one available product (used to filter chip bar)
+  const catsWithProducts = useMemo(() => {
+    const ids = new Set();
+    categories.forEach((cat) => {
+      (cat.subcategories || []).forEach((sub) => {
+        if ((sub.products || []).some((p) => p.is_available !== false)) ids.add(cat.id);
+      });
+    });
+    return ids;
+  }, [categories]);
+
+  // Build SectionList sections from categories -> subcategories -> products
+  // Each section = one subcategory; section header shows category name when it’s
+  // the first subcategory in its category.
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
     const cats = selectedCat
@@ -147,7 +158,7 @@ export default function MenuScreen({ navigation }) {
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catList}>
           <Chip selected={!selectedCat} onPress={() => setSelectedCat(null)} style={styles.catChip}>All</Chip>
-          {categories.map((c) => (
+          {categories.filter((c) => catsWithProducts.has(c.id)).map((c) => (
             <Chip key={c.id} selected={selectedCat === c.id} onPress={() => setSelectedCat(selectedCat === c.id ? null : c.id)} style={styles.catChip}>{c.name}</Chip>
           ))}
         </ScrollView>
@@ -182,7 +193,7 @@ export default function MenuScreen({ navigation }) {
           >
             All
           </Chip>
-          {categories.map((cat) => (
+          {categories.filter((cat) => catsWithProducts.has(cat.id)).map((cat) => (
             <Chip
               key={cat.id}
               selected={selectedCat === cat.id}

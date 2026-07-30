@@ -31,8 +31,10 @@ import { apiOrders, apiPrintBill, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
-import { saveOfflinePayment, getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
+import { saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { printReceiptLocal } from '../../utils/printReceipt';
 
 const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
@@ -65,9 +67,12 @@ const ORDER_STATUS_COLOR = {
 export default function CCPaymentsScreen({ navigation }) {
   const theme = useTheme();
   const { format } = useCurrency();
+  const { user } = useAuthStore();
+  const { pendingCount, lastSyncTime } = useSyncStore();
   const [orders, setOrders]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('');
@@ -148,6 +153,9 @@ export default function CCPaymentsScreen({ navigation }) {
     }, [fetchOrders])
   );
 
+  // Immediately refresh when an offline order is placed or sync completes
+  useEffect(() => { fetchOrders(true); }, [pendingCount, lastSyncTime]);
+
   // Load table list once for the dropdown filter
   useEffect(() => {
     apiTables().then((data) => setAllTables(Array.isArray(data) ? data : [])).catch(() => {});
@@ -168,9 +176,31 @@ export default function CCPaymentsScreen({ navigation }) {
     if (isNaN(parsedAmount) || parsedAmount <= 0) { setSnack('Enter a valid amount'); return; }
     setPaying(true);
     try {
+      // Offline-pending order: queue payment linked to the offline order
+      if (payDialog._is_offline_pending) {
+        await saveOfflinePaymentForOfflineOrder({
+          offline_order_ref: payDialog.offline_id,
+          order_number:      payDialog.order_number,
+          amount:            parsedAmount,
+          payment_method:    method,
+          reference_number:  reference.trim(),
+          notes:             notes.trim(),
+        });
+        await useSyncStore.getState().refreshPendingCount();
+        setOrders((prev) => prev.map((o) => {
+          if (o.id !== payDialog.id) return o;
+          const newPaid = (o.total_paid ?? 0) + parsedAmount;
+          const newDue = Math.max(0, (o.balance_due ?? o.total ?? 0) - parsedAmount);
+          const newStatus = newDue <= 0 ? 'paid' : newPaid > 0 ? 'partial' : o.payment_status;
+          return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
+        }));
+        setPayDialog(null);
+        setSnack('Payment queued – will sync when online');
+        return;
+      }
+
       const netState = await NetInfo.fetch();
       if (!netState.isConnected) {
-        // Save offline — will sync automatically when internet restores
         await saveOfflinePayment({
           order_id:         payDialog.id,
           order_number:     payDialog.order_number,
@@ -180,8 +210,6 @@ export default function CCPaymentsScreen({ navigation }) {
           notes:            notes.trim(),
         });
         await useSyncStore.getState().refreshPendingCount();
-        // Update local state so the Pay button reflects this offline payment
-        // and staff cannot accidentally pay the same order twice offline
         setOrders((prev) =>
           prev.map((o) => {
             if (o.id !== payDialog.id) return o;
@@ -219,20 +247,29 @@ export default function CCPaymentsScreen({ navigation }) {
 
   // â”€â”€ Print Bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePrintBill = async (order) => {
+    // Offline-pending orders or when device is offline: print locally via Bluetooth
+    if (order._is_offline_pending) {
+      try {
+        await printReceiptLocal({ order, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' });
+      } catch (err) {
+        setSnack('Print failed: ' + (err.message || 'unknown error'));
+      }
+      return;
+    }
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      setSnack('No internet — connect to Wi-Fi or mobile data to print the bill');
+      try {
+        await printReceiptLocal({ order, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' });
+      } catch (err) {
+        setSnack('Print failed: ' + (err.message || 'unknown error'));
+      }
       return;
     }
     try {
       const res = await apiPrintBill(order.id);
       setSnack(res.message || 'Bill sent to printer');
     } catch (err) {
-      setSnack(
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        'Bill print failed'
-      );
+      setSnack(err.response?.data?.error || err.response?.data?.message || 'Bill print failed');
     }
   };
 
@@ -419,15 +456,22 @@ export default function CCPaymentsScreen({ navigation }) {
                     visible={isMenuOpen}
                     onDismiss={() => setMenuOpenId(null)}
                     anchor={
-                      <Button compact icon="dots-vertical" disabled={!!order._is_offline_pending} onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                      <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
                     }
                   >
+                    {order._is_offline_pending && (
+                      <Menu.Item leadingIcon="eye" title="View Items" onPress={() => { setMenuOpenId(null); setExpandedId(expandedId === order.id ? null : order.id); }} />
+                    )}
                     {!isCancelled && !isPaid && (
                       <Menu.Item leadingIcon="cash" title="Pay" onPress={() => { setMenuOpenId(null); openPayment(order); }} />
                     )}
                     <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
-                    {!isCancelled && !isPaid && (
+                    {!isCancelled && !isPaid && !order._is_offline_pending && (
                       <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpenId(null); openTransfer(order); }} />
+                    )}
+                    {order._is_offline_pending && (
+                      <Menu.Item leadingIcon="delete-outline" title="Delete Queued Order" titleStyle={{ color: '#E53935' }}
+                        onPress={() => { setMenuOpenId(null); deleteOfflineOrder(order.offline_id).then(() => fetchOrders(true)); }} />
                     )}
                   </Menu>
                 </View>
@@ -447,19 +491,31 @@ export default function CCPaymentsScreen({ navigation }) {
               </View>
             </Card.Content>
 
-            {/* View button — only visible action; Pay/Print/Transfer are in the 3-dots menu */}
+            {/* Inline item list for offline-pending orders */}
+            {expandedId === order.id && order._is_offline_pending && (
+              <View style={{ paddingHorizontal: 16, paddingBottom: 8, borderTopWidth: 1, borderTopColor: '#eee' }}>
+                {(order.items || []).map((item, i) => (
+                  <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                    <Text variant="bodySmall" style={{ flex: 1 }}>{item.quantity}× {item.name || `Item #${item.product_id}`}</Text>
+                    <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold' }}>{format(item.price * item.quantity)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
             <Card.Actions style={styles.actions}>
               {order._is_offline_pending ? (
-                <Text variant="bodySmall" style={{ color: '#E65100', opacity: 0.7, paddingHorizontal: 8 }}>
-                  Actions available after sync
-                </Text>
+                <>
+                  {!isPaid && (
+                    <Button compact mode="contained" onPress={() => openPayment(order)}>Pay</Button>
+                  )}
+                  <Button compact mode="outlined" icon="printer" onPress={() => handlePrintBill(order)}>Print</Button>
+                  {isPaid && (
+                    <Text variant="bodySmall" style={{ color: '#2E7D32', paddingHorizontal: 8 }}>✓ Paid (queued)</Text>
+                  )}
+                </>
               ) : (
-                <Button
-                  compact
-                  mode="outlined"
-                  icon="eye"
-                  onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
-                >
+                <Button compact mode="outlined" icon="eye" onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}>
                   View
                 </Button>
               )}
