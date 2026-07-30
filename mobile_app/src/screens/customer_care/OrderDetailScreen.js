@@ -109,6 +109,8 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   const handleCancelItem = async () => {
     if (!cancelItemTarget) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to remove item'); setCancelItemDialog(false); return; }
     setCancellingItem(true);
     try {
       const res = await apiCancelOrderItem(cancelItemTarget.id, cancelItemReason);
@@ -123,6 +125,8 @@ export default function OrderDetailScreen({ route, navigation }) {
   };
 
   const handleCancel = async () => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to cancel order'); setCancelDialog(false); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(orderId, cancelReason || 'Cancelled by customer care');
@@ -138,6 +142,8 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async () => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to print the bill'); return; }
     try {
       await apiPrintBill(orderId);
       setSnack('Bill sent to printer');
@@ -161,6 +167,8 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   const handleTransfer = async () => {
     if (!targetTable) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(false); return; }
     setTransferring(true);
     try {
       await apiTransferTable(orderId, targetTable.id);

@@ -251,6 +251,8 @@ export default function CCPaymentsScreen({ navigation }) {
 
   const handleTransfer = async () => {
     if (!selectedTableId) { setSnack('Please select a destination table'); return; }
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       const res = await apiTransferTable(transferDialog.id, parseInt(selectedTableId));

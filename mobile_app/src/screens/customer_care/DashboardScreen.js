@@ -228,6 +228,8 @@ export default function CCDashboardScreen({ navigation }) {
   }, [fetchAll]);
 
   const handleComplete = async (id) => {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to complete a bill request'); return; }
     setCompleting(id);
     try {
       await apiCompleteBillRequest(id);
@@ -296,6 +298,8 @@ export default function CCDashboardScreen({ navigation }) {
 
   const handleTransfer = async () => {
     if (!transferDialog || !targetTable) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       await apiTransferTable(transferDialog.id, targetTable.id);

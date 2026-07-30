@@ -260,6 +260,8 @@ export default function CashierDashboardScreen({ navigation }) {
 
   const handleTransfer = async () => {
     if (!transferDialog || !targetTable) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       await apiTransferTable(transferDialog.id, targetTable.id);
@@ -310,6 +312,8 @@ export default function CashierDashboardScreen({ navigation }) {
 
   const handleAutoAssign = async () => {
     if (!assignDialog) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to auto-assign a rider'); setAssignDialog(null); return; }
     setAutoAssigning(true);
     try {
       const res = await apiAutoAssign(assignDialog.id);
@@ -328,6 +332,8 @@ export default function CashierDashboardScreen({ navigation }) {
 
   const handleAssignRider = async () => {
     if (!assignDialog || !selectedRider) return;
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) { setSnack('No internet — connect to assign a rider'); setAssignDialog(null); return; }
     setAssigning(true);
     try {
       await apiAssignRider(assignDialog.id, selectedRider);
