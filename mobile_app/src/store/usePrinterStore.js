@@ -23,7 +23,7 @@ export const usePrinterStore = create((set, get) => ({
   bluetoothDevice: null,
 
   /** If true, auto-print receipt immediately after payment (no tap needed) */
-  autoPrintAfterPayment: false,
+  autoPrintAfterPayment: true,
 
   /**
    * If true, mobile prints an ORDER TICKET (KOT/BOT) locally via BT or system
@@ -43,7 +43,7 @@ export const usePrinterStore = create((set, get) => ({
         set({
           mode:                  saved.mode                  ?? 'auto',
           bluetoothDevice:       saved.bluetoothDevice       ?? null,
-          autoPrintAfterPayment: saved.autoPrintAfterPayment ?? false,
+          autoPrintAfterPayment: saved.autoPrintAfterPayment ?? true,
           localKotBot:           saved.localKotBot           ?? false,
         });
       }

@@ -10,6 +10,7 @@ import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable } fro
 import NetInfo from '@react-native-community/netinfo';
 import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
+import { usePrinterStore } from '../../store/usePrinterStore';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
@@ -203,7 +204,9 @@ export default function CashierMyOrdersScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        if (usePrinterStore.getState().autoPrintAfterPayment) {
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        }
         return;
       }
       const net = await NetInfo.fetch();
@@ -230,7 +233,9 @@ export default function CashierMyOrdersScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('No internet – payment saved and will sync automatically');
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        if (usePrinterStore.getState().autoPrintAfterPayment) {
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        }
         return;
       }
       await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });

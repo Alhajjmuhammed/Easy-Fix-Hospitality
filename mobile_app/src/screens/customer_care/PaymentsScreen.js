@@ -33,6 +33,7 @@ import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
 import { saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
+import { usePrinterStore } from '../../store/usePrinterStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 
@@ -198,7 +199,9 @@ export default function CCPaymentsScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        if (usePrinterStore.getState().autoPrintAfterPayment) {
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        }
         return;
       }
 
@@ -226,7 +229,9 @@ export default function CCPaymentsScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('No internet — payment saved offline and will sync automatically');
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        if (usePrinterStore.getState().autoPrintAfterPayment) {
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+        }
         return;
       }
       await apiProcessPayment({
