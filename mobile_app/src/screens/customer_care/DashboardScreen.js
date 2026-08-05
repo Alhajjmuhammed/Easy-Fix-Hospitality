@@ -17,7 +17,7 @@ import {
   TextInput,
 } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
-import { apiOrders, apiCancelOrder, apiPrintBill, apiTransferTable } from '../../api/orders';
+import { apiOrders, apiCancelOrder, apiTransferTable } from '../../api/orders';
 import { apiTables } from '../../api/tables';
 import { apiBillRequests, apiCompleteBillRequest } from '../../api/billRequests';
 import { getOrders, cacheOrders, getOfflinePendingOrders, deleteOfflineOrder } from '../../database/operations';
@@ -249,12 +249,13 @@ export default function CCDashboardScreen({ navigation }) {
   // ── Print bill ──────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
     try {
-      await printReceipt({
+      const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
       });
+      if (ok) setSnack('Bill sent to printer');
     } catch (err) {
       setSnack('Print failed: ' + (err.message || 'unknown error'));
     }

@@ -7,7 +7,7 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
-import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
+import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
@@ -322,14 +322,13 @@ export default function CashierDashboardScreen({ navigation }) {
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
     try {
-      // printReceipt() routes by mode: BT → network (online, orderId only) → system dialog.
-      // For offline/pending orders, network mode falls back to system dialog automatically.
-      await printReceipt({
+      const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
       });
+      if (ok) setSnack('Bill sent to printer');
     } catch (err) {
       setSnack('Print failed: ' + (err.message || 'unknown error'));
     }

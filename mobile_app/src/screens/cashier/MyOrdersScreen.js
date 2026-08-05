@@ -6,7 +6,7 @@ import {
   List, RadioButton, Banner,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable, apiPrintBill } from '../../api/orders';
+import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable } from '../../api/orders';
 import NetInfo from '@react-native-community/netinfo';
 import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
@@ -322,12 +322,13 @@ export default function CashierMyOrdersScreen({ navigation }) {
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
     try {
-      await printReceipt({
+      const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
       });
+      if (ok) setSnack('Bill sent to printer');
     } catch (err) {
       setSnack('Print failed: ' + (err.message || 'unknown error'));
     }

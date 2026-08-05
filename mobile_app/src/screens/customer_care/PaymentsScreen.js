@@ -27,7 +27,7 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
-import { apiOrders, apiPrintBill, apiTransferTable } from '../../api/orders';
+import { apiOrders, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -254,12 +254,13 @@ export default function CCPaymentsScreen({ navigation }) {
   // ── Print Bill ────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
     try {
-      await printReceipt({
+      const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
       });
+      if (ok) setSnack('Bill sent to printer');
     } catch (err) {
       setSnack('Print failed: ' + (err.message || 'unknown error'));
     }

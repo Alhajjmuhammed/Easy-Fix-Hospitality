@@ -17,7 +17,7 @@ import {
   Menu,
 } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
-import { apiOrderDetail, apiCancelOrder, apiCancelOrderItem, apiPrintBill, apiTransferTable } from '../../api/orders';
+import { apiOrderDetail, apiCancelOrder, apiCancelOrderItem, apiTransferTable } from '../../api/orders';
 import { apiTables } from '../../api/tables';
 import { getOrderById } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -146,12 +146,13 @@ export default function OrderDetailScreen({ route, navigation }) {
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async () => {
     try {
-      await printReceipt({
+      const ok = await printReceipt({
         orderId: isOffline ? undefined : orderId,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
       });
+      if (ok) setSnack('Bill sent to printer');
     } catch (err) {
       setSnack('Print failed: ' + (err.message || 'unknown error'));
     }
