@@ -260,6 +260,7 @@ export default function PrinterSettingsScreen() {
       };
       await printReceipt({
         order:          demoOrder,
+        payment:        { payment_method: 'cash', amount: '11.50', created_at: new Date().toISOString(), id: 999999 },
         restaurantName: restaurantName || 'My Restaurant',
         currencySymbol: currencySymbol || '$',
       });

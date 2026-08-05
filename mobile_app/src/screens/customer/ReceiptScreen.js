@@ -85,6 +85,7 @@ export default function ReceiptScreen({ route }) {
       await printReceipt({
         orderId:        order?.id,
         order,
+        payment:        order?.payments?.[0] || null,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
       });
