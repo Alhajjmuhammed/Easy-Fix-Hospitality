@@ -241,8 +241,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
         return;
       }
       await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });
+      const paidOrder   = payDialog;
+      const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
+      const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       setPayDialog(null);
       setSnack('Payment recorded');
+      if (usePrinterStore.getState().autoPrintAfterPayment) {
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
+      }
       fetchOrders(true);
     } catch (err) {
       setSnack(err.response?.data?.detail || err.response?.data?.error || 'Payment failed');

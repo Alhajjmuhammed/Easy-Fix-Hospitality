@@ -82,12 +82,14 @@ export default function ReceiptScreen({ route }) {
   const handleLocalPrint = async () => {
     setPrinting(true);
     try {
+      const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       await printReceipt({
         orderId:        order?.id,
         order,
         payment:        order?.payments?.[0] || null,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
+        staffName,
       });
     } catch (err) {
       // user cancelled or error — silently ignore cancel

@@ -68,12 +68,16 @@ export default function ReceiptScreen({ route }) {
     if (!data) return;
     setPrinting(true);
     try {
+      const staffName = data.payment?.processed_by_name
+        || [user?.first_name, user?.last_name].filter(Boolean).join(' ')
+        || user?.username || '';
       await printReceipt({
         orderId:        data.payment?.order_id ?? data.order?.id,
         order:          data.order,
         payment:        data.payment,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
+        staffName,
       });
     } catch (err) {
       setSnack('Print failed: ' + (err?.message || 'Unknown error'));
