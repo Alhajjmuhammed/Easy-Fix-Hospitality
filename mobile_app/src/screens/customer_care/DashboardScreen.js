@@ -248,12 +248,14 @@ export default function CCDashboardScreen({ navigation }) {
 
   // ── Print bill ──────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
+    const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
     try {
       const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
+        staffName,
       });
       if (ok) setSnack('Bill sent to printer');
     } catch (err) {

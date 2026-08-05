@@ -46,14 +46,15 @@ export default function PlaceOrderScreen({ navigation }) {
     const fireTickets = (order, alwaysFire = false) => {
       if (!localKotBot && !alwaysFire) return;
       const rName = user?.restaurant_name || '';
+      const orderedBy = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       const allItems = order.items || order.order_items || [];
       const stations = [...new Set(allItems.map(i => i.station).filter(Boolean))];
       if (stations.length === 0) {
         // No station info (old cached menu) → single combined ticket
-        printOrderTicket(order, rName, null).catch(() => {});
+        printOrderTicket(order, rName, null, orderedBy).catch(() => {});
       } else {
         // One ticket per station (KOT / BOT / Buffet / Service)
-        stations.forEach(s => printOrderTicket(order, rName, s).catch(() => {}));
+        stations.forEach(s => printOrderTicket(order, rName, s, orderedBy).catch(() => {}));
       }
     };
 

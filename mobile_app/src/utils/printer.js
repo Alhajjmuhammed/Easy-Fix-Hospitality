@@ -172,7 +172,7 @@ export async function connectBluetoothPrinter(address) {
 /**
  * Send a formatted receipt to a BT Classic ESC/POS printer silently.
  */
-async function printBtClassic({ order, payment, restaurantName, currencySymbol }) {
+async function printBtClassic({ order, payment, restaurantName, currencySymbol, staffName = '' }) {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('BT Classic module not loaded');
 
@@ -229,6 +229,7 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol }
   await BluetoothEscposPrinter.printText(pad('Order:', `#${orderNum}`) + '\n\r', {});
   await BluetoothEscposPrinter.printText(pad('Table:', String(tableNo)) + '\n\r', {});
   await BluetoothEscposPrinter.printText(`Date : ${dateStr}\n\r`, {});
+  if (staffName) await BluetoothEscposPrinter.printText(pad('Staff:', staffName) + '\n\r', {});
   await BluetoothEscposPrinter.printText(dash + '\n\r', {});
 
   // Items
@@ -323,15 +324,16 @@ async function printNetwork(orderId) {
 export async function printReceipt({
   orderId,
   order,
-  payment       = null,
+  payment        = null,
   restaurantName = '',
   currencySymbol = '',
+  staffName      = '',
 } = {}) {
   const { mode } = usePrinterStore.getState();
 
   // System dialog — works everywhere, use directly
   if (mode === 'system') {
-    return printReceiptLocal({ order, payment, restaurantName, currencySymbol });
+    return printReceiptLocal({ order, payment, restaurantName, currencySymbol, staffName });
   }
 
   // Network mode — try server, fall back to system dialog
@@ -344,14 +346,14 @@ export async function printReceipt({
         console.warn('[Printer] Network failed → system dialog:', netErr?.message);
       }
     }
-    return printReceiptLocal({ order, payment, restaurantName, currencySymbol });
+    return printReceiptLocal({ order, payment, restaurantName, currencySymbol, staffName });
   }
 
   // Bluetooth or Auto mode — try BT Classic SPP first
   if (mode === 'bluetooth' || mode === 'auto') {
     if (isBtClassicAvailable()) {
       try {
-        await printBtClassic({ order, payment, restaurantName, currencySymbol });
+        await printBtClassic({ order, payment, restaurantName, currencySymbol, staffName });
         return true;
       } catch (btErr) {
         console.warn('[Printer] BT Classic failed → fallback:', btErr?.message);
@@ -368,16 +370,16 @@ export async function printReceipt({
       } catch (_) {}
     }
 
-    return printReceiptLocal({ order, payment, restaurantName, currencySymbol });
+    return printReceiptLocal({ order, payment, restaurantName, currencySymbol, staffName });
   }
 
   // Catch-all fallback
-  return printReceiptLocal({ order, payment, restaurantName, currencySymbol });
+  return printReceiptLocal({ order, payment, restaurantName, currencySymbol, staffName });
 }
 
 // ─── BT Classic ticket (KOT/BOT — no prices, no cash drawer) ────────────────
 
-async function _printTicketBtClassic({ order, restaurantName, stationFilter = null }) {
+async function _printTicketBtClassic({ order, restaurantName, stationFilter = null, orderedBy = '' }) {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('BT Classic module not loaded');
 
@@ -436,6 +438,7 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
   await BluetoothEscposPrinter.printText(pad('Order:', `#${orderNum}`) + '\n\r', {});
   await BluetoothEscposPrinter.printText(pad('Table:', String(tableNo)) + '\n\r', {});
   await BluetoothEscposPrinter.printText(`Time : ${timeStr}\n\r`, {});
+  if (orderedBy) await BluetoothEscposPrinter.printText(pad('By:', orderedBy) + '\n\r', {});
   await BluetoothEscposPrinter.printText(dash + '\n\r', {});
 
   // Items — bold, no prices
@@ -486,9 +489,9 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
  * @param {string} restaurantName
  * @returns {Promise<boolean>}
  */
-export async function printOrderTicket(order, restaurantName = '', stationFilter = null) {
+export async function printOrderTicket(order, restaurantName = '', stationFilter = null, orderedBy = '') {
   const { mode } = usePrinterStore.getState();
-  const opts = { order, restaurantName, stationFilter };
+  const opts = { order, restaurantName, stationFilter, orderedBy };
 
   // Bluetooth / Auto → try BT Classic first, fall back to system dialog
   if (mode === 'bluetooth' || mode === 'auto') {

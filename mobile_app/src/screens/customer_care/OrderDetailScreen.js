@@ -145,12 +145,14 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async () => {
+    const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
     try {
       const ok = await printReceipt({
         orderId: isOffline ? undefined : orderId,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
+        staffName,
       });
       if (ok) setSnack('Bill sent to printer');
     } catch (err) {

@@ -202,10 +202,11 @@ export default function CashierMyOrdersScreen({ navigation }) {
         );
         const paidOrder   = payDialog;
         const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
+        const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
         }
         return;
       }
@@ -231,10 +232,11 @@ export default function CashierMyOrdersScreen({ navigation }) {
         );
         const paidOrder   = payDialog;
         const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
+        const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
         setSnack('No internet – payment saved and will sync automatically');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
         }
         return;
       }
@@ -326,12 +328,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
+    const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
     try {
       const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: '',
+        staffName,
       });
       if (ok) setSnack('Bill sent to printer');
     } catch (err) {
