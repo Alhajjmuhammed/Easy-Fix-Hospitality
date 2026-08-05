@@ -46,7 +46,8 @@ export default function PlaceOrderScreen({ navigation }) {
     const fireTickets = (order, alwaysFire = false) => {
       if (!localKotBot && !alwaysFire) return;
       const rName = user?.restaurant_name || '';
-      const orderedBy = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
+      const userFullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
+      const orderedBy = order.ordered_by_name || userFullName;
       const allItems = order.items || order.order_items || [];
       const stations = [...new Set(allItems.map(i => i.station).filter(Boolean))];
       if (stations.length === 0) {
