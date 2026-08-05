@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import {
   Text, Card, Chip, Button, ActivityIndicator,
-  Snackbar, Switch, Divider,
+  Snackbar, Switch, Divider, Banner,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -37,10 +37,19 @@ export default function RiderDashboardScreen() {
   const [available, setAvailable]     = useState(true);
   const [togglingAvail, setTogglingAvail] = useState(false);
   const [snack, setSnack]             = useState('');
+  const [isOffline, setIsOffline]     = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        setIsOffline(true);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      setIsOffline(false);
       const data = await apiMyAssignments();
       setAssignments(data.assignments || []);
       setAvailable(data.is_available ?? true);
@@ -124,6 +133,15 @@ export default function RiderDashboardScreen() {
 
   return (
     <View style={styles.screen}>
+      <Banner
+        visible={isOffline}
+        icon="wifi-off"
+        actions={[]}
+        style={{ backgroundColor: '#FFF8E1' }}
+      >
+        Offline – assignments not available. Connect to internet to view deliveries.
+      </Banner>
+
       {/* Availability toggle header */}
       <View style={styles.availBar}>
         <View style={styles.availLeft}>

@@ -84,6 +84,11 @@ export default function TableSelectionScreen({ navigation }) {
 
   const handleAddToExisting = async () => {
     setShowOccupiedDialog(false);
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) {
+      setSnack('Offline – cannot fetch active orders. Use "New Order" to continue offline.');
+      return;
+    }
     setLoadingOrders(true);
     try {
       const orders = await apiActiveOrdersForTable(occupiedTable.id);

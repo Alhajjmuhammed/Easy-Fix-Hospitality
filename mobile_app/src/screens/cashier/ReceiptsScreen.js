@@ -62,7 +62,6 @@ export default function CashierReceiptsScreen() {
   const handleLocalPrint = async (p) => {
     setLocalPrinting(p.id);
     try {
-      // Build a minimal order object from the payment summary
       const orderObj = {
         order_number: p.order_number || p.order_id,
         table_number: p.table_number,
@@ -72,12 +71,16 @@ export default function CashierReceiptsScreen() {
         total_amount: p.amount,
         total:        p.amount,
       };
+      const staffName = p.processed_by_name
+        || [user?.first_name, user?.last_name].filter(Boolean).join(' ')
+        || user?.username || '';
       await printReceipt({
         orderId:        p.order_id,
         order:          orderObj,
         payment:        p,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
+        staffName,
       });
     } catch (err) {
       setSnack('Print failed: ' + (err?.message || 'Unknown error'));

@@ -100,6 +100,9 @@ export default function CashierWasteScreen() {
         const flat = [];
         const categories = data || [];
         categories.forEach((cat) => {
+          (cat.subcategories || []).forEach((sub) => {
+            (sub.products || []).forEach((p) => flat.push(p));
+          });
           (cat.products || []).forEach((p) => flat.push(p));
         });
         setProducts(flat);
