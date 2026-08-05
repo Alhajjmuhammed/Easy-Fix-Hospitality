@@ -25,7 +25,7 @@ import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceiptLocal } from '../../utils/printReceipt';
+import { printReceipt } from '../../utils/printer';
 
 function stringToColor(str = '') {
   const PALETTE = ['#2c3e50', '#AD1457', '#6A1B9A', '#00838F', '#2E7D32', '#E65100', '#4527A0', '#37474F'];
@@ -248,23 +248,15 @@ export default function CCDashboardScreen({ navigation }) {
 
   // ── Print bill ──────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
-    const restaurantName = user?.restaurant_name || 'Restaurant';
-    if (order._is_offline_pending) {
-      try { await printReceiptLocal({ order, restaurantName, currencySymbol: '' }); }
-      catch (err) { setSnack('Print failed: ' + (err.message || 'unknown error')); }
-      return;
-    }
-    const net = await NetInfo.fetch();
-    if (!net.isConnected) {
-      try { await printReceiptLocal({ order, restaurantName, currencySymbol: '' }); }
-      catch (err) { setSnack('Print failed: ' + (err.message || 'unknown error')); }
-      return;
-    }
     try {
-      await apiPrintBill(order.id);
-      setSnack('Bill sent to printer');
+      await printReceipt({
+        orderId: order._is_offline_pending ? undefined : order.id,
+        order,
+        restaurantName: user?.restaurant_name || 'Restaurant',
+        currencySymbol: '',
+      });
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Print failed');
+      setSnack('Print failed: ' + (err.message || 'unknown error'));
     }
   };
 

@@ -34,7 +34,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceiptLocal } from '../../utils/printReceipt';
+import { printReceipt } from '../../utils/printer';
 
 const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
@@ -194,8 +194,11 @@ export default function CCPaymentsScreen({ navigation }) {
           const newStatus = newDue <= 0 ? 'paid' : newPaid > 0 ? 'partial' : o.payment_status;
           return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
         }));
+        const paidOrder   = payDialog;
+        const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
         return;
       }
 
@@ -219,8 +222,11 @@ export default function CCPaymentsScreen({ navigation }) {
             return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
           })
         );
+        const paidOrder   = payDialog;
+        const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('No internet — payment saved offline and will sync automatically');
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
         return;
       }
       await apiProcessPayment({
@@ -245,31 +251,17 @@ export default function CCPaymentsScreen({ navigation }) {
     }
   };
 
-  // â”€â”€ Print Bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Print Bill ────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
-    // Offline-pending orders or when device is offline: print locally via Bluetooth
-    if (order._is_offline_pending) {
-      try {
-        await printReceiptLocal({ order, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' });
-      } catch (err) {
-        setSnack('Print failed: ' + (err.message || 'unknown error'));
-      }
-      return;
-    }
-    const netState = await NetInfo.fetch();
-    if (!netState.isConnected) {
-      try {
-        await printReceiptLocal({ order, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' });
-      } catch (err) {
-        setSnack('Print failed: ' + (err.message || 'unknown error'));
-      }
-      return;
-    }
     try {
-      const res = await apiPrintBill(order.id);
-      setSnack(res.message || 'Bill sent to printer');
+      await printReceipt({
+        orderId: order._is_offline_pending ? undefined : order.id,
+        order,
+        restaurantName: user?.restaurant_name || 'Restaurant',
+        currencySymbol: '',
+      });
     } catch (err) {
-      setSnack(err.response?.data?.error || err.response?.data?.message || 'Bill print failed');
+      setSnack('Print failed: ' + (err.message || 'unknown error'));
     }
   };
 

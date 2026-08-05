@@ -22,7 +22,7 @@ import { apiTables } from '../../api/tables';
 import { getOrderById } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceiptLocal } from '../../utils/printReceipt';
+import { printReceipt } from '../../utils/printer';
 
 const STATUS_COLORS = {
   pending:   '#FFA000',
@@ -145,17 +145,15 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async () => {
-    const restaurantName = user?.restaurant_name || 'Restaurant';
-    if (isOffline) {
-      try { await printReceiptLocal({ order, restaurantName, currencySymbol: '' }); }
-      catch (err) { setSnack('Print failed: ' + (err.message || 'unknown error')); }
-      return;
-    }
     try {
-      await apiPrintBill(orderId);
-      setSnack('Bill sent to printer');
+      await printReceipt({
+        orderId: isOffline ? undefined : orderId,
+        order,
+        restaurantName: user?.restaurant_name || 'Restaurant',
+        currencySymbol: '',
+      });
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Print failed');
+      setSnack('Print failed: ' + (err.message || 'unknown error'));
     }
   };
 

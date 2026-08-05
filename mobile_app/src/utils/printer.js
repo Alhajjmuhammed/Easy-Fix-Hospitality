@@ -203,6 +203,7 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol }
   const tax      = parseFloat(order.tax_amount ?? 0);
   const discount = parseFloat(order.discount_amount ?? 0);
 
+  const isBill = !payment;
   const A = BluetoothEscposPrinter.ALIGN;
 
   await BluetoothEscposPrinter.printerInit();
@@ -210,18 +211,21 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol }
   // Header
   await BluetoothEscposPrinter.printerAlign(A.CENTER);
   await BluetoothEscposPrinter.printText(restaurantName.toUpperCase() + '\n\r', { fonttype: 1, widthtimes: 1, heigthtimes: 1 });
+  await BluetoothEscposPrinter.printText((isBill ? '** BILL **' : 'RECEIPT / TAX INVOICE') + '\n\r', { fonttype: 1 });
   await BluetoothEscposPrinter.printerAlign(A.LEFT);
   await BluetoothEscposPrinter.printText(dash + '\n\r', {});
 
-  // Order details
-  if (payment?.id) {
-    await BluetoothEscposPrinter.printerAlign(A.CENTER);
-    await BluetoothEscposPrinter.printText(`RECEIPT #${String(payment.id).padStart(6, '0')}\n\r`, { fonttype: 1 });
-    await BluetoothEscposPrinter.printerAlign(A.LEFT);
-  }
+  // Order reference line
   const orderNum = order.order_number || order.id || '';
   const tableNo  = order.table_number ?? order.table_no ?? 'Takeaway';
   const dateStr  = new Date((payment?.created_at || order.created_at || Date.now())).toLocaleString();
+  await BluetoothEscposPrinter.printerAlign(A.CENTER);
+  if (!isBill && payment?.id) {
+    await BluetoothEscposPrinter.printText(`RECEIPT #${String(payment.id).padStart(6, '0')}\n\r`, { fonttype: 1 });
+  } else {
+    await BluetoothEscposPrinter.printText(`ORDER #${orderNum}\n\r`, { fonttype: 1 });
+  }
+  await BluetoothEscposPrinter.printerAlign(A.LEFT);
   await BluetoothEscposPrinter.printText(pad('Order:', `#${orderNum}`) + '\n\r', {});
   await BluetoothEscposPrinter.printText(pad('Table:', String(tableNo)) + '\n\r', {});
   await BluetoothEscposPrinter.printText(`Date : ${dateStr}\n\r`, {});
@@ -240,19 +244,54 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol }
   // Totals
   await BluetoothEscposPrinter.printText(pad('Subtotal:', `${sym}${fmt(subtotal)}`) + '\n\r', {});
   if (discount > 0) await BluetoothEscposPrinter.printText(pad('Discount:', `-${sym}${fmt(discount)}`) + '\n\r', {});
-  if (tax > 0)      await BluetoothEscposPrinter.printText(pad(`Tax:`, `${sym}${fmt(tax)}`) + '\n\r', {});
+  if (tax > 0)      await BluetoothEscposPrinter.printText(pad('Tax:', `${sym}${fmt(tax)}`) + '\n\r', {});
+
+  // Bill: partial payment rows
+  const totalPaid = parseFloat(order.total_paid || 0);
+  if (isBill && totalPaid > 0) {
+    await BluetoothEscposPrinter.printText(pad('Amount Paid:', `${sym}${fmt(totalPaid)}`) + '\n\r', {});
+    await BluetoothEscposPrinter.printText(pad('BALANCE DUE:', `${sym}${fmt(Math.max(0, total - totalPaid))}`) + '\n\r', { fonttype: 1 });
+  }
+
   await BluetoothEscposPrinter.printText(dash + '\n\r', {});
-  await BluetoothEscposPrinter.printText(pad('TOTAL:', `${sym}${fmt(total)}`) + '\n\r', { fonttype: 1, widthtimes: 1, heigthtimes: 1 });
+  const totalLabel = isBill ? 'TOTAL DUE:' : 'TOTAL:';
+  await BluetoothEscposPrinter.printText(pad(totalLabel, `${sym}${fmt(total)}`) + '\n\r', { fonttype: 1, widthtimes: 1, heigthtimes: 1 });
+
+  // Receipt: payment section
+  if (!isBill && payment) {
+    await BluetoothEscposPrinter.printText(dash + '\n\r', {});
+    const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
+    const methodLabel = METHOD_LABELS[payment.payment_method] || payment.payment_method || '';
+    const amtPaid = parseFloat(payment.amount || 0);
+    const change  = amtPaid > total ? amtPaid - total : 0;
+    await BluetoothEscposPrinter.printText(pad('Payment:', methodLabel) + '\n\r', {});
+    await BluetoothEscposPrinter.printText(pad('Amount Paid:', `${sym}${fmt(amtPaid)}`) + '\n\r', { fonttype: 1 });
+    if (change > 0) await BluetoothEscposPrinter.printText(pad('Change:', `${sym}${fmt(change)}`) + '\n\r', {});
+  }
 
   // Footer
   await BluetoothEscposPrinter.printText(dash + '\n\r', {});
   await BluetoothEscposPrinter.printerAlign(A.CENTER);
-  await BluetoothEscposPrinter.printText('Thank you for your visit!\n\r', {});
+  if (isBill) {
+    await BluetoothEscposPrinter.printText('*** THIS IS NOT A RECEIPT ***\n\r', { fonttype: 1 });
+    await BluetoothEscposPrinter.printText('Payment required\n\r', {});
+    await BluetoothEscposPrinter.printText('Thank you for dining with us!\n\r', {});
+  } else {
+    await BluetoothEscposPrinter.printText('Thank you for dining with us!\n\r', {});
+    await BluetoothEscposPrinter.printText('Please come again\n\r', {});
+  }
   await BluetoothEscposPrinter.printText('\n\r\n\r\n\r', {});
 
-  // Feed paper and cut
   await BluetoothEscposPrinter.printAndFeed(3);
   try { await BluetoothEscposPrinter.cutOnePoint(); } catch (_) {}
+
+  // Cash drawer kick after receipt (ESC p 0 25 250)
+  if (!isBill) {
+    try {
+      const ESC_P = `\x1B\x70\x00\x19\xFA`;
+      await BluetoothEscposPrinter.printText(ESC_P, {});
+    } catch (_) { /* cash drawer is optional */ }
+  }
 }
 
 // ─── Network printing ─────────────────────────────────────────────────────────
@@ -358,12 +397,19 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
   }
 
   const BT_STATION_TITLES = {
-    kitchen: 'KOT - KITCHEN',
-    bar:     'BOT - BAR',
-    buffet:  'BUFFET ORDER',
-    service: 'SERVICE ORDER',
+    kitchen: 'KITCHEN ORDER TICKET (KOT)',
+    bar:     'BAR ORDER TICKET (BOT)',
+    buffet:  'BUFFET ORDER TICKET',
+    service: 'SERVICE ORDER TICKET',
+  };
+  const BT_STATION_FOOTER = {
+    kitchen: 'For kitchen preparation only',
+    bar:     'For bar preparation only',
+    buffet:  'For buffet station only',
+    service: 'For service station only',
   };
   const ticketTitle = (stationFilter && BT_STATION_TITLES[stationFilter]) || 'ORDER TICKET';
+  const footerNote  = (stationFilter && BT_STATION_FOOTER[stationFilter]) || 'For staff use only';
 
   const W   = 32; // 58mm = 32 chars; change to 48 for 80mm
   const pad = (l, r, w = W) => l + ' '.repeat(Math.max(1, w - l.length - r.length)) + r;
@@ -402,12 +448,22 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
     }
   }
 
-  // Notes
+  // Notes / special instructions
   const notes = (order.special_instructions || '').trim();
   if (notes) {
     await BluetoothEscposPrinter.printText(dash + '\n\r', {});
     await BluetoothEscposPrinter.printText(`Notes: ${notes}\n\r`, {});
   }
+
+  // Totals line + station footer
+  const totalItems = items.length;
+  const totalQty   = items.reduce((acc, i) => acc + (i.quantity || 1), 0);
+  await BluetoothEscposPrinter.printText(dash + '\n\r', {});
+  await BluetoothEscposPrinter.printText(`Total Items: ${totalItems} | Total Qty: ${totalQty}\n\r`, {});
+  await BluetoothEscposPrinter.printText(dash + '\n\r', {});
+  await BluetoothEscposPrinter.printerAlign(A.CENTER);
+  await BluetoothEscposPrinter.printText(footerNote + '\n\r', {});
+  await BluetoothEscposPrinter.printText('NOT FOR BILLING\n\r', { fonttype: 1 });
 
   // Feed and cut — NO cash drawer (KOT/BOT don't open the drawer)
   await BluetoothEscposPrinter.printText('\n\r\n\r\n\r', {});

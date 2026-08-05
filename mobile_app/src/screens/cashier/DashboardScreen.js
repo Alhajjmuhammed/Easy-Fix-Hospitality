@@ -15,7 +15,7 @@ import { getOrders, cacheOrders, getOfflinePendingOrders, deleteOfflineOrder, sa
 import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceiptLocal } from '../../utils/printReceipt';
+import { printReceipt } from '../../utils/printer';
 
 const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
@@ -195,8 +195,11 @@ export default function CashierDashboardScreen({ navigation }) {
             return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
           })
         );
+        const paidOrder   = payDialog;
+        const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
         return;
       }
 
@@ -220,8 +223,11 @@ export default function CashierDashboardScreen({ navigation }) {
             return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
           })
         );
+        const paidOrder   = payDialog;
+        const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
         setPayDialog(null);
         setSnack('No internet – payment saved and will sync automatically');
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '' }).catch(() => {});
         return;
       }
       await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });
@@ -315,38 +321,17 @@ export default function CashierDashboardScreen({ navigation }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
-    // Offline orders: print locally using expo-print (no server needed)
-    if (order._is_offline_pending) {
-      try {
-        await printReceiptLocal({
-          order,
-          restaurantName: user?.restaurant_name || 'Restaurant',
-          currencySymbol: '',
-        });
-      } catch (err) {
-        setSnack('Print failed: ' + (err.message || 'unknown error'));
-      }
-      return;
-    }
-    const net = await NetInfo.fetch();
-    if (!net.isConnected) {
-      // Fall back to local print using cached order data
-      try {
-        await printReceiptLocal({
-          order,
-          restaurantName: user?.restaurant_name || 'Restaurant',
-          currencySymbol: '',
-        });
-      } catch (err) {
-        setSnack('Print failed: ' + (err.message || 'unknown error'));
-      }
-      return;
-    }
     try {
-      await apiPrintBill(order.id);
-      setSnack('Bill sent to printer');
+      // printReceipt() routes by mode: BT → network (online, orderId only) → system dialog.
+      // For offline/pending orders, network mode falls back to system dialog automatically.
+      await printReceipt({
+        orderId: order._is_offline_pending ? undefined : order.id,
+        order,
+        restaurantName: user?.restaurant_name || 'Restaurant',
+        currencySymbol: '',
+      });
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Print failed');
+      setSnack('Print failed: ' + (err.message || 'unknown error'));
     }
   };
 

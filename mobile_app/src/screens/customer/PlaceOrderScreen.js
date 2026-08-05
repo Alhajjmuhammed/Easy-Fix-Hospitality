@@ -41,8 +41,10 @@ export default function PlaceOrderScreen({ navigation }) {
   const handleConfirmOrder = async () => {
     // Station-aware ticket helper — prints one ticket per station (KOT/BOT/etc.),
     // fire-and-forget. Falls back to one combined ticket if no station data.
-    const fireTickets = (order) => {
-      if (!localKotBot) return;
+    // alwaysFire=true bypasses the localKotBot guard (used for offline orders —
+    // kitchen/bar always needs tickets regardless of the user's online preference)
+    const fireTickets = (order, alwaysFire = false) => {
+      if (!localKotBot && !alwaysFire) return;
       const rName = user?.restaurant_name || '';
       const allItems = order.items || order.order_items || [];
       const stations = [...new Set(allItems.map(i => i.station).filter(Boolean))];
@@ -50,7 +52,7 @@ export default function PlaceOrderScreen({ navigation }) {
         // No station info (old cached menu) → single combined ticket
         printOrderTicket(order, rName, null).catch(() => {});
       } else {
-        // One ticket per station
+        // One ticket per station (KOT / BOT / Buffet / Service)
         stations.forEach(s => printOrderTicket(order, rName, s).catch(() => {}));
       }
     };
@@ -136,7 +138,7 @@ export default function PlaceOrderScreen({ navigation }) {
           })),
           special_instructions: notes.trim(),
         };
-        fireTickets(draftOrder);
+        fireTickets(draftOrder, true); // always fire KOT/BOT when offline
 
         clearCart();
         setSnack('Order saved – will sync when online');
