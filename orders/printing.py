@@ -157,7 +157,7 @@ def get_restaurant_print_settings(order):
         }
 
     # Fallback to User (owner) settings
-    owner = table.owner
+    owner = table.owner if table is not None else None
     if owner:
         return {
             'source': 'owner',

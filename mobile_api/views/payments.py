@@ -166,7 +166,7 @@ def _process_payment(request):
 
     try:
         from orders.printing import auto_print_receipt
-        auto_print_receipt(payment, printed_by=request.user)
+        auto_print_receipt(payment)
     except Exception as e:
         logger.warning('Auto-print receipt failed: %s', e)
 
@@ -298,7 +298,7 @@ def reprint_receipt(request, payment_id):
 
     try:
         from orders.printing import auto_print_receipt
-        result = auto_print_receipt(payment, printed_by=request.user)
+        result = auto_print_receipt(payment)
         if result.get('receipt_printed'):
             return Response({'success': True, 'message': f'Receipt reprinted for payment #{payment_id}'})
         errors = result.get('errors', ['Unknown error'])
