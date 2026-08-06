@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, StyleSheet, RefreshControl } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { ScrollView, View, StyleSheet, RefreshControl, FlatList, TouchableOpacity, Modal } from 'react-native';
 import {
   Text,
   Card,
@@ -8,7 +8,10 @@ import {
   Snackbar,
   Divider,
   Surface,
+  SegmentedButtons,
   Banner,
+  Button,
+  Checkbox,
 } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
@@ -31,17 +34,32 @@ const ORDER_STATUS_COLOR = {
   cancelled: '#C62828',
 };
 
+const PERIODS = [
+  { value: 'today',   label: 'Today' },
+  { value: 'weekly',  label: 'This Week' },
+  { value: 'monthly', label: 'This Month' },
+];
+
 export default function CCReportsScreen() {
-  const [loading, setLoading]           = useState(true);
-  const [refreshing, setRefreshing]     = useState(false);
-  const [data, setData]                 = useState(null);
-  const [snack, setSnack]               = useState('');
+  const [loading,        setLoading]        = useState(true);
+  const [refreshing,     setRefreshing]     = useState(false);
+  const [data,           setData]           = useState(null);
+  const [snack,          setSnack]          = useState('');
+  const [period,         setPeriod]         = useState('today');
   const [isOffline,      setIsOffline]      = useState(false);
   const [offlineOrders,  setOfflineOrders]  = useState([]);
   const [cacheTimestamp, setCacheTimestamp] = useState(null);
+  const [selectedPids,   setSelectedPids]   = useState([]);
+  const [tempPids,       setTempPids]       = useState([]);
+  const [showPicker,     setShowPicker]     = useState(false);
   const { format } = useCurrency();
+  // Ref so fetchReport can always read the latest pids without being a closure dep
+  const selectedPidsRef = useRef([]);
+  useEffect(() => { selectedPidsRef.current = selectedPids; }, [selectedPids]);
 
-  const fetchReport = useCallback(async (silent = false) => {
+  const fetchReport = useCallback(async (silent = false, pids) => {
+    // pids passed explicitly (Apply/Clear); fall back to ref for initial/refresh fetches
+    const effectivePids = pids !== undefined ? pids : selectedPidsRef.current;
     if (!silent) setLoading(true);
     try {
       const net = await NetInfo.fetch();
@@ -63,7 +81,9 @@ export default function CCReportsScreen() {
         setOfflineOrders(pending);
         setIsOffline(true);
       } else {
-        const res = await client.get('/reports/cc/', { params: { period: 'today' } });
+        const params = { period };
+        if (effectivePids.length > 0) params.product_ids = effectivePids.join(',');
+        const res = await client.get('/reports/cc/', { params });
         setData(res.data);
         setIsOffline(false);
         setCacheTimestamp(null);
@@ -102,7 +122,7 @@ export default function CCReportsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [period]); // selectedPids intentionally omitted — accessed via ref to avoid double-fetch
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
@@ -127,6 +147,54 @@ export default function CCReportsScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchReport(true); }} />
       }
     >
+      {/* Product picker modal */}
+      <Modal visible={showPicker} transparent animationType="slide" onRequestClose={() => setShowPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHeader}>
+              <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>Filter by Product</Text>
+              <TouchableOpacity onPress={() => setShowPicker(false)}>
+                <MaterialCommunityIcons name="close" size={22} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={data?.products || []}
+              keyExtractor={(item) => String(item.id)}
+              style={{ maxHeight: 360 }}
+              ListEmptyComponent={() => (
+                <Text style={{ textAlign: 'center', opacity: 0.5, padding: 20 }}>No products available</Text>
+              )}
+              renderItem={({ item }) => {
+                const checked = tempPids.includes(item.id);
+                return (
+                  <TouchableOpacity
+                    style={styles.pickerRow}
+                    onPress={() => setTempPids((prev) =>
+                      checked ? prev.filter((id) => id !== item.id) : [...prev, item.id]
+                    )}
+                  >
+                    <Checkbox status={checked ? 'checked' : 'unchecked'} />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold' }} numberOfLines={1}>{item.name}</Text>
+                      <Text variant="bodySmall" style={{ opacity: 0.55, fontSize: 11 }}>{item['main_category__name']}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+            <Divider />
+            <View style={styles.pickerActions}>
+              <Button mode="outlined" onPress={() => setTempPids([])} style={{ flex: 1 }}>Clear</Button>
+              <Button mode="contained" onPress={() => {
+                setSelectedPids(tempPids);
+                setShowPicker(false);
+                fetchReport(false, tempPids);
+              }} style={{ flex: 1 }}>Apply</Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Offline banner */}
       <Banner
         visible={isOffline || offlineOrders.length > 0}
@@ -176,7 +244,7 @@ export default function CCReportsScreen() {
         </>
       )}
 
-      {/* Offline queued orders (shown whether online or offline) */}
+      {/* Offline queued orders */}
       {pendingOrders.length > 0 && (
         <>
           <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#E65100' }]}>
@@ -224,7 +292,7 @@ export default function CCReportsScreen() {
         </>
       )}
 
-      {/* Report — shows cached data offline, live data online */}
+      {/* Report */}
       {isOffline && !data ? (
         <Card style={styles.card}>
           <Card.Content style={styles.emptyContent}>
@@ -236,11 +304,41 @@ export default function CCReportsScreen() {
         </Card>
       ) : data ? (
         <>
+          {/* Period selector */}
+          <SegmentedButtons
+            value={period}
+            onValueChange={setPeriod}
+            buttons={PERIODS}
+            style={styles.periods}
+          />
+
+          {/* Product filter chip */}
+          <TouchableOpacity
+            onPress={() => { setTempPids(selectedPids); setShowPicker(true); }}
+            style={styles.filterChipRow}
+          >
+            <Chip
+              icon="food-outline"
+              mode={selectedPids.length > 0 ? 'flat' : 'outlined'}
+              style={selectedPids.length > 0 ? { backgroundColor: '#1565C022' } : {}}
+              textStyle={selectedPids.length > 0 ? { color: '#1565C0' } : {}}
+            >
+              {selectedPids.length === 0
+                ? 'All Products'
+                : `${selectedPids.length} Product${selectedPids.length > 1 ? 's' : ''} Selected`}
+            </Chip>
+            {selectedPids.length > 0 && (
+              <TouchableOpacity onPress={() => { setSelectedPids([]); fetchReport(false, []); }} style={{ marginLeft: 6 }}>
+                <MaterialCommunityIcons name="close-circle" size={18} color="#C62828" />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+
           {/* Stats cards */}
           <View style={styles.statsRow}>
-            <StatCard label="Orders"    value={stats.total_orders}             color="#2c3e50" icon="clipboard-list-outline" />
+            <StatCard label="Orders"    value={stats.total_orders}               color="#2c3e50" icon="clipboard-list-outline" />
             <StatCard label="Revenue"   value={format(stats.total_revenue ?? 0)} color="#2E7D32" icon="cash-multiple" />
-            <StatCard label="Items"     value={stats.total_items}             color="#6A1B9A" icon="food-outline" />
+            <StatCard label="Items"     value={stats.total_items}                color="#6A1B9A" icon="food-outline" />
             <StatCard label="Avg Order" value={format(stats.avg_order_value ?? 0)} color="#FF8F00" icon="chart-line" />
           </View>
 
@@ -348,21 +446,8 @@ const styles = StyleSheet.create({
   container:      { padding: 16, paddingBottom: 40 },
   center:         { flex: 1, justifyContent: 'center', alignItems: 'center' },
   statsRow:       { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  statCard:       {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-  },
-  statIconWrap:   {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
+  statCard:       { flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 6, borderRadius: 10 },
+  statIconWrap:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   statValue:      { fontFamily: 'Poppins_700Bold', fontSize: 16, lineHeight: 22 },
   statLabel:      { fontFamily: 'Poppins_500Medium', opacity: 0.65, fontSize: 10, marginTop: 2, textAlign: 'center' },
   card:           { borderRadius: 10, marginBottom: 12 },
@@ -375,4 +460,11 @@ const styles = StyleSheet.create({
   sectionTitle:   { fontFamily: 'Poppins_700Bold', marginBottom: 8 },
   emptyContent:   { alignItems: 'center', paddingVertical: 24 },
   row:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  periods:        { marginBottom: 12 },
+  filterChipRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  pickerOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  pickerSheet:    { backgroundColor: '#fff', borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingBottom: 24 },
+  pickerHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
+  pickerRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, gap: 10 },
+  pickerActions:  { flexDirection: 'row', gap: 10, padding: 16 },
 });

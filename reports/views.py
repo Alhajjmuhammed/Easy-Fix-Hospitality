@@ -1,4 +1,4 @@
-from django.shortcuts import render
+﻿from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 
 
@@ -57,7 +57,11 @@ def dashboard(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Kitchen/Bar filtering
-    product_id = request.GET.get('product_id', 'all')
+    # Multi-product filter: accepts repeated product_ids params, falls back to old product_id
+    _raw_product_ids = request.GET.getlist('product_ids') or (
+        [request.GET.get('product_id')] if request.GET.get('product_id', 'all') != 'all' else []
+    )
+    product_ids = [int(p) for p in _raw_product_ids if str(p).strip().isdigit()]
     table_id = request.GET.get('table_id', 'all')
     staff_filter = request.GET.get('staff_filter', 'all')  # NEW: Staff member filtering
     restaurant_filter = request.GET.get('restaurant', '').strip()
@@ -212,9 +216,9 @@ def dashboard(request):
         except (ValueError, TypeError):
             pass  # Invalid staff_filter, ignore
 
-    # Apply product filter (only orders containing this specific product)
-    if product_id != 'all':
-        orders = orders.filter(order_items__product_id=product_id).distinct()
+    # Apply product filter — OR logic: orders containing ANY of the selected products
+    if product_ids:
+        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
 
     # Apply table filter (only orders from this specific table)
     if table_id != 'all':
@@ -240,7 +244,7 @@ def dashboard(request):
 
     # Calculate summary data with optimized queries
     total_orders = orders.count()
-    _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
+    _item_filter_active = (bool(product_ids) or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
     if _item_filter_active:
         _stats_items = OrderItem.objects.filter(order__in=orders)
         if category_id != 'all':
@@ -249,8 +253,8 @@ def dashboard(request):
             _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
         if station_filter != 'all':
             _stats_items = _stats_items.filter(product__station=station_filter)
-        if product_id != 'all':
-            _stats_items = _stats_items.filter(product_id=product_id)
+        if product_ids:
+            _stats_items = _stats_items.filter(product_id__in=product_ids)
         total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
         total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
     else:
@@ -487,19 +491,17 @@ def dashboard(request):
         _subcat = subcategories.filter(id=subcategory_id).first()
         selected_subcategory_name = _subcat.name if _subcat else None
 
-    # Resolve selected product and table display names
-    # SECURITY: validate against restaurant-scoped querysets — prevents cross-tenant name leakage
-    selected_product_name = None
+    # Resolve selected product names and validate IDs against restaurant scope (IDOR prevention)
+    selected_product_names = []
     selected_table_name = None
-    if product_id != 'all':
-        try:
-            _prod = ProductModel.objects.filter(id=product_id, main_category__in=categories).first()
-            if _prod:
-                selected_product_name = _prod.name
-            else:
-                product_id = 'all'
-        except (ValueError, Exception):
-            product_id = 'all'
+    if product_ids:
+        _valid_prods = list(
+            ProductModel.objects.filter(id__in=product_ids, main_category__in=categories)
+            .values_list('id', 'name')
+        )
+        valid_ids = {p[0] for p in _valid_prods}
+        selected_product_names = [p[1] for p in _valid_prods]
+        product_ids = [pid for pid in product_ids if pid in valid_ids]
     if table_id != 'all':
         try:
             _tbl = tables_qs.filter(id=table_id).first()
@@ -527,7 +529,7 @@ def dashboard(request):
     voucher_total = payment_method_stats.get('voucher', {}).get('total', 0) or 0
 
     # Today's date for template defaults
-    today_str = timezone.now().date().strftime('%Y-%m-%d')
+    today_str = today.strftime('%Y-%m-%d')
 
     context = {
         'total_orders': total_orders,
@@ -575,9 +577,9 @@ def dashboard(request):
         'mixed_orders_count': mixed_orders_count,
         'products': products_qs,
         'tables': tables_qs,
-        'selected_product': product_id,
+        'selected_product_ids': product_ids,
+        'selected_product_names': selected_product_names,
         'selected_table': table_id,
-        'selected_product_name': selected_product_name,
         'selected_table_name': selected_table_name,
         'top_products': top_products,
         'from_date': from_date,  # Default date values for template
@@ -616,7 +618,10 @@ def export_csv(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
-    product_id = request.GET.get('product_id', 'all')
+    _raw_product_ids = request.GET.getlist('product_ids') or (
+        [request.GET.get('product_id')] if request.GET.get('product_id', 'all') != 'all' else []
+    )
+    product_ids = [int(p) for p in _raw_product_ids if str(p).strip().isdigit()]
     table_id = request.GET.get('table_id', 'all')
     staff_filter = request.GET.get('staff_filter', 'all')  # NEW: Staff filtering
     restaurant_filter = request.GET.get('restaurant', '').strip()
@@ -726,12 +731,22 @@ def export_csv(request):
     elif payment_status == 'partial':
         orders = orders.filter(payment_status='partial')
     
-    # Apply date filters (these override period if specified)
-    if from_date:
-        orders = orders.filter(created_at__date__gte=from_date)
-    if to_date:
-        orders = orders.filter(created_at__date__lte=to_date)
-    
+    # Apply custom date filters with timezone-aware boundaries (same as dashboard)
+    if (period == 'all' or period == 'custom') and (from_date or to_date):
+        if from_date:
+            try:
+                from_dt = datetime.strptime(from_date, '%Y-%m-%d').date()
+                orders = orders.filter(created_at__gte=timezone.make_aware(datetime.combine(from_dt, datetime.min.time())))
+            except (ValueError, TypeError):
+                pass
+        if to_date:
+            try:
+                to_dt = datetime.strptime(to_date, '%Y-%m-%d').date()
+                end_dt = timezone.make_aware(datetime.combine(to_dt + timedelta(days=1), datetime.min.time()))
+                orders = orders.filter(created_at__lt=end_dt)
+            except (ValueError, TypeError):
+                pass
+
     # Apply station filtering (Kitchen/Bar/All)
     if station_filter == 'kitchen':
         orders = orders.filter(order_items__product__station='kitchen').distinct()
@@ -741,7 +756,7 @@ def export_csv(request):
         orders = orders.filter(order_items__product__station='buffet').distinct()
     elif station_filter == 'service':
         orders = orders.filter(order_items__product__station='service').distinct()
-    
+
     # Apply staff filtering (filter by who created the order)
     if staff_filter != 'all':
         try:
@@ -750,9 +765,9 @@ def export_csv(request):
         except (ValueError, TypeError):
             pass  # Invalid staff_filter, ignore
 
-    # Apply product filter (only orders containing this specific product)
-    if product_id != 'all':
-        orders = orders.filter(order_items__product_id=product_id).distinct()
+    # Apply product filter — OR logic: orders containing ANY of the selected products
+    if product_ids:
+        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
 
     # Apply table filter (only orders from this specific table)
     if table_id != 'all':
@@ -762,7 +777,7 @@ def export_csv(request):
 
     # Calculate summary data for the export
     total_orders = orders.count()
-    _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
+    _item_filter_active = (bool(product_ids) or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
     if _item_filter_active:
         # AND-chain all active filters (same logic as dashboard) so combined filters are accurate
         _stats_items = OrderItem.objects.filter(order__in=orders)
@@ -772,8 +787,8 @@ def export_csv(request):
             _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
         if station_filter != 'all':
             _stats_items = _stats_items.filter(product__station=station_filter)
-        if product_id != 'all':
-            _stats_items = _stats_items.filter(product_id=product_id)
+        if product_ids:
+            _stats_items = _stats_items.filter(product_id__in=product_ids)
         total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
         total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
     else:
@@ -885,32 +900,13 @@ def export_csv(request):
             id=subcategory_id
         ).values('name').first()
         writer.writerow(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
-    if product_id != 'all':
+    if product_ids:
         try:
             from restaurant.models import Product as ProductModel
-            if target_restaurant:
-                _valid_cats = MainCategory.objects.filter(
-                    Q(restaurant=target_restaurant) |
-                    Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
-                )
-            elif not request.user.is_administrator():
-                _accessible = restaurant_context['accessible_restaurants']
-                _cat_q = Q()
-                for _r in _accessible:
-                    _cat_q |= Q(restaurant=_r)
-                    if _r.main_owner: _cat_q |= Q(owner=_r.main_owner, restaurant__isnull=True)
-                    if _r.branch_owner: _cat_q |= Q(owner=_r.branch_owner, restaurant__isnull=True)
-                _valid_cats = MainCategory.objects.filter(_cat_q)
-            else:
-                _valid_cats = None
-            _prod = (ProductModel.objects.filter(id=product_id, main_category__in=_valid_cats)
-                     if _valid_cats is not None else ProductModel.objects.filter(id=product_id)).first()
-            if _prod:
-                writer.writerow(['Product Filter:', _prod.name])
-            else:
-                writer.writerow(['Product Filter:', f'Product ID {product_id}'])
+            _prod_names = list(ProductModel.objects.filter(id__in=product_ids).values_list('name', flat=True))
+            writer.writerow(['Product Filter:', ', '.join(_prod_names) if _prod_names else f'IDs {product_ids}'])
         except Exception:
-            writer.writerow(['Product Filter:', f'Product ID {product_id}'])
+            writer.writerow(['Product Filter:', f'IDs {product_ids}'])
     if table_id != 'all':
         try:
             from restaurant.models import TableInfo as TableInfoModel
@@ -1081,9 +1077,9 @@ def export_csv(request):
         # Filter items for Items column based on active filter.
         # Priority: product (most specific) > subcategory > category > station
         filtered_items = []
-        if product_id != 'all':
+        if product_ids:
             for item in all_items:
-                if str(item.product_id) == str(product_id):
+                if item.product_id in product_ids:
                     filtered_items.append(item)
         elif subcategory_id != 'all':
             # Filter by subcategory
@@ -1103,7 +1099,7 @@ def export_csv(request):
         else:
             # No filter - show all items
             filtered_items = all_items
-        
+
         # Items column: shows filtered items
         items_list = ', '.join([f"{(item.product.name if item.product else '[deleted]')} x{item.quantity}" for item in filtered_items])
 
@@ -1192,7 +1188,10 @@ def export_pdf(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     station_filter = request.GET.get('station_filter', 'all')  # NEW: Station filtering
-    product_id = request.GET.get('product_id', 'all')
+    _raw_product_ids = request.GET.getlist('product_ids') or (
+        [request.GET.get('product_id')] if request.GET.get('product_id', 'all') != 'all' else []
+    )
+    product_ids = [int(p) for p in _raw_product_ids if str(p).strip().isdigit()]
     table_id = request.GET.get('table_id', 'all')
     staff_filter = request.GET.get('staff_filter', 'all')  # NEW: Staff filtering
     restaurant_filter = request.GET.get('restaurant', '').strip()
@@ -1302,12 +1301,22 @@ def export_pdf(request):
     elif payment_status == 'partial':
         orders = orders.filter(payment_status='partial')
     
-    # Apply date filters (these override period if specified)
-    if from_date:
-        orders = orders.filter(created_at__date__gte=from_date)
-    if to_date:
-        orders = orders.filter(created_at__date__lte=to_date)
-    
+    # Apply custom date filters with timezone-aware boundaries (same as dashboard)
+    if (period == 'all' or period == 'custom') and (from_date or to_date):
+        if from_date:
+            try:
+                from_dt = datetime.strptime(from_date, '%Y-%m-%d').date()
+                orders = orders.filter(created_at__gte=timezone.make_aware(datetime.combine(from_dt, datetime.min.time())))
+            except (ValueError, TypeError):
+                pass
+        if to_date:
+            try:
+                to_dt = datetime.strptime(to_date, '%Y-%m-%d').date()
+                end_dt = timezone.make_aware(datetime.combine(to_dt + timedelta(days=1), datetime.min.time()))
+                orders = orders.filter(created_at__lt=end_dt)
+            except (ValueError, TypeError):
+                pass
+
     # Apply station filtering (Kitchen/Bar/All)
     if station_filter == 'kitchen':
         orders = orders.filter(order_items__product__station='kitchen').distinct()
@@ -1317,7 +1326,7 @@ def export_pdf(request):
         orders = orders.filter(order_items__product__station='buffet').distinct()
     elif station_filter == 'service':
         orders = orders.filter(order_items__product__station='service').distinct()
-    
+
     # Apply staff filtering (filter by who created the order)
     if staff_filter != 'all':
         try:
@@ -1326,9 +1335,9 @@ def export_pdf(request):
         except (ValueError, TypeError):
             pass  # Invalid staff_filter, ignore
 
-    # Apply product filter (only orders containing this specific product)
-    if product_id != 'all':
-        orders = orders.filter(order_items__product_id=product_id).distinct()
+    # Apply product filter — OR logic: orders containing ANY of the selected products
+    if product_ids:
+        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
 
     # Apply table filter (only orders from this specific table)
     if table_id != 'all':
@@ -1338,7 +1347,7 @@ def export_pdf(request):
 
     # Calculate summary data for the export
     total_orders = orders.count()
-    _item_filter_active = (product_id != 'all' or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
+    _item_filter_active = (bool(product_ids) or category_id != 'all' or subcategory_id != 'all' or station_filter != 'all')
     if _item_filter_active:
         # AND-chain all active filters (same logic as dashboard) so combined filters are accurate
         _stats_items = OrderItem.objects.filter(order__in=orders)
@@ -1348,8 +1357,8 @@ def export_pdf(request):
             _stats_items = _stats_items.filter(product__sub_category_id=subcategory_id)
         if station_filter != 'all':
             _stats_items = _stats_items.filter(product__station=station_filter)
-        if product_id != 'all':
-            _stats_items = _stats_items.filter(product_id=product_id)
+        if product_ids:
+            _stats_items = _stats_items.filter(product_id__in=product_ids)
         total_revenue = sum(item.quantity * item.unit_price for item in _stats_items) or 0
         total_items = _stats_items.aggregate(total=Sum('quantity'))['total'] or 0
     else:
@@ -1474,11 +1483,13 @@ def export_pdf(request):
     
     if staff_filter != 'all':
         try:
-            staff_user = User.objects.get(id=int(staff_filter))
-            report_info.append(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
+            # SECURITY: only resolve user if they have orders in the already-scoped queryset
+            if orders.filter(ordered_by_id=int(staff_filter)).exists():
+                staff_user = User.objects.get(id=int(staff_filter))
+                report_info.append(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
         except (User.DoesNotExist, ValueError):
             pass
-    
+
     if target_restaurant:
         report_info.append(['Restaurant:', target_restaurant.name])
     
@@ -1494,32 +1505,13 @@ def export_pdf(request):
             id=subcategory_id
         ).values('name').first()
         report_info.append(['Sub Category Filter:', _subcat['name'] if _subcat else f'Sub Category ID {subcategory_id}'])
-    if product_id != 'all':
+    if product_ids:
         try:
             from restaurant.models import Product as ProductModel
-            if target_restaurant:
-                _valid_cats = MainCategory.objects.filter(
-                    Q(restaurant=target_restaurant) |
-                    Q(owner=target_restaurant.main_owner, restaurant__isnull=True)
-                )
-            elif not request.user.is_administrator():
-                _accessible = restaurant_context['accessible_restaurants']
-                _cat_q = Q()
-                for _r in _accessible:
-                    _cat_q |= Q(restaurant=_r)
-                    if _r.main_owner: _cat_q |= Q(owner=_r.main_owner, restaurant__isnull=True)
-                    if _r.branch_owner: _cat_q |= Q(owner=_r.branch_owner, restaurant__isnull=True)
-                _valid_cats = MainCategory.objects.filter(_cat_q)
-            else:
-                _valid_cats = None
-            _prod = (ProductModel.objects.filter(id=product_id, main_category__in=_valid_cats)
-                     if _valid_cats is not None else ProductModel.objects.filter(id=product_id)).first()
-            if _prod:
-                report_info.append(['Product Filter:', _prod.name])
-            else:
-                report_info.append(['Product Filter:', f'Product ID {product_id}'])
+            _prod_names = list(ProductModel.objects.filter(id__in=product_ids).values_list('name', flat=True))
+            report_info.append(['Product Filter:', ', '.join(_prod_names) if _prod_names else f'IDs {product_ids}'])
         except Exception:
-            report_info.append(['Product Filter:', f'Product ID {product_id}'])
+            report_info.append(['Product Filter:', f'IDs {product_ids}'])
     if table_id != 'all':
         try:
             from restaurant.models import TableInfo as TableInfoModel
@@ -1706,7 +1698,7 @@ def export_pdf(request):
                             location_label if idx == 0 else '',  # Only show location name on first row
                             product['product__name'][:20],  # Limit product name length
                             f"{product['total_quantity']:,}",
-                            f"${product['total_revenue']:,.2f}",
+                            f"{currency_symbol}{product['total_revenue']:,.2f}",
                             f"{product_percentage:.1f}%"
                         ])
                     
@@ -1747,9 +1739,9 @@ def export_pdf(request):
         # Filter items for Items column based on active filter.
         # Priority: product (most specific) > subcategory > category > station
         filtered_items = []
-        if product_id != 'all':
+        if product_ids:
             for item in all_items:
-                if str(item.product_id) == str(product_id):
+                if item.product_id in product_ids:
                     filtered_items.append(item)
         elif subcategory_id != 'all':
             # Filter by subcategory
@@ -1895,7 +1887,9 @@ def money_flow(request):
     else:
         orders_qs = Order.objects.none()
 
-    orders_qs = orders_qs.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
+    _mf_start = timezone.make_aware(datetime.combine(date_from, datetime.min.time()))
+    _mf_end   = timezone.make_aware(datetime.combine(date_to + timedelta(days=1), datetime.min.time()))
+    orders_qs = orders_qs.filter(created_at__gte=_mf_start, created_at__lt=_mf_end)
 
     sales_revenue      = orders_qs.filter(payment_status='paid').aggregate(t=Sum('total_amount'))['t'] or 0
     sales_unpaid       = orders_qs.filter(payment_status='unpaid').aggregate(t=Sum('total_amount'))['t'] or 0
@@ -1959,8 +1953,10 @@ def money_flow(request):
         label = day.strftime('%b %d') if delta <= 31 else day.strftime('%Y-%m-%d')
         chart_labels.append(label)
 
+        _day_start = timezone.make_aware(datetime.combine(day, datetime.min.time()))
+        _day_end   = timezone.make_aware(datetime.combine(day + timedelta(days=1), datetime.min.time()))
         day_orders_revenue = orders_qs.filter(
-            created_at__date=day, payment_status='paid'
+            created_at__gte=_day_start, created_at__lt=_day_end, payment_status='paid'
         ).aggregate(t=Sum('total_amount'))['t'] or 0
 
         try:
@@ -1981,7 +1977,7 @@ def money_flow(request):
         chart_out.append(float(max(0, day_inv_spent - day_inv_refunds)))
 
     from admin_panel.restaurant_utils import get_restaurant_context as _get_rc
-    _restaurant_context = _get_rc(request.user, request.session.get('current_restaurant_id'), request)
+    _restaurant_context = _get_rc(request.user, request.session.get('selected_restaurant_id'), request)
 
     import json
     context = {

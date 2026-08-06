@@ -660,7 +660,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
               anchor={
                 <Button mode="outlined" onPress={() => setTableMenuVisible(true)}
                   icon="table-chair" style={{ marginBottom: 4 }}>
-                  {targetTable ? `Table ${targetTable.table_number}` : 'Select available table'}
+                  {targetTable ? `Table ${targetTable.table_number ?? targetTable.tbl_no}` : 'Select available table'}
                 </Button>
               }
             >

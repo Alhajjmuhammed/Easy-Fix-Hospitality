@@ -11,7 +11,6 @@ import {
   Text,
   Card,
   Button,
-  IconButton,
   TextInput,
   Dialog,
   Portal,
@@ -41,6 +40,7 @@ const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
   { value: 'card',    label: 'Card' },
   { value: 'digital', label: 'Digital' },
+  { value: 'voucher', label: 'Voucher' },
 ];
 
 const STATUS_FILTER_OPTIONS = [
@@ -381,13 +381,13 @@ export default function CCPaymentsScreen({ navigation }) {
           />
           <Divider />
           {allTables.map((t) => {
-            const active = String(tableFilter) === String(t.table_number);
+            const active = String(tableFilter) === String(t.table_number ?? t.tbl_no);
             return (
               <Menu.Item
                 key={t.id}
-                title={`Table ${t.table_number}`}
+                title={`Table ${t.table_number ?? t.tbl_no}`}
                 leadingIcon={active ? 'check' : (t.is_available ? 'circle-outline' : 'circle')}
-                onPress={() => { setTableFilter(String(t.table_number)); setTableMenuOpen(false); }}
+                onPress={() => { setTableFilter(String(t.table_number ?? t.tbl_no)); setTableMenuOpen(false); }}
                 titleStyle={[
                   active && { color: '#2c3e50', fontFamily: 'Poppins_700Bold' },
                   !t.is_available && !active && { color: '#FF8F00' },
@@ -596,7 +596,7 @@ export default function CCPaymentsScreen({ navigation }) {
                         ]}
                         textStyle={!t.is_available ? { color: '#FF8F00' } : undefined}
                       >
-                        {t.table_number || `Table ${t.table_number}`}
+                        {`Table ${t.table_number ?? t.tbl_no}`}
                         {!t.is_available ? ' â—' : ''}
                       </Chip>
                     ))}
@@ -658,7 +658,6 @@ const styles = StyleSheet.create({
   amountRow:    { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap' },
   meta:         { opacity: 0.65, marginBottom: 4 },
   actions:      { flexDirection: 'row', paddingHorizontal: 4, paddingBottom: 4, gap: 0 },
-  iconBtn:      { margin: 2 },
   dialogMeta:   { opacity: 0.7, marginBottom: 4 },
   dialogInput:  { marginBottom: 10 },
   methodLabel:  { marginBottom: 6, opacity: 0.7 },

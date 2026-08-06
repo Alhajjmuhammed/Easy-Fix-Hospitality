@@ -144,15 +144,8 @@ export default function PlaceOrderScreen({ navigation }) {
 
         clearCart();
         setSnack('Order saved – will sync when online');
-        const isRemoteOffline = orderType === 'delivery' || orderType === 'pickup';
-        setTimeout(async () => {
-          if (isRemoteOffline) {
-            const { setRestaurant } = useAuthStore.getState();
-            try { await setRestaurant(null); } catch { /* ignore */ }
-            navigation.reset({ index: 0, routes: [{ name: 'RestaurantSelector' }] });
-          } else {
-            navigation.reset({ index: 0, routes: [{ name: 'TableSelection' }] });
-          }
+        setTimeout(() => {
+          navigation.reset({ index: 0, routes: [{ name: 'TableSelection' }] });
         }, 1500);
       }
     } catch (err) {

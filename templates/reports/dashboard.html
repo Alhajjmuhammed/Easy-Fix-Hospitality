@@ -17,6 +17,8 @@
     .summary-card-value { font-size: 1rem; }
     .summary-card-icon { display: none !important; }
 }
+/* Item-list separator — avoids trailing commas from forloop.last on filtered subsets */
+.item-sep + .item-sep::before { content: ", "; }
 </style>
 {% endblock %}
 
@@ -248,7 +250,7 @@
                     <div class="row">
                         {% for product in top_products %}
                         <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="card border-left-{{ product.product__station|yesno:'success,info' }} shadow h-100">
+                            <div class="card border-left-{% if product.product__station == 'kitchen' %}success{% else %}info{% endif %} shadow h-100">
                                 <div class="card-body">
                                     <div class="row no-gutters align-items-center">
                                         <div class="col mr-2">
@@ -365,15 +367,40 @@
                 </div>
 
                 <div class="col-lg-2 col-md-4">
-                    <label for="product_id" class="form-label font-weight-bold">Product</label>
-                    <select class="form-control" id="product_id" name="product_id" onchange="this.form.submit()">
-                        <option value="all" {% if selected_product == 'all' or not selected_product %}selected{% endif %}>All Products</option>
-                        {% for product in products %}
-                            <option value="{{ product.id }}" {% if selected_product == product.id|stringformat:"s" %}selected{% endif %}>
-                                {{ product.main_category.name }} &mdash; {{ product.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
+                    <label class="form-label font-weight-bold">Product</label>
+                    <div class="dropdown w-100" id="productDropdownWrap">
+                        <button class="btn btn-outline-secondary btn-sm w-100 text-start d-flex justify-content-between align-items-center"
+                                type="button" id="productDropdownBtn"
+                                data-bs-toggle="dropdown" data-toggle="dropdown"
+                                aria-haspopup="true" aria-expanded="false">
+                            <span id="productBtnLabel" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">
+                                {% if selected_product_names %}{{ selected_product_names|join:", " }}{% else %}All Products{% endif %}
+                            </span>
+                            <i class="fas fa-chevron-down ms-1 ml-1" style="font-size:0.7rem;flex-shrink:0;"></i>
+                        </button>
+                        <div class="dropdown-menu p-2 shadow" aria-labelledby="productDropdownBtn"
+                             style="min-width:240px;max-height:280px;overflow-y:auto;">
+                            {% if not products %}
+                                <span class="text-muted small px-2">No products available</span>
+                            {% else %}
+                                {% for product in products %}
+                                <div class="form-check py-1 px-3">
+                                    <input class="form-check-input product-cb" type="checkbox"
+                                           name="product_ids" value="{{ product.id }}"
+                                           id="prod_{{ product.id }}"
+                                           {% if product.id in selected_product_ids %}checked{% endif %}>
+                                    <label class="form-check-label small" for="prod_{{ product.id }}">
+                                        <span class="text-muted">{{ product.main_category.name }}</span> &mdash; {{ product.name }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            <div class="d-flex gap-1 mt-2 px-2">
+                                <button type="button" class="btn btn-sm btn-primary flex-fill" onclick="applyProducts()">Apply</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="clearProducts()">Clear</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-lg-2 col-md-4">
@@ -426,12 +453,12 @@
                 </div>
                 
                 <div class="col-lg-12 col-md-12 d-flex align-items-end justify-content-end">
-                    <a href="{% url 'reports:export_csv' %}?payment_status={{ payment_status }}&payment_method={{ payment_method }}&station_filter={{ station_filter }}&staff_filter={{ staff_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-success me-3">
-                        <i class="fas fa-download mr-2"></i>Export CSV
-                    </a>
-                    <a href="{% url 'reports:export_pdf' %}?payment_status={{ payment_status }}&payment_method={{ payment_method }}&station_filter={{ station_filter }}&staff_filter={{ staff_filter }}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}" class="btn btn-danger">
-                        <i class="fas fa-file-pdf mr-2"></i>Export PDF
-                    </a>
+                    <button type="button" class="btn btn-success me-3" onclick="exportReport('csv')">
+                        <i class="fas fa-download me-1"></i>Export CSV
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="exportReport('pdf')">
+                        <i class="fas fa-file-pdf me-1"></i>Export PDF
+                    </button>
                 </div>
             </form>
         </div>
@@ -493,24 +520,24 @@
                                 <small>
                                 {% comment %}Filter items based on active filters. Priority: product > subcategory > category > station{% endcomment %}
                                 {% for item in order.order_items.all %}
-                                    {% if selected_product and selected_product != 'all' %}
-                                        {% if item.product.id|stringformat:"s" == selected_product %}
-                                            {{ item.product.name }} x{{ item.quantity }}
+                                    {% if selected_product_ids %}
+                                        {% if item.product.id in selected_product_ids %}
+                                            <span class="item-sep">{{ item.product.name }} x{{ item.quantity }}</span>
                                         {% endif %}
                                     {% elif selected_subcategory and selected_subcategory != 'all' %}
                                         {% if item.product.sub_category and item.product.sub_category.id|stringformat:"s" == selected_subcategory %}
-                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                            <span class="item-sep">{{ item.product.name }} x{{ item.quantity }}</span>
                                         {% endif %}
                                     {% elif selected_category and selected_category != 'all' %}
                                         {% if item.product.main_category.id|stringformat:"s" == selected_category %}
-                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                            <span class="item-sep">{{ item.product.name }} x{{ item.quantity }}</span>
                                         {% endif %}
                                     {% elif station_filter and station_filter != 'all' %}
                                         {% if item.product.station == station_filter %}
-                                            {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                            <span class="item-sep">{{ item.product.name }} x{{ item.quantity }}</span>
                                         {% endif %}
                                     {% else %}
-                                        {{ item.product.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                                        <span class="item-sep">{{ item.product.name }} x{{ item.quantity }}</span>
                                     {% endif %}
                                 {% endfor %}
                                 </small>
@@ -519,11 +546,11 @@
                                 <small>
                                 {% if selected_category_name %}
                                     {{ selected_category_name }}
-                                {% elif selected_product and selected_product != 'all' %}
-                                    {% for item in order.order_items.all %}{% if item.product.id|stringformat:"s" == selected_product %}{{ item.product.main_category.name }}{% endif %}{% endfor %}
+                                {% elif selected_product_ids %}
+                                    {% for item in order.order_items.all %}{% if item.product.id in selected_product_ids %}<span class="item-sep">{{ item.product.main_category.name }}</span>{% endif %}{% endfor %}
                                 {% else %}
                                     {% for item in order.order_items.all %}
-                                        {{ item.product.main_category.name }}{% if not forloop.last %}, {% endif %}
+                                        <span class="item-sep">{{ item.product.main_category.name }}</span>
                                     {% endfor %}
                                 {% endif %}
                                 </small>
@@ -532,11 +559,11 @@
                                 <small>
                                 {% if selected_subcategory_name %}
                                     {{ selected_subcategory_name }}
-                                {% elif selected_product and selected_product != 'all' %}
-                                    {% for item in order.order_items.all %}{% if item.product.id|stringformat:"s" == selected_product %}{% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% endif %}{% endfor %}
+                                {% elif selected_product_ids %}
+                                    {% for item in order.order_items.all %}{% if item.product.id in selected_product_ids %}<span class="item-sep">{% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}</span>{% endif %}{% endfor %}
                                 {% else %}
                                     {% for item in order.order_items.all %}
-                                        {% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}{% if not forloop.last %}, {% endif %}
+                                        <span class="item-sep">{% if item.product.sub_category %}{{ item.product.sub_category.name }}{% else %}-{% endif %}</span>
                                     {% endfor %}
                                 {% endif %}
                                 </small>
@@ -675,12 +702,12 @@
                     <ul class="pagination mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page=1{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page=1{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if payment_method and payment_method != 'all' %}&payment_method={{ payment_method }}{% endif %}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% for pid in selected_product_ids %}&product_ids={{ pid }}{% endfor %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-double-left"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if payment_method and payment_method != 'all' %}&payment_method={{ payment_method }}{% endif %}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% for pid in selected_product_ids %}&product_ids={{ pid }}{% endfor %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-left"></i>
                                 </a>
                             </li>
@@ -693,19 +720,19 @@
                                 </li>
                             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">{{ num }}</a>
+                                    <a class="page-link" href="?page={{ num }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if payment_method and payment_method != 'all' %}&payment_method={{ payment_method }}{% endif %}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% for pid in selected_product_ids %}&product_ids={{ pid }}{% endfor %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">{{ num }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
                         
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if payment_method and payment_method != 'all' %}&payment_method={{ payment_method }}{% endif %}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% for pid in selected_product_ids %}&product_ids={{ pid }}{% endfor %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-right"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% if selected_product and selected_product != 'all' %}&product_id={{ selected_product }}{% endif %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.payment_status %}&payment_status={{ request.GET.payment_status }}{% endif %}{% if payment_method and payment_method != 'all' %}&payment_method={{ payment_method }}{% endif %}{% if request.GET.restaurant %}&restaurant={{ request.GET.restaurant }}{% endif %}{% if request.GET.station_filter %}&station_filter={{ request.GET.station_filter }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if selected_category != 'all' %}&category_id={{ selected_category }}{% endif %}{% if selected_subcategory != 'all' %}&subcategory_id={{ selected_subcategory }}{% endif %}{% if staff_filter != 'all' %}&staff_filter={{ staff_filter }}{% endif %}{% for pid in selected_product_ids %}&product_ids={{ pid }}{% endfor %}{% if selected_table and selected_table != 'all' %}&table_id={{ selected_table }}{% endif %}">
                                     <i class="fas fa-angle-double-right"></i>
                                 </a>
                             </li>
@@ -744,6 +771,50 @@ function toggleDateFields() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     toggleDateFields();
+    updateProductBtnLabel();
+
+    // Keep product dropdown open when clicking checkboxes
+    var dropMenu = document.querySelector('#productDropdownWrap .dropdown-menu');
+    if (dropMenu) {
+        dropMenu.addEventListener('click', function(e) {
+            if (e.target.type === 'checkbox' || e.target.tagName === 'LABEL') {
+                e.stopPropagation();
+                updateProductBtnLabel();
+            }
+        });
+    }
 });
+
+function updateProductBtnLabel() {
+    var checked = document.querySelectorAll('.product-cb:checked');
+    var label = document.getElementById('productBtnLabel');
+    if (!label) return;
+    if (checked.length === 0) {
+        label.textContent = 'All Products';
+    } else {
+        var names = Array.from(checked).map(function(cb) {
+            var lbl = document.querySelector('label[for="' + cb.id + '"]');
+            if (!lbl) return '';
+            return lbl.textContent.trim().split('—').pop().trim();
+        });
+        label.textContent = names.join(', ');
+    }
+}
+
+function applyProducts() {
+    document.getElementById('reportFilterForm').submit();
+}
+
+function clearProducts() {
+    document.querySelectorAll('.product-cb').forEach(function(cb) { cb.checked = false; });
+    document.getElementById('reportFilterForm').submit();
+}
+
+function exportReport(type) {
+    var form = document.getElementById('reportFilterForm');
+    var baseUrl = type === 'csv' ? "{% url 'reports:export_csv' %}" : "{% url 'reports:export_pdf' %}";
+    var params = new URLSearchParams(new FormData(form));
+    window.location.href = baseUrl + '?' + params.toString();
+}
 </script>
 {% endblock %}

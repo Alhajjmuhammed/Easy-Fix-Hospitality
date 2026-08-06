@@ -42,7 +42,7 @@ def cc_reports(request):
         date_from = today
         date_to = today
     elif period == 'weekly':
-        date_from = today - timedelta(days=today.weekday())
+        date_from = today - timedelta(days=6)
         date_to = today
     elif period == 'monthly':
         date_from = today.replace(day=1)
@@ -77,17 +77,25 @@ def cc_reports(request):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
+    _start_dt = timezone.make_aware(datetime.combine(date_from, datetime.min.time()))
+    _end_dt   = timezone.make_aware(datetime.combine(date_to + timedelta(days=1), datetime.min.time()))
     orders = Order.objects.filter(
         _tq,
         ordered_by=request.user,
-        created_at__date__gte=date_from,
-        created_at__date__lte=date_to,
+        created_at__gte=_start_dt,
+        created_at__lt=_end_dt,
     ).distinct()
 
     # --- Payment-status filter ---
     payment_status = request.GET.get('payment_status', 'all')
     if payment_status in ('paid', 'unpaid', 'partial'):
         orders = orders.filter(payment_status=payment_status)
+
+    # --- Product filter (comma-separated IDs, OR logic) ---
+    _raw_pids = request.GET.get('product_ids', '').strip()
+    product_ids = [int(x) for x in _raw_pids.split(',') if x.strip().isdigit()] if _raw_pids else []
+    if product_ids:
+        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
 
     orders = orders.select_related('table_info').prefetch_related(
         'order_items__product__main_category',
@@ -117,6 +125,18 @@ def cc_reports(request):
         'partial_orders': agg['partial_orders'] or 0,
     }
 
+    # --- Products list for picker ---
+    from restaurant.models import Product as _Product, MainCategory as _MainCat
+    _cats = _MainCat.objects.filter(
+        Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner)
+    )
+    products_list = list(
+        _Product.objects.filter(main_category__in=_cats, is_available=True)
+        .select_related('main_category')
+        .order_by('main_category__name', 'name')
+        .values('id', 'name', 'main_category__name')
+    )
+
     # --- Order list (max 100) ---
     orders_list = []
     for order in orders[:100]:
@@ -137,6 +157,8 @@ def cc_reports(request):
         'period':  period,
         'date_from': str(date_from),
         'date_to':   str(date_to),
+        'products': products_list,
+        'selected_product_ids': product_ids,
     })
 
 
@@ -165,7 +187,7 @@ def owner_reports(request):
         date_from = today
         date_to = today
     elif period == 'weekly':
-        date_from = today - timedelta(days=today.weekday())
+        date_from = today - timedelta(days=6)
         date_to = today
     elif period == 'monthly':
         date_from = today.replace(day=1)
@@ -213,15 +235,23 @@ def owner_reports(request):
             Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
         )
 
+    _start_dt = timezone.make_aware(_dt.combine(date_from, _dt.min.time()))
+    _end_dt   = timezone.make_aware(_dt.combine(date_to + timedelta(days=1), _dt.min.time()))
     orders = Order.objects.filter(
         table_q,
-        created_at__date__gte=date_from,
-        created_at__date__lte=date_to,
+        created_at__gte=_start_dt,
+        created_at__lt=_end_dt,
     ).select_related('table_info', 'ordered_by').prefetch_related('payments')
 
     payment_status = request.GET.get('payment_status', 'all')
     if payment_status in ('paid', 'unpaid', 'partial'):
         orders = orders.filter(payment_status=payment_status)
+
+    # --- Product filter (comma-separated IDs, OR logic) ---
+    _raw_pids = request.GET.get('product_ids', '').strip()
+    product_ids = [int(x) for x in _raw_pids.split(',') if x.strip().isdigit()] if _raw_pids else []
+    if product_ids:
+        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
 
     orders = orders.order_by('-created_at')
 
@@ -256,13 +286,25 @@ def owner_reports(request):
     cashier_totals = (
         Payment.objects.filter(
             cashier_table_q,
-            order__created_at__date__gte=date_from,
-            order__created_at__date__lte=date_to,
+            order__created_at__gte=_start_dt,
+            order__created_at__lt=_end_dt,
             is_voided=False,
         )
         .values('processed_by__username', 'processed_by__first_name', 'processed_by__last_name')
         .annotate(collected=_Sum('amount'))
         .order_by('-collected')
+    )
+
+    # --- Products list for picker ---
+    from restaurant.models import Product as _Product, MainCategory as _MainCat
+    _cats = _MainCat.objects.filter(
+        Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner)
+    )
+    products_list = list(
+        _Product.objects.filter(main_category__in=_cats, is_available=True)
+        .select_related('main_category')
+        .order_by('main_category__name', 'name')
+        .values('id', 'name', 'main_category__name')
     )
 
     orders_list = []
@@ -294,6 +336,8 @@ def owner_reports(request):
         'period':   period,
         'date_from': str(date_from),
         'date_to':   str(date_to),
+        'products': products_list,
+        'selected_product_ids': product_ids,
     })
 
 
@@ -324,7 +368,7 @@ def cashier_reports(request):
         date_from = today
         date_to = today
     elif period == 'weekly':
-        date_from = today - timedelta(days=today.weekday())
+        date_from = today - timedelta(days=6)
         date_to = today
     elif period == 'monthly':
         date_from = today.replace(day=1)
@@ -358,15 +402,23 @@ def cashier_reports(request):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
+    _start_dt = timezone.make_aware(_dt.combine(date_from, _dt.min.time()))
+    _end_dt   = timezone.make_aware(_dt.combine(date_to + timedelta(days=1), _dt.min.time()))
     orders = Order.objects.filter(
         _tq,
-        created_at__date__gte=date_from,
-        created_at__date__lte=date_to,
+        created_at__gte=_start_dt,
+        created_at__lt=_end_dt,
     ).distinct()
 
     payment_status_filter = request.GET.get('payment_status', 'all')
     if payment_status_filter in ('paid', 'unpaid', 'partial'):
         orders = orders.filter(payment_status=payment_status_filter)
+
+    # --- Product filter (comma-separated IDs, OR logic) ---
+    _raw_pids = request.GET.get('product_ids', '').strip()
+    product_ids = [int(x) for x in _raw_pids.split(',') if x.strip().isdigit()] if _raw_pids else []
+    if product_ids:
+        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
 
     orders = orders.select_related('table_info', 'ordered_by').prefetch_related(
         'order_items__product', 'payments'
@@ -398,8 +450,8 @@ def cashier_reports(request):
         _ptq,
         processed_by=user,
         is_voided=False,
-        created_at__date__gte=date_from,
-        created_at__date__lte=date_to,
+        created_at__gte=_start_dt,
+        created_at__lt=_end_dt,
     )
     my_collections = my_payments.aggregate(
         total=_Sum('amount'),
@@ -423,6 +475,18 @@ def cashier_reports(request):
         .values('product__name')
         .annotate(qty=Sum('quantity'), revenue=Sum(F('unit_price') * F('quantity')))
         .order_by('-qty')[:5]
+    )
+
+    # --- Products list for picker ---
+    from restaurant.models import Product as _Product, MainCategory as _MainCat
+    _cats = _MainCat.objects.filter(
+        Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner)
+    )
+    products_list = list(
+        _Product.objects.filter(main_category__in=_cats, is_available=True)
+        .select_related('main_category')
+        .order_by('main_category__name', 'name')
+        .values('id', 'name', 'main_category__name')
     )
 
     # --- Order list (max 100, most recent first) ---
@@ -468,4 +532,6 @@ def cashier_reports(request):
         'period':    period,
         'date_from': str(date_from),
         'date_to':   str(date_to),
+        'products': products_list,
+        'selected_product_ids': product_ids,
     })

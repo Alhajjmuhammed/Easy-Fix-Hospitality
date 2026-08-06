@@ -469,12 +469,12 @@ export default function OrderDetailScreen({ route, navigation }) {
               anchor={
                 <Button mode="outlined" onPress={() => setTableMenuVisible(true)}
                   icon="table-chair" style={{ marginBottom: 4 }}>
-                  {targetTable ? `Table ${targetTable.table_number}` : 'Select available table'}
+                  {targetTable ? `Table ${targetTable.table_number ?? targetTable.tbl_no}` : 'Select available table'}
                 </Button>
               }
             >
               {tables.map((t) => (
-                <Menu.Item key={t.id} title={`Table ${t.table_number}`}
+                <Menu.Item key={t.id} title={`Table ${t.table_number ?? t.tbl_no}`}
                   onPress={() => { setTargetTable(t); setTableMenuVisible(false); }} />
               ))}
               {tables.length === 0 && <Menu.Item title="No available tables" disabled />}

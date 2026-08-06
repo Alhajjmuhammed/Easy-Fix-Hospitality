@@ -25,7 +25,7 @@
 
 import { Platform, PermissionsAndroid } from 'react-native';
 import client from '../api/client';
-import { printReceiptLocal, buildReceiptHtml, printTicketLocal } from './printReceipt';
+import { printReceiptLocal, printTicketLocal } from './printReceipt';
 import { usePrinterStore } from '../store/usePrinterStore';
 
 // ─── BT Classic SPP helpers ──────────────────────────────────────────────────
@@ -343,7 +343,7 @@ export async function printReceipt({
         await printNetwork(orderId);
         return true;
       } catch (netErr) {
-        console.warn('[Printer] Network failed → system dialog:', netErr?.message);
+        if (__DEV__) console.warn('[Printer] Network failed → system dialog:', netErr?.message);
       }
     }
     return printReceiptLocal({ order, payment, restaurantName, currencySymbol, staffName });
@@ -356,10 +356,10 @@ export async function printReceipt({
         await printBtClassic({ order, payment, restaurantName, currencySymbol, staffName });
         return true;
       } catch (btErr) {
-        console.warn('[Printer] BT Classic failed → fallback:', btErr?.message);
+        if (__DEV__) console.warn('[Printer] BT Classic failed → fallback:', btErr?.message);
       }
     } else {
-      console.warn('[Printer] BT Classic not available (Expo Go or module missing)');
+      if (__DEV__) console.warn('[Printer] BT Classic not available (Expo Go or module missing)');
     }
 
     // Auto: also try network before giving up
@@ -500,7 +500,7 @@ export async function printOrderTicket(order, restaurantName = '', stationFilter
         await _printTicketBtClassic(opts);
         return true;
       } catch (btErr) {
-        console.warn('[Printer] Ticket BT failed → system dialog:', btErr?.message);
+        if (__DEV__) console.warn('[Printer] Ticket BT failed → system dialog:', btErr?.message);
       }
     }
   }
