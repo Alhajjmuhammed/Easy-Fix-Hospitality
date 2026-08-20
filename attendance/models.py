@@ -82,7 +82,7 @@ class AttendanceRecord(models.Model):
     )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name='managed_attendance',
         null=True,
     )

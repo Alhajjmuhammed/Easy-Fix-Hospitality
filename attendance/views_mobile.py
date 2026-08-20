@@ -2,6 +2,7 @@
 
 from datetime import date, timedelta
 
+from django.db import IntegrityError
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -154,15 +155,19 @@ def attendance_confirm(request):
     restaurant = qr.restaurant
     shift = _best_shift(owner, restaurant, now_time)
 
-    record, created = AttendanceRecord.objects.get_or_create(
-        staff=user,
-        date=today,
-        defaults={
-            'owner': owner,
-            'restaurant': restaurant,
-            'shift': shift,
-        },
-    )
+    try:
+        record, created = AttendanceRecord.objects.get_or_create(
+            staff=user,
+            date=today,
+            defaults={
+                'owner': owner,
+                'restaurant': restaurant,
+                'shift': shift,
+            },
+        )
+    except IntegrityError:
+        record = AttendanceRecord.objects.get(staff=user, date=today)
+        created = False
 
     if action == 'check_in':
         if record.check_in:

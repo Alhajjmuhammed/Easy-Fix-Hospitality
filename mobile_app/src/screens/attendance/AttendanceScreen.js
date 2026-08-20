@@ -10,7 +10,16 @@ import { apiAttendanceScan, apiAttendanceConfirm } from '../../api/attendance';
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function fmtTime(str) {
   if (!str) return '—';
-  // Accept HH:MM:SS or HH:MM
+  // Handles both "HH:MM" shift times and ISO 8601 datetime strings from API
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${m} ${ampm}`;
+  }
+  // Fallback: plain "HH:MM" or "HH:MM:SS"
   const parts = str.split(':');
   const h = parseInt(parts[0], 10);
   const m = parts[1] || '00';
