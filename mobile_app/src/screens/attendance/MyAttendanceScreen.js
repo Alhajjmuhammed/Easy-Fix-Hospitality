@@ -14,11 +14,12 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-function fmtTime(str) {
-  if (!str) return '—';
-  const parts = str.split(':');
-  const h = parseInt(parts[0], 10);
-  const m = parts[1] || '00';
+function fmtTime(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '—';
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:${m} ${ampm}`;
@@ -210,18 +211,14 @@ export default function MyAttendanceScreen() {
     else           setLoading(true);
 
     try {
-      // The API accepts page; filter by year+month if supported, else client-side
-      const data = await apiAttendanceMy(pg);
+      // Pass date range so server returns only the selected month's records
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const from = `${year}-${String(month).padStart(2, '0')}-01`;
+      const to   = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+      const data = await apiAttendanceMy(pg, from, to);
       if (!mountedRef.current) return;
 
-      // Filter by selected year + month (works whether server filters or not)
-      const filtered = (data.results || []).filter((r) => {
-        if (!r.date) return false;
-        const d = new Date(r.date);
-        return d.getFullYear() === year && d.getMonth() + 1 === month;
-      });
-
-      setRecords(filtered);
+      setRecords(data.results || []);
       setPage(data.page || pg);
       setTotalPages(data.num_pages || 1);
     } catch {

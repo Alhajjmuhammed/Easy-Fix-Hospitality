@@ -11,19 +11,37 @@ from .models import AttendanceQRToken, AttendanceRecord, Shift
 
 
 def _best_shift(owner, restaurant, now_time):
-    """Return the Shift whose window best covers now_time, else None."""
-    shifts = Shift.objects.filter(owner=owner, is_active=True)
+    """Return the Shift whose window best covers now_time, else None.
+    Checks restaurant-specific shifts first, then global (restaurant=None) shifts."""
+    def _find_in(qs):
+        for shift in qs:
+            if shift.start_time <= shift.end_time:
+                if shift.start_time <= now_time <= shift.end_time:
+                    return shift
+            else:
+                if now_time >= shift.start_time or now_time <= shift.end_time:
+                    return shift
+        return None
+
+    base_qs = Shift.objects.filter(owner=owner, is_active=True)
+
     if restaurant:
-        shifts = shifts.filter(restaurant=restaurant)
-    for shift in shifts:
-        if shift.start_time <= shift.end_time:
-            if shift.start_time <= now_time <= shift.end_time:
-                return shift
-        else:
-            if now_time >= shift.start_time or now_time <= shift.end_time:
-                return shift
-    # Fall back to any active shift for owner
-    return shifts.first()
+        specific = base_qs.filter(restaurant=restaurant)
+        found = _find_in(specific)
+        if found:
+            return found
+        # Try global shifts (no restaurant) as fallback
+        global_qs = base_qs.filter(restaurant=None)
+        found = _find_in(global_qs)
+        if found:
+            return found
+        return specific.first() or global_qs.first()
+
+    global_qs = base_qs.filter(restaurant=None)
+    found = _find_in(global_qs)
+    if found:
+        return found
+    return global_qs.first()
 
 
 def _record_to_dict(rec):

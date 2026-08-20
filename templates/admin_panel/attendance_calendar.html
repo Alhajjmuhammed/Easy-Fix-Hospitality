@@ -240,6 +240,7 @@
 
 <script>
 const dayModal = new bootstrap.Modal(document.getElementById('dayModal'));
+const DAY_RECORDS_URL = "{% url 'attendance:day_records' %}";
 
 function loadDayRecords(dateStr, dateLabel) {
     document.getElementById('dayModalDate').textContent = dateLabel;
@@ -252,7 +253,7 @@ function loadDayRecords(dateStr, dateLabel) {
         </div>`;
     dayModal.show();
 
-    fetch('/admin-panel/attendance/calendar/day/?date=' + dateStr, {
+    fetch(DAY_RECORDS_URL + '?date=' + dateStr, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(function(res) {

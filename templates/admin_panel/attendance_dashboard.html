@@ -200,15 +200,15 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if rec.check_in %}
-                                    <span class="fw-semibold">{{ rec.check_in|date:"H:i" }}</span>
+                                {% if rec.check_in != '—' %}
+                                    <span class="fw-semibold">{{ rec.check_in }}</span>
                                 {% else %}
                                     <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if rec.check_out %}
-                                    <span class="fw-semibold">{{ rec.check_out|date:"H:i" }}</span>
+                                {% if rec.check_out != '—' %}
+                                    <span class="fw-semibold">{{ rec.check_out }}</span>
                                 {% else %}
                                     <span class="text-muted small fst-italic">Still in</span>
                                 {% endif %}

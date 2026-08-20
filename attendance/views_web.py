@@ -39,10 +39,13 @@ def _require_owner_or_manager(request):
 
 
 def _get_or_create_qr(owner, restaurant):
-    qr, _ = AttendanceQRToken.objects.get_or_create(
-        owner=owner,
-        restaurant=restaurant,
-    )
+    qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=restaurant).first()
+    if not qr:
+        from django.db import IntegrityError
+        try:
+            qr = AttendanceQRToken.objects.create(owner=owner, restaurant=restaurant)
+        except IntegrityError:
+            qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=restaurant).first()
     return qr
 
 
@@ -136,7 +139,11 @@ def attendance_shifts(request):
             shift_type = request.POST.get('shift_type', 'custom')
             start = request.POST.get('start_time', '')
             end = request.POST.get('end_time', '')
-            grace = int(request.POST.get('grace_minutes', 15))
+            try:
+                grace = int(request.POST.get('grace_minutes', 15))
+            except (TypeError, ValueError):
+                grace = 15
+            is_active = request.POST.get('is_active') in ('on', '1', 'true')
             if name and start and end:
                 Shift.objects.create(
                     owner=owner,
@@ -146,6 +153,7 @@ def attendance_shifts(request):
                     start_time=start,
                     end_time=end,
                     grace_minutes=grace,
+                    is_active=is_active,
                 )
                 messages.success(request, f'Shift "{name}" created.')
             else:
@@ -158,8 +166,11 @@ def attendance_shifts(request):
             shift.shift_type = request.POST.get('shift_type', shift.shift_type)
             shift.start_time = request.POST.get('start_time', str(shift.start_time))
             shift.end_time = request.POST.get('end_time', str(shift.end_time))
-            shift.grace_minutes = int(request.POST.get('grace_minutes', shift.grace_minutes))
-            shift.is_active = request.POST.get('is_active') == 'on'
+            try:
+                shift.grace_minutes = int(request.POST.get('grace_minutes', shift.grace_minutes))
+            except (TypeError, ValueError):
+                pass
+            shift.is_active = request.POST.get('is_active') in ('on', '1', 'true')
             shift.save()
             messages.success(request, f'Shift "{shift.name}" updated.')
 
@@ -188,8 +199,11 @@ def attendance_calendar(request):
     owner, restaurant = _get_owner_and_restaurant(request)
 
     today = timezone.localdate()
-    year = int(request.GET.get('year', today.year))
-    month = int(request.GET.get('month', today.month))
+    try:
+        year  = int(request.GET.get('year',  today.year))
+        month = int(request.GET.get('month', today.month))
+    except (TypeError, ValueError):
+        year, month = today.year, today.month
 
     # Clamp month
     if month < 1: month = 12; year -= 1
@@ -386,8 +400,11 @@ def attendance_my(request):
     today = timezone.localdate()
 
     # Default: current month
-    year = int(request.GET.get('year', today.year))
-    month = int(request.GET.get('month', today.month))
+    try:
+        year  = int(request.GET.get('year',  today.year))
+        month = int(request.GET.get('month', today.month))
+    except (TypeError, ValueError):
+        year, month = today.year, today.month
 
     from_date = date(year, month, 1)
     _, days_in_month = monthrange(year, month)

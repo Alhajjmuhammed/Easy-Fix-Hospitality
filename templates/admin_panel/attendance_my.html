@@ -155,7 +155,7 @@
                     <tbody>
                         {% for record in records %}
                         <tr {% if record.date == today %}class="today-row"{% endif %}
-                            data-present="1"
+                            data-present="{% if record.check_in %}1{% else %}0{% endif %}"
                             data-late="{% if record.is_late %}1{% else %}0{% endif %}"
                             data-overtime="{% if record.is_overtime %}1{% else %}0{% endif %}">
                             <td class="ps-4 fw-semibold">
