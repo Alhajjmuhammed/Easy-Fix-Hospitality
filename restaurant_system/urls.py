@@ -14,20 +14,13 @@ from accounts.views import qr_code_access
 
 @require_GET
 def health_check(request):
-    """Health check endpoint for monitoring and load balancers"""
+    """Health check endpoint for load balancers — minimal response, no internal details."""
     try:
-        # Test database connection
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')
-        db_status = 'healthy'
+        return HttpResponse('OK', content_type='text/plain')
     except Exception:
-        db_status = 'unhealthy'
-    
-    return JsonResponse({
-        'status': 'healthy' if db_status == 'healthy' else 'degraded',
-        'database': db_status,
-        'version': '1.0.0'
-    })
+        return HttpResponse('Service Unavailable', status=503, content_type='text/plain')
 
 # Import security views
 try:
@@ -76,6 +69,7 @@ urlpatterns = [
     path('orders/', include('orders.urls')),
     path('restaurant/', include('restaurant.urls')),
     path('api/v1/', include('mobile_api.urls')),  # Mobile REST API
+    path('admin-panel/attendance/', include(('attendance.urls', 'attendance'), namespace='attendance')),
 ]
 
 if settings.DEBUG:

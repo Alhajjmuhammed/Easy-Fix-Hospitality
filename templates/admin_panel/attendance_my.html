@@ -1,0 +1,276 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}My Attendance History{% endblock %}
+
+{% block extra_css %}
+<style>
+    .month-nav {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .month-nav a {
+        color: var(--accent-color);
+        text-decoration: none;
+        font-size: 1.05rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 6px;
+        transition: background 0.15s;
+        line-height: 1;
+    }
+    .month-nav a:hover {
+        background: rgba(52,152,219,0.12);
+    }
+    .month-nav-label {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        min-width: 160px;
+        text-align: center;
+    }
+    .summary-stat {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+        transition: transform 0.15s;
+    }
+    .summary-stat:hover {
+        transform: translateY(-2px);
+    }
+    .summary-stat .stat-val {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .summary-stat .stat-lbl {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6c757d;
+        font-weight: 500;
+    }
+    .my-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #495057;
+        border-top: none;
+    }
+    .my-table td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+    .time-mono {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        font-size: 0.88rem;
+    }
+    .hours-cell {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+    .today-row {
+        background: rgba(52,152,219,0.05) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
+                <i class="bi bi-clock-history me-2" style="color: var(--accent-color);"></i>My Attendance History
+            </h4>
+        </div>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="month-nav">
+                <a href="{% url 'attendance:my' %}?year={{ prev_year }}&month={{ prev_month }}" title="Previous month">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+                <span class="month-nav-label">{{ month_name }}</span>
+                <a href="{% url 'attendance:my' %}?year={{ next_year }}&month={{ next_month }}" title="Next month">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </div>
+            <a href="{% url 'attendance:web_checkin' %}" class="btn btn-sm"
+               style="background-color: var(--accent-color); color: #fff;">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Check In / Out
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+
+    <!-- Summary Stats -->
+    {% if records %}
+    <div class="row g-3 mb-4" id="summaryRow">
+        <div class="col-6 col-md-3">
+            <div class="card summary-stat text-center py-3">
+                <div class="stat-val" style="color: var(--primary-color);" id="totalDays">—</div>
+                <div class="stat-lbl">Total Days</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card summary-stat text-center py-3">
+                <div class="stat-val" style="color: var(--success-color);" id="presentDays">—</div>
+                <div class="stat-lbl">Days Present</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card summary-stat text-center py-3">
+                <div class="stat-val" style="color: var(--warning-color);" id="lateDays">—</div>
+                <div class="stat-lbl">Late Days</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card summary-stat text-center py-3">
+                <div class="stat-val" style="color: var(--danger-color);" id="overtimeDays">—</div>
+                <div class="stat-lbl">Overtime Days</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Records Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            {% if records %}
+            <div class="table-responsive">
+                <table class="table table-hover my-table mb-0" id="historyTable">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Date</th>
+                            <th>Day</th>
+                            <th>Shift</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th>Hours</th>
+                            <th>Flags</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr {% if record.date == today %}class="today-row"{% endif %}
+                            data-present="1"
+                            data-late="{% if record.is_late %}1{% else %}0{% endif %}"
+                            data-overtime="{% if record.is_overtime %}1{% else %}0{% endif %}">
+                            <td class="ps-4 fw-semibold">
+                                {{ record.date|date:"N j, Y" }}
+                                {% if record.date == today %}
+                                    <span class="badge bg-primary ms-1" style="font-size: 0.68rem; vertical-align: middle;">Today</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ record.date|date:"D" }}</td>
+                            <td>
+                                {% if record.shift %}
+                                    <span class="text-muted small">{{ record.shift.name }}</span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.check_in %}
+                                    <span class="time-mono">{{ record.check_in|date:"H:i" }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.check_out %}
+                                    <span class="time-mono">{{ record.check_out|date:"H:i" }}</span>
+                                {% else %}
+                                    <span class="text-muted fst-italic small">In progress</span>
+                                {% endif %}
+                            </td>
+                            <td class="hours-cell">
+                                {% if record.work_minutes %}
+                                    <span class="hours-fmt" data-minutes="{{ record.work_minutes }}">
+                                        {{ record.work_minutes }} min
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.is_late %}
+                                    <span class="badge bg-warning text-dark me-1" title="Late by {{ record.late_minutes }} min">
+                                        <i class="bi bi-clock-history me-1"></i>Late
+                                        {% if record.late_minutes %}
+                                            +{{ record.late_minutes }}m
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                                {% if record.is_overtime %}
+                                    <span class="badge bg-danger" title="Overtime {{ record.overtime_minutes }} min">
+                                        <i class="bi bi-lightning me-1"></i>OT
+                                        {% if record.overtime_minutes %}
+                                            +{{ record.overtime_minutes }}m
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                                {% if not record.is_late and not record.is_overtime %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle me-1"></i>On Time
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-calendar-x display-5 mb-3 d-block" style="opacity: 0.3;"></i>
+                <p class="mb-1 fw-semibold">No attendance records for {{ month_name }}.</p>
+                <p class="small mb-3">Records will appear here once you check in.</p>
+                <a href="{% url 'attendance:web_checkin' %}" class="btn btn-sm"
+                   style="background-color: var(--accent-color); color: #fff;">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>Check In Now
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function() {
+    // Format all work_minutes elements as "Xh Ym"
+    document.querySelectorAll('.hours-fmt').forEach(function(el) {
+        var mins = parseInt(el.dataset.minutes, 10);
+        if (!isNaN(mins) && mins > 0) {
+            var h = Math.floor(mins / 60);
+            var m = mins % 60;
+            el.textContent = h > 0 ? (h + 'h ' + (m > 0 ? m + 'm' : '')) : (m + 'm');
+        }
+    });
+
+    // Compute summary stats from table rows
+    var rows = document.querySelectorAll('#historyTable tbody tr');
+    if (!rows.length) return;
+
+    var totalDays = rows.length;
+    var presentDays = 0, lateDays = 0, overtimeDays = 0;
+    rows.forEach(function(row) {
+        if (row.dataset.present === '1') presentDays++;
+        if (row.dataset.late === '1') lateDays++;
+        if (row.dataset.overtime === '1') overtimeDays++;
+    });
+
+    var set = function(id, val) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+    set('totalDays', totalDays);
+    set('presentDays', presentDays);
+    set('lateDays', lateDays);
+    set('overtimeDays', overtimeDays);
+})();
+</script>
+{% endblock %}

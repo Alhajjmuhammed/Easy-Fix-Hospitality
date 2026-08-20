@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
+import StationDashboardScreen from '../screens/station/StationDashboardScreen';
 
 import CCDashboardScreen         from '../screens/customer_care/DashboardScreen';
 import CCPaymentsScreen          from '../screens/customer_care/PaymentsScreen';
@@ -22,12 +23,19 @@ import CashierMyOrdersScreen     from '../screens/cashier/MyOrdersScreen';
 import CashierWasteScreen        from '../screens/cashier/WasteScreen';
 import RestaurantHeader          from '../components/RestaurantHeader';
 import PrinterSettingsScreen     from '../screens/settings/PrinterSettingsScreen';
+import AttendanceScreen          from '../screens/attendance/AttendanceScreen';
+import MyAttendanceScreen        from '../screens/attendance/MyAttendanceScreen';
 
 const Tab = createBottomTabNavigator();
-const CCOrderStack         = createNativeStackNavigator();
-const CCPaymentStack       = createNativeStackNavigator();
-const CashierMyOrdersStack = createNativeStackNavigator();
+const CCOrderStack          = createNativeStackNavigator();
+const CCPaymentStack        = createNativeStackNavigator();
+const CashierMyOrdersStack  = createNativeStackNavigator();
 const CashierDashboardStack = createNativeStackNavigator();
+const StationStack          = createNativeStackNavigator();
+const StationTab            = createBottomTabNavigator();
+const AttendanceStack       = createNativeStackNavigator();
+
+const STATION_ROLES = ['kitchen', 'bar', 'buffet', 'service'];
 
 function CashierDashboardStackNavigator() {
   return (
@@ -140,15 +148,34 @@ function CCPaymentStackNavigator() {
   );
 }
 
+function AttendanceStackNavigator() {
+  return (
+    <AttendanceStack.Navigator
+      screenOptions={({ navigation }) => ({
+        headerShown: true,
+        header: () => (
+          <RestaurantHeader
+            onBack={navigation.canGoBack() ? () => navigation.goBack() : null}
+          />
+        ),
+      })}
+    >
+      <AttendanceStack.Screen name="AttendanceMain" component={AttendanceScreen} />
+      <AttendanceStack.Screen name="MyAttendance"   component={MyAttendanceScreen} />
+    </AttendanceStack.Navigator>
+  );
+}
+
 const ICONS = {
-  Dashboard: 'view-dashboard',
-  Order:     'food-fork-drink',
-  Payments:  'cash-register',
-  Reports:   'chart-bar',
-  Receipts:  'receipt-text',
-  MyOrders:  'account-clock',
-  Waste:     'trash-can-outline',
-  Settings:  'cog-outline',
+  Dashboard:  'view-dashboard',
+  Order:      'food-fork-drink',
+  Payments:   'cash-register',
+  Reports:    'chart-bar',
+  Receipts:   'receipt-text',
+  MyOrders:   'account-clock',
+  Waste:      'trash-can-outline',
+  Settings:   'cog-outline',
+  Attendance: 'badge-account-outline',
 };
 
 const tabScreenOptions = ({ navigation }) => ({
@@ -162,7 +189,42 @@ const tabScreenOptions = ({ navigation }) => ({
 
 export default function StaffNavigator() {
   const { user } = useAuthStore();
-  const isCashier = user?.role_name === 'cashier';
+  const isCashier  = user?.role_name === 'cashier';
+  const isStation  = STATION_ROLES.includes(user?.role_name);
+
+  // Station staff (kitchen / bar / buffet / service) get Dashboard + Printer Settings
+  if (isStation) {
+    return (
+      <StationTab.Navigator
+        screenOptions={({ route }) => ({
+          headerShown: false,
+          tabBarActiveTintColor: '#2c3e50',
+          tabBarInactiveTintColor: '#9E9E9E',
+          tabBarIcon: ({ color, size }) => {
+            const icons = { Dashboard: 'view-dashboard', Settings: 'cog-outline' };
+            return (
+              <MaterialCommunityIcons
+                name={icons[route.name] || 'circle'}
+                size={size}
+                color={color}
+              />
+            );
+          },
+        })}
+      >
+        <StationTab.Screen
+          name="Dashboard"
+          component={StationDashboardScreen}
+          options={{ title: 'Orders', headerShown: false }}
+        />
+        <StationTab.Screen
+          name="Settings"
+          component={PrinterSettingsScreen}
+          options={{ title: 'Printer', headerShown: false }}
+        />
+      </StationTab.Navigator>
+    );
+  }
 
   return (
     <Tab.Navigator
@@ -216,6 +278,11 @@ export default function StaffNavigator() {
             component={PrinterSettingsScreen}
             options={{ title: 'Printer', headerShown: false }}
           />
+          <Tab.Screen
+            name="Attendance"
+            component={AttendanceStackNavigator}
+            options={{ title: 'Attendance', headerShown: false }}
+          />
         </>
       ) : (
         <>
@@ -249,6 +316,11 @@ export default function StaffNavigator() {
             name="Settings"
             component={PrinterSettingsScreen}
             options={{ title: 'Printer', headerShown: false }}
+          />
+          <Tab.Screen
+            name="Attendance"
+            component={AttendanceStackNavigator}
+            options={{ title: 'Attendance', headerShown: false }}
           />
         </>
       )}

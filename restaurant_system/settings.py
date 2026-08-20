@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'waste_management',
     'reports',
     'inventory',
+    'attendance',
 ]
 
 MIDDLEWARE = [
@@ -343,7 +344,6 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:19006',  # Expo web
 ]
 # Allow all origins in DEBUG mode for mobile development
-CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -355,6 +355,8 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'x-restaurant-id',
+    'x-local-print',
 ]
 
 # Content Security Policy (CSP)
@@ -492,5 +494,17 @@ REST_FRAMEWORK = {
 # Set to True for hosted/remote printing (uses print queue + print client)
 # Set to False for local direct printing (uses win32print directly)
 USE_PRINT_QUEUE = True  # ENABLED for print client - creates PrintJob records
+
+# ============================================================================
+# MESSAGE TAGS — Map Django message levels to Bootstrap 5 alert classes
+# ============================================================================
+from django.contrib.messages import constants as messages
+MESSAGE_TAGS = {
+    messages.DEBUG:   'secondary',
+    messages.INFO:    'info',
+    messages.SUCCESS: 'success',
+    messages.WARNING: 'warning',
+    messages.ERROR:   'danger',
+}
 
 sys.stderr.write("Info: Security configuration loaded\n")

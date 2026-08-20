@@ -1,0 +1,207 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}Attendance QR Code{% endblock %}
+
+{% block extra_css %}
+<style>
+    .qr-card {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        max-width: 380px;
+        margin: 0 auto;
+    }
+    .qr-image-wrap {
+        background: #fff;
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: inline-block;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .qr-image-wrap img {
+        display: block;
+        width: 250px;
+        height: 250px;
+        image-rendering: pixelated;
+    }
+    .qr-token {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        color: #6c757d;
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 0.3rem 0.6rem;
+        word-break: break-all;
+    }
+    .restaurant-name-display {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+    .instructions-list {
+        counter-reset: steps;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .instructions-list li {
+        counter-increment: steps;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.9rem;
+    }
+    .instructions-list li:last-child {
+        border-bottom: none;
+    }
+    .step-num {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent-color);
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* Print styles */
+    @media print {
+        body * { visibility: hidden !important; }
+        #printArea, #printArea * { visibility: visible !important; }
+        #printArea {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        #printArea img {
+            width: 300px !important;
+            height: 300px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <a href="{% url 'attendance:dashboard' %}" class="text-decoration-none text-muted small me-2">
+                <i class="bi bi-arrow-left me-1"></i>Attendance
+            </a>
+            <h4 class="mb-0 fw-bold d-inline-block" style="color: var(--primary-color);">
+                <i class="bi bi-qr-code me-2" style="color: var(--accent-color);"></i>Attendance QR Code
+            </h4>
+            <div class="text-muted small mt-1">Staff scan this QR code with their mobile app to check in/out</div>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+    <div class="row g-4 justify-content-center">
+
+        <!-- QR Code Card -->
+        <div class="col-12 col-md-5 col-lg-4">
+            <div class="card qr-card text-center">
+                <div class="card-body py-4 px-3">
+
+                    <div id="printArea">
+                        <div class="qr-image-wrap mb-3">
+                            <img src="{{ qr_data_uri }}" alt="Attendance QR Code">
+                        </div>
+                        <div class="restaurant-name-display mb-1">{{ restaurant_name }}</div>
+                        <div class="text-muted small mb-3">Scan to check in / check out</div>
+                    </div>
+
+                    <div class="qr-token mb-3" title="QR Token">{{ qr_token }}</div>
+
+                    <div class="text-muted" style="font-size: 0.78rem;">
+                        <i class="bi bi-clock-history me-1"></i>
+                        Last regenerated: {{ regenerated_at|date:"N j, Y H:i" }}
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top pt-3 pb-3 d-flex flex-column gap-2">
+                    <button class="btn w-100"
+                            style="background-color: var(--accent-color); color: #fff;"
+                            onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i>Print QR Code
+                    </button>
+                    <form method="post" action="{% url 'attendance:qr_regenerate' %}"
+                          onsubmit="return confirm('This will invalidate the current QR code. Staff will need to scan the new one. Continue?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="bi bi-arrow-repeat me-1"></i>Regenerate QR
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Card -->
+        <div class="col-12 col-md-7 col-lg-5">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="mb-0 fw-bold" style="color: var(--primary-color);">
+                        <i class="bi bi-info-circle me-2" style="color: var(--accent-color);"></i>
+                        How to Use
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ol class="instructions-list">
+                        <li>
+                            <div class="step-num">1</div>
+                            <div>
+                                <div class="fw-semibold">Open the mobile app</div>
+                                <div class="text-muted small">Make sure you are logged in to the restaurant app.</div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-num">2</div>
+                            <div>
+                                <div class="fw-semibold">Go to the Attendance tab</div>
+                                <div class="text-muted small">Tap the Attendance icon in the bottom navigation.</div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-num">3</div>
+                            <div>
+                                <div class="fw-semibold">Scan this QR code</div>
+                                <div class="text-muted small">Point the camera at the QR code displayed here.</div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-num">4</div>
+                            <div>
+                                <div class="fw-semibold">Confirm check-in or check-out</div>
+                                <div class="text-muted small">The app will detect whether you are checking in or out and confirm the action.</div>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+                <div class="card-footer bg-white border-top">
+                    <div class="d-flex align-items-start gap-2 p-1"
+                         style="background: rgba(243,156,18,0.08); border-radius: 8px; padding: 0.75rem !important;">
+                        <i class="bi bi-exclamation-triangle-fill mt-1" style="color: var(--warning-color); flex-shrink: 0;"></i>
+                        <div style="font-size: 0.82rem; color: #856404;">
+                            <strong>Note:</strong> Regenerating the QR code will immediately invalidate the old one.
+                            All staff must scan the new code for their next attendance action.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

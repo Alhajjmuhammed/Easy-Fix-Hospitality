@@ -1,0 +1,299 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}Attendance - {{ today|date:"N j, Y" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .attendance-stat-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        overflow: hidden;
+    }
+    .attendance-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+    }
+    .stat-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.82rem;
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .nav-action-bar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .attendance-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #495057;
+        border-top: none;
+    }
+    .attendance-table td {
+        vertical-align: middle;
+        font-size: 0.92rem;
+    }
+    .absent-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .absent-item:last-child {
+        border-bottom: none;
+    }
+    .absent-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #6c757d;
+        flex-shrink: 0;
+    }
+    .section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
+                <i class="bi bi-calendar-check me-2" style="color: var(--accent-color);"></i>Today's Attendance
+            </h4>
+            <small class="text-muted">{{ today|date:"l, N j, Y" }}</small>
+        </div>
+        <div class="nav-action-bar">
+            <a href="{% url 'attendance:shifts' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-clock me-1"></i>Shifts
+            </a>
+            <a href="{% url 'attendance:calendar' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-calendar3 me-1"></i>Calendar
+            </a>
+            <a href="{% url 'attendance:qr' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-qr-code me-1"></i>QR Code
+            </a>
+            <a href="{% url 'attendance:web_checkin' %}" class="btn btn-sm" style="background-color: var(--accent-color); color: #fff;">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Web Check-In
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+
+    <!-- Stat Cards -->
+    <div class="row g-3 mb-4">
+        <!-- Total Checked In -->
+        <div class="col-12 col-sm-4">
+            <div class="card attendance-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="stat-icon" style="background: rgba(52,152,219,0.12); color: var(--accent-color);">
+                        <i class="bi bi-box-arrow-in-right"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color: var(--accent-color);">{{ checked_in_count }}</div>
+                        <div class="stat-label">Checked In</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Total Checked Out -->
+        <div class="col-12 col-sm-4">
+            <div class="card attendance-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="stat-icon" style="background: rgba(39,174,96,0.12); color: var(--success-color);">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color: var(--success-color);">{{ checked_out_count }}</div>
+                        <div class="stat-label">Checked Out</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Late Arrivals -->
+        <div class="col-12 col-sm-4">
+            <div class="card attendance-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3">
+                    <div class="stat-icon" style="background: rgba(243,156,18,0.12); color: var(--warning-color);">
+                        <i class="bi bi-alarm"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color: var(--warning-color);">{{ late_count }}</div>
+                        <div class="stat-label">Late Arrivals</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Records Table -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+            <h6 class="mb-0 section-title">
+                <i class="bi bi-people me-2" style="color: var(--accent-color);"></i>
+                Today's Records
+                <span class="badge bg-secondary ms-2" style="font-size: 0.75rem;">{{ records|length }}</span>
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            {% if records %}
+            <div class="table-responsive">
+                <table class="table table-hover attendance-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Staff Name</th>
+                            <th>Role</th>
+                            <th>Shift</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th>Hours</th>
+                            <th>Status</th>
+                            <th>Via</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in records %}
+                        <tr>
+                            <td class="ps-4 fw-semibold">{{ rec.staff_name }}</td>
+                            <td>
+                                <span class="badge bg-light text-dark border">{{ rec.staff_role }}</span>
+                            </td>
+                            <td>
+                                {% if rec.shift_name %}
+                                    <span class="text-muted small">{{ rec.shift_name }}</span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.check_in %}
+                                    <span class="fw-semibold">{{ rec.check_in|date:"H:i" }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.check_out %}
+                                    <span class="fw-semibold">{{ rec.check_out|date:"H:i" }}</span>
+                                {% else %}
+                                    <span class="text-muted small fst-italic">Still in</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.work_display %}
+                                    {{ rec.work_display }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.is_late %}
+                                    <span class="badge bg-warning text-dark me-1">
+                                        <i class="bi bi-clock-history me-1"></i>Late
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success me-1">
+                                        <i class="bi bi-check-circle me-1"></i>On Time
+                                    </span>
+                                {% endif %}
+                                {% if rec.is_overtime %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-lightning me-1"></i>OT
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.check_in_via == 'mobile' %}
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-phone me-1"></i>Mobile
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-globe me-1"></i>Web
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-calendar-x display-5 mb-2 d-block" style="opacity: 0.3;"></i>
+                <p class="mb-0">No check-ins recorded today.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Not Yet Checked In -->
+    {% if absent_staff %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <h6 class="mb-0 section-title">
+                <i class="bi bi-person-x me-2" style="color: var(--danger-color);"></i>
+                Not Yet Checked In
+                <span class="badge ms-2" style="background-color: var(--danger-color); font-size: 0.75rem;">{{ absent_staff|length }}</span>
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                {% for staff in absent_staff %}
+                <div class="col-12 col-md-6 col-xl-4">
+                    <div class="absent-item">
+                        <div class="absent-avatar">
+                            {{ staff.get_full_name|default:staff.username|slice:":1"|upper }}
+                        </div>
+                        <div>
+                            <div class="fw-semibold" style="font-size: 0.9rem;">
+                                {{ staff.get_full_name|default:staff.username }}
+                            </div>
+                            <div class="text-muted" style="font-size: 0.78rem;">
+                                {% if staff.role %}{{ staff.role.name }}{% else %}Staff{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

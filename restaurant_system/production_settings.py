@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'reports',
     'mobile_api',
     'inventory',
+    'attendance',
 ]
 
 MIDDLEWARE = [
@@ -475,6 +476,7 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
     'x-restaurant-id',  # Required for mobile API tenant resolution
+    'x-local-print',    # Mobile app signals it will print KOT/BOT locally
 ]
 
 # Content Security Policy - Stricter for production

@@ -1,0 +1,315 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}Attendance Calendar - {{ month_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cal-nav {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .cal-nav a {
+        color: var(--accent-color);
+        text-decoration: none;
+        font-size: 1.1rem;
+        line-height: 1;
+        padding: 0.3rem 0.6rem;
+        border-radius: 6px;
+        transition: background 0.15s;
+    }
+    .cal-nav a:hover {
+        background: rgba(52,152,219,0.12);
+    }
+    .cal-month-label {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        min-width: 180px;
+        text-align: center;
+    }
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    .cal-day-header {
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6c757d;
+        padding: 0.5rem 0;
+    }
+    .cal-day {
+        border: 1.5px solid #e9ecef;
+        border-radius: 8px;
+        min-height: 80px;
+        padding: 0.4rem 0.5rem;
+        background: #fff;
+        cursor: default;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        position: relative;
+        overflow: hidden;
+    }
+    .cal-day.out-of-month {
+        background: #f8f9fa;
+        opacity: 0.5;
+    }
+    .cal-day.is-today {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+    }
+    .cal-day.has-records {
+        cursor: pointer;
+    }
+    .cal-day.has-records:hover {
+        border-color: var(--accent-color);
+        box-shadow: 0 2px 8px rgba(52,152,219,0.15);
+    }
+    .cal-date-num {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 4px;
+    }
+    .cal-day.is-today .cal-date-num {
+        color: var(--accent-color);
+    }
+    .cal-present-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.72rem;
+        background: rgba(39,174,96,0.12);
+        color: var(--success-color);
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-weight: 600;
+    }
+    .cal-late-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--danger-color);
+        margin-left: 3px;
+        vertical-align: middle;
+    }
+    .cal-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        margin-top: 4px;
+    }
+
+    /* Day Records Modal */
+    .day-records-table th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #495057;
+    }
+    .day-records-table td {
+        font-size: 0.88rem;
+        vertical-align: middle;
+    }
+    #dayModal .modal-header {
+        background: var(--primary-color);
+    }
+    #dayModalBody .spinner-border {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    @media (max-width: 576px) {
+        .cal-day { min-height: 54px; padding: 0.25rem; }
+        .cal-date-num { font-size: 0.75rem; }
+        .cal-present-badge { font-size: 0.65rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <a href="{% url 'attendance:dashboard' %}" class="text-decoration-none text-muted small me-2">
+                <i class="bi bi-arrow-left me-1"></i>Attendance
+            </a>
+            <h4 class="mb-0 fw-bold d-inline-block" style="color: var(--primary-color);">
+                <i class="bi bi-calendar3 me-2" style="color: var(--accent-color);"></i>Attendance Calendar
+            </h4>
+        </div>
+        <div class="cal-nav">
+            <a href="{% url 'attendance:calendar' %}?year={{ prev_year }}&month={{ prev_month }}"
+               title="Previous month">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <span class="cal-month-label">{{ month_name }}</span>
+            <a href="{% url 'attendance:calendar' %}?year={{ next_year }}&month={{ next_month }}"
+               title="Next month">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-3 p-md-4">
+
+            <!-- Day Headers -->
+            <div class="calendar-grid mb-1">
+                {% for day_name in "Mon,Tue,Wed,Thu,Fri,Sat,Sun"|split:"," %}
+                <div class="cal-day-header">{{ day_name }}</div>
+                {% endfor %}
+            </div>
+
+            <!-- Weeks -->
+            {% for week in calendar_data %}
+            <div class="calendar-grid mb-1">
+                {% for day in week %}
+                <div class="cal-day{% if not day.in_month %} out-of-month{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.in_month and day.total > 0 %} has-records{% endif %}"
+                     {% if day.in_month and day.total > 0 %}
+                     onclick="loadDayRecords('{{ day.date|date:"Y-m-d" }}', '{{ day.date|date:"N j, Y" }}')"
+                     title="Click to view records"
+                     {% endif %}>
+                    <div class="cal-date-num">{{ day.date.day }}</div>
+                    {% if day.in_month and day.total > 0 %}
+                    <div class="cal-meta">
+                        <span class="cal-present-badge">
+                            <i class="bi bi-person-check" style="font-size: 0.7rem;"></i>
+                            {{ day.present }}
+                        </span>
+                        {% if day.late > 0 %}
+                        <span title="{{ day.late }} late" style="display:inline-flex;align-items:center;font-size:0.72rem;color:var(--danger-color);">
+                            <span class="cal-late-dot"></span>
+                            <span class="ms-1">{{ day.late }}L</span>
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            <!-- Legend -->
+            <div class="d-flex flex-wrap gap-3 mt-3 pt-2 border-top" style="font-size: 0.78rem; color: #6c757d;">
+                <span><span class="cal-present-badge me-1"><i class="bi bi-person-check" style="font-size:0.7rem;"></i> N</span> Present count</span>
+                <span><span class="cal-late-dot me-1"></span> Late arrivals</span>
+                <span>
+                    <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--accent-color);border-radius:3px;vertical-align:middle;"></span>
+                    Today
+                </span>
+                <span class="fst-italic">Click a day with records to view details</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Day Records Modal -->
+<div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom" style="background: var(--primary-color);">
+                <h5 class="modal-title text-white" id="dayModalLabel">
+                    <i class="bi bi-calendar-day me-2"></i>
+                    <span id="dayModalDate">Records</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="dayModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted mt-2 mb-0 small">Loading records…</p>
+                </div>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const dayModal = new bootstrap.Modal(document.getElementById('dayModal'));
+
+function loadDayRecords(dateStr, dateLabel) {
+    document.getElementById('dayModalDate').textContent = dateLabel;
+    document.getElementById('dayModalBody').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2 mb-0 small">Loading records…</p>
+        </div>`;
+    dayModal.show();
+
+    fetch('/admin-panel/attendance/calendar/day/?date=' + dateStr, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function(res) {
+        if (!res.ok) throw new Error('Server error: ' + res.status);
+        return res.json();
+    })
+    .then(function(data) {
+        if (!data.records || data.records.length === 0) {
+            document.getElementById('dayModalBody').innerHTML =
+                '<div class="text-center text-muted py-4"><i class="bi bi-inbox display-6 d-block mb-2" style="opacity:0.3;"></i>No records for this day.</div>';
+            return;
+        }
+        let rows = data.records.map(function(r) {
+            const lateB = r.is_late
+                ? '<span class="badge bg-warning text-dark me-1">Late</span>'
+                : '<span class="badge bg-success me-1">On Time</span>';
+            const otB = r.is_overtime ? '<span class="badge bg-danger">OT</span>' : '';
+            const viaB = r.check_in_via === 'mobile'
+                ? '<span class="badge bg-primary">Mobile</span>'
+                : '<span class="badge bg-secondary">Web</span>';
+            return `<tr>
+                <td class="ps-3 fw-semibold">${escHtml(r.staff_name)}</td>
+                <td><span class="badge bg-light text-dark border">${escHtml(r.staff_role)}</span></td>
+                <td>${r.check_in || '—'}</td>
+                <td>${r.check_out || '—'}</td>
+                <td>${r.work_display || '—'}</td>
+                <td>${lateB}${otB}</td>
+                <td>${viaB}</td>
+            </tr>`;
+        }).join('');
+        document.getElementById('dayModalBody').innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-hover day-records-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Name</th>
+                            <th>Role</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th>Hours</th>
+                            <th>Status</th>
+                            <th>Via</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+    })
+    .catch(function(err) {
+        document.getElementById('dayModalBody').innerHTML =
+            '<div class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle me-1"></i>Failed to load records. Please try again.</div>';
+    });
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

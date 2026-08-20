@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants, delivery
+from attendance import views_mobile as attendance
 
 app_name = 'mobile_api'
 
@@ -25,7 +26,8 @@ urlpatterns = [
     path('orders/',                                   orders.orders,               name='orders'),
     path('orders/<int:order_id>/',                    orders.order_detail,         name='order_detail'),
     path('orders/<int:order_id>/status/',             orders.update_order_status,  name='update_order_status'),
-    path('orders/<int:order_id>/print-bill/',         orders.print_bill,           name='print_bill'),
+    path('orders/<int:order_id>/print-bill/',           orders.print_bill,            name='print_bill'),
+    path('orders/<int:order_id>/print-station-ticket/', orders.print_station_ticket, name='print_station_ticket'),
     path('orders/<int:order_id>/transfer/',           orders.transfer_table,       name='transfer_table'),
     path('orders/<int:order_id>/cancel/',             orders.cancel_order,         name='cancel_order'),
     path('orders/<int:order_id>/add-items/',          orders.add_items_to_order,   name='add_items_to_order'),
@@ -67,4 +69,10 @@ urlpatterns = [
     path('delivery/<int:order_id>/track/',         delivery.track_order,         name='delivery_track'),
     path('delivery/<int:order_id>/pickup/',        delivery.mark_picked_up,      name='delivery_pickup'),
     path('delivery/<int:order_id>/complete/',      delivery.mark_delivered,      name='delivery_complete'),
+
+    # ── Attendance ────────────────────────────────────────────────────────
+    path('attendance/scan/',    attendance.attendance_scan,    name='attendance_scan'),
+    path('attendance/confirm/', attendance.attendance_confirm, name='attendance_confirm'),
+    path('attendance/my/',      attendance.attendance_my,      name='attendance_my'),
+    path('attendance/status/',  attendance.attendance_status,  name='attendance_status'),
 ]

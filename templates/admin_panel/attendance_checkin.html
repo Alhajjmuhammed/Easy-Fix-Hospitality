@@ -1,0 +1,254 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}My Attendance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .checkin-card {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.09);
+        max-width: 480px;
+        margin: 0 auto;
+    }
+    .status-icon-ring {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin: 0 auto 1rem;
+    }
+    .status-icon-ring.not-checked-in {
+        background: rgba(52,152,219,0.1);
+        color: var(--accent-color);
+    }
+    .status-icon-ring.checked-in {
+        background: rgba(39,174,96,0.12);
+        color: var(--success-color);
+    }
+    .status-icon-ring.checked-out {
+        background: rgba(44,62,80,0.1);
+        color: var(--primary-color);
+    }
+    .time-big {
+        font-size: 2.2rem;
+        font-weight: 700;
+        font-family: 'Courier New', monospace;
+        color: var(--primary-color);
+        line-height: 1;
+    }
+    .time-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6c757d;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+    }
+    .btn-checkin {
+        font-size: 1.05rem;
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+        border-radius: 10px;
+        border: none;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-checkin:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+    .shift-info-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        border: 1px solid #e9ecef;
+        padding: 1rem 1.25rem;
+    }
+    .shift-time-pair {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+    }
+    .shift-time-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .hours-display {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
+                <i class="bi bi-person-check me-2" style="color: var(--accent-color);"></i>My Attendance
+            </h4>
+            <small class="text-muted">
+                {{ today|date:"l, N j, Y" }}
+                <span class="mx-1">·</span>
+                <span class="fw-semibold" style="color: var(--accent-color);">{{ current_time }}</span>
+            </small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'attendance:my' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-clock-history me-1"></i>My History
+            </a>
+            <a href="{% url 'attendance:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-7 col-lg-5">
+
+            <!-- Status Card -->
+            <div class="card checkin-card mb-4">
+                <div class="card-body text-center py-4 px-4">
+
+                    {% if not record %}
+                    <!-- Not checked in -->
+                    <div class="status-icon-ring not-checked-in">
+                        <i class="bi bi-door-open"></i>
+                    </div>
+                    <h5 class="fw-bold mb-1" style="color: var(--primary-color);">Not Checked In</h5>
+                    <p class="text-muted small mb-4">You have not checked in today.</p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="check_in">
+                        <button type="submit" class="btn btn-checkin w-100"
+                                style="background-color: var(--success-color); color: #fff;">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Check In Now
+                        </button>
+                    </form>
+
+                    {% elif record.check_in and not record.check_out %}
+                    <!-- Checked in, not yet checked out -->
+                    <div class="status-icon-ring checked-in">
+                        <i class="bi bi-person-check-fill"></i>
+                    </div>
+                    <div class="mb-3">
+                        <span class="badge px-3 py-2" style="background-color: var(--success-color); font-size: 0.9rem;">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Checked In at {{ record.check_in|date:"H:i" }}
+                        </span>
+                    </div>
+                    {% if record.is_late %}
+                    <div class="mb-3">
+                        <span class="badge bg-warning text-dark px-3 py-2">
+                            <i class="bi bi-clock-history me-1"></i>Late Arrival
+                        </span>
+                    </div>
+                    {% endif %}
+                    <p class="text-muted small mb-4">You are currently on the clock. Check out when your shift ends.</p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="check_out">
+                        <button type="submit" class="btn btn-checkin w-100"
+                                style="background-color: var(--danger-color); color: #fff;">
+                            <i class="bi bi-box-arrow-right me-2"></i>Check Out Now
+                        </button>
+                    </form>
+
+                    {% else %}
+                    <!-- Fully checked out -->
+                    <div class="status-icon-ring checked-out">
+                        <i class="bi bi-calendar2-check-fill"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3" style="color: var(--primary-color);">Shift Complete</h5>
+                    <div class="row g-3 mb-3 text-start">
+                        <div class="col-6">
+                            <div class="time-label">Check In</div>
+                            <div class="time-big">{{ record.check_in|date:"H:i" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="time-label">Check Out</div>
+                            <div class="time-big">{{ record.check_out|date:"H:i" }}</div>
+                        </div>
+                    </div>
+                    {% if record.work_minutes %}
+                    <div class="mb-3">
+                        <div class="time-label">Total Hours</div>
+                        <div class="hours-display" id="hoursDisplay">{{ record.work_minutes }} min</div>
+                    </div>
+                    {% endif %}
+                    <div class="d-flex justify-content-center gap-2 flex-wrap">
+                        {% if record.is_late %}
+                        <span class="badge bg-warning text-dark px-3 py-2">
+                            <i class="bi bi-clock-history me-1"></i>Late
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success px-3 py-2">
+                            <i class="bi bi-check-circle me-1"></i>On Time
+                        </span>
+                        {% endif %}
+                        {% if record.is_overtime %}
+                        <span class="badge bg-danger px-3 py-2">
+                            <i class="bi bi-lightning me-1"></i>Overtime
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+            <!-- Shift Info -->
+            {% if shift %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom py-2">
+                    <h6 class="mb-0 fw-semibold" style="color: var(--primary-color); font-size: 0.9rem;">
+                        <i class="bi bi-clock me-2" style="color: var(--accent-color);"></i>Current Shift
+                    </h6>
+                </div>
+                <div class="card-body py-3">
+                    <div class="fw-bold mb-2">{{ shift.name }}</div>
+                    <div class="shift-time-pair">
+                        <div class="shift-time-item">
+                            <span class="time-label">Start</span>
+                            <span class="fw-semibold" style="font-family: 'Courier New', monospace;">{{ shift.start_time|time:"H:i" }}</span>
+                        </div>
+                        <div class="shift-time-item">
+                            <span class="time-label">End</span>
+                            <span class="fw-semibold" style="font-family: 'Courier New', monospace;">{{ shift.end_time|time:"H:i" }}</span>
+                        </div>
+                        <div class="shift-time-item">
+                            <span class="time-label">Grace</span>
+                            <span class="fw-semibold">{{ shift.grace_minutes }} min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="text-center">
+                <a href="{% url 'attendance:my' %}" class="text-decoration-none text-muted small">
+                    <i class="bi bi-clock-history me-1"></i>View My Attendance History
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+{% if record and record.work_minutes %}
+(function() {
+    var mins = {{ record.work_minutes|default:0 }};
+    var h = Math.floor(mins / 60);
+    var m = mins % 60;
+    var el = document.getElementById('hoursDisplay');
+    if (el) { el.textContent = h + 'h ' + m + 'm'; }
+})();
+{% endif %}
+</script>
+{% endblock %}
