@@ -465,20 +465,26 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
     # ── Channel layer event handlers ──────────────────────────────────────────
 
     async def location_broadcast(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'location_update',
-            'lat': event['lat'],
-            'lng': event['lng'],
-            'timestamp': event['timestamp'],
-        }))
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'location_update',
+                'lat': event['lat'],
+                'lng': event['lng'],
+                'timestamp': event['timestamp'],
+            }))
+        except Exception as e:
+            logger.warning(f"DeliveryConsumer location_broadcast send failed: {e}")
 
     async def delivery_status_update(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'delivery_status',
-            'status': event['status'],
-            'status_display': event['status_display'],
-            'timestamp': event['timestamp'],
-        }))
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'delivery_status',
+                'status': event['status'],
+                'status_display': event['status_display'],
+                'timestamp': event['timestamp'],
+            }))
+        except Exception as e:
+            logger.warning(f"DeliveryConsumer delivery_status_update send failed: {e}")
 
     # ── DB helpers ────────────────────────────────────────────────────────────
 

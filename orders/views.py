@@ -1901,7 +1901,7 @@ def update_order_status(request, order_id):
             # Handle form data
             new_status = request.POST.get('status')
         
-        if new_status not in ['confirmed', 'preparing', 'ready', 'served', 'cancelled']:
+        if new_status not in ['confirmed', 'preparing', 'ready', 'served', 'out_for_delivery', 'delivered', 'cancelled']:
             return JsonResponse({'success': False, 'message': 'Invalid status.'})
         
         # Get order with owner filtering
@@ -1913,9 +1913,9 @@ def update_order_status(request, order_id):
                 Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
                 Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
-            order = get_object_or_404(Order.objects.filter(_oq_uos3), id=order_id)
+            order = get_object_or_404(Order.objects.select_for_update().filter(_oq_uos3), id=order_id)
         else:
-            order = get_object_or_404(Order, id=order_id)
+            order = get_object_or_404(Order.objects.select_for_update(), id=order_id)
         
         # Load order items once — avoids up to 4 separate queries for station checks
         _order_items = list(order.order_items.select_related('product').all())
@@ -1949,8 +1949,10 @@ def update_order_status(request, order_id):
             'pending': ['confirmed', 'cancelled'],
             'confirmed': ['preparing', 'cancelled'],
             'preparing': ['ready', 'cancelled'],
-            'ready': ['served', 'cancelled'],
-            'served': ['cancelled'],  # Allow cancellation even after served (refunds, etc.)
+            'ready': ['served', 'out_for_delivery', 'cancelled'],
+            'served': ['cancelled'],
+            'out_for_delivery': ['delivered', 'cancelled'],
+            'delivered': ['cancelled'],
             'cancelled': []
         }
         
@@ -1981,43 +1983,52 @@ def update_order_status(request, order_id):
             
         order.save()
 
-        # Send real-time notifications
-        async_to_sync(channel_layer.group_send)(
-            f'order_{order.id}',
-            {
-                'type': 'order_status_update',
-                'message': {
+        # Send real-time notifications (non-critical — Redis failure must not roll back order.save())
+        try:
+            async_to_sync(channel_layer.group_send)(
+                f'order_{order.id}',
+                {
+                    'type': 'order_status_update',
                     'order_id': order.id,
                     'order_number': order.order_number,
                     'status': order.status,
                     'status_display': order.get_status_display(),
+                    'message': f'Order updated to {order.get_status_display()}',
                     'updated_by': request.user.get_full_name() or request.user.username,
-                    'timestamp': timezone.now().isoformat()
+                    'timestamp': timezone.now().isoformat(),
                 }
-            }
-        )
+            )
+        except Exception as ws_err:
+            logger.warning(f"WS order notify failed (non-critical): {ws_err}")
 
         # Send notification to restaurant staff
-        if order.ordered_by and order.ordered_by.owner:
-            owner_id = order.ordered_by.owner.id
+        if order.ordered_by:
+            if hasattr(order.ordered_by, 'is_owner') and order.ordered_by.is_owner():
+                owner_id = order.ordered_by.id
+            elif getattr(order.ordered_by, 'owner_id', None):
+                owner_id = order.ordered_by.owner_id
+            elif order.table_info and getattr(order.table_info, 'owner_id', None):
+                owner_id = order.table_info.owner_id
+            else:
+                owner_id = None
         else:
-            owner_id = 'default'
-            
-        async_to_sync(channel_layer.group_send)(
-            f'restaurant_{owner_id}',
-            {
-                'type': 'order_status_update',
-                'message': {
-                    'order_id': order.id,
-                    'order_number': order.order_number,
-                    'status': order.status,
-                    'status_display': order.get_status_display(),
-                    'customer': order.ordered_by.get_full_name() or order.ordered_by.username,
-                    'updated_by': request.user.get_full_name() or request.user.username,
-                    'timestamp': timezone.now().isoformat()
-                }
-            }
-        )
+            owner_id = None
+        if owner_id:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f'restaurant_{owner_id}',
+                    {
+                        'type': 'order_status_update',
+                        'order_id': order.id,
+                        'order_number': order.order_number,
+                        'status': order.status,
+                        'status_display': order.get_status_display(),
+                        'updated_by': request.user.get_full_name() or request.user.username,
+                        'timestamp': timezone.now().isoformat(),
+                    }
+                )
+            except Exception as ws_err:
+                logger.warning(f"WS restaurant notify failed (non-critical): {ws_err}")
 
         # Return appropriate response based on request type
         if request.content_type == 'application/json':
@@ -2110,8 +2121,9 @@ def cancel_order(request, order_id):
                     for item in order.order_items.select_related('product').all():
                         product = item.product
                         if product and product.available_in_stock is not None:
+                            product = Product.objects.select_for_update().get(pk=product.pk)
                             product.available_in_stock += item.quantity
-                            product.save()
+                            product.save(update_fields=['available_in_stock'])
 
                     # Update order
                     order.status = 'cancelled'
@@ -2137,8 +2149,9 @@ def cancel_order(request, order_id):
                 for item in order.order_items.select_related('product').all():
                     product = item.product
                     if product and product.available_in_stock is not None:
+                        product = Product.objects.select_for_update().get(pk=product.pk)
                         product.available_in_stock += item.quantity
-                        product.save()
+                        product.save(update_fields=['available_in_stock'])
                 
                 # Update order
                 order.status = 'cancelled'
@@ -2205,8 +2218,9 @@ def customer_cancel_order(request, order_id):
                     for item in order.order_items.select_related('product').all():
                         product = item.product
                         if product and product.available_in_stock is not None:
+                            product = Product.objects.select_for_update().get(pk=product.pk)
                             product.available_in_stock += item.quantity
-                            product.save()
+                            product.save(update_fields=['available_in_stock'])
 
                     # Update order
                     order.status = 'cancelled'
@@ -2233,8 +2247,9 @@ def customer_cancel_order(request, order_id):
                 for item in order.order_items.select_related('product').all():
                     product = item.product
                     if product and product.available_in_stock is not None:
+                        product = Product.objects.select_for_update().get(pk=product.pk)
                         product.available_in_stock += item.quantity
-                        product.save()
+                        product.save(update_fields=['available_in_stock'])
                 
                 # Update order
                 order.status = 'cancelled'
@@ -3333,14 +3348,17 @@ def mark_bill_request_completed(request, request_id):
         
         # Check ownership using Q-filter (handles both legacy owner FK and new restaurant FK)
         owner = request.user.get_owner()
-        if owner and bill_request.table_info:
-            table_belongs = TableInfo.objects.filter(
-                Q(pk=bill_request.table_info_id) & (
-                    Q(owner=owner) |
-                    Q(restaurant__main_owner=owner) |
-                    Q(restaurant__branch_owner=owner)
-                )
-            ).exists()
+        if owner:
+            if not bill_request.table_info:
+                table_belongs = False
+            else:
+                table_belongs = TableInfo.objects.filter(
+                    Q(pk=bill_request.table_info_id) & (
+                        Q(owner=owner) |
+                        Q(restaurant__main_owner=owner) |
+                        Q(restaurant__branch_owner=owner)
+                    )
+                ).exists()
             if not table_belongs:
                 messages.error(request, 'Access denied.')
                 return redirect('orders:customer_care_dashboard')

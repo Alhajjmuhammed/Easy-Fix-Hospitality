@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useCurrency } from '../../hooks/useCurrency';
 import { FlatList, StyleSheet, View } from 'react-native';
 import {
   Text,
@@ -23,6 +24,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 export default function TableSelectionScreen({ navigation }) {
   const theme = useTheme();
+  const { format } = useCurrency();
   const { setTable, clearCart, setExistingOrder } = useCartStore();
   const { setRestaurant, user } = useAuthStore();
   const isStaff = user?.role_name && user.role_name !== 'customer';
@@ -35,25 +37,32 @@ export default function TableSelectionScreen({ navigation }) {
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const loadTables = useCallback(async () => {
     setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (net.isConnected) {
         const data = await apiTables();
+        if (!mountedRef.current) return;
         await saveTables(data);
         setTables(data);
       } else {
         const local = await getTables();
+        if (!mountedRef.current) return;
         setTables(local);
         setSnack('Offline – showing cached tables');
       }
     } catch {
       const local = await getTables();
+      if (!mountedRef.current) return;
       setTables(local);
       setSnack('Could not refresh – showing cached data');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
@@ -62,7 +71,7 @@ export default function TableSelectionScreen({ navigation }) {
   }, [loadTables]);
 
   const goToMenu = (table) => {
-    const tNum = table.table_number ?? table.tbl_no;
+    const tNum = table.table_number ?? table.tbl_no ?? '?';
     setTable(table.id, `Table ${tNum}`, null);
     navigation.navigate('Menu', { tableId: table.id, tableName: `Table ${tNum}` });
   };
@@ -83,27 +92,27 @@ export default function TableSelectionScreen({ navigation }) {
   };
 
   const handleAddToExisting = async () => {
-    setShowOccupiedDialog(false);
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) {
       setSnack('Offline – cannot fetch active orders. Use "New Order" to continue offline.');
       return;
     }
+    setShowOccupiedDialog(false);
     setLoadingOrders(true);
     try {
       const orders = await apiActiveOrdersForTable(occupiedTable.id);
+      if (!mountedRef.current) return;
       if (!orders || orders.length === 0) {
-        // No orders belong to this user at this table — same as web: show error, stay on table screen.
         setSnack(`You have no active orders at Table ${occupiedTable.table_number ?? occupiedTable.tbl_no}. Choose "New Order" to start one.`);
         return;
       }
-      // Always show picker — even for a single order (matches web behaviour).
       setActiveOrders(orders);
       setShowOrderPicker(true);
     } catch {
-      setSnack('Could not fetch orders. Please try again.');
+      if (mountedRef.current) setSnack('Could not fetch orders. Please try again.');
     } finally {
-      setLoadingOrders(false);
+      if (mountedRef.current) setLoadingOrders(false);
     }
   };
 
@@ -135,8 +144,12 @@ export default function TableSelectionScreen({ navigation }) {
           mode="text"
           compact
           onPress={async () => {
-            await setRestaurant(null);
-            navigation.replace('RestaurantSelector');
+            try {
+              await setRestaurant(null);
+              navigation.replace('RestaurantSelector');
+            } catch {
+              setSnack('Could not change restaurant. Please try again.');
+            }
           }}
           style={styles.changeRestaurantBtn}
           labelStyle={styles.changeRestaurantLabel}
@@ -221,7 +234,7 @@ export default function TableSelectionScreen({ navigation }) {
                         {(order.items || []).map((i) => `${i.product_name} ×${i.quantity}`).join(', ') || 'No items'}
                       </Text>
                       <Text style={{ fontSize: 12, color: '#888', marginTop: 2, fontFamily: 'Poppins_400Regular' }}>
-                        Total: {Number(order.total_amount ?? 0).toFixed(2)} · {order.status} · {order.payment_status}
+                        Total: {format(order.total_amount ?? 0)} · {order.status} · {order.payment_status}
                       </Text>
                     </View>
                   )}

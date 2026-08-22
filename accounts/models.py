@@ -737,7 +737,12 @@ class RestaurantSubscription(models.Model):
         """Update subscription status based on current date"""
         today = date.today()
         old_status = self.subscription_status
-        
+
+        # Fast-path: already expired and owner deactivated — nothing left to do.
+        # Without this guard every authenticated request creates a duplicate SubscriptionLog row.
+        if self.subscription_status == 'expired' and not self.restaurant_owner.is_active:
+            return
+
         # Don't change status if blocked by admin
         if self.is_blocked_by_admin:
             return

@@ -170,36 +170,49 @@ def branch_reports(request):
     if selected_restaurant and selected_restaurant != 'all':
         try:
             selected_rest = restaurants.get(id=selected_restaurant)
-            query = (
-                Q(table_info__restaurant=selected_rest) |
-                Q(table_info__owner=selected_rest.branch_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_rest.branch_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_rest.branch_owner)
-            )
+            query = Q(table_info__restaurant=selected_rest)
+            if selected_rest.branch_owner:
+                query |= Q(table_info__owner=selected_rest.branch_owner)
+                query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_rest.branch_owner)
+                query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_rest.branch_owner)
+            elif selected_rest.main_owner:
+                query |= Q(table_info__owner=selected_rest.main_owner)
+                query |= Q(order_type__in=['delivery', 'pickup'], ordered_by=selected_rest.main_owner)
             restaurant_filter = restaurants.filter(id=selected_restaurant)
         except Restaurant.DoesNotExist:
             pass
     else:
         # All restaurants
         for restaurant in restaurants:
-            restaurant_query = (
-                Q(table_info__restaurant=restaurant) |
-                Q(table_info__owner=restaurant.branch_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
-            )
+            restaurant_query = Q(table_info__restaurant=restaurant)
+            if restaurant.branch_owner:
+                restaurant_query |= Q(table_info__owner=restaurant.branch_owner)
+                restaurant_query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner)
+                restaurant_query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
+            elif restaurant.main_owner:
+                restaurant_query |= Q(table_info__owner=restaurant.main_owner)
+                restaurant_query |= Q(order_type__in=['delivery', 'pickup'], ordered_by=restaurant.main_owner)
             if query:
                 query |= restaurant_query
             else:
                 query = restaurant_query
 
-    orders = Order.objects.filter(query)
-    
+    if not query:
+        orders = Order.objects.none()
+    else:
+        orders = Order.objects.filter(query)
+
     # Apply date filters
     if date_from:
-        orders = orders.filter(created_at__gte=date_from)
+        try:
+            orders = orders.filter(created_at__gte=date_from)
+        except (ValueError, TypeError):
+            pass
     if date_to:
-        orders = orders.filter(created_at__lte=date_to)
+        try:
+            orders = orders.filter(created_at__lte=date_to)
+        except (ValueError, TypeError):
+            pass
     
     # Calculate metrics
     total_orders = orders.count()
@@ -282,7 +295,10 @@ def view_all_orders(request):
         else:
             query = restaurant_query
 
-    orders = Order.objects.filter(query).select_related('table_info', 'ordered_by').prefetch_related('order_items').order_by('-created_at')
+    if not query:
+        orders = Order.objects.none()
+    else:
+        orders = Order.objects.filter(query).select_related('table_info', 'ordered_by').prefetch_related('order_items').order_by('-created_at')
     
     # Filters
     status_filter = request.GET.get('status')

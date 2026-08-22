@@ -18,14 +18,29 @@ export const useAuthStore = create((set, get) => ({
 
   /** Called on app start – restores persisted token */
   loadToken: async () => {
-    const token = await SecureStore.getItemAsync('auth_token');
-    const userJson = await SecureStore.getItemAsync('auth_user');
-    const restaurantId = await SecureStore.getItemAsync('restaurant_id');
-    const lastOnlineAt = await SecureStore.getItemAsync('last_online_at');
+    let token, userJson, restaurantId, lastOnlineAt;
+    try {
+      [token, userJson, restaurantId, lastOnlineAt] = await Promise.all([
+        SecureStore.getItemAsync('auth_token'),
+        SecureStore.getItemAsync('auth_user'),
+        SecureStore.getItemAsync('restaurant_id'),
+        SecureStore.getItemAsync('last_online_at'),
+      ]);
+    } catch (_) {
+      // Keychain unavailable (locked device, corrupted storage) — start as logged out.
+      return;
+    }
 
     if (token && userJson) {
+      const lastOnlineMs = Number(lastOnlineAt) || 0;
+      const now = Date.now();
+
+      // Clock-tamper guard: a future timestamp means the device clock was moved
+      // forward. Treat it the same as an expired session to prevent bypass.
+      const clockTampered = lastOnlineMs > now;
+
       // Enforce 15-day offline grace period
-      if (lastOnlineAt && Date.now() - Number(lastOnlineAt) > OFFLINE_GRACE_MS) {
+      if (lastOnlineAt && (clockTampered || now - lastOnlineMs > OFFLINE_GRACE_MS)) {
         clearClientAuth();
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('auth_user');
@@ -42,13 +57,28 @@ export const useAuthStore = create((set, get) => ({
       // First launch after this feature was added — stamp now so the 15-day
       // window starts from today rather than retroactively locking everyone out.
       if (!lastOnlineAt) {
-        await SecureStore.setItemAsync('last_online_at', String(Date.now()));
+        await SecureStore.setItemAsync('last_online_at', String(now));
+      }
+
+      // Parse cached user data — guard against corrupted SecureStore values.
+      let parsedUser = null;
+      try {
+        parsedUser = JSON.parse(userJson);
+      } catch (_) {
+        // Corrupted JSON — clear everything and force re-login.
+        clearClientAuth();
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('auth_user');
+        await SecureStore.deleteItemAsync('restaurant_id');
+        await SecureStore.deleteItemAsync('last_online_at');
+        set({ error: 'Your session data was corrupted. Please sign in again.' });
+        return;
       }
 
       // Restore cached data immediately so the app can start
       set({
         token,
-        user: JSON.parse(userJson),
+        user: parsedUser,
         restaurantId: restaurantId ? Number(restaurantId) : null,
       });
       // Populate in-memory auth cache so API calls skip SecureStore reads
@@ -57,9 +87,13 @@ export const useAuthStore = create((set, get) => ({
       try {
         const res = await apiMe();
         const freshUser = res.data;
-        await SecureStore.setItemAsync('auth_user', JSON.stringify(freshUser));
-        await SecureStore.setItemAsync('last_online_at', String(Date.now()));
-        set({ user: freshUser });
+        // Guard: logout() may have fired while apiMe() was in flight, clearing the token.
+        // Only restore user if the session is still active.
+        if (get().token) {
+          await SecureStore.setItemAsync('auth_user', JSON.stringify(freshUser));
+          await SecureStore.setItemAsync('last_online_at', String(Date.now()));
+          set({ user: freshUser });
+        }
       } catch (_) {
         // Offline or token expired — keep cached data, logout will handle expiry
       }
@@ -71,19 +105,28 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await apiLogin(username, password);
       const { token, user } = res.data;
+      const restaurantId = res.data.restaurant_id ? Number(res.data.restaurant_id) : null;
 
       await SecureStore.setItemAsync('auth_token', token);
       await SecureStore.setItemAsync('auth_user', JSON.stringify(user));
       await SecureStore.setItemAsync('last_online_at', String(Date.now()));
+      if (restaurantId) {
+        await SecureStore.setItemAsync('restaurant_id', String(restaurantId));
+      } else {
+        await SecureStore.deleteItemAsync('restaurant_id');
+      }
 
-      setClientAuth(token, null);
-      set({ token, user, isLoading: false });
+      setClientAuth(token, restaurantId);
+      // Clear any stale cart from a previous session that may not have been
+      // cleaned up if the app crashed before logout was called.
+      const { useCartStore } = require('./useCartStore');
+      useCartStore.getState().clearCart();
+      set({ token, user, restaurantId, isLoading: false });
       return { success: true, user };
     } catch (err) {
       let message;
       if (!err.response) {
-        // No response = network unreachable (wrong IP or server not running)
-        message = 'Cannot reach server. Check that the API_BASE_URL in config.js matches your machine\'s LAN IP (e.g. http://192.168.x.x:8000/api/v1) and Django is running.';
+        message = 'Cannot connect to server. Please check your internet connection.';
       } else {
         message = err.response?.data?.error || 'Login failed. Check your credentials.';
       }
@@ -119,6 +162,9 @@ export const useAuthStore = create((set, get) => ({
     await SecureStore.deleteItemAsync('auth_user');
     await SecureStore.deleteItemAsync('restaurant_id');
     await SecureStore.deleteItemAsync('last_online_at');
+    // Clear lock PIN — on shared devices the next user must set their own PIN;
+    // inheriting a previous user's PIN can lock them out of the app.
+    try { await SecureStore.deleteItemAsync('app_lock_pin'); } catch (_) {}
     // Clear cart from AsyncStorage and in-memory state — prevents next user
     // on this device seeing previous user's cart (data breach fix)
     const { useCartStore } = require('./useCartStore');
@@ -126,6 +172,10 @@ export const useAuthStore = create((set, get) => ({
     // Reset sync pending count so next user sees 0, not previous user's count
     const { useSyncStore } = require('./useSyncStore');
     useSyncStore.getState().reset();
+    // Reset printer settings to defaults — Bluetooth device paired by one staff
+    // member should not carry over to the next user session.
+    const { usePrinterStore } = require('./usePrinterStore');
+    usePrinterStore.getState().resetSettings();
     // Clear all SQLite cached/offline data — menu, tables, offline orders/payments
     // belong to the previous user's restaurant and must not leak to next user
     try { await clearAllUserData(); } catch (_) {}
@@ -135,11 +185,11 @@ export const useAuthStore = create((set, get) => ({
   /** Customers call this after scanning a QR / selecting a restaurant */
   setRestaurant: async (restaurantId) => {
     if (restaurantId === null || restaurantId === undefined) {
-      await SecureStore.deleteItemAsync('restaurant_id');
+      try { await SecureStore.deleteItemAsync('restaurant_id'); } catch (_) {}
       setClientAuth(get().token, null);
       set({ restaurantId: null });
     } else {
-      await SecureStore.setItemAsync('restaurant_id', String(restaurantId));
+      try { await SecureStore.setItemAsync('restaurant_id', String(restaurantId)); } catch (_) {}
       setClientAuth(get().token, restaurantId);
       set({ restaurantId });
     }
@@ -147,8 +197,8 @@ export const useAuthStore = create((set, get) => ({
 
   /** Silently re-fetch user profile from server — picks up restaurant name,
    *  logo, currency, tax rate changes without requiring a re-login.
-   *  Uses a plain fetch with no axios interceptor so a 401 here does NOT
-   *  trigger auto-logout (avoids logging out users on brief network issues). */
+   *  Goes through the axios client, so a 401 WILL trigger auto-logout via
+   *  the response interceptor in client.js. Other errors are silently ignored. */
   refreshProfile: async () => {
     const token = get().token;
     if (!token) return;
@@ -164,6 +214,8 @@ export const useAuthStore = create((set, get) => ({
       // All other errors (network down, 500, etc.) — ignore silently.
     }
   },
+
+  clearError: () => set({ error: null }),
 
   isAuthenticated: () => !!get().token,
 }));

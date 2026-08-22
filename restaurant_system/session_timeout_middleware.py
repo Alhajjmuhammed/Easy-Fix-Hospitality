@@ -37,24 +37,17 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
         '/api/auth/',  # Only auth API endpoints exempt
         '/api/health/',  # Health check endpoint
         '/orders/api/',  # Print client API (uses token auth)
+        '/api/v1/',  # Mobile app REST API (uses token auth, not session)
     ]
     
     def _is_ajax_request(self, request):
-        """Check if request is AJAX/fetch"""
-        # Check XMLHttpRequest header
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return True
-        # Check Accept header for JSON
         accept = request.headers.get('Accept', '')
-        if 'application/json' in accept:
+        if 'application/json' in accept and 'text/html' not in accept:
             return True
-        # Check Content-Type for JSON
         content_type = request.content_type or ''
         if 'application/json' in content_type:
-            return True
-        # Check if it's a fetch request (usually has specific headers)
-        if request.headers.get('X-CSRFToken'):
-            # If CSRF token is in header (not form), it's likely AJAX
             return True
         return False
     

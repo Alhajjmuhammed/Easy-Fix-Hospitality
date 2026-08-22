@@ -267,8 +267,8 @@ def dashboard(request):
 
     # Get tax rate for display (must come before any tax calculation)
     tax_rate_percentage = 0
-    if orders.exists():
-        first_order = orders.first()
+    first_order = orders.first()
+    if first_order:
         tax_rate_percentage = first_order.tax_rate
     elif target_restaurant and hasattr(target_restaurant, 'tax_rate'):
         tax_rate_percentage = float(target_restaurant.tax_rate * 100)
@@ -282,11 +282,14 @@ def dashboard(request):
     if _item_filter_active:
         total_tax = (Decimal(str(total_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
     else:
-        total_tax = Decimal('0.00')
-        for order in orders:
-            total_tax += order.get_tax_amount()
+        # Compute tax in DB: tax = total_amount - sum(unit_price * quantity) per order.
+        # Replaces N Python-level iterations with 1 DB aggregation.
+        _items_subtotal = OrderItem.objects.filter(order__in=orders).aggregate(
+            t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
+        )['t'] or Decimal('0.00')
         # sum(total_amount) is tax-inclusive; derive pre-tax base to avoid double-counting
         _total_rev_with_tax = Decimal(str(total_revenue))
+        total_tax = max(Decimal('0.00'), _total_rev_with_tax - _items_subtotal)
         total_revenue = _total_rev_with_tax - total_tax
         avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
     total_revenue_with_tax = Decimal(str(total_revenue)) + total_tax
@@ -305,10 +308,12 @@ def dashboard(request):
     if _item_filter_active:
         paid_tax = (Decimal(str(paid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
     else:
-        paid_tax = Decimal('0.00')
-        for order in paid_orders:
-            paid_tax += order.get_tax_amount()
-        paid_revenue = Decimal(str(paid_revenue)) - paid_tax
+        _paid_items_subtotal = OrderItem.objects.filter(order__in=paid_orders).aggregate(
+            t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
+        )['t'] or Decimal('0.00')
+        _paid_rev_with_tax = Decimal(str(paid_revenue))
+        paid_tax = max(Decimal('0.00'), _paid_rev_with_tax - _paid_items_subtotal)
+        paid_revenue = _paid_rev_with_tax - paid_tax
     paid_revenue_with_tax = Decimal(str(paid_revenue)) + paid_tax
 
     unpaid_orders = orders.filter(payment_status='unpaid')
@@ -320,10 +325,12 @@ def dashboard(request):
     if _item_filter_active:
         unpaid_tax = (Decimal(str(unpaid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
     else:
-        unpaid_tax = Decimal('0.00')
-        for order in unpaid_orders:
-            unpaid_tax += order.get_tax_amount()
-        unpaid_revenue = Decimal(str(unpaid_revenue)) - unpaid_tax
+        _unpaid_items_subtotal = OrderItem.objects.filter(order__in=unpaid_orders).aggregate(
+            t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
+        )['t'] or Decimal('0.00')
+        _unpaid_rev_with_tax = Decimal(str(unpaid_revenue))
+        unpaid_tax = max(Decimal('0.00'), _unpaid_rev_with_tax - _unpaid_items_subtotal)
+        unpaid_revenue = _unpaid_rev_with_tax - unpaid_tax
     unpaid_revenue_with_tax = Decimal(str(unpaid_revenue)) + unpaid_tax
 
     partial_orders = orders.filter(payment_status='partial')
@@ -335,10 +342,12 @@ def dashboard(request):
     if _item_filter_active:
         partial_tax = (Decimal(str(partial_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
     else:
-        partial_tax = Decimal('0.00')
-        for order in partial_orders:
-            partial_tax += order.get_tax_amount()
-        partial_revenue = Decimal(str(partial_revenue)) - partial_tax
+        _partial_items_subtotal = OrderItem.objects.filter(order__in=partial_orders).aggregate(
+            t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
+        )['t'] or Decimal('0.00')
+        _partial_rev_with_tax = Decimal(str(partial_revenue))
+        partial_tax = max(Decimal('0.00'), _partial_rev_with_tax - _partial_items_subtotal)
+        partial_revenue = _partial_rev_with_tax - partial_tax
     partial_revenue_with_tax = Decimal(str(partial_revenue)) + partial_tax
     
     # Calculate station-specific metrics
@@ -650,7 +659,8 @@ def export_csv(request):
     if target_restaurant:
         if target_restaurant.is_main_restaurant:
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                                  'payments__processed_by')\
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
@@ -658,7 +668,8 @@ def export_csv(request):
                 )
         else:
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                                  'payments__processed_by')\
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
@@ -666,7 +677,8 @@ def export_csv(request):
                 )
     elif request.user.is_administrator():
         orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category').all()
+            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                              'payments__processed_by').all()
     else:
         accessible_restaurants = restaurant_context['accessible_restaurants']
         if accessible_restaurants.exists():
@@ -679,7 +691,8 @@ def export_csv(request):
                     Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o])
                 )
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                                  'payments__processed_by')\
                 .filter(order_query)
         else:
             orders = Order.objects.none()
@@ -884,15 +897,17 @@ def export_csv(request):
             # SECURITY: only resolve user if they have orders in the already-scoped queryset
             if orders.filter(ordered_by_id=int(staff_filter)).exists():
                 staff_user = User.objects.get(id=int(staff_filter))
-                writer.writerow(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
-        except (User.DoesNotExist, ValueError):
+                role_name = staff_user.role.get_name_display() if staff_user.role_id else 'Unknown'
+                writer.writerow(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({role_name})'])
+        except (User.DoesNotExist, ValueError, AttributeError):
             pass
     if target_restaurant:
         writer.writerow(['Restaurant:', target_restaurant.name])
     if category_id != 'all':
         # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
         _cat = MainCategory.objects.filter(
-            id=category_id
+            id=category_id,
+            product__order_items__order__in=orders
         ).values('name').first()
         writer.writerow(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     if subcategory_id != 'all':
@@ -1125,14 +1140,19 @@ def export_csv(request):
         customer_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name}" if order.ordered_by else 'Walk-in Customer'
         
         # Order By column
-        order_by_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name} ({order.ordered_by.role.get_name_display()})" if order.ordered_by else '-'
+        if order.ordered_by:
+            _ob_role = order.ordered_by.role.get_name_display() if order.ordered_by.role_id else 'Unknown'
+            order_by_name = f"{order.ordered_by.first_name} {order.ordered_by.last_name} ({_ob_role})"
+        else:
+            order_by_name = '-'
         
         # Paid By column - get all payments
         paid_by_names = []
         if hasattr(order, 'payments'):
             for payment in order.payments.all():
                 if not payment.is_voided and payment.processed_by:
-                    paid_by_names.append(f"{payment.processed_by.first_name} {payment.processed_by.last_name} ({payment.processed_by.role.get_name_display()})")
+                    _pb_role = payment.processed_by.role.get_name_display() if payment.processed_by.role_id else 'Unknown'
+                    paid_by_names.append(f"{payment.processed_by.first_name} {payment.processed_by.last_name} ({_pb_role})")
         paid_by_name = ', '.join(paid_by_names) if paid_by_names else '-'
         
         # Get restaurant/branch name for this order
@@ -1220,7 +1240,8 @@ def export_pdf(request):
     if target_restaurant:
         if target_restaurant.is_main_restaurant:
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                                  'payments__processed_by')\
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
@@ -1228,7 +1249,8 @@ def export_pdf(request):
                 )
         else:
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                                  'payments__processed_by')\
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
@@ -1236,7 +1258,8 @@ def export_pdf(request):
                 )
     elif request.user.is_administrator():
         orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category').all()
+            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                              'payments__processed_by').all()
     else:
         accessible_restaurants = restaurant_context['accessible_restaurants']
         if accessible_restaurants.exists():
@@ -1249,7 +1272,8 @@ def export_pdf(request):
                     Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o])
                 )
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
+                                  'payments__processed_by')\
                 .filter(order_query)
         else:
             orders = Order.objects.none()
@@ -1486,8 +1510,9 @@ def export_pdf(request):
             # SECURITY: only resolve user if they have orders in the already-scoped queryset
             if orders.filter(ordered_by_id=int(staff_filter)).exists():
                 staff_user = User.objects.get(id=int(staff_filter))
-                report_info.append(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({staff_user.role.get_name_display()})'])
-        except (User.DoesNotExist, ValueError):
+                _sf_role = staff_user.role.get_name_display() if staff_user.role_id else 'Unknown'
+                report_info.append(['Staff Filter:', f'{staff_user.first_name} {staff_user.last_name} ({_sf_role})'])
+        except (User.DoesNotExist, ValueError, AttributeError):
             pass
 
     if target_restaurant:
@@ -1496,7 +1521,8 @@ def export_pdf(request):
     if category_id != 'all':
         # SECURITY: anchor lookup to already-scoped orders — prevents cross-tenant name leakage
         _cat = MainCategory.objects.filter(
-            id=category_id
+            id=category_id,
+            product__order_items__order__in=orders
         ).values('name').first()
         report_info.append(['Category Filter:', _cat['name'] if _cat else f'Category ID {category_id}'])
     
@@ -1942,37 +1968,66 @@ def money_flow(request):
     net_position     = total_in - total_out
 
     # ── Daily chart data (money in vs out per day in range) ──────────────────
+    # Batch-fetch all daily totals in 4 queries instead of 4*delta queries
+    # (up to 1,460 for a yearly chart). Each map is keyed by date object.
     from collections import defaultdict
+    from django.db.models.functions import TruncDate
     delta = (date_to - date_from).days + 1
     chart_labels = []
     chart_in = []
     chart_out = []
 
+    daily_sales_map = {
+        row['day']: float(row['revenue'] or 0)
+        for row in (
+            orders_qs.filter(payment_status='paid')
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(revenue=Sum('total_amount'))
+            .order_by('day')
+        )
+    }
+
+    try:
+        daily_events_map = {
+            row['event_date']: float(row['collected'] or 0)
+            for row in (
+                events_qs.values('event_date')
+                .annotate(collected=Sum('amount_paid'))
+                .order_by('event_date')
+            )
+        }
+    except Exception:
+        daily_events_map = {}
+
+    daily_inv_spent_map = {
+        row['recorded_at__date']: float(row['spent'] or 0)
+        for row in (
+            inv_qs.exclude(record_type='returned').exclude(unit_price__isnull=True)
+            .values('recorded_at__date')
+            .annotate(spent=Sum(_inv_cost_expr))
+            .order_by('recorded_at__date')
+        )
+    }
+
+    daily_inv_refunds_map = {
+        row['recorded_at__date']: float(row['refunded'] or 0)
+        for row in (
+            inv_qs.filter(record_type='returned').exclude(unit_price__isnull=True)
+            .values('recorded_at__date')
+            .annotate(refunded=Sum(_inv_cost_expr))
+            .order_by('recorded_at__date')
+        )
+    }
+
     for i in range(delta):
         day = date_from + timedelta(days=i)
         label = day.strftime('%b %d') if delta <= 31 else day.strftime('%Y-%m-%d')
         chart_labels.append(label)
-
-        _day_start = timezone.make_aware(datetime.combine(day, datetime.min.time()))
-        _day_end   = timezone.make_aware(datetime.combine(day + timedelta(days=1), datetime.min.time()))
-        day_orders_revenue = orders_qs.filter(
-            created_at__gte=_day_start, created_at__lt=_day_end, payment_status='paid'
-        ).aggregate(t=Sum('total_amount'))['t'] or 0
-
-        try:
-            day_event_collected = events_qs.filter(
-                event_date=day
-            ).aggregate(t=Sum('amount_paid'))['t'] or 0
-        except Exception:
-            day_event_collected = 0
-
-        day_inv_spent = inv_qs.filter(
-            recorded_at__date=day
-        ).exclude(record_type='returned').exclude(unit_price__isnull=True).aggregate(t=Sum(_inv_cost_expr))['t'] or 0
-        day_inv_refunds = inv_qs.filter(
-            recorded_at__date=day, record_type='returned'
-        ).exclude(unit_price__isnull=True).aggregate(t=Sum(_inv_cost_expr))['t'] or 0
-
+        day_orders_revenue = daily_sales_map.get(day, 0)
+        day_event_collected = daily_events_map.get(day, 0)
+        day_inv_spent = daily_inv_spent_map.get(day, 0)
+        day_inv_refunds = daily_inv_refunds_map.get(day, 0)
         chart_in.append(float(day_orders_revenue + day_event_collected))
         chart_out.append(float(max(0, day_inv_spent - day_inv_refunds)))
 
