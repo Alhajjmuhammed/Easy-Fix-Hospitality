@@ -171,6 +171,7 @@ export default function RiderActiveDeliveryScreen({ route }) {
 
     async function startTracking() {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      if (!active) return; // guard: unmount during permission dialog
       if (status !== 'granted') {
         setSnack('Location permission denied — tracking disabled');
         return;
@@ -192,17 +193,16 @@ export default function RiderActiveDeliveryScreen({ route }) {
           const { latitude: lat, longitude: lng } = loc.coords;
           setRiderPos({ lat, lng });
 
-          // Push to map — guard against sensor glitches returning NaN/Infinity
+          // Guard against sensor glitches — gate both map injection and WS send on isFinite
           if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
             webViewRef.current?.injectJavaScript(`updateRider(${lat}, ${lng}); true;`);
-          }
-
-          // Send via WebSocket if open
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'location_update', lat, lng }));
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'location_update', lat, lng }));
+            }
           }
         }
       );
+      if (!active) { sub.remove(); return; } // guard: unmount during watchPositionAsync
       locSubRef.current = sub;
     }
 

@@ -492,28 +492,56 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
     def check_permission(self, user, order_id):
         try:
             order = Order.objects.select_related(
-                'ordered_by', 'table_info__owner'
+                'ordered_by', 'table_info__owner',
+                'table_info__restaurant__main_owner',
+                'table_info__restaurant__branch_owner',
+                'delivery_assignment__rider__user',
             ).get(id=order_id)
 
             if user.is_administrator():
                 return True
             if order.ordered_by == user:
                 return True
-            # Restaurant staff (dine-in orders have table_info)
+
+            # Restaurant staff (dine-in orders with table_info — legacy and new FK chains)
             owner = order.table_info.owner if order.table_info else None
             if owner:
                 if owner == user:
                     return True
-                if hasattr(user, 'owner') and user.owner == owner:
+                if getattr(user, 'owner_id', None) and user.owner == owner:
                     return True
-            # Delivery/pickup orders have no table_info — check via ordered_by.owner
-            if not owner and order.order_type in ('delivery', 'pickup'):
-                order_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
-                if order_owner:
-                    if order_owner == user:
+            if order.table_info and order.table_info.restaurant:
+                rest = order.table_info.restaurant
+                if rest.main_owner == user or rest.branch_owner == user:
+                    return True
+                if getattr(user, 'owner_id', None):
+                    if rest.main_owner_id == user.owner_id or rest.branch_owner_id == user.owner_id:
                         return True
-                    if hasattr(user, 'owner') and user.owner == order_owner:
+
+            # Delivery/pickup orders — use same ownership filter as track_order REST endpoint
+            # so cashiers, managers, and branch owners can connect to the delivery WS.
+            if order.order_type in ('delivery', 'pickup'):
+                _owner_user = None
+                if getattr(user, 'owner_id', None):
+                    _owner_user = user.owner  # staff → their restaurant owner
+                elif hasattr(user, 'is_owner') and (
+                    user.is_owner() or user.is_main_owner() or
+                    user.is_branch_owner() or user.is_manager()
+                ):
+                    _owner_user = user
+                if _owner_user:
+                    from django.db.models import Q as _Q
+                    _stq = (
+                        _Q(table_info__owner=_owner_user) |
+                        _Q(table_info__restaurant__main_owner=_owner_user) |
+                        _Q(table_info__restaurant__branch_owner=_owner_user) |
+                        _Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=_owner_user) |
+                        _Q(order_type__in=['delivery', 'pickup'],
+                           ordered_by__owner__managed_restaurant__main_owner=_owner_user)
+                    )
+                    if Order.objects.filter(_stq, id=order_id).exists():
                         return True
+
             # The assigned rider
             try:
                 assignment = order.delivery_assignment
@@ -531,11 +559,12 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def is_assigned_rider(self, user, order_id):
         try:
-            assignment = DeliveryAssignment.objects.select_related('rider__user').get(
-                order_id=order_id
-            )
-            return assignment.rider.user == user
-        except DeliveryAssignment.DoesNotExist:
+            assignment = DeliveryAssignment.objects.select_related('rider__user').filter(
+                order_id=order_id,
+                status__in=['assigned', 'picked_up'],
+            ).first()
+            return assignment is not None and assignment.rider.user == user
+        except Exception:
             return False
 
     @database_sync_to_async

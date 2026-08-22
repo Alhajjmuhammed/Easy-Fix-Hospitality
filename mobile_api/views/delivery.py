@@ -205,7 +205,10 @@ def assign_rider(request):
             if not rider.is_available:
                 raise ValueError('This rider just became unavailable. Please select another.')
 
+            _prev_rider_ids = list(DeliveryAssignment.objects.filter(order=order).values_list('rider_id', flat=True))
             DeliveryAssignment.objects.filter(order=order).delete()
+            if _prev_rider_ids:
+                DeliveryRider.objects.filter(id__in=_prev_rider_ids).update(is_available=True)
             assignment = DeliveryAssignment.objects.create(order=order, rider=rider)
             rider.is_available = False
             rider.save(update_fields=['is_available'])
@@ -302,7 +305,10 @@ def auto_assign_rider(request):
             if not locked:
                 raise ValueError('Rider was just taken. Try again.')
 
+            _prev_rider_ids = list(DeliveryAssignment.objects.filter(order=order).values_list('rider_id', flat=True))
             DeliveryAssignment.objects.filter(order=order).delete()
+            if _prev_rider_ids:
+                DeliveryRider.objects.filter(id__in=_prev_rider_ids).update(is_available=True)
             assignment = DeliveryAssignment.objects.create(order=order, rider=locked)
             locked.is_available = False
             locked.save(update_fields=['is_available'])
@@ -400,7 +406,13 @@ def track_order(request, order_id):
     GET /api/v1/delivery/<order_id>/track/
     Returns rider's current GPS + assignment details.
     """
-    order = get_object_or_404(Order, id=order_id)
+    order = get_object_or_404(
+        Order.objects.select_related(
+            'ordered_by', 'table_info__owner',
+            'delivery_assignment__rider__user',
+        ).prefetch_related('order_items__product'),
+        id=order_id,
+    )
     user = request.user
 
     # Permission: the customer who placed it, the assigned rider, or restaurant staff

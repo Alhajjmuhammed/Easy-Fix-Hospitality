@@ -34,6 +34,10 @@ export function useOrderWebSocket(orderId, onUpdate) {
   const reconnectRef  = useRef(null);
   const backoffRef    = useRef(2_000);
   const mountedRef    = useRef(true);
+  // Store onUpdate in a ref so callers can pass inline arrows without causing
+  // connect() to be recreated (which would re-open the socket on every render).
+  const onUpdateRef   = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
 
   const cleanup = useCallback(() => {
     clearTimeout(reconnectRef.current);
@@ -57,7 +61,7 @@ export function useOrderWebSocket(orderId, onUpdate) {
     } catch {
       return; // SecureStore unavailable — fall back to polling only
     }
-    if (!mountedRef.current || !token) return;
+    if (!mountedRef.current || !token || !orderId) return;
 
     const url = `${WS_BASE}/ws/order/${orderId}/?token=${encodeURIComponent(token)}`;
 
@@ -84,7 +88,7 @@ export function useOrderWebSocket(orderId, onUpdate) {
           data.type === 'order_status_update' ||
           data.type === 'order_status'
         ) {
-          onUpdate(data);
+          onUpdateRef.current(data);
         }
       } catch {
         // Ignore malformed messages
@@ -106,7 +110,7 @@ export function useOrderWebSocket(orderId, onUpdate) {
       backoffRef.current = Math.min(delay * 2, MAX_BACKOFF_MS);
       reconnectRef.current = setTimeout(connect, delay);
     };
-  }, [orderId, onUpdate, cleanup]);
+  }, [orderId, cleanup]);
 
   useEffect(() => {
     mountedRef.current = true;

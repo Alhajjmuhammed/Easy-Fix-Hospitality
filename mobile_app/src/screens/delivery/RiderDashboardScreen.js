@@ -34,7 +34,7 @@ export default function RiderDashboardScreen() {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
-  const [available, setAvailable]     = useState(true);
+  const [available, setAvailable]     = useState(false);
   const [togglingAvail, setTogglingAvail] = useState(false);
   const [snack, setSnack]             = useState('');
   const [isOffline, setIsOffline]     = useState(false);
@@ -89,7 +89,7 @@ export default function RiderDashboardScreen() {
     const color = STATUS_COLOR[item.status] || '#757575';
     const isActive = ['assigned', 'picked_up'].includes(item.status);
     return (
-      <Card style={styles.card} onPress={() => navigation.navigate('RiderActiveDelivery', { assignmentOrderId: item.order_id })}>
+      <Card style={styles.card} onPress={!isActive ? () => navigation.navigate('RiderActiveDelivery', { assignmentOrderId: item.order_id }) : undefined}>
         <Card.Content>
           <View style={styles.row}>
             <Text variant="titleMedium" style={styles.bold}>Order #{item.order_number}</Text>
@@ -164,7 +164,7 @@ export default function RiderDashboardScreen() {
 
       <FlatList
         data={[...active, ...(recent.length > 0 ? [{ _divider: true }] : []), ...recent]}
-        keyExtractor={(item, i) => item._divider ? 'div' : String(item.order_id)}
+        keyExtractor={(item, i) => item._divider ? 'div' : String(item.order_id ?? i)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
         renderItem={({ item }) => {
           if (item._divider) {

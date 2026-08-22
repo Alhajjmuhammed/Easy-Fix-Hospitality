@@ -1021,11 +1021,11 @@ def order_detail(request, order_id):
     # Build progress steps based on order type
     if order.order_type == 'delivery':
         status_progress = [
-            {'status': 'pending',   'label': 'Order Placed',      'icon': 'bi-receipt',       'description': 'Your order has been received'},
-            {'status': 'confirmed', 'label': 'Confirmed',          'icon': 'bi-check-circle',  'description': 'Restaurant confirmed your order'},
-            {'status': 'preparing', 'label': 'Being Prepared',     'icon': 'bi-hourglass-split','description': 'Kitchen is cooking your order'},
-            {'status': 'ready',     'label': 'Out for Delivery',   'icon': 'bi-bicycle',       'description': 'Your order is on the way'},
-            {'status': 'served',    'label': 'Delivered',          'icon': 'bi-check2-all',    'description': 'Order delivered successfully'},
+            {'status': 'pending',          'label': 'Order Placed',    'icon': 'bi-receipt',        'description': 'Your order has been received'},
+            {'status': 'confirmed',        'label': 'Confirmed',        'icon': 'bi-check-circle',   'description': 'Restaurant confirmed your order'},
+            {'status': 'preparing',        'label': 'Being Prepared',   'icon': 'bi-hourglass-split','description': 'Kitchen is cooking your order'},
+            {'status': 'out_for_delivery', 'label': 'Out for Delivery', 'icon': 'bi-bicycle',        'description': 'Your order is on the way'},
+            {'status': 'delivered',        'label': 'Delivered',        'icon': 'bi-check2-all',     'description': 'Order delivered successfully'},
         ]
     elif order.order_type == 'pickup':
         status_progress = [
@@ -1044,7 +1044,10 @@ def order_detail(request, order_id):
             {'status': 'served',    'label': 'Served',         'icon': 'bi-check2-all',     'description': 'Enjoy your meal!'},
         ]
 
-    status_order = ['pending', 'confirmed', 'preparing', 'ready', 'served']
+    if order.order_type == 'delivery':
+        status_order = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered']
+    else:
+        status_order = ['pending', 'confirmed', 'preparing', 'ready', 'served']
     try:
         current_step = status_order.index(order.status)
         completed_steps = current_step + 1 if order.status != 'cancelled' else 0
