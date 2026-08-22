@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import {
   Text,
@@ -21,6 +21,7 @@ import { apiCreateBillRequest } from '../../api/billRequests';
 import { saveOfflineBillRequest, getOrderById, cacheOrders } from '../../database/operations';
 import NetInfo from '@react-native-community/netinfo';
 import { useSyncStore } from '../../store/useSyncStore';
+import { useCurrency } from '../../hooks/useCurrency';
 
 const STATUS_COLORS = {
   pending:          '#FFA000',
@@ -57,7 +58,16 @@ const DELIVERY_STEPS = [
   { key: 'delivered',        label: 'Delivered',         desc: 'Your order has arrived!' },
 ];
 
+const PICKUP_STEPS = [
+  { key: 'pending',   label: 'Order Placed',      desc: 'Your order has been received' },
+  { key: 'confirmed', label: 'Confirmed',          desc: 'Kitchen has confirmed your order' },
+  { key: 'preparing', label: 'Preparing',          desc: 'Your food is being prepared' },
+  { key: 'ready',     label: 'Ready',              desc: 'Your order is ready for collection' },
+  { key: 'served',    label: 'Collected',          desc: 'Enjoy your meal!' },
+];
+
 const DINE_IN_ORDER   = ['pending','confirmed','preparing','ready','served'];
+const PICKUP_ORDER    = ['pending','confirmed','preparing','ready','served'];
 const DELIVERY_ORDER  = ['pending','confirmed','preparing','ready','out_for_delivery','delivered'];
 
 const POLL_INTERVAL = 60_000; // 60-second safety-net; WebSocket delivers live updates faster
@@ -65,6 +75,7 @@ const POLL_INTERVAL = 60_000; // 60-second safety-net; WebSocket delivers live u
 function getRelativeTime(isoString) {
   try {
     const diffMs = Date.now() - new Date(isoString).getTime();
+    if (isNaN(diffMs) || diffMs < 0) return '';
     const diffSecs = Math.floor(diffMs / 1000);
     if (diffSecs < 60) return `${diffSecs} second${diffSecs !== 1 ? 's' : ''}`;
     const diffMins = Math.floor(diffSecs / 60);
@@ -81,6 +92,10 @@ export default function OrderTrackingScreen({ route }) {
   const theme = useTheme();
   const navigation = useNavigation();
   const { refreshPendingCount } = useSyncStore();
+  const { format: formatCurrency } = useCurrency();
+
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -96,20 +111,24 @@ export default function OrderTrackingScreen({ route }) {
   const fetchOrder = useCallback(async () => {
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (net.isConnected) {
         const data = await apiOrderDetail(orderId);
+        if (!mountedRef.current) return;
         setOrder(data);
         setIsOffline(false);
         try { await cacheOrders([data]); } catch { /* best-effort */ }
       } else {
         setIsOffline(true);
         const cached = await getOrderById(orderId);
+        if (!mountedRef.current) return;
         if (cached) setOrder(cached);
       }
     } catch {
       // Network error — try cache
       try {
         const cached = await getOrderById(orderId);
+        if (!mountedRef.current) return;
         if (cached) {
           setOrder(cached);
           setIsOffline(true);
@@ -118,7 +137,7 @@ export default function OrderTrackingScreen({ route }) {
         // SQLite error — leave existing order state as-is
       }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [orderId]);
 
@@ -139,37 +158,42 @@ export default function OrderTrackingScreen({ route }) {
     setBillRequesting(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (net.isConnected) {
         await apiCreateBillRequest(order.table_info);
+        if (!mountedRef.current) return;
         setOrder((prev) => prev ? { ...prev, pending_bill_requested: true } : prev);
         setSnack('Bill requested – staff have been notified');
       } else {
         await saveOfflineBillRequest(order.table_info);
         await refreshPendingCount();
+        if (!mountedRef.current) return;
         setSnack('Bill request saved – will sync when online');
       }
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Could not request bill');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Could not request bill');
     } finally {
-      setBillRequesting(false);
+      if (mountedRef.current) setBillRequesting(false);
     }
   };
 
   const handleCancelConfirm = async () => {
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to cancel the order'); setCancelVisible(false); return; }
     setCancelling(true);
     try {
       const reason = cancelReason.trim() || 'Changed mind / No longer needed';
       await apiCancelOrder(orderId, reason);
+      if (!mountedRef.current) return;
       setCancelVisible(false);
       setCancelReason('');
       setSnack('Order cancelled');
       fetchOrder(); // refresh
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Could not cancel order');
+      if (mountedRef.current) setSnack(err.response?.data?.error || 'Could not cancel order');
     } finally {
-      setCancelling(false);
+      if (mountedRef.current) setCancelling(false);
     }
   };
 
@@ -199,15 +223,16 @@ export default function OrderTrackingScreen({ route }) {
 
   // Delivery vs dine-in progress
   const isDelivery     = order.order_type === 'delivery';
-  const PROGRESS_STEPS = isDelivery ? DELIVERY_STEPS : DINE_IN_STEPS;
-  const STEP_ORDER     = isDelivery ? DELIVERY_ORDER  : DINE_IN_ORDER;
+  const isPickup       = order.order_type === 'pickup';
+  const PROGRESS_STEPS = isDelivery ? DELIVERY_STEPS : isPickup ? PICKUP_STEPS : DINE_IN_STEPS;
+  const STEP_ORDER     = isDelivery ? DELIVERY_ORDER  : isPickup ? PICKUP_ORDER  : DINE_IN_ORDER;
 
   // Progress tracking
   const currentStepIdx = STEP_ORDER.indexOf(order.status);
   const isCancelled = order.status === 'cancelled';
   const isOutForDelivery = order.status === 'out_for_delivery';
   const isDelivered      = order.status === 'delivered';
-  const fmt = (v) => (v != null ? String(v) : '0.00');
+  const fmt = formatCurrency;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -334,7 +359,7 @@ export default function OrderTrackingScreen({ route }) {
                 ) : null}
               </View>
               <Text variant="bodyMedium" style={{ fontFamily: P400, marginLeft: 8 }}>
-                {item.quantity} × {item.unit_price}
+                {item.quantity} × {formatCurrency(item.unit_price)}
               </Text>
             </View>
           ))}
@@ -373,18 +398,24 @@ export default function OrderTrackingScreen({ route }) {
       </Card>
 
       {/* ── Special Instructions ── */}
-      {order.special_instructions ? (
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="labelLarge" style={{ fontFamily: P600, color: '#9E9E9E', marginBottom: 4 }}>
-              SPECIAL INSTRUCTIONS
-            </Text>
-            <Text variant="bodyMedium" style={{ fontFamily: P400 }}>
-              {order.special_instructions}
-            </Text>
-          </Card.Content>
-        </Card>
-      ) : null}
+      {(() => {
+        const cleaned = (order.special_instructions || '')
+          .replace(/\[offline:[^\]]*\]/g, '')
+          .replace(/\[offline-append:[^\]]*\]/g, '')
+          .trim();
+        return cleaned ? (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="labelLarge" style={{ fontFamily: P600, color: '#9E9E9E', marginBottom: 4 }}>
+                SPECIAL INSTRUCTIONS
+              </Text>
+              <Text variant="bodyMedium" style={{ fontFamily: P400 }}>
+                {cleaned}
+              </Text>
+            </Card.Content>
+          </Card>
+        ) : null;
+      })()}
 
       {/* ── Action buttons ── */}
 
@@ -402,8 +433,8 @@ export default function OrderTrackingScreen({ route }) {
         </Button>
       )}
 
-      {/* Bill request – when served, not yet paid */}
-      {order.status === 'served' && order.payment_status !== 'paid' && (
+      {/* Bill request – dine-in only, when served and not yet paid */}
+      {order.table_info && order.status === 'served' && order.payment_status !== 'paid' && (
         order.pending_bill_requested ? (
           <View style={[styles.infoBanner, { backgroundColor: '#E3F2FD', marginTop: 8 }]}>
             <Text style={{ fontFamily: P700, color: '#1565C0', fontSize: 13, marginBottom: 2 }}>

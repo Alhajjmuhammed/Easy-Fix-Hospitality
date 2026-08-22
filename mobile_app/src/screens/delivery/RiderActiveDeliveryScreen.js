@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { Text, Button, Card, Chip, ActivityIndicator, Snackbar } from 'react-native-paper';
 import { WebView } from 'react-native-webview';
@@ -37,7 +37,7 @@ function buildMapHtml({ riderLat, riderLng, destLat, destLng, destAddress }) {
 </style>
 </head>
 <body>
-${hasDest ? `<div id="addr">📍 ${(destAddress || 'Delivery address').replace(/'/g, "&#39;")}</div>` : ''}
+${hasDest ? `<div id="addr">📍 ${(destAddress || 'Delivery address').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</div>` : ''}
 <div id="map"></div>
 <script>
 var map = L.map('map').setView([${centerLat}, ${centerLng}], 14);
@@ -106,6 +106,7 @@ export default function RiderActiveDeliveryScreen({ route }) {
 
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [loadError, setLoadError]   = useState(false);
   const [actioning, setActioning]   = useState(false);
   const [snack, setSnack]           = useState('');
   const [riderPos, setRiderPos]     = useState(null);
@@ -120,10 +121,12 @@ export default function RiderActiveDeliveryScreen({ route }) {
     try {
       const data = await apiTrackOrder(assignmentOrderId);
       setAssignment(data);
+      setLoadError(false);
       const lat = data?.assignment?.delivery_lat;
       const lng = data?.assignment?.delivery_lng;
       if (lat != null && lng != null) setDestCoords({ lat, lng });
     } catch {
+      setLoadError(true);
       setSnack('Could not load delivery details');
     } finally {
       setLoading(false);
@@ -131,6 +134,19 @@ export default function RiderActiveDeliveryScreen({ route }) {
   }, [assignmentOrderId]);
 
   useEffect(() => { loadAssignment(); }, [loadAssignment]);
+
+  // Stable mapHtml — depends only on the initial API values, NOT riderPos.
+  // Live GPS updates go through injectJavaScript so the WebView never reloads.
+  const mapHtml = useMemo(() => {
+    const a = assignment?.assignment;
+    return buildMapHtml({
+      riderLat: assignment?.rider_lat ?? null,
+      riderLng: assignment?.rider_lng ?? null,
+      destLat:  destCoords?.lat ?? null,
+      destLng:  destCoords?.lng ?? null,
+      destAddress: a?.delivery_address ?? '',
+    });
+  }, [assignment, destCoords]);
 
   // ── Location tracking ────────────────────────────────────────────────────
   useEffect(() => {
@@ -226,21 +242,24 @@ export default function RiderActiveDeliveryScreen({ route }) {
     );
   };
 
-  if (loading || !assignment) {
+  if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" /></View>;
   }
 
-  const a = assignment.assignment;
-  const rLat = assignment.rider_lat;
-  const rLng = assignment.rider_lng;
+  if (!assignment || loadError) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ fontFamily: 'Poppins_400Regular', color: '#757575', marginBottom: 16 }}>
+          Could not load delivery details
+        </Text>
+        <Button mode="outlined" icon="refresh" onPress={loadAssignment}>
+          Retry
+        </Button>
+      </View>
+    );
+  }
 
-  const mapHtml = buildMapHtml({
-    riderLat: riderPos?.lat ?? rLat,
-    riderLng: riderPos?.lng ?? rLng,
-    destLat: destCoords?.lat ?? null,
-    destLng: destCoords?.lng ?? null,
-    destAddress: a?.delivery_address,
-  });
+  const a = assignment.assignment;
 
   const statusColor = { assigned: '#1565C0', picked_up: '#6A1B9A', delivered: '#2E7D32' };
   const col = statusColor[a?.status] || '#757575';

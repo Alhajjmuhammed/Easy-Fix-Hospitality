@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { FlatList, ScrollView, View, StyleSheet, RefreshControl } from 'react-native';
 import {
   Text,
@@ -18,15 +18,9 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiCancelOrder } from '../../api/orders';
 import { getOrders, cacheOrders } from '../../database/operations';
 import { useCartStore } from '../../store/useCartStore';
-
-const STATUS_COLORS = {
-  pending: '#FFA000',
-  confirmed: '#2c3e50',
-  preparing: '#6A1B9A',
-  ready: '#2E7D32',
-  served: '#00796B',
-  cancelled: '#B71C1C',
-};
+import { useAuthStore } from '../../store/useAuthStore';
+import { useCurrency } from '../../hooks/useCurrency';
+import { STATUS_COLORS } from '../../constants/statusColors';
 
 const PAYMENT_COLORS = {
   unpaid:  { bg: '#FFF3E0', text: '#E65100', label: 'Payment Pending' },
@@ -44,7 +38,12 @@ const FILTER_TABS = [
 export default function MyOrdersScreen() {
   const theme = useTheme();
   const navigation = useNavigation();
-  const { setTable, clearCart, addItem } = useCartStore();
+  const { format } = useCurrency();
+  const { restaurantId } = useAuthStore();
+  const { setTable, setRemoteOrder, clearCart, addItem } = useCartStore();
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,32 +58,34 @@ export default function MyOrdersScreen() {
   const [activeFilter, setActiveFilter] = useState('all');
 
   const fetchOrders = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent && mountedRef.current) setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (net.isConnected) {
         const data = await apiOrders();
         const fetched = Array.isArray(data) ? data : data.results || [];
+        if (!mountedRef.current) return;
         setOrders(fetched);
         setIsOffline(false);
         try { await cacheOrders(fetched); } catch { /* best-effort */ }
       } else {
         const cached = await getOrders();
+        if (!mountedRef.current) return;
         setOrders(cached);
         setIsOffline(true);
       }
     } catch {
-      // Network error — fall back to cache
       try {
         const cached = await getOrders();
+        if (!mountedRef.current) return;
         setOrders(cached);
       } catch {
-        setOrders([]);
+        if (mountedRef.current) setOrders([]);
       }
-      setIsOffline(true);
+      if (mountedRef.current) setIsOffline(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
@@ -107,49 +108,61 @@ export default function MyOrdersScreen() {
     }
     setReorderingId(order.id);
     clearCart();
-    // Only set table for dine-in orders — delivery/pickup have no table
-    if (order.order_type !== 'delivery' && order.order_type !== 'pickup' && order.table_info) {
-      setTable(order.table_info, `Table ${order.table_number}`, null);
-    }
     order.items.forEach((item) => {
       addItem(
         {
           id: item.product_id,
           name: item.product_name,
-          current_price: parseFloat(item.unit_price),
+          current_price: item.unit_price != null ? parseFloat(item.unit_price) || 0 : 0,
+          station: item.station || 'kitchen',
         },
         item.quantity,
       );
     });
-    setReorderingId(null);
-    setSnack('Items added to cart!');
-    navigation.navigate('Order', { screen: 'Cart' });
-  }, [clearCart, setTable, addItem, navigation]);
+    if (order.order_type === 'delivery') {
+      // Delivery reorders must collect a fresh address — never pre-fill a stale one.
+      setRemoteOrder(restaurantId, 'delivery');
+      setTimeout(() => setReorderingId(null), 400);
+      navigation.navigate('Order', { screen: 'DeliveryInfo' });
+    } else if (order.order_type === 'pickup') {
+      setRemoteOrder(restaurantId, 'pickup');
+      setSnack('Items added to cart!');
+      setTimeout(() => setReorderingId(null), 400);
+      navigation.navigate('Order', { screen: 'Cart' });
+    } else {
+      if (order.table_info) setTable(order.table_info, `Table ${order.table_number}`, restaurantId);
+      setSnack('Items added to cart!');
+      setTimeout(() => setReorderingId(null), 400);
+      navigation.navigate('Order', { screen: 'Cart' });
+    }
+  }, [clearCart, setTable, setRemoteOrder, addItem, navigation, restaurantId]);
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet – connect to cancel an order'); return; }
     setCancelling(true);
     try {
       const reason = cancelReason.trim() || 'Changed mind / No longer needed';
       await apiCancelOrder(cancelTarget.id, reason);
+      if (!mountedRef.current) return;
       setCancelTarget(null);
       setCancelReason('');
       setSnack('Order cancelled');
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Could not cancel order');
+      if (mountedRef.current) setSnack(err.response?.data?.error || 'Could not cancel order');
     } finally {
-      setCancelling(false);
+      if (mountedRef.current) setCancelling(false);
     }
   };
 
   const filteredOrders = orders.filter((o) => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'pending') return o.status === 'pending';
-    if (activeFilter === 'active') return ['confirmed', 'preparing', 'ready', 'served'].includes(o.status);
-    if (activeFilter === 'done') return o.status === 'cancelled' || (o.status === 'served' && o.payment_status === 'paid');
+    if (activeFilter === 'active') return ['confirmed', 'preparing', 'ready', 'served', 'out_for_delivery'].includes(o.status) || (o.status === 'delivered' && o.payment_status !== 'paid');
+    if (activeFilter === 'done') return o.status === 'cancelled' || ((o.status === 'served' || o.status === 'delivered') && o.payment_status === 'paid');
     return true;
   });
 
@@ -236,7 +249,7 @@ export default function MyOrdersScreen() {
                     style={[styles.chip, { backgroundColor: color + '22' }]}
                     textStyle={{ color, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}
                   >
-                    {order.status.toUpperCase()}
+                    {(order.status || 'unknown').toUpperCase()}
                   </Chip>
                 </View>
 
@@ -254,18 +267,22 @@ export default function MyOrdersScreen() {
                       ? '🛍 Pickup'
                       : `Table ${order.table_number}`
                   }
-                  {` · ${order.items_count} item${order.items_count !== 1 ? 's' : ''} · Total: ${order.total}`}
+                  {` · ${order.items_count ?? order.items?.length ?? '?'} item${(order.items_count ?? order.items?.length ?? 0) !== 1 ? 's' : ''} · Total: ${format(order.total)}`}
                 </Text>
                 {order.created_at ? (
                   <Text variant="bodySmall" style={styles.date}>
                     {new Date(order.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </Text>
                 ) : null}
-                {order.special_instructions ? (
-                  <Text variant="bodySmall" style={styles.specialInstructions} numberOfLines={1}>
-                    📝 {order.special_instructions}
-                  </Text>
-                ) : null}
+                {(() => {
+                  const note = (order.special_instructions || '')
+                    .replace(/\[offline(?:-append)?:[^\]]*\]/g, '').trim();
+                  return note ? (
+                    <Text variant="bodySmall" style={styles.specialInstructions} numberOfLines={1}>
+                      📝 {note}
+                    </Text>
+                  ) : null;
+                })()}
               </Card.Content>
 
               {/* Action buttons */}

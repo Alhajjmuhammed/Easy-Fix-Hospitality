@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, Card, Chip, ActivityIndicator, Snackbar, Banner } from 'react-native-paper';
 import { WebView } from 'react-native-webview';
@@ -7,6 +7,10 @@ import { apiTrackOrder } from '../../api/delivery';
 import { API_BASE_URL } from '../../config';
 
 // Build the Leaflet map HTML — shows moving rider + customer's home pin
+function escHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function buildMapHtml({ riderLat, riderLng, riderName, vehicle, destLat, destLng, destAddress }) {
   const hasRider = riderLat != null && riderLng != null;
   const hasDest  = destLat  != null && destLng  != null;
@@ -15,6 +19,9 @@ function buildMapHtml({ riderLat, riderLng, riderName, vehicle, destLat, destLng
 
   const vehicleEmoji = { motorcycle: '🏍', bicycle: '🚲', car: '🚗', foot: '🚶' };
   const emoji = vehicleEmoji[vehicle] || '🏍';
+  // Safe versions for HTML and JS string contexts to prevent XSS via riderName
+  const safeRiderNameHtml = escHtml(riderName || 'Rider');
+  const safeRiderNameJs   = JSON.stringify(riderName || 'Rider');
 
   return `<!DOCTYPE html>
 <html>
@@ -31,7 +38,7 @@ function buildMapHtml({ riderLat, riderLng, riderName, vehicle, destLat, destLng
 </style>
 </head>
 <body>
-<div id="info">${emoji} ${riderName || 'Rider'} is on the way!</div>
+<div id="info">${emoji} ${safeRiderNameHtml} is on the way!</div>
 <div id="map"></div>
 <script>
 var map = L.map('map').setView([${centerLat}, ${centerLng}], 14);
@@ -53,7 +60,7 @@ var homeMarker  = null;
 
 ${hasRider ? `
 riderMarker = L.marker([${riderLat}, ${riderLng}], {icon: riderIcon})
-  .addTo(map).bindPopup('${riderName || 'Rider'}').openPopup();
+  .addTo(map).bindPopup(${safeRiderNameJs}).openPopup();
 ` : ''}
 
 ${hasDest ? `
@@ -67,7 +74,7 @@ map.fitBounds(L.latLngBounds([[${riderLat},${riderLng}],[${destLat},${destLng}]]
 
 function moveRider(lat, lng) {
   if (!riderMarker) {
-    riderMarker = L.marker([lat, lng], {icon: riderIcon}).addTo(map).bindPopup('${riderName || 'Rider'}');
+    riderMarker = L.marker([lat, lng], {icon: riderIcon}).addTo(map).bindPopup(${safeRiderNameJs});
   } else {
     riderMarker.setLatLng([lat, lng]);
   }
@@ -111,24 +118,40 @@ export default function DeliveryTrackingScreen({ route }) {
   const [loading, setLoading]       = useState(true);
   const [snack, setSnack]           = useState('');
   const [delivered, setDelivered]   = useState(false);
-  const [destCoords, setDestCoords] = useState(null);
+  // initMapData is set ONCE on first load and never changed — keeps the WebView stable.
+  const [initMapData, setInitMapData] = useState(null);
+  const mapInitializedRef = useRef(false);
 
   const webViewRef = useRef(null);
   const wsRef      = useRef(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   // ── Initial load ─────────────────────────────────────────────────────────
   const loadTrack = useCallback(async () => {
     try {
       const data = await apiTrackOrder(orderId);
+      if (!mountedRef.current) return;
       setTrackData(data);
       if (data.assignment?.status === 'delivered') setDelivered(true);
-      const lat = data?.assignment?.delivery_lat;
-      const lng = data?.assignment?.delivery_lng;
-      if (lat != null && lng != null) setDestCoords({ lat, lng });
+      // Lock the map's initial position on the very first load only — subsequent
+      // polls update the info strip but must NOT change mapHtml (which would reload WebView).
+      if (!mapInitializedRef.current) {
+        mapInitializedRef.current = true;
+        setInitMapData({
+          riderLat:    data.rider_lat,
+          riderLng:    data.rider_lng,
+          riderName:   data.assignment?.rider?.name,
+          vehicle:     data.assignment?.rider?.vehicle,
+          destLat:     data.assignment?.delivery_lat ?? null,
+          destLng:     data.assignment?.delivery_lng ?? null,
+          destAddress: data.assignment?.delivery_address,
+        });
+      }
     } catch {
-      setSnack('Could not load tracking info');
+      if (mountedRef.current) setSnack('Could not load tracking info');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [orderId]);
 
@@ -147,15 +170,15 @@ export default function DeliveryTrackingScreen({ route }) {
     wsRef.current = ws;
 
     ws.onmessage = (e) => {
+      if (!mountedRef.current) return;
       try {
         const msg = JSON.parse(e.data);
 
         if (msg.type === 'location_update' || msg.type === 'location_broadcast') {
           const { lat, lng } = msg;
-          // Update map
-          webViewRef.current?.injectJavaScript(
-            `moveRider(${lat}, ${lng}); true;`
-          );
+          if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
+            webViewRef.current?.injectJavaScript(`moveRider(${lat}, ${lng}); true;`);
+          }
         }
 
         if (msg.type === 'delivery_status' && msg.status === 'delivered') {
@@ -168,11 +191,9 @@ export default function DeliveryTrackingScreen({ route }) {
         }
 
         if (msg.type === 'snapshot') {
-          // Initial snapshot from server
-          if (msg.lat && msg.lng) {
-            webViewRef.current?.injectJavaScript(
-              `moveRider(${msg.lat}, ${msg.lng}); true;`
-            );
+          if (typeof msg.lat === 'number' && typeof msg.lng === 'number' &&
+              isFinite(msg.lat) && isFinite(msg.lng)) {
+            webViewRef.current?.injectJavaScript(`moveRider(${msg.lat}, ${msg.lng}); true;`);
           }
         }
       } catch { /* ignore parse errors */ }
@@ -207,15 +228,18 @@ export default function DeliveryTrackingScreen({ route }) {
   const rider = a?.rider;
   const col   = STATUS_COLOR[a?.status] || '#757575';
 
-  const mapHtml = buildMapHtml({
-    riderLat: trackData.rider_lat,
-    riderLng: trackData.rider_lng,
-    riderName: rider?.name,
-    vehicle: rider?.vehicle,
-    destLat: destCoords?.lat ?? null,
-    destLng: destCoords?.lng ?? null,
-    destAddress: a?.delivery_address,
-  });
+  // mapHtml is memoized from the INITIAL load only. Subsequent 15-second polls
+  // update trackData (info strip) but never change mapHtml → no WebView reload.
+  // Live rider position updates arrive via injectJavaScript from the WebSocket.
+  const mapHtml = useMemo(() => buildMapHtml({
+    riderLat:    initMapData?.riderLat    ?? null,
+    riderLng:    initMapData?.riderLng    ?? null,
+    riderName:   initMapData?.riderName,
+    vehicle:     initMapData?.vehicle,
+    destLat:     initMapData?.destLat     ?? null,
+    destLng:     initMapData?.destLng     ?? null,
+    destAddress: initMapData?.destAddress,
+  }), [initMapData]);
 
   return (
     <View style={styles.screen}>
