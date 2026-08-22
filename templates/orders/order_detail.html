@@ -126,7 +126,29 @@
     .item-price { font-size: 0.82rem; }
     .action-grid .btn { font-size: 0.82rem; padding: 0.45rem 0.8rem; }
 }
+
+/* ── Delivery Live Map ─────────────────────────────────────── */
+#delivery-map { height: 300px; background: #e8f5e9; }
+.map-rider-bar {
+    background: linear-gradient(90deg, #1b5e20, #2e7d32);
+    color: #fff; padding: 0.55rem 1rem;
+    font-size: 0.82rem; font-weight: 600;
+    display: flex; align-items: center; gap: 0.6rem;
+}
+.map-ws-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #69f0ae; flex-shrink: 0;
+    animation: livePulse 1.2s ease-in-out infinite;
+}
+.map-ws-dot.disconnected { background: #ff5252; animation: none; }
+@media (max-width: 576px) { #delivery-map { height: 220px; } }
 </style>
+{% if order.order_type == 'delivery' %}
+{% if order.status == 'out_for_delivery' or order.status == 'delivered' %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+{% endif %}
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -240,6 +262,33 @@
             </div>
         </div>
         {% endif %}
+
+        {% if ot == 'delivery' %}{% if order.status == 'out_for_delivery' or order.status == 'delivered' %}
+        <!-- Live delivery tracking map -->
+        <div class="card border-0 shadow-sm mb-4" id="delivery-map-card"
+             style="border-radius:16px;overflow:hidden;"
+             data-order-id="{{ order.id }}"
+             data-delivered="{% if order.status == 'delivered' %}true{% else %}false{% endif %}">
+            <div class="map-rider-bar">
+                <span class="map-ws-dot" id="map-ws-dot"></span>
+                <i class="bi bi-bicycle"></i>
+                <span id="map-rider-label">Connecting to rider…</span>
+            </div>
+            <div style="position:relative;">
+                <div id="delivery-map"></div>
+                <div id="map-placeholder" style="position:absolute;inset:0;background:#f1f8e9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:#558b2f;z-index:500;pointer-events:none;">
+                    <i class="bi bi-bicycle" style="font-size:2.5rem;opacity:.4;"></i>
+                    <span style="font-size:.9rem;font-weight:600;">Waiting for rider location…</span>
+                    <small style="opacity:.65;font-size:.75rem;">Map appears once the rider starts moving</small>
+                </div>
+                <div id="map-delivered-overlay" style="position:absolute;inset:0;background:rgba(27,94,32,.9);display:{% if order.status == 'delivered' %}flex{% else %}none{% endif %};flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;z-index:1000;gap:.4rem;pointer-events:none;">
+                    <i class="bi bi-check-circle-fill" style="font-size:2.5rem;"></i>
+                    <strong style="font-size:1.15rem;">Order Delivered!</strong>
+                    <small style="opacity:.85;">Your order has arrived. Enjoy!</small>
+                </div>
+            </div>
+        </div>
+        {% endif %}{% endif %}
 
         <!-- Order items -->
         <div class="card border-0 shadow-sm" style="border-radius:16px;">
@@ -390,4 +439,177 @@
 </div><!-- /row -->
 
 {% endwith %}
+{% endblock %}
+
+{% block extra_js %}
+{% if order.order_type == 'delivery' %}
+{% if order.status == 'out_for_delivery' or order.status == 'delivered' %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLcE=" crossorigin="anonymous"></script>
+<script>
+(function () {
+  'use strict';
+  var card = document.getElementById('delivery-map-card');
+  if (!card) return;
+  var ORDER_ID = card.dataset.orderId;
+
+  /* ── Leaflet map ─────────────────────────────────────────────── */
+  var map = L.map('delivery-map', { zoomControl: true, attributionControl: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(map);
+  L.control.attribution({ prefix: false }).addTo(map);
+
+  var riderMarker = null, destMarker = null, hasCoords = false;
+  var placeholder    = document.getElementById('map-placeholder');
+  var deliveredEl    = document.getElementById('map-delivered-overlay');
+  var riderLabel     = document.getElementById('map-rider-label');
+  var wsDot          = document.getElementById('map-ws-dot');
+
+  var riderIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:32px;height:32px;border-radius:50%;background:#2e7d32;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:17px;">🛵</div>',
+    iconSize: [32, 32], iconAnchor: [16, 16]
+  });
+  var destIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:28px;height:28px;border-radius:50%;background:#d63384;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:15px;">📍</div>',
+    iconSize: [28, 28], iconAnchor: [14, 28]
+  });
+
+  function moveRider(lat, lng) {
+    if (riderMarker) {
+      riderMarker.setLatLng([lat, lng]);
+    } else {
+      riderMarker = L.marker([lat, lng], { icon: riderIcon })
+        .bindTooltip('Rider', { permanent: false }).addTo(map);
+    }
+    if (!hasCoords) {
+      hasCoords = true;
+      if (placeholder) placeholder.style.display = 'none';
+      if (destMarker) {
+        map.fitBounds(L.latLngBounds(riderMarker.getLatLng(), destMarker.getLatLng()), { padding: [40, 40] });
+      } else {
+        map.setView([lat, lng], 14);
+      }
+    }
+  }
+
+  function placeDestination(lat, lng, address) {
+    if (lat == null || lng == null || destMarker) return;
+    destMarker = L.marker([lat, lng], { icon: destIcon })
+      .bindTooltip(address || 'Delivery address', { permanent: false }).addTo(map);
+    if (riderMarker) {
+      map.fitBounds(L.latLngBounds(riderMarker.getLatLng(), destMarker.getLatLng()), { padding: [40, 40] });
+    } else {
+      map.setView([lat, lng], 14);
+    }
+  }
+
+  function markDelivered() {
+    if (deliveredEl) deliveredEl.style.display = 'flex';
+    if (wsDot) wsDot.classList.add('disconnected');
+    if (riderLabel) riderLabel.textContent = '✅ Order delivered!';
+  }
+
+  /* ── REST fallback ───────────────────────────────────────────── */
+  function fetchTracking() {
+    fetch('/api/v1/delivery/' + ORDER_ID + '/track/', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        if (data.rider_lat != null && data.rider_lng != null) {
+          moveRider(parseFloat(data.rider_lat), parseFloat(data.rider_lng));
+        }
+        if (data.assignment) {
+          var a = data.assignment;
+          if (a.delivery_lat != null) {
+            placeDestination(parseFloat(a.delivery_lat), parseFloat(a.delivery_lng), a.delivery_address);
+          }
+          if (a.rider && riderLabel && a.status !== 'delivered') {
+            riderLabel.textContent = (a.rider.name || 'Rider') + (a.rider.vehicle_display ? '  ·  ' + a.rider.vehicle_display : '');
+          }
+          if (a.status === 'delivered') markDelivered();
+        }
+      })
+      .catch(function () {});
+  }
+
+  /* ── WebSocket ───────────────────────────────────────────────── */
+  var ws, pollTimer, reconnectTimer;
+  var reconnectDelay = 2000;
+
+  function connect() {
+    var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(proto + '://' + location.host + '/ws/delivery/' + ORDER_ID + '/');
+
+    ws.onopen = function () {
+      if (wsDot) wsDot.classList.remove('disconnected');
+      reconnectDelay = 2000;
+      clearInterval(pollTimer); pollTimer = null;
+    };
+
+    ws.onmessage = function (e) {
+      var msg;
+      try { msg = JSON.parse(e.data); } catch (ex) { return; }
+
+      if (msg.type === 'snapshot') {
+        if (msg.rider_name && riderLabel) {
+          riderLabel.textContent = msg.rider_name + (msg.vehicle ? '  ·  ' + msg.vehicle : '');
+        }
+        if (msg.lat != null && msg.lng != null && isFinite(msg.lat) && isFinite(msg.lng)) {
+          moveRider(msg.lat, msg.lng);
+        }
+        if (msg.delivery_lat != null) {
+          placeDestination(msg.delivery_lat, msg.delivery_lng, msg.delivery_address);
+        }
+        if (msg.status === 'delivered') markDelivered();
+      }
+
+      if (msg.type === 'location_update' || msg.type === 'location_broadcast') {
+        if (msg.lat != null && isFinite(msg.lat) && msg.lng != null && isFinite(msg.lng)) {
+          moveRider(msg.lat, msg.lng);
+        }
+      }
+
+      if (msg.type === 'delivery_status') {
+        if (msg.status === 'delivered') markDelivered();
+        fetchTracking();
+      }
+    };
+
+    ws.onerror = function () {
+      if (wsDot) wsDot.classList.add('disconnected');
+    };
+
+    ws.onclose = function (e) {
+      if (wsDot) wsDot.classList.add('disconnected');
+      if (e.code === 4001 || e.code === 4003) return;
+      if (deliveredEl && deliveredEl.style.display === 'flex') return;
+      reconnectTimer = setTimeout(function () {
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+        connect();
+      }, reconnectDelay);
+      if (!pollTimer) {
+        fetchTracking();
+        pollTimer = setInterval(fetchTracking, 10000);
+      }
+    };
+  }
+
+  /* ── Boot ────────────────────────────────────────────────────── */
+  fetchTracking();
+  connect();
+  if (card.dataset.delivered === 'true') markDelivered();
+
+  window.addEventListener('pagehide', function () {
+    clearTimeout(reconnectTimer);
+    clearInterval(pollTimer);
+    if (ws && ws.readyState < 2) ws.close(1000);
+  });
+}());
+</script>
+{% endif %}
+{% endif %}
 {% endblock %}
