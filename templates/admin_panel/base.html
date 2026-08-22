@@ -709,13 +709,9 @@
                 <div class="nav-section">
                     <div class="nav-section-title">Attendance</div>
                     {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
-                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'attendance:dashboard' %}" data-tooltip="Attendance Reports">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Attendance Reports</span>
-                    </a>
-                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'qr' %}active{% endif %}" href="{% url 'attendance:qr' %}" data-tooltip="Attendance QR Code">
-                        <i class="fas fa-qrcode"></i>
-                        <span>Attendance QR</span>
+                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'attendance:dashboard' %}" data-tooltip="Attendance">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Attendance</span>
                     </a>
                     <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'shifts' %}active{% endif %}" href="{% url 'attendance:shifts' %}" data-tooltip="Manage Shifts">
                         <i class="fas fa-business-time"></i>
