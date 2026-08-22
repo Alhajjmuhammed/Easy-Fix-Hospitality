@@ -206,9 +206,16 @@ def attendance_my(request):
     user = request.user
     records = AttendanceRecord.objects.filter(staff=user).select_related('shift', 'restaurant')
 
-    # Optional date-range filter
-    from_date = request.query_params.get('from')
-    to_date = request.query_params.get('to')
+    # Optional date-range filter — validate to prevent ORM crash on bad input
+    from datetime import date as _date
+    def _parse_date(s):
+        try:
+            return _date.fromisoformat(s) if s else None
+        except (ValueError, TypeError):
+            return None
+
+    from_date = _parse_date(request.query_params.get('from'))
+    to_date   = _parse_date(request.query_params.get('to'))
     if from_date:
         records = records.filter(date__gte=from_date)
     if to_date:

@@ -48,13 +48,11 @@ def _hide_owner_records(user):
 
 
 def _get_or_create_qr(owner, restaurant):
-    qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=restaurant).first()
-    if not qr:
-        from django.db import IntegrityError
-        try:
-            qr = AttendanceQRToken.objects.create(owner=owner, restaurant=restaurant)
-        except IntegrityError:
-            qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=restaurant).first()
+    from django.db import IntegrityError
+    try:
+        qr, _ = AttendanceQRToken.objects.get_or_create(owner=owner, restaurant=restaurant)
+    except IntegrityError:
+        qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=restaurant).first()
     return qr
 
 
@@ -112,8 +110,11 @@ def attendance_dashboard(request):
 
     records = [_record_to_dict(r) for r in records_qs]
 
-    # Staff who haven't checked in yet
-    staff_ids_present = records_qs.values_list('staff_id', flat=True)
+    # Staff who haven't checked in yet — use all today's records (not restaurant-filtered)
+    # so staff who checked in at another branch don't appear as absent
+    staff_ids_present = AttendanceRecord.objects.filter(
+        owner=owner, date=today, check_in__isnull=False
+    ).values_list('staff_id', flat=True)
     absent_staff = User.objects.filter(
         owner=owner, is_active=True, is_active_staff=True
     ).exclude(id__in=staff_ids_present).exclude(id=owner.id)
@@ -373,7 +374,7 @@ def attendance_web_checkin(request):
 
     if request.method == 'POST':
         if not can_web_checkin:
-            messages.error(request, 'Please use the QR code in the mobile app to check in or out.')
+            messages.error(request, 'Please use the QR camera scanner on this page to check in or out.')
             return redirect('attendance:web_checkin')
 
         now = timezone.now()
