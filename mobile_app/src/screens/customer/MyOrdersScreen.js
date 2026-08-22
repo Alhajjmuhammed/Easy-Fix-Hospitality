@@ -123,7 +123,7 @@ export default function MyOrdersScreen() {
       // Delivery reorders must collect a fresh address — never pre-fill a stale one.
       setRemoteOrder(restaurantId, 'delivery');
       setTimeout(() => setReorderingId(null), 400);
-      navigation.navigate('Order', { screen: 'DeliveryInfo' });
+      navigation.navigate('Order', { screen: 'DeliveryInfo', params: { restaurant: { id: restaurantId }, orderType: 'delivery' } });
     } else if (order.order_type === 'pickup') {
       setRemoteOrder(restaurantId, 'pickup');
       setSnack('Items added to cart!');

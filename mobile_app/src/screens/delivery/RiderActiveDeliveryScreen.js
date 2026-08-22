@@ -111,42 +111,59 @@ export default function RiderActiveDeliveryScreen({ route }) {
   const [snack, setSnack]           = useState('');
   const [riderPos, setRiderPos]     = useState(null);
   const [destCoords, setDestCoords] = useState(null);
+  // initMapData is set ONCE on first successful load so mapHtml stays stable —
+  // subsequent loadAssignment() calls (after pick-up action etc.) update assignment
+  // state for the UI cards but do NOT change the WebView source.
+  const [initMapData, setInitMapData] = useState(null);
+  const mapInitializedRef = useRef(false);
 
   const webViewRef  = useRef(null);
   const wsRef       = useRef(null);
   const locSubRef   = useRef(null);
+  const mountedRef  = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   // ── Load assignment data ─────────────────────────────────────────────────
   const loadAssignment = useCallback(async () => {
     try {
       const data = await apiTrackOrder(assignmentOrderId);
+      if (!mountedRef.current) return;
       setAssignment(data);
       setLoadError(false);
       const lat = data?.assignment?.delivery_lat;
       const lng = data?.assignment?.delivery_lng;
       if (lat != null && lng != null) setDestCoords({ lat, lng });
+      // Capture initial map data only once — prevents WebView reload on re-fetch
+      if (!mapInitializedRef.current) {
+        mapInitializedRef.current = true;
+        setInitMapData({
+          riderLat:    data?.rider_lat ?? null,
+          riderLng:    data?.rider_lng ?? null,
+          destLat:     lat ?? null,
+          destLng:     lng ?? null,
+          destAddress: data?.assignment?.delivery_address ?? '',
+        });
+      }
     } catch {
+      if (!mountedRef.current) return;
       setLoadError(true);
       setSnack('Could not load delivery details');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [assignmentOrderId]);
 
   useEffect(() => { loadAssignment(); }, [loadAssignment]);
 
-  // Stable mapHtml — depends only on the initial API values, NOT riderPos.
-  // Live GPS updates go through injectJavaScript so the WebView never reloads.
-  const mapHtml = useMemo(() => {
-    const a = assignment?.assignment;
-    return buildMapHtml({
-      riderLat: assignment?.rider_lat ?? null,
-      riderLng: assignment?.rider_lng ?? null,
-      destLat:  destCoords?.lat ?? null,
-      destLng:  destCoords?.lng ?? null,
-      destAddress: a?.delivery_address ?? '',
-    });
-  }, [assignment, destCoords]);
+  // mapHtml is built once from initMapData and never changes — live GPS updates
+  // go through injectJavaScript so the WebView source prop stays stable.
+  const mapHtml = useMemo(() => buildMapHtml({
+    riderLat:    initMapData?.riderLat    ?? null,
+    riderLng:    initMapData?.riderLng    ?? null,
+    destLat:     initMapData?.destLat     ?? null,
+    destLng:     initMapData?.destLng     ?? null,
+    destAddress: initMapData?.destAddress ?? '',
+  }), [initMapData]);
 
   // ── Location tracking ────────────────────────────────────────────────────
   useEffect(() => {
@@ -175,10 +192,10 @@ export default function RiderActiveDeliveryScreen({ route }) {
           const { latitude: lat, longitude: lng } = loc.coords;
           setRiderPos({ lat, lng });
 
-          // Push to map
-          webViewRef.current?.injectJavaScript(
-            `updateRider(${lat}, ${lng}); true;`
-          );
+          // Push to map — guard against sensor glitches returning NaN/Infinity
+          if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
+            webViewRef.current?.injectJavaScript(`updateRider(${lat}, ${lng}); true;`);
+          }
 
           // Send via WebSocket if open
           if (ws.readyState === WebSocket.OPEN) {

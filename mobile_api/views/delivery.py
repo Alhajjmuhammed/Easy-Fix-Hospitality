@@ -442,8 +442,8 @@ def track_order(request, order_id):
     rider = assignment.rider
     return Response({
         'assignment': _assignment_data(assignment),
-        'rider_lat': float(rider.current_lat) if rider.current_lat else None,
-        'rider_lng': float(rider.current_lng) if rider.current_lng else None,
+        'rider_lat': float(rider.current_lat) if rider.current_lat is not None else None,
+        'rider_lng': float(rider.current_lng) if rider.current_lng is not None else None,
         'last_location_at': rider.last_location_at.isoformat() if rider.last_location_at else None,
     })
 

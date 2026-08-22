@@ -343,11 +343,11 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
             if user.is_administrator():
                 return True
             
-            # Owner/main_owner/branch_owner/manager can access their own restaurant
-            if (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager()) and user.id == owner_id:
+            # Owner/main_owner/branch_owner can access their own restaurant directly
+            if (user.is_owner() or user.is_main_owner() or user.is_branch_owner()) and user.id == owner_id:
                 return True
-                
-            # Staff can access their owner's restaurant
+
+            # Staff (cashier, customer_care, manager, etc.) access via their owner FK
             if hasattr(user, 'owner') and user.owner and user.owner.id == owner_id:
                 return True
                 

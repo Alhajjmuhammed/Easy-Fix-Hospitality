@@ -304,8 +304,9 @@ def process_payment(request, order_id):
             return JsonResponse({'error': 'Order is already fully paid'}, status=400)
         
         if amount > remaining_balance:
+            cur = getattr(request.user, 'currency_symbol', None) or '$'
             return JsonResponse({
-                'error': f'Payment amount (${amount}) exceeds remaining balance (${remaining_balance})'
+                'error': f'Payment amount ({cur}{amount}) exceeds remaining balance ({cur}{remaining_balance})'
             }, status=400)
         
         # Create payment record
@@ -476,8 +477,8 @@ def void_payment(request, payment_id):
         payment.voided_at = timezone.now()
         payment.save()
         
-        # Update order payment status
-        order = payment.order
+        # Update order payment status — lock the order row to prevent concurrent payment/void races
+        order = Order.objects.select_for_update().get(pk=payment.order_id)
         total_paid = order.payments.filter(is_voided=False).aggregate(
             total=Sum('amount'))['total'] or Decimal('0.00')
         
@@ -568,6 +569,9 @@ def transfer_table(request, order_id):
     )
     target_table = get_object_or_404(TableInfo.objects.select_for_update().filter(_ttq).distinct(), id=target_table_id)
 
+    if order.table_info is None:
+        return JsonResponse({'error': 'Delivery and pickup orders cannot be transferred to a table'}, status=400)
+
     if target_table.id == order.table_info_id:
         return JsonResponse({'error': 'Order is already on this table'}, status=400)
 
@@ -619,8 +623,8 @@ def cancel_order(request, order_id):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    order = get_object_or_404(Order.objects.filter(_oq_co), id=order_id)
-    
+    order = get_object_or_404(Order.objects.select_for_update().filter(_oq_co), id=order_id)
+
     # Check if order status allows cancellation (mirrors mobile API and kitchen staff logic)
     if order.status in ['served', 'cancelled']:
         return JsonResponse({'error': f'Cannot cancel an order with status "{order.status}"'}, status=400)

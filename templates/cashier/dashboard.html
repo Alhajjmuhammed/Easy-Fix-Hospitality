@@ -188,8 +188,10 @@ $(document).ready(function() {
             try {
                 var msg = JSON.parse(e.data);
                 if (msg.type === 'new_order') {
-                    // Show a toast-style banner and reload after a brief pause
                     showOrderNotification(msg.order_number, msg.table_number);
+                } else if (msg.type === 'order_status_update' || msg.type === 'order_update') {
+                    // Payment or status change — schedule a quiet refresh
+                    scheduleReload();
                 }
             } catch(err) {}
         };
@@ -202,6 +204,14 @@ $(document).ready(function() {
         };
     }
 
+    var _reloadTimer = null;
+    function scheduleReload(delay) {
+        // Debounce: clear any pending reload before scheduling a new one
+        // so a burst of messages causes exactly one reload.
+        clearTimeout(_reloadTimer);
+        _reloadTimer = setTimeout(function() { window.location.reload(); }, delay || 5000);
+    }
+
     function showOrderNotification(orderNum, tableNum) {
         // Create a fixed notification bar at top of page
         var bar = document.getElementById('ws-order-bar');
@@ -209,12 +219,11 @@ $(document).ready(function() {
             bar = document.createElement('div');
             bar.id = 'ws-order-bar';
             bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#1565C0;color:#fff;text-align:center;padding:10px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);';
-            bar.onclick = function() { window.location.reload(); };
+            bar.onclick = function() { clearTimeout(_reloadTimer); window.location.reload(); };
             document.body.prepend(bar);
         }
         bar.textContent = '🔔 New Order #' + (orderNum || '?') + (tableNum && tableNum !== 'N/A' ? ' · Table ' + tableNum : '') + ' — Click to refresh';
-        // Also reload after 5 s automatically
-        setTimeout(function() { window.location.reload(); }, 5000);
+        scheduleReload(5000);
     }
 
     connect();
