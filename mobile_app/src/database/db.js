@@ -3,13 +3,18 @@ import * as SQLite from 'expo-sqlite';
 // expo-sqlite v14 (Expo SDK 51) uses an async API.
 // All functions are async; the old openDatabase/transaction/executeSql API is removed.
 
-let _db = null;
+// Singleton promise: assigned immediately on first call so concurrent callers
+// all await the same Promise rather than each opening a separate DB handle.
+let _dbPromise = null;
 
-export const getDb = async () => {
-  if (!_db) {
-    _db = await SQLite.openDatabaseAsync('easyfix.db');
+export const getDb = () => {
+  if (!_dbPromise) {
+    _dbPromise = SQLite.openDatabaseAsync('easyfix.db').catch((err) => {
+      _dbPromise = null; // allow retry on next call
+      return Promise.reject(err);
+    });
   }
-  return _db;
+  return _dbPromise;
 };
 
 /** Execute a write statement (INSERT / UPDATE / DELETE / DDL) with optional params. */
@@ -73,6 +78,7 @@ export const initDatabase = async () => {
       payment_status       TEXT    DEFAULT 'unpaid',
       created_at           TEXT    NOT NULL,
       sync_status          TEXT    DEFAULT 'pending',
+      status               TEXT    DEFAULT 'pending',
       server_order_id      INTEGER,
       server_order_number  TEXT,
       error_message        TEXT,
@@ -139,6 +145,11 @@ export const initDatabase = async () => {
       payments_json             TEXT,
       pending_bill_requested    INTEGER DEFAULT 0,
       pending_bill_requested_at TEXT,
+      order_type                TEXT    DEFAULT 'dine-in',
+      delivery_address          TEXT,
+      delivery_phone            TEXT,
+      delivery_lat              REAL,
+      delivery_lng              REAL,
       synced_at                 TEXT
     );
   `);
@@ -173,6 +184,40 @@ export const initDatabase = async () => {
     try { await db.runAsync(stmt); } catch (_) {}
   }
 
+  // Migration: add order_type to the orders cache (missing from original schema)
+  try { await db.runAsync(`ALTER TABLE orders ADD COLUMN order_type TEXT DEFAULT 'dine-in'`); } catch (_) {}
+
+  // Migration: delivery fields for orders cache (required for offline cache writes)
+  for (const stmt of [
+    `ALTER TABLE orders ADD COLUMN delivery_address TEXT`,
+    `ALTER TABLE orders ADD COLUMN delivery_phone TEXT`,
+    `ALTER TABLE orders ADD COLUMN delivery_lat REAL`,
+    `ALTER TABLE orders ADD COLUMN delivery_lng REAL`,
+  ]) {
+    try { await db.runAsync(stmt); } catch (_) {}
+  }
+
+  // Migration: order workflow status for offline orders (separate from sync_status)
+  try { await db.runAsync(`ALTER TABLE offline_orders ADD COLUMN status TEXT DEFAULT 'pending'`); } catch (_) {}
+
+  // Migration: track when an offline-queued row is appending to an existing server order
+  // (not a new order) and store the tax rate for correct receipt subtotal/tax breakdown
+  try { await db.runAsync(`ALTER TABLE offline_orders ADD COLUMN existing_order_id INTEGER`); } catch (_) {}
+  try { await db.runAsync(`ALTER TABLE offline_orders ADD COLUMN tax_rate REAL DEFAULT 0`); } catch (_) {}
+  try { await db.runAsync(`ALTER TABLE offline_orders ADD COLUMN local_print_fired INTEGER DEFAULT 0`); } catch (_) {}
+
+  // Migration: indexes for common filter/sort queries
+  for (const stmt of [
+    `CREATE INDEX IF NOT EXISTS idx_orders_status       ON orders (status)`,
+    `CREATE INDEX IF NOT EXISTS idx_orders_created_at   ON orders (created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders (payment_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_offline_orders_sync ON offline_orders (sync_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_offline_payments_sync ON offline_payments (sync_status)`,
+    `CREATE INDEX IF NOT EXISTS idx_offline_payments_offline_order_ref ON offline_payments (offline_order_ref)`,
+  ]) {
+    try { await db.runAsync(stmt); } catch (_) {}
+  }
+
   // Migration: add orders cache table for existing installs that pre-date this feature.
   // CREATE TABLE IF NOT EXISTS in the block above already handles fresh installs;
   // this covers the case where initDatabase was already called once before orders existed.
@@ -203,6 +248,11 @@ export const initDatabase = async () => {
         payments_json             TEXT,
         pending_bill_requested    INTEGER DEFAULT 0,
         pending_bill_requested_at TEXT,
+        order_type                TEXT    DEFAULT 'dine-in',
+        delivery_address          TEXT,
+        delivery_phone            TEXT,
+        delivery_lat              REAL,
+        delivery_lng              REAL,
         synced_at                 TEXT
       )
     `);

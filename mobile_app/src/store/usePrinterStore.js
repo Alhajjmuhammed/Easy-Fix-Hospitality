@@ -15,6 +15,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@printer_settings_v1';
 
+// Resolved once loadSettings() completes — lets printReceipt() await it on cold start.
+let _settingsResolve;
+export const settingsReadyPromise = new Promise(r => { _settingsResolve = r; });
+
 export const usePrinterStore = create((set, get) => ({
   /** One of: 'auto' | 'bluetooth' | 'network' | 'system' */
   mode: 'auto',
@@ -34,6 +38,9 @@ export const usePrinterStore = create((set, get) => ({
    */
   localKotBot: false,
 
+  /** true once loadSettings() has resolved — guards against cold-start race */
+  settingsLoaded: false,
+
   /** Load persisted settings on app start */
   loadSettings: async () => {
     try {
@@ -48,12 +55,25 @@ export const usePrinterStore = create((set, get) => ({
         });
       }
     } catch (_) {}
+    set({ settingsLoaded: true });
+    _settingsResolve();
+  },
+
+  /** Clear all printer settings on logout so the next user starts fresh. */
+  resetSettings: async () => {
+    set({ mode: 'auto', bluetoothDevice: null, autoPrintAfterPayment: true, localKotBot: false });
+    try { await AsyncStorage.removeItem(STORAGE_KEY); } catch (_) {}
   },
 
   /** Persist a partial settings update */
   saveSettings: async (updates) => {
-    const next = { ...get(), ...updates };
-    set(updates);
+    // Read the merged state inside set()'s callback so concurrent calls each
+    // see the already-committed previous update, not a stale snapshot.
+    let next;
+    set((s) => {
+      next = { ...s, ...updates };
+      return updates;
+    });
     try {
       await AsyncStorage.setItem(
         STORAGE_KEY,

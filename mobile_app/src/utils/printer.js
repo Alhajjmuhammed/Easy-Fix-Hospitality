@@ -4,7 +4,7 @@
  * Supports ALL printing scenarios with automatic smart fallback.
  *
  *  Mode 'auto'      → BT Classic SPP → Network → System dialog
- *  Mode 'bluetooth' → BT Classic SPP → (fail) System dialog
+ *  Mode 'bluetooth' → BT Classic SPP → (fail) returns false, NO system dialog
  *  Mode 'network'   → Server/Print Client → (fail) System dialog
  *  Mode 'system'    → Native OS print dialog (any paired printer, always works)
  *
@@ -26,7 +26,7 @@
 import { Platform, PermissionsAndroid } from 'react-native';
 import client from '../api/client';
 import { printReceiptLocal, printTicketLocal } from './printReceipt';
-import { usePrinterStore } from '../store/usePrinterStore';
+import { usePrinterStore, settingsReadyPromise } from '../store/usePrinterStore';
 
 // ─── BT Classic SPP helpers ──────────────────────────────────────────────────
 
@@ -172,7 +172,7 @@ export async function connectBluetoothPrinter(address) {
 /**
  * Send a formatted receipt to a BT Classic ESC/POS printer silently.
  */
-async function printBtClassic({ order, payment, restaurantName, currencySymbol, staffName = '' }) {
+async function printBtClassic({ order, payment, restaurantName, currencySymbol, staffName = '', decimals = 2 }) {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('BT Classic module not loaded');
 
@@ -192,7 +192,7 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol, 
   }
 
   const sym = currencySymbol || '';
-  const fmt = (v) => { const n = parseFloat(v); return isNaN(n) ? '0.00' : n.toFixed(2); };
+  const fmt = (v) => { const n = parseFloat(v); return isNaN(n) ? (0).toFixed(decimals) : n.toFixed(decimals); };
   const W   = 32; // 58mm paper = 32 chars; change to 48 for 80mm
   const pad = (l, r, w = W) => l + ' '.repeat(Math.max(1, w - l.length - r.length)) + r;
   const dash = '─'.repeat(W);
@@ -220,8 +220,11 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol, 
   const tableNo  = order.table_number ?? order.table_no ?? 'Takeaway';
   const dateStr  = new Date((payment?.created_at || order.created_at || Date.now())).toLocaleString();
   await BluetoothEscposPrinter.printerAlign(A.CENTER);
-  if (!isBill && payment?.id) {
-    await BluetoothEscposPrinter.printText(`RECEIPT #${String(payment.id).padStart(6, '0')}\n\r`, { fonttype: 1 });
+  if (!isBill) {
+    const receiptRef = payment?.id
+      ? `RECEIPT #${String(payment.id).padStart(6, '0')}`
+      : `RECEIPT #------`;
+    await BluetoothEscposPrinter.printText(`${receiptRef}\n\r`, { fonttype: 1 });
   } else {
     await BluetoothEscposPrinter.printText(`ORDER #${orderNum}\n\r`, { fonttype: 1 });
   }
@@ -237,7 +240,11 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol, 
   for (const item of items) {
     const name   = String(item.product_name || item.name || '').substring(0, W - 10);
     const qty    = item.quantity || 1;
-    const price  = parseFloat(item.total_price ?? item.unit_price * qty ?? 0);
+    const price  = parseFloat(
+      item.total_price ??
+      (item.unit_price != null ? item.unit_price * qty : null) ??
+      (item.price != null ? item.price * qty : 0)
+    ) || 0;
     await BluetoothEscposPrinter.printText(pad(`${qty}x ${name}`, `${sym}${fmt(price)}`) + '\n\r', {});
   }
   await BluetoothEscposPrinter.printText(dash + '\n\r', {});
@@ -298,7 +305,8 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol, 
 // ─── Network printing ─────────────────────────────────────────────────────────
 
 async function printNetwork(orderId) {
-  await client.post(`/orders/${orderId}/print-bill/`);
+  const { data } = await client.post(`/orders/${orderId}/print-bill/`);
+  if (data && data.success === false) throw new Error(data.message || 'Print failed');
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -328,7 +336,10 @@ export async function printReceipt({
   restaurantName = '',
   currencySymbol = '',
   staffName      = '',
+  decimals       = 2,
 } = {}) {
+  // Ensure persisted settings are applied before reading mode/device (cold-start race guard)
+  await settingsReadyPromise;
   const { mode } = usePrinterStore.getState();
 
   // System dialog — works everywhere, use directly
@@ -353,7 +364,7 @@ export async function printReceipt({
   if (mode === 'bluetooth' || mode === 'auto') {
     if (isBtClassicAvailable()) {
       try {
-        await printBtClassic({ order, payment, restaurantName, currencySymbol, staffName });
+        await printBtClassic({ order, payment, restaurantName, currencySymbol, staffName, decimals });
         return true;
       } catch (btErr) {
         if (__DEV__) console.warn('[Printer] BT Classic failed → fallback:', btErr?.message);
@@ -368,6 +379,12 @@ export async function printReceipt({
         await printNetwork(orderId);
         return true;
       } catch (_) {}
+    }
+
+    // Strict bluetooth mode: never show native OS dialog — caller must handle failure
+    if (mode === 'bluetooth') {
+      if (__DEV__) console.warn('[Printer] Bluetooth mode: refusing native dialog fallback');
+      return false;
     }
 
     return printReceiptLocal({ order, payment, restaurantName, currencySymbol, staffName });
@@ -418,7 +435,7 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
   const dash = '-'.repeat(W);
   const allItems = order.items || order.order_items || [];
   const items = stationFilter
-    ? allItems.filter(i => (i.station || i.product?.station) === stationFilter)
+    ? allItems.filter(i => (i.station || i.product?.station || 'kitchen') === stationFilter)
     : allItems;
   const A = BluetoothEscposPrinter.ALIGN;
 
@@ -451,8 +468,8 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
     }
   }
 
-  // Notes / special instructions
-  const notes = (order.special_instructions || '').trim();
+  // Notes / special instructions — strip offline dedup tags before printing
+  const notes = (order.special_instructions || '').replace(/\[offline(?:-append)?:[^\]]*\]/g, '').trim();
   if (notes) {
     await BluetoothEscposPrinter.printText(dash + '\n\r', {});
     await BluetoothEscposPrinter.printText(`Notes: ${notes}\n\r`, {});
@@ -482,7 +499,8 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
  * and bar staff only need to see item quantities.
  *
  * Fallback chain:
- *   'auto' / 'bluetooth' → BT Classic SPP → System dialog
+ *   'bluetooth' → BT Classic SPP → error (no dialog — KOT/BOT shouldn't open UI on cashier's phone)
+ *   'auto'      → BT Classic SPP → System dialog
  *   'network' / 'system' → System dialog
  *
  * @param {object} order          - Order object returned by the API
@@ -493,8 +511,15 @@ export async function printOrderTicket(order, restaurantName = '', stationFilter
   const { mode } = usePrinterStore.getState();
   const opts = { order, restaurantName, stationFilter, orderedBy };
 
-  // Bluetooth / Auto → try BT Classic first, fall back to system dialog
-  if (mode === 'bluetooth' || mode === 'auto') {
+  if (mode === 'bluetooth') {
+    // Strict BT mode: no system-dialog fallback for KOT/BOT tickets.
+    // Kitchen/bar staff shouldn't have a print dialog appear on the cashier's phone.
+    if (!isBtClassicAvailable()) return false;
+    await _printTicketBtClassic(opts); // throws on failure — caller catches
+    return true;
+  }
+
+  if (mode === 'auto') {
     if (isBtClassicAvailable()) {
       try {
         await _printTicketBtClassic(opts);
@@ -505,6 +530,7 @@ export async function printOrderTicket(order, restaurantName = '', stationFilter
     }
   }
 
+  // Network / system / auto-fallback → system dialog
   // Network mode: server queue already handles KOT/BOT when X-Local-Print is NOT set;
   // if we reach here it means server queue is skipped, so system dialog is the fallback.
   return printTicketLocal(opts);
