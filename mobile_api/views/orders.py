@@ -388,16 +388,10 @@ def _place_order(request):
     if offline_id:
         special = f'[offline:{offline_id}] {special}'.strip()
 
-    # Generate a collision-resistant order number. UUID4 hex[:8] is 4-billion
-    # space; collision is negligible per request but nonzero over the system
-    # lifetime, so we retry up to 5 times before giving up.
-    for _attempt in range(5):
-        _candidate = f'ORD-{uuid.uuid4().hex[:8].upper()}'
-        if not Order.objects.filter(order_number=_candidate).exists():
-            order_number = _candidate
-            break
-    else:
-        order_number = f'ORD-{uuid.uuid4().hex[:12].upper()}'
+    # Order number is generated INSIDE the atomic block (below) to avoid a
+    # TOCTOU race where two concurrent requests both see the same candidate as
+    # unused and then collide on the unique constraint → unhandled IntegrityError.
+    order_number = None  # assigned inside the atomic block
 
     # ── Phase 2: DB writes inside atomic block (no return statements inside) ──
     # async_to_sync (used by _notify_ws) must NOT run inside a transaction on
@@ -412,6 +406,17 @@ def _place_order(request):
 
     try:
       with transaction.atomic():
+        # Generate the order number inside the transaction — eliminates TOCTOU where
+        # two concurrent requests both see the same candidate as unused before either
+        # has committed, then collide on the unique constraint → IntegrityError/500.
+        for _attempt in range(5):
+            _candidate = f'ORD-{uuid.uuid4().hex[:8].upper()}'
+            if not Order.objects.filter(order_number=_candidate).exists():
+                order_number = _candidate
+                break
+        else:
+            order_number = f'ORD-{uuid.uuid4().hex[:12].upper()}'
+
         if offline_id:
             # Lock this user's row to serialize concurrent POSTs with the same offline_id.
             # The second request blocks here until the first transaction commits, then
@@ -1091,6 +1096,13 @@ def add_items_to_order(request, order_id):
                 # cross-restaurant injection.
                 allowed_ids = order.order_items.values_list('product_id', flat=True)
                 product = Product.objects.filter(id=product_id, id__in=allowed_ids).first()
+                if product is None:
+                    # Product exists in the catalogue but is not already in this order.
+                    if Product.objects.filter(id=product_id).exists():
+                        return Response(
+                            {'error': 'New items cannot be added to an existing delivery or pickup order. Please place a new order.'},
+                            status=400,
+                        )
             if product is None:
                 raise Product.DoesNotExist
         except Product.DoesNotExist:

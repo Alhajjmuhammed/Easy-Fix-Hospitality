@@ -40,7 +40,7 @@ export default function PlaceOrderScreen({ navigation }) {
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const subtotal = getSubtotal();
-  const taxRate = parseFloat(user?.tax_rate) || 0;
+  const taxRate = Math.min(1, Math.max(0, parseFloat(user?.tax_rate) || 0));
   const cartTotal = subtotal * (1 + taxRate);   // tax-inclusive, matches CartScreen and server
   const isAddingToExisting = !!existingOrderId;
 
@@ -174,7 +174,10 @@ export default function PlaceOrderScreen({ navigation }) {
         } else {
           setSnack('Order saved – will sync when online');
           navTimer.current = setTimeout(() => {
-            navigation.reset({ index: 0, routes: [{ name: 'TableSelection' }] });
+            const resetTarget = (orderType === 'delivery' || orderType === 'pickup')
+              ? 'RestaurantSelector'
+              : 'TableSelection';
+            navigation.reset({ index: 0, routes: [{ name: resetTarget }] });
           }, 1500);
         }
       }

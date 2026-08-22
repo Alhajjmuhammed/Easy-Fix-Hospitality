@@ -533,7 +533,9 @@ def sync_pull(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) |
+        # Self-registered customers (owner=None) — their delivery/pickup orders have no owner FK
+        Q(order_type__in=['delivery', 'pickup'], ordered_by=user, ordered_by__owner__isnull=True)
     )
     orders_qs = Order.objects.filter(
         order_table_q,

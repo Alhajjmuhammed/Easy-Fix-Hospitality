@@ -554,8 +554,8 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
                 'status': assignment.status,
                 'rider_name': rider.user.get_full_name() or rider.user.username,
                 'vehicle': rider.get_vehicle_type_display(),
-                'lat': float(rider.current_lat) if rider.current_lat else None,
-                'lng': float(rider.current_lng) if rider.current_lng else None,
+                'lat': float(rider.current_lat) if rider.current_lat is not None else None,
+                'lng': float(rider.current_lng) if rider.current_lng is not None else None,
                 'delivery_address': assignment.order.delivery_address,
             }
         except DeliveryAssignment.DoesNotExist:
