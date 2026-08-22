@@ -188,6 +188,16 @@ def add_branch(request):
                     # Use existing user
                     try:
                         branch_owner = User.objects.get(username=branch_owner_username)
+                        # Verify user belongs to this owner's restaurant network
+                        if branch_owner.owner_id != request.user.id:
+                            belongs = Restaurant.objects.filter(
+                                Q(main_owner=request.user) | Q(branch_owner=request.user)
+                            ).filter(
+                                Q(main_owner=branch_owner) | Q(branch_owner=branch_owner)
+                            ).exists()
+                            if not belongs:
+                                messages.error(request, f'User "{branch_owner_username}" does not belong to your restaurant network.')
+                                return render(request, 'admin_panel/add_branch.html', {'main_restaurant': main_restaurant})
                         # Upgrade to branch_owner role if needed
                         if not branch_owner.is_branch_owner():
                             branch_owner_role = Role.objects.get(name='branch_owner')
@@ -275,10 +285,10 @@ def edit_branch(request, restaurant_id):
     
     if request.method == 'POST':
         try:
-            # Update restaurant details
-            restaurant.name = request.POST.get('name', '').strip()
-            restaurant.description = request.POST.get('description', '').strip()
-            restaurant.address = request.POST.get('address', '').strip()
+            # Update restaurant details (sanitize to match add_branch behaviour)
+            restaurant.name = sanitize_input(request.POST.get('name', ''), max_length=200)
+            restaurant.description = sanitize_input(request.POST.get('description', ''), max_length=1000)
+            restaurant.address = sanitize_input(request.POST.get('address', ''), max_length=500)
             try:
                 restaurant.tax_rate = float(request.POST.get('tax_rate', 8.0)) / 100
             except (ValueError, TypeError):

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Text,
@@ -19,7 +19,7 @@ import { useSyncStore } from '../../store/useSyncStore';
 import { apiPlaceOrder, apiAddItemsToOrder } from '../../api/orders';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { printOrderTicket } from '../../utils/printer';
-import { saveOfflineOrder } from '../../database/operations';
+import { saveOfflineOrder, cacheOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 
 export default function PlaceOrderScreen({ navigation }) {
@@ -34,13 +34,19 @@ export default function PlaceOrderScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState('');
   const [conflictDialog, setConflictDialog] = useState(null);
+  const navTimer = useRef(null);
+  useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
-  const cartTotal = getSubtotal();
+  const subtotal = getSubtotal();
+  const taxRate = parseFloat(user?.tax_rate) || 0;
+  const cartTotal = subtotal * (1 + taxRate);   // tax-inclusive, matches CartScreen and server
   const isAddingToExisting = !!existingOrderId;
 
   const handleConfirmOrder = async () => {
     // Station-aware ticket helper — prints one ticket per station (KOT/BOT/etc.),
-    // fire-and-forget. Falls back to one combined ticket if no station data.
+    // fire-and-forget. Items with no station default to 'kitchen'.
     // alwaysFire=true bypasses the localKotBot guard (used for offline orders —
     // kitchen/bar always needs tickets regardless of the user's online preference)
     const fireTickets = (order, alwaysFire = false) => {
@@ -49,14 +55,10 @@ export default function PlaceOrderScreen({ navigation }) {
       const userFullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       const orderedBy = order.ordered_by_name || userFullName;
       const allItems = order.items || order.order_items || [];
-      const stations = [...new Set(allItems.map(i => i.station).filter(Boolean))];
-      if (stations.length === 0) {
-        // No station info (old cached menu) → single combined ticket
-        printOrderTicket(order, rName, null, orderedBy).catch(() => {});
-      } else {
-        // One ticket per station (KOT / BOT / Buffet / Service)
-        stations.forEach(s => printOrderTicket(order, rName, s, orderedBy).catch(() => {}));
-      }
+      // Default null/empty station to 'kitchen' so items always appear on a ticket
+      const stations = [...new Set(allItems.map(i => i.station || 'kitchen'))];
+      // One ticket per station (KOT / BOT / Buffet / Service)
+      stations.forEach(s => printOrderTicket(order, rName, s, orderedBy).catch(() => {}));
     };
 
     if (!items.length) return;
@@ -76,8 +78,8 @@ export default function PlaceOrderScreen({ navigation }) {
         order_type: orderType || 'dine-in',
         delivery_address: deliveryAddress || '',
         delivery_phone: deliveryPhone || '',
-        delivery_lat: deliveryLat != null ? parseFloat(deliveryLat.toFixed(7)) : null,
-        delivery_lng: deliveryLng != null ? parseFloat(deliveryLng.toFixed(7)) : null,
+        delivery_lat: deliveryLat != null ? parseFloat(Number(deliveryLat).toFixed(7)) : null,
+        delivery_lng: deliveryLng != null ? parseFloat(Number(deliveryLng).toFixed(7)) : null,
       };
 
       if (net.isConnected) {
@@ -88,70 +90,98 @@ export default function PlaceOrderScreen({ navigation }) {
               items: orderData.items,
               special_instructions: orderData.special_instructions,
             }, localKotBot);
+            // Cache immediately so the updated order is available offline
+            cacheOrders([result.order]).catch(() => {});
+            // Print ticket for ONLY the newly added items (not the full order)
+            const newItemsOrder = {
+              ...result.order,
+              items: items.map((i) => ({
+                product_name: i.product.name,
+                quantity: i.quantity,
+                special_notes: i.special_notes || '',
+                station: i.product.station || 'kitchen',
+              })),
+            };
             clearCart();
-            fireTickets(result.order);
+            fireTickets(newItemsOrder);
             navigation.replace('OrderConfirmation', { order: result.order });
           } else {
             const result = await apiPlaceOrder(orderData, localKotBot);
+            // Cache immediately so the order is available offline
+            cacheOrders([result.order]).catch(() => {});
             clearCart();
             fireTickets(result.order);
             navigation.replace('OrderConfirmation', { order: result.order });
           }
         } catch (err) {
+          if (!mountedRef.current) return;
           if (err.response?.status === 409) {
             const { price_changes, unavailable_items } = err.response.data;
-            if (price_changes?.length) {
-              setConflictDialog(price_changes);
-            } else if (unavailable_items?.length) {
+            if (unavailable_items?.length) {
               setSnack(
                 `Some items are no longer available: ${unavailable_items.map(i => i.name || i).join(', ')}`
               );
-            } else {
+            }
+            if (price_changes?.length) {
+              setConflictDialog(price_changes);
+            } else if (!unavailable_items?.length) {
               setSnack(err.response.data?.detail || 'Order failed. Please try again.');
             }
           } else {
-            const data = err.response?.data;
-            let errMsg = data?.error || data?.detail;
-            if (!errMsg && data && typeof data === 'object') {
-              // DRF serializer validation error: { field: ['msg'] }
-              const firstKey = Object.keys(data)[0];
-              const val = data[firstKey];
-              errMsg = `${firstKey}: ${Array.isArray(val) ? val[0] : val}`;
-            }
-            setSnack(errMsg || err.message || 'Something went wrong.');
+            const friendlyMsg = err.response?.data?.detail
+              || err.response?.data?.error
+              || err.response?.data?.message
+              || (err.response ? 'Please check your order and try again.' : 'No internet connection. Please try again.');
+            setSnack(friendlyMsg);
           }
         }
       } else {
-        await saveOfflineOrder({ ...orderData, user_id: user?.id, total_amount: cartTotal });
+        await saveOfflineOrder({
+          ...orderData,
+          user_id: user?.id,
+          total_amount: cartTotal,
+          tax_rate: taxRate,
+          // Signal that the BT ticket was already fired locally so the sync
+          // endpoint skips auto_print_new_items and avoids a duplicate print.
+          local_print_fired: localKotBot,
+          // Link to the existing server order so the sync endpoint appends items
+          // instead of creating a duplicate standalone order.
+          ...(isAddingToExisting ? { existing_order_id: existingOrderId } : {}),
+        });
         await refreshPendingCount();
 
-        // Print draft ticket from cart data if localKotBot is enabled.
+        // Print draft ticket from cart data (new items only) if localKotBot is enabled.
         // Station is included so tickets split by station (KOT/BOT) exactly
         // like online orders. fireTickets() is a no-op when localKotBot=false.
         const draftOrder = {
-          order_number: 'OFFLINE',
+          order_number: isAddingToExisting ? 'ADD-ITEMS' : 'OFFLINE',
           table_number: tableName,
           created_at:   new Date().toISOString(),
           items:        items.map((i) => ({
             product_name:  i.product.name,
             quantity:      i.quantity,
             special_notes: i.special_notes || '',
-            station:       i.product.station || null,
+            station:       i.product.station || 'kitchen',
           })),
           special_instructions: notes.trim(),
         };
         fireTickets(draftOrder, true); // always fire KOT/BOT when offline
 
         clearCart();
-        setSnack('Order saved – will sync when online');
-        setTimeout(() => {
-          navigation.reset({ index: 0, routes: [{ name: 'TableSelection' }] });
-        }, 1500);
+        if (isAddingToExisting) {
+          setSnack('Items saved – will be added to order when online');
+          navTimer.current = setTimeout(() => navigation.goBack(), 1500);
+        } else {
+          setSnack('Order saved – will sync when online');
+          navTimer.current = setTimeout(() => {
+            navigation.reset({ index: 0, routes: [{ name: 'TableSelection' }] });
+          }, 1500);
+        }
       }
     } catch (err) {
-      setSnack(err.message || 'Something went wrong.');
+      if (mountedRef.current) setSnack(err.message || 'Something went wrong.');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
@@ -183,7 +213,7 @@ export default function PlaceOrderScreen({ navigation }) {
         </Text>
       </Surface>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Special instructions — matches web's textarea */}
         <Text variant="titleSmall" style={styles.sectionTitle}>
           Special Instructions (optional)
@@ -267,7 +297,7 @@ export default function PlaceOrderScreen({ navigation }) {
           <Dialog.Content>
             {conflictDialog?.map((c) => (
               <Text key={c.product_id} variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>
-                {c.name}: {c.old_price} → {c.new_price}
+                {c.name}: {format(c.old_price)} → {format(c.new_price)}
               </Text>
             ))}
             <Text variant="bodySmall" style={{ marginTop: 8, fontFamily: 'Poppins_400Regular' }}>

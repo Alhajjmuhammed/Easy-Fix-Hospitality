@@ -76,7 +76,7 @@
 <script>
     // Currency symbol for JavaScript
     const CURRENCY_SYMBOL = '{% currency_symbol %}';
-    
+
     // Pass products data from Django template to JavaScript
     const wasteProducts = [
         {% for product in waste_products %}
@@ -87,12 +87,12 @@
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ];
-    
+
     // Load products when waste modal is opened (override the base template function)
     function loadProductsForWaste() {
         const productSelect = document.getElementById('product_id');
         productSelect.innerHTML = '<option value="">Select Product</option>';
-        
+
         wasteProducts.forEach(product => {
             const option = document.createElement('option');
             option.value = product.id;
@@ -100,6 +100,125 @@
             productSelect.appendChild(option);
         });
     }
+</script>
+<script>
+// Waste Recording Modal functionality
+$(document).ready(function() {
+    // Open waste recording modal
+    $('#openWasteModal').on('click', function() {
+        $('#wasteRecordModal').modal('show');
+    });
+
+    // Submit waste form
+    $('#submitWasteForm').on('click', function() {
+        if (!$('#wasteRecordForm')[0].checkValidity()) {
+            $('#wasteRecordForm')[0].reportValidity();
+            return;
+        }
+
+        const productId = $('#product').val();
+        const quantity = $('#quantity').val();
+        const wasteReason = $('#dash_waste_reason').val();
+        const disposalMethod = $('#disposal_method').val();
+        const notes = $('#notes').val();
+
+        $.ajax({
+            url: "{% url 'waste_management:record_waste' %}",
+            type: "POST",
+            dataType: "json",
+            contentType: "application/json",
+            data: JSON.stringify({
+                product_id: productId,
+                quantity_wasted: quantity,
+                waste_reason: wasteReason,
+                disposal_method: disposalMethod,
+                notes: notes
+            }),
+            headers: {
+                "X-CSRFToken": getCookie("csrftoken")
+            },
+            success: function(data) {
+                $('#wasteSuccessDetails').html(`
+                    <div class="alert alert-light border text-start">
+                        <strong>${data.waste_log.product_name}</strong><br>
+                        Quantity: ${data.waste_log.quantity_wasted}<br>
+                        Total Cost: ${CURRENCY_SYMBOL}${data.waste_log.total_cost.toFixed(2)}<br>
+                        Reason: ${data.waste_log.waste_reason}
+                    </div>
+                `);
+                $('#wasteRecordModal').modal('hide');
+                $('#wasteSuccessModal').modal('show');
+                $('#wasteRecordForm')[0].reset();
+            },
+            error: function(xhr) {
+                let errorMessage = "An error occurred while recording waste.";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMessage = xhr.responseJSON.error;
+                }
+                alert(errorMessage);
+            }
+        });
+    });
+});
+</script>
+
+<script>
+// Live new-order notifications via WebSocket (restaurant channel group)
+(function() {
+    {% if user.owner %}
+    var OWNER_ID = {{ user.owner.id }};
+    {% elif user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %}
+    var OWNER_ID = {{ user.id }};
+    {% else %}
+    var OWNER_ID = null;
+    {% endif %}
+    if (!OWNER_ID) return;
+
+    var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    var wsUrl  = scheme + '://' + window.location.host + '/ws/restaurant/' + OWNER_ID + '/';
+    var retryDelay = 3000;
+    var MAX_DELAY  = 30000;
+
+    function connect() {
+        var ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() { retryDelay = 3000; };
+
+        ws.onmessage = function(e) {
+            try {
+                var msg = JSON.parse(e.data);
+                if (msg.type === 'new_order') {
+                    // Show a toast-style banner and reload after a brief pause
+                    showOrderNotification(msg.order_number, msg.table_number);
+                }
+            } catch(err) {}
+        };
+
+        ws.onclose = function(ev) {
+            // Don't retry on auth failures
+            if (ev.code === 4001 || ev.code === 4003) return;
+            setTimeout(connect, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, MAX_DELAY);
+        };
+    }
+
+    function showOrderNotification(orderNum, tableNum) {
+        // Create a fixed notification bar at top of page
+        var bar = document.getElementById('ws-order-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'ws-order-bar';
+            bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#1565C0;color:#fff;text-align:center;padding:10px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+            bar.onclick = function() { window.location.reload(); };
+            document.body.prepend(bar);
+        }
+        bar.textContent = '🔔 New Order #' + (orderNum || '?') + (tableNum && tableNum !== 'N/A' ? ' · Table ' + tableNum : '') + ' — Click to refresh';
+        // Also reload after 5 s automatically
+        setTimeout(function() { window.location.reload(); }, 5000);
+    }
+
+    connect();
+})();
 </script>
 {% endblock %}
 
@@ -563,14 +682,6 @@ function processPayment(orderId) {
             console.error('Error:', error);
             alert('Error loading payment form');
         });
-    
-    // Handle form submission
-    document.addEventListener('submit', function(e) {
-        if (e.target.id === 'paymentForm') {
-            e.preventDefault();
-            submitPayment();
-        }
-    });
 }
 
 function toggleSplitBill() {
@@ -865,6 +976,14 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Added once at load — not inside processPayment() to prevent listener accumulation
+document.addEventListener('submit', function(e) {
+    if (e.target.id === 'paymentForm') {
+        e.preventDefault();
+        submitPayment();
+    }
+});
 </script>
 
 <!-- Waste Recording Modal -->
@@ -878,7 +997,7 @@ function getCookie(name) {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="wasteForm">
+                <form id="wasteRecordForm">
                     {% csrf_token %}
                     <div class="row">
                         <div class="col-md-6">
@@ -903,8 +1022,8 @@ function getCookie(name) {
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="waste_reason" class="form-label">Reason <span class="text-danger">*</span></label>
-                                <select class="form-select" id="waste_reason" name="waste_reason" required>
+                                <label for="dash_waste_reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                                <select class="form-select" id="dash_waste_reason" name="waste_reason" required>
                                     <option value="">Select reason...</option>
                                     <option value="customer_refused">Customer Refused</option>
                                     <option value="customer_left">Customer Left Before Pickup</option>
@@ -977,136 +1096,3 @@ function getCookie(name) {
 </div>
 {% endblock %}
 
-<script>
-// Waste Recording Modal functionality
-$(document).ready(function() {
-    // Open waste recording modal
-    $('#openWasteModal').on('click', function() {
-        $('#wasteRecordModal').modal('show');
-    });
-    
-    // Submit waste form
-    $('#submitWasteForm').on('click', function() {
-        if (!$('#wasteForm')[0].checkValidity()) {
-            $('#wasteForm')[0].reportValidity();
-            return;
-        }
-        
-        // Collect form data
-        const productId = $('#product').val();
-        const quantity = $('#quantity').val();
-        const wasteReason = $('#waste_reason').val();
-        const disposalMethod = $('#disposal_method').val();
-        const notes = $('#notes').val();
-        
-        // Submit data via AJAX
-        $.ajax({
-            url: "{% url 'waste_management:record_waste' %}",
-            type: "POST",
-            dataType: "json",
-            contentType: "application/json",
-            data: JSON.stringify({
-                product_id: productId,
-                quantity_wasted: quantity,
-                waste_reason: wasteReason,
-                disposal_method: disposalMethod,
-                notes: notes
-            }),
-            headers: {
-                "X-CSRFToken": getCookie("csrftoken")
-            },
-            success: function(data) {
-                // Show success message
-                $('#wasteSuccessDetails').html(`
-                    <div class="alert alert-light border text-start">
-                        <strong>${data.waste_log.product_name}</strong><br>
-                        Quantity: ${data.waste_log.quantity_wasted}<br>
-                        Total Cost: ${CURRENCY_SYMBOL}${data.waste_log.total_cost.toFixed(2)}<br>
-                        Reason: ${data.waste_log.waste_reason}
-                    </div>
-                `);
-                
-                // Close waste modal and show success
-                $('#wasteRecordModal').modal('hide');
-                $('#wasteSuccessModal').modal('show');
-                
-                // Reset form
-                $('#wasteForm')[0].reset();
-                
-                // Update recent records
-                loadRecentRecords();
-            },
-            error: function(xhr, status, error) {
-                let errorMessage = "An error occurred while recording waste.";
-                
-                if (xhr.responseJSON && xhr.responseJSON.error) {
-                    errorMessage = xhr.responseJSON.error;
-                }
-                
-                // Show error message
-                alert(errorMessage);
-            }
-        });
-    });
-    
-    // Load recent records
-    function loadRecentRecords() {
-        $.ajax({
-            url: "/waste-management/api/recent-records/",
-            type: "GET",
-            success: function(data) {
-                if (data.records && data.records.length > 0) {
-                    let html = '<div class="list-group list-group-flush small">';
-                    data.records.forEach(function(record) {
-                        html += `
-                            <div class="list-group-item px-0">
-                                <div class="d-flex justify-content-between">
-                                    <span><strong>${record.product_name}</strong> × ${record.quantity}</span>
-                                    <span class="text-danger">${CURRENCY_SYMBOL}${record.cost.toFixed(2)}</span>
-                                </div>
-                                <small class="text-muted d-block">${record.reason} • ${record.date}</small>
-                            </div>
-                        `;
-                    });
-                    html += '</div>';
-                    $('#recentRecords').html(html);
-                } else {
-                    $('#recentRecords').html('<p class="text-muted">No recent waste records found.</p>');
-                }
-            },
-            error: function() {
-                $('#recentRecords').html('<p class="text-danger">Failed to load recent records.</p>');
-            }
-        });
-    }
-    
-    // Initial load of recent records
-    // loadRecentRecords();
-    
-    // Waste Products Data for Modal
-    const wasteProducts = [
-        {% for product in waste_products %}
-        {
-            id: {{ product.id }},
-            name: "{{ product.name|escapejs }}",
-            category: "{{ product.main_category.name|escapejs }}{% if product.sub_category %} - {{ product.sub_category.name|escapejs }}{% endif %}"
-        }{% if not forloop.last %},{% endif %}
-        {% endfor %}
-    ];
-    
-    // Override the loadProductsForWaste function from base template
-    window.loadProductsForWaste = function() {
-        const productSelect = document.getElementById('product_id');
-        if (!productSelect) return;
-        
-        productSelect.innerHTML = '<option value="">Select Product</option>';
-        
-        wasteProducts.forEach(product => {
-            const option = document.createElement('option');
-            option.value = product.id;
-            option.textContent = `${product.name} (${product.category})`;
-            productSelect.appendChild(option);
-        });
-    };
-});
-</script>

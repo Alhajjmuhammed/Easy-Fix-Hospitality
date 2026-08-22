@@ -62,12 +62,12 @@ def cc_reports(request):
         try:
             date_from = datetime.strptime(raw_from, '%Y-%m-%d').date()
         except ValueError:
-            pass
+            return Response({'error': 'Invalid from_date. Use YYYY-MM-DD.'}, status=400)
     if raw_to:
         try:
             date_to = datetime.strptime(raw_to, '%Y-%m-%d').date()
         except ValueError:
-            pass
+            return Response({'error': 'Invalid to_date. Use YYYY-MM-DD.'}, status=400)
 
     # Base queryset – CC sees only their own orders (all order types including delivery/pickup)
     _tq = (
@@ -147,7 +147,7 @@ def cc_reports(request):
             'status':         order.status,
             'payment_status': order.payment_status,
             'total_amount':   float(order.total_amount),
-            'items_count':    order.order_items.count(),
+            'items_count':    len(order.order_items.all()),
             'created_at':     order.created_at.isoformat(),
         })
 
@@ -206,34 +206,28 @@ def owner_reports(request):
         try:
             date_from = _dt.strptime(raw_from, '%Y-%m-%d').date()
         except ValueError:
-            pass
+            return Response({'error': 'Invalid from_date. Use YYYY-MM-DD.'}, status=400)
     if raw_to:
         try:
             date_to = _dt.strptime(raw_to, '%Y-%m-%d').date()
         except ValueError:
-            pass
+            return Response({'error': 'Invalid to_date. Use YYYY-MM-DD.'}, status=400)
 
     # Build dual-FK order filter (mirrors reports/views.py pattern).
     # TableInfo links to an owner either via the legacy `owner` FK (owner is NULL on restaurant)
     # or via the newer `restaurant` FK (where restaurant.main_owner / .branch_owner = owner).
     from restaurant.models import Restaurant as _Restaurant
-    restaurant_obj = _Restaurant.objects.filter(
+    # Fetch ALL restaurants for this owner (multi-branch support).
+    owned_restaurants = _Restaurant.objects.filter(
         Q(main_owner=owner) | Q(branch_owner=owner)
-    ).first()
+    )
 
-    if restaurant_obj:
-        table_q = (
-            Q(table_info__restaurant=restaurant_obj) |
-            Q(table_info__owner=owner, table_info__restaurant__isnull=True) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
-        )
-    else:
-        table_q = (
-            Q(table_info__owner=owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
-        )
+    table_q = (
+        Q(table_info__restaurant__in=owned_restaurants) |
+        Q(table_info__owner=owner, table_info__restaurant__isnull=True) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+    )
 
     _start_dt = timezone.make_aware(_dt.combine(date_from, _dt.min.time()))
     _end_dt   = timezone.make_aware(_dt.combine(date_to + timedelta(days=1), _dt.min.time()))
@@ -241,7 +235,7 @@ def owner_reports(request):
         table_q,
         created_at__gte=_start_dt,
         created_at__lt=_end_dt,
-    ).select_related('table_info', 'ordered_by').prefetch_related('payments')
+    ).distinct().select_related('table_info', 'ordered_by').prefetch_related('order_items', 'payments')
 
     payment_status = request.GET.get('payment_status', 'all')
     if payment_status in ('paid', 'unpaid', 'partial'):
@@ -317,7 +311,7 @@ def owner_reports(request):
             'status':         order.status,
             'payment_status': order.payment_status,
             'total_amount':   float(order.total_amount),
-            'items_count':    order.order_items.count(),
+            'items_count':    len(order.order_items.all()),
             'created_at':     order.created_at.isoformat(),
         })
 
@@ -387,12 +381,12 @@ def cashier_reports(request):
         try:
             date_from = _dt.strptime(raw_from, '%Y-%m-%d').date()
         except ValueError:
-            pass
+            return Response({'error': 'Invalid from_date. Use YYYY-MM-DD.'}, status=400)
     if raw_to:
         try:
             date_to = _dt.strptime(raw_to, '%Y-%m-%d').date()
         except ValueError:
-            pass
+            return Response({'error': 'Invalid to_date. Use YYYY-MM-DD.'}, status=400)
 
     # --- Restaurant-wide orders for the period (all order types) ---
     _tq = (
@@ -500,7 +494,7 @@ def cashier_reports(request):
             'status':         order.status,
             'payment_status': order.payment_status,
             'total_amount':   float(order.total_amount),
-            'items_count':    order.order_items.count(),
+            'items_count':    len(order.order_items.all()),
             'created_at':     order.created_at.isoformat(),
         })
 

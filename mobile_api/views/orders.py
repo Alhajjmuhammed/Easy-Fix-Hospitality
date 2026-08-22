@@ -11,7 +11,7 @@ from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from channels.layers import get_channel_layer
@@ -19,6 +19,7 @@ from asgiref.sync import async_to_sync
 
 from orders.models import Order, OrderItem
 from restaurant.models import TableInfo, Product
+from cashier.models import Payment
 from ..serializers import OrderSerializer, PlaceOrderSerializer
 from .helpers import get_restaurant_owner
 from accounts.security_utils import sanitize_special_instructions
@@ -51,7 +52,7 @@ def _notify_ws(order, updated_by_user, event_type='order_status_update'):
     _table_no       = str(order.table_info.tbl_no) if order.table_info else 'N/A'
     _status         = order.status
     _status_display = order.get_status_display()
-    _items_count    = order.order_items.count()
+    _items_count    = len(order.order_items.all())
     _total          = str(order.total_amount)
     _customer_name  = (
         order.ordered_by.get_full_name() or order.ordered_by.username
@@ -109,20 +110,21 @@ def _notify_ws(order, updated_by_user, event_type='order_status_update'):
                         'timestamp': _ts,
                     }
                 )
-                async_to_sync(channel_layer.group_send)(
-                    f'restaurant_{_owner_id}',
-                    {
-                        'type': 'order_status_update',
-                        'order_id': str(_order_id),
-                        'order_number': _order_number,
-                        'status': _status,
-                        'status_display': _status_display,
-                        'customer': _customer_name,
-                        'message': msg,
-                        'updated_by': _actor,
-                        'timestamp': _ts,
-                    }
-                )
+                if _owner_id is not None:
+                    async_to_sync(channel_layer.group_send)(
+                        f'restaurant_{_owner_id}',
+                        {
+                            'type': 'order_status_update',
+                            'order_id': str(_order_id),
+                            'order_number': _order_number,
+                            'status': _status,
+                            'status_display': _status_display,
+                            'customer': _customer_name,
+                            'message': msg,
+                            'updated_by': _actor,
+                            'timestamp': _ts,
+                        }
+                    )
         except Exception as e:
             logger.warning('WS notification failed (non-critical): %s', e)
 
@@ -140,8 +142,8 @@ def _customer_order_qs(user):
     return (
         Order.objects
         .filter(ordered_by=user)
-        .select_related('table_info', 'ordered_by')
-        .prefetch_related('order_items__product', 'payments')
+        .select_related('table_info', 'ordered_by', 'confirmed_by', 'entered_by')
+        .prefetch_related('order_items__product', 'payments', 'table_info__bill_requests')
     )
 
 
@@ -162,8 +164,12 @@ def _list_orders(request):
     # would silently exclude them.
     if user.is_customer():
         qs = Order.objects.filter(ordered_by=user).select_related(
-            'table_info', 'ordered_by'
-        ).prefetch_related('order_items__product', 'payments')
+            'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
+        ).prefetch_related(
+            'order_items__product',
+            Prefetch('payments', queryset=Payment.objects.select_related('processed_by')),
+            'table_info__bill_requests',
+        )
         qs = qs.order_by('-created_at')[:100]
         return Response({'orders': OrderSerializer(qs, many=True, context={'request': request}).data})
 
@@ -178,13 +184,30 @@ def _list_orders(request):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    qs = Order.objects.filter(_tq).distinct().select_related('table_info', 'ordered_by').prefetch_related(
-        'order_items__product', 'payments'
+    qs = Order.objects.filter(_tq).distinct().select_related(
+        'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
+    ).prefetch_related(
+        'order_items__product',
+        Prefetch('payments', queryset=Payment.objects.select_related('processed_by')),
+        'table_info__bill_requests',
     )
 
     # Customer-care staff only see orders they placed themselves.
     if user.is_customer_care():
         qs = qs.filter(ordered_by=user)
+
+    # Station staff: only orders containing items from their station.
+    # Returns early so the generic period/payment/status filters do not override
+    # the active-only constraint that is meaningful for kitchen/bar/buffet/service.
+    _STATION_ROLES = {'kitchen', 'bar', 'buffet', 'service'}
+    if user.role and user.role.name in _STATION_ROLES:
+        qs = qs.filter(
+            order_items__product__station=user.role.name
+        ).distinct().filter(
+            status__in=['pending', 'confirmed', 'preparing', 'ready']
+        )
+        qs = qs.order_by('-created_at')[:100]
+        return Response({'orders': OrderSerializer(qs, many=True, context={'request': request}).data})
 
     # my_orders=true  → show only orders placed or entered by the requesting user (cashier "My Orders")
     if request.GET.get('my_orders') == 'true':
@@ -201,10 +224,16 @@ def _list_orders(request):
         week_start = today - timedelta(days=today.weekday())
         qs = qs.filter(created_at__date__gte=week_start)
 
+    VALID_PAYMENT_STATUSES = {'unpaid', 'partial', 'paid'}
+    VALID_ORDER_STATUSES = {'pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled', 'out_for_delivery', 'delivered'}
+
     # Payment status filter — supports comma-separated values (e.g. "unpaid,partial")
     payment_status = request.GET.get('payment_status', '')
     if payment_status:
         statuses = [s.strip() for s in payment_status.split(',') if s.strip()]
+        invalid = [s for s in statuses if s not in VALID_PAYMENT_STATUSES]
+        if invalid:
+            return Response({'error': f'Invalid payment_status: {", ".join(invalid)}'}, status=400)
         if statuses:
             qs = qs.filter(payment_status__in=statuses)
 
@@ -212,6 +241,9 @@ def _list_orders(request):
     order_status = request.GET.get('status', '')
     if order_status:
         statuses = [s.strip() for s in order_status.split(',') if s.strip()]
+        invalid = [s for s in statuses if s not in VALID_ORDER_STATUSES]
+        if invalid:
+            return Response({'error': f'Invalid status: {", ".join(invalid)}'}, status=400)
         if statuses:
             qs = qs.filter(status__in=statuses)
 
@@ -356,12 +388,43 @@ def _place_order(request):
     if offline_id:
         special = f'[offline:{offline_id}] {special}'.strip()
 
-    order_number = f'ORD-{uuid.uuid4().hex[:8].upper()}'
+    # Generate a collision-resistant order number. UUID4 hex[:8] is 4-billion
+    # space; collision is negligible per request but nonzero over the system
+    # lifetime, so we retry up to 5 times before giving up.
+    for _attempt in range(5):
+        _candidate = f'ORD-{uuid.uuid4().hex[:8].upper()}'
+        if not Order.objects.filter(order_number=_candidate).exists():
+            order_number = _candidate
+            break
+    else:
+        order_number = f'ORD-{uuid.uuid4().hex[:12].upper()}'
 
     # ── Phase 2: DB writes inside atomic block (no return statements inside) ──
     # async_to_sync (used by _notify_ws) must NOT run inside a transaction on
     # PostgreSQL — it corrupts the connection. Keep only pure DB writes here.
-    with transaction.atomic():
+    # Use a sentinel exception to signal validation failures so we can return a
+    # clean JSON 409 from OUTSIDE the block without corrupting the transaction.
+    class _ItemsUnavailable(Exception):
+        pass
+
+    class _DuplicateOrder(Exception):
+        def __init__(self, order): self.order = order
+
+    try:
+      with transaction.atomic():
+        if offline_id:
+            # Lock this user's row to serialize concurrent POSTs with the same offline_id.
+            # The second request blocks here until the first transaction commits, then
+            # sees the already-created order in the filter below — no migration required.
+            from django.contrib.auth import get_user_model as _gum
+            _gum().objects.select_for_update(of=('self',)).get(pk=user.pk)
+            _dup = Order.objects.filter(
+                ordered_by=user,
+                special_instructions__contains=f'[offline:{offline_id}]',
+            ).first()
+            if _dup:
+                raise _DuplicateOrder(_dup)
+
         validated_items = []
         for pv in pre_validated:
             # Re-fetch with row lock to prevent overselling under concurrent load
@@ -379,8 +442,7 @@ def _place_order(request):
             validated_items.append({'product': product, 'quantity': pv['quantity'], 'unit_price': pv['unit_price']})
 
         if not validated_items:
-            # All items became unavailable between validation and lock — safe to raise
-            raise Exception('No valid items could be locked for order.')
+            raise _ItemsUnavailable()
 
         from decimal import Decimal as _Dec
         total_amount = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated_items)
@@ -417,6 +479,15 @@ def _place_order(request):
             table.is_available = False
             table.save(update_fields=['is_available'])
         # --- transaction commits here ---
+    except _DuplicateOrder as _de:
+        return Response(
+            {'order': OrderSerializer(_de.order, context={'request': request}).data, 'already_synced': True}
+        )
+    except _ItemsUnavailable:
+        return Response(
+            {'error': 'All selected items became unavailable. Please refresh the menu and try again.'},
+            status=status.HTTP_409_CONFLICT,
+        )
 
     # ── Phase 3: outside transaction — WebSocket + print ─────────────────
     _notify_ws(order, user, event_type='new_order')
@@ -463,8 +534,10 @@ def order_detail(request, order_id):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(
-        Order.objects.filter(_tq).distinct().select_related('table_info', 'ordered_by').prefetch_related(
-            'order_items__product', 'payments'
+        Order.objects.filter(_tq).distinct().select_related(
+            'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
+        ).prefetch_related(
+            'order_items__product', 'payments', 'table_info__bill_requests'
         ),
         id=order_id,
     )
@@ -519,9 +592,11 @@ def _send_push_async(token, title, body, data=None):
 def update_order_status(request, order_id):
     """Update order status (staff only)."""
     user = request.user
+    _STATION_ROLES = {'kitchen', 'bar', 'buffet', 'service'}
+    _is_station_staff = bool(user.role and user.role.name in _STATION_ROLES)
     if not (user.is_cashier() or user.is_customer_care() or
             user.is_owner() or user.is_main_owner() or
-            user.is_branch_owner() or user.is_manager()):
+            user.is_branch_owner() or user.is_manager() or _is_station_staff):
         return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
@@ -536,51 +611,76 @@ def update_order_status(request, order_id):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     order = get_object_or_404(
-        Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
+        Order.objects.filter(_tq).distinct().prefetch_related(
+            'order_items__product', 'payments', 'table_info__bill_requests',
+        ).select_related('confirmed_by', 'entered_by'),
         id=order_id,
     )
+    # CC staff are scoped to orders they placed — consistent with cancel_order, order_detail.
+    if user.is_customer_care() and order.ordered_by != user:
+        return Response({'error': 'Access denied.'}, status=403)
     new_status = request.data.get('status')
     valid = [s[0] for s in Order.STATUS_CHOICES]
 
     if new_status not in valid:
         return Response({'error': f'Invalid status. Valid values: {valid}'}, status=400)
 
+    # Station staff may only advance orders to 'preparing' or 'ready'.
+    STATION_ALLOWED_STATUSES = ('preparing', 'ready')
+    if _is_station_staff and new_status not in STATION_ALLOWED_STATUSES:
+        return Response(
+            {'error': f'Station staff can only set status to: {", ".join(STATION_ALLOWED_STATUSES)}'},
+            status=403,
+        )
+
     # Enforce directed status transition rules — mirrors web's update_order_status.
     valid_transitions = {
-        'pending':   ['confirmed', 'cancelled'],
-        'confirmed': ['preparing', 'cancelled'],
-        'preparing': ['ready', 'cancelled'],
-        'ready':     ['served', 'cancelled'],
-        'served':    ['cancelled'],
-        'cancelled': [],
+        'pending':          ['confirmed', 'cancelled'],
+        'confirmed':        ['preparing', 'cancelled'],
+        'preparing':        ['ready', 'cancelled'],
+        'ready':            ['served', 'out_for_delivery', 'cancelled'],
+        'served':           ['cancelled'],
+        'out_for_delivery': ['delivered', 'cancelled'],
+        'delivered':        [],
+        'cancelled':        [],
     }
     # Owners, managers, and cashiers may step backwards for corrections.
     if (user.is_owner() or user.is_main_owner() or user.is_branch_owner()
             or user.is_manager() or user.is_cashier()):
         valid_transitions.update({
-            'confirmed': ['pending', 'preparing', 'cancelled'],
-            'preparing': ['confirmed', 'ready', 'cancelled'],
-            'ready':     ['preparing', 'served', 'cancelled'],
-            'served':    ['ready', 'cancelled'],
+            'confirmed':        ['pending', 'preparing', 'cancelled'],
+            'preparing':        ['confirmed', 'ready', 'cancelled'],
+            'ready':            ['preparing', 'served', 'out_for_delivery', 'cancelled'],
+            'served':           ['ready', 'cancelled'],
+            'out_for_delivery': ['ready', 'delivered', 'cancelled'],
+            'delivered':        ['out_for_delivery', 'cancelled'],
         })
 
-    if new_status not in valid_transitions.get(order.status, []):
-        return Response(
-            {'error': f'Cannot transition order from "{order.status}" to "{new_status}".'},
-            status=400,
-        )
-
     with transaction.atomic():
+        # Re-fetch under lock so two concurrent status transitions cannot both pass
+        # the guard (TOCTOU fix). Use the same import pattern as cancel_order_item.
+        from orders.models import Order as _Order
+        order = _Order.objects.select_for_update().get(pk=order.pk)
+        # Re-check inside the lock — the status may have changed since the prefetch.
+        # Return immediately so we release the lock as fast as possible on error paths.
+        _allowed = valid_transitions.get(order.status, [])
+        if new_status not in _allowed:
+            return Response(
+                {'error': f'Cannot transition order from "{order.status}" to "{new_status}".'},
+                status=400,
+            )
         order.status = new_status
         if new_status == 'confirmed' and not order.confirmed_by:
             order.confirmed_by = user
             order.save(update_fields=['status', 'confirmed_by', 'updated_at'])
         elif new_status == 'cancelled':
+            from restaurant.models import Product as _Product
+            from django.db.models import F as _F
             for item in order.order_items.select_related('product').all():
-                p = item.product
-                if p and p.available_in_stock is not None:
-                    p.available_in_stock += item.quantity
-                    p.save(update_fields=['available_in_stock'])
+                if item.product_id and item.product and item.product.available_in_stock is not None:
+                    _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
+                        available_in_stock=_F('available_in_stock') + item.quantity
+                    )
             order.release_table()
             order.save(update_fields=['status', 'updated_at'])
         else:
@@ -601,6 +701,13 @@ def update_order_status(request, order_id):
 
     _notify_ws(order, user)
 
+    order = Order.objects.select_related(
+        'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
+    ).prefetch_related(
+        Prefetch('payments', queryset=Payment.objects.select_related('processed_by')),
+        'order_items__product',
+        'table_info__bill_requests',
+    ).get(pk=order.pk)
     return Response(OrderSerializer(order, context={'request': request}).data)
 
 
@@ -655,6 +762,59 @@ def print_bill(request, order_id):
         return Response({'error': 'Bill print failed. Check printer connection.'}, status=500)
 
 
+_STATION_ROLES = {'kitchen', 'bar', 'buffet', 'service'}
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSubscriptionActive])
+def print_station_ticket(request, order_id):
+    """Reprint a KOT/BOT/buffet/service ticket for a specific order.
+    Station staff always print their own station; managers/owners pass {'station': '...'}.
+    """
+    user = request.user
+    role = user.role.name if user.role else None
+
+    if role not in _STATION_ROLES and not (
+        user.is_owner() or user.is_main_owner() or
+        user.is_branch_owner() or user.is_manager() or
+        user.is_cashier() or user.is_customer_care()
+    ):
+        return Response({'error': 'Access denied.'}, status=403)
+
+    station = role if role in _STATION_ROLES else request.data.get('station')
+    if station not in _STATION_ROLES:
+        return Response({'error': 'Invalid or missing station.'}, status=400)
+
+    owner = get_restaurant_owner(request)
+    if owner is None:
+        return Response({'error': 'Restaurant not found.'}, status=404)
+
+    _tq = (
+        Q(table_info__owner=owner) |
+        Q(table_info__restaurant__main_owner=owner) |
+        Q(table_info__restaurant__branch_owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
+        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+    )
+    order = get_object_or_404(
+        Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
+        id=order_id,
+    )
+
+    if order.status == 'cancelled':
+        return Response({'error': 'Cannot print ticket for a cancelled order.'}, status=400)
+
+    try:
+        from orders.printing import reprint_station_ticket
+        result = reprint_station_ticket(order, station)
+        if result.get('printed'):
+            return Response({'success': True, 'message': f'{station.upper()} ticket printed for Order #{order.order_number}'})
+        errors = result.get('errors', ['Unknown error'])
+        return Response({'success': False, 'message': f'Print failed: {", ".join(errors)}'})
+    except Exception as e:
+        logger.error('print_station_ticket error for order %s: %s', order_id, e)
+        return Response({'error': 'Ticket print failed. Check printer connection.'}, status=500)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
 def transfer_table(request, order_id):
@@ -703,10 +863,19 @@ def transfer_table(request, order_id):
         return Response({'error': 'Order is already on this table.'}, status=400)
 
     with transaction.atomic():
+        # Lock both tables and the order so concurrent transfers to/from the
+        # same tables don't double-assign or leave is_available in a bad state.
+        from restaurant.models import TableInfo as _TI
+        locked_tables = list(
+            _TI.objects.select_for_update().filter(id__in=[order.table_info_id, target_table.id])
+        )
+        from orders.models import Order as _Order
+        order = _Order.objects.select_for_update().get(pk=order.pk)
+
         old_table = order.table_info
         order.table_info = target_table
         order.save(update_fields=['table_info'])
-        still_active = Order.objects.filter(
+        still_active = _Order.objects.filter(
             table_info=old_table,
             status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
             payment_status__in=['unpaid', 'partial'],
@@ -782,15 +951,6 @@ def cancel_order(request, order_id):
                 status=400,
             )
 
-    # Mirrors cashier/views.py cancel_order: block if any non-voided payments exist so
-    # we do not cancel orders with partial/full payments without reversing them first.
-    has_payments = order.payments.filter(is_voided=False).exists()
-    if has_payments:
-        return Response(
-            {'error': 'Cannot cancel order with payments. Void all payments first.'},
-            status=400,
-        )
-
     reason = (request.data.get('reason', '') or '').strip()
     if not reason:
         # Require a reason from privileged staff so the audit trail is meaningful.
@@ -799,15 +959,31 @@ def cancel_order(request, order_id):
         reason = 'Cancelled by customer'
 
     with transaction.atomic():
+        # Re-fetch under a row lock so two concurrent cancel requests cannot
+        # both pass the status/payment guards above and each restore stock.
+        from orders.models import Order as _CancelOrder
+        from restaurant.models import Product as _Product
+        from django.db.models import F as _F
+        order = _CancelOrder.objects.select_for_update().get(pk=order.pk)
+        # Re-check status inside the lock — a concurrent request may have changed it.
+        if order.status == 'cancelled':
+            return Response({'error': 'Order is already cancelled.'}, status=400)
+        # Re-check payments inside the lock — a payment could have been created between
+        # the outer status check and acquiring this lock.
+        if order.payments.filter(is_voided=False).exists():
+            return Response(
+                {'error': 'Cannot cancel order with payments. Void all payments first.'},
+                status=400,
+            )
         for item in order.order_items.select_related('product').all():
-            p = item.product
-            if p and p.available_in_stock is not None:
-                p.available_in_stock += item.quantity
-                p.save(update_fields=['available_in_stock'])
+            if item.product_id and item.product and item.product.available_in_stock is not None:
+                _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
+                    available_in_stock=_F('available_in_stock') + item.quantity
+                )
         order.status = 'cancelled'
         order.reason_if_cancelled = reason
         order.release_table()
-        order.save()
+        order.save(update_fields=['status', 'reason_if_cancelled', 'updated_at'])
         # --- transaction commits here ---
 
     _notify_ws(order, user)
@@ -834,12 +1010,22 @@ def add_items_to_order(request, order_id):
 
     if user.is_customer():
         order = get_object_or_404(
-            _customer_order_qs(user).prefetch_related('order_items__product'),
+            _customer_order_qs(user).prefetch_related(
+                'order_items__product', 'payments', 'table_info__bill_requests',
+            ),
             id=order_id,
         )
-        # Derive owner for product validation: use table owner for dine-in,
-        # or None for delivery/pickup (product lookup falls back to ID-only below).
-        owner = order.table_info.owner if order.table_info else None
+        # Derive owner for product validation. Support both legacy (table.owner) and
+        # new (table.restaurant.main/branch_owner) FK systems, then delivery/pickup.
+        if order.table_info:
+            ti = order.table_info
+            owner = (
+                ti.owner
+                or (ti.restaurant.main_owner if ti.restaurant else None)
+                or (ti.restaurant.branch_owner if ti.restaurant else None)
+            )
+        else:
+            owner = None
     else:
         owner = get_restaurant_owner(request)
         if owner is None:
@@ -853,7 +1039,9 @@ def add_items_to_order(request, order_id):
             Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
         )
         order = get_object_or_404(
-            Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
+            Order.objects.filter(_tq).distinct().prefetch_related(
+                'order_items__product', 'payments', 'table_info__bill_requests',
+            ),
             id=order_id,
         )
 
@@ -936,15 +1124,27 @@ def add_items_to_order(request, order_id):
             if _orig_subtotal else _Dec('0')
         )
 
-    with transaction.atomic():
+    class _StockConflict(Exception):
+        def __init__(self, msg): self.msg = msg
+
+    new_items = []  # collect created OrderItem instances for targeted KOT/BOT printing
+    try:
+      with transaction.atomic():
         for item in validated:
-            OrderItem.objects.create(
+            # Re-fetch product under SELECT FOR UPDATE so concurrent add-item
+            # requests cannot both pass the stock check and together oversell.
+            p = Product.objects.select_for_update(of=('self',)).get(id=item['product'].id)
+            if not p.is_available:
+                raise _StockConflict(f'"{p.name}" is no longer available.')
+            if p.available_in_stock is not None and p.available_in_stock < item['quantity']:
+                raise _StockConflict(f'Only {p.available_in_stock} of "{p.name}" left in stock.')
+            oi = OrderItem.objects.create(
                 order=order,
-                product=item['product'],
+                product=p,
                 quantity=item['quantity'],
                 unit_price=item['unit_price'],
             )
-            p = item['product']
+            new_items.append(oi)
             if p.available_in_stock is not None:
                 p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
                 p.save(update_fields=['available_in_stock'])
@@ -957,12 +1157,27 @@ def add_items_to_order(request, order_id):
             order.special_instructions = (order.special_instructions + '\n' + extra_notes).strip()
         order.save(update_fields=['total_amount', 'special_instructions', 'updated_at'])
         # --- transaction commits here ---
+    except _StockConflict as e:
+        return Response({'error': e.msg}, status=status.HTTP_409_CONFLICT)
 
-    # X-Local-Print: true → mobile prints locally; skip server queue (same as _place_order)
+    # Re-fetch with full select_related + prefetch — the atomic block created new
+    # OrderItems so the original instance's prefetch cache is stale, and
+    # refresh_from_db() clears select_related FKs causing extra FK queries on serialise.
+    order = Order.objects.select_related(
+        'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
+    ).prefetch_related(
+        Prefetch('payments', queryset=Payment.objects.select_related('processed_by')),
+        'order_items__product',
+        'table_info__bill_requests',
+    ).get(pk=order.pk)
+
+    # X-Local-Print: true → mobile prints locally (only new items via BT/system dialog).
+    # Otherwise print only the newly added items server-side — NOT the full order.
+    # auto_print_order prints ALL items and would re-print everything already in the kitchen.
     if request.META.get('HTTP_X_LOCAL_PRINT') != 'true':
         try:
-            from orders.printing import auto_print_order
-            auto_print_order(order)
+            from orders.printing import auto_print_new_items
+            auto_print_new_items(order, new_items)
         except Exception as e:
             logger.warning('Auto-print failed adding items to order %s: %s', order.order_number, e)
 
@@ -995,12 +1210,18 @@ def active_order_for_table(request, table_id):
     )
     table = get_object_or_404(TableInfo.objects.filter(_tq_aot).distinct(), id=table_id)
 
-    active = Order.objects.filter(
+    active_qs = Order.objects.filter(
         table_info=table,
-        status__in=['pending', 'confirmed', 'preparing', 'ready'],
+        status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
     ).select_related('table_info', 'ordered_by').prefetch_related(
         'order_items__product', 'payments'
-    ).order_by('-created_at').first()
+    ).order_by('-created_at')
+
+    # CC staff are scoped to orders they placed themselves (consistent with all other CC views).
+    if user.is_customer_care():
+        active_qs = active_qs.filter(ordered_by=user)
+
+    active = active_qs.first()
 
     if not active:
         return Response({'order': None})
@@ -1082,18 +1303,33 @@ def cancel_order_item(request, item_id):
         id=item_id,
     )
     order = item.order
+    # CC staff are scoped to orders they placed — consistent with all other CC views.
+    if user.is_customer_care() and order.ordered_by != user:
+        return Response({'error': 'Access denied.'}, status=403)
 
     if order.status == 'cancelled':
         return Response({'error': 'Cannot cancel item from a cancelled order.'}, status=400)
     if order.payment_status == 'paid':
         return Response({'error': 'Cannot cancel item from a fully paid order.'}, status=400)
-    if order.order_items.count() <= 1:
-        return Response({'error': 'Cannot cancel the last item. Please cancel the whole order instead.'}, status=400)
 
     reason = (request.data.get('reason', '') or '').strip() or 'Item cancelled by staff'
     item_name = item.product.name if item.product else 'Item'
 
     with transaction.atomic():
+        # Re-fetch order with row lock so two concurrent cancel-item requests
+        # cannot both pass the last-item guard simultaneously.
+        from orders.models import Order as _Order, OrderItem as _OItem
+        order = _Order.objects.select_for_update().get(pk=order.pk)
+        if order.order_items.count() <= 1:
+            return Response({'error': 'Cannot cancel the last item. Please cancel the whole order instead.'}, status=400)
+
+        # Re-fetch item inside the lock — a concurrent request may have already deleted it.
+        item = _OItem.objects.select_for_update().filter(
+            order=order, id=item_id
+        ).select_related('product').first()
+        if item is None:
+            return Response({'error': 'Item no longer exists (already cancelled).'}, status=404)
+
         from decimal import Decimal as _Dec
         # Recover effective tax rate BEFORE deleting the item.
         # For delivery/pickup orders (table_info=None) reverse-calculate from
@@ -1108,10 +1344,12 @@ def cancel_order_item(request, item_id):
                 _Dec(str(order.total_amount)) / _Dec(str(pre_subtotal)) - _Dec('1')
                 if pre_subtotal else _Dec('0')
             )
-        p = item.product
-        if p and p.available_in_stock is not None:
-            p.available_in_stock += item.quantity
-            p.save(update_fields=['available_in_stock'])
+        if item.product_id and item.product and item.product.available_in_stock is not None:
+            from restaurant.models import Product as _Prod
+            from django.db.models import F as _F2
+            _Prod.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
+                available_in_stock=_F2('available_in_stock') + item.quantity
+            )
         item.delete()
         subtotal = sum(
             oi.get_subtotal() for oi in order.order_items.select_related('product').all()

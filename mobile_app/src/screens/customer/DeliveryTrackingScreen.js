@@ -210,6 +210,19 @@ export default function DeliveryTrackingScreen({ route }) {
     };
   }, [orderId, token, loadTrack]);
 
+  // useMemo MUST be before any early returns (Rules of Hooks).
+  // initMapData is set only on the first successful load, so mapHtml is stable
+  // after mount — WebView never reloads on subsequent polls or state changes.
+  const mapHtml = useMemo(() => buildMapHtml({
+    riderLat:    initMapData?.riderLat    ?? null,
+    riderLng:    initMapData?.riderLng    ?? null,
+    riderName:   initMapData?.riderName,
+    vehicle:     initMapData?.vehicle,
+    destLat:     initMapData?.destLat     ?? null,
+    destLng:     initMapData?.destLng     ?? null,
+    destAddress: initMapData?.destAddress,
+  }), [initMapData]);
+
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" /></View>;
   }
@@ -227,19 +240,6 @@ export default function DeliveryTrackingScreen({ route }) {
   const a     = trackData.assignment;
   const rider = a?.rider;
   const col   = STATUS_COLOR[a?.status] || '#757575';
-
-  // mapHtml is memoized from the INITIAL load only. Subsequent 15-second polls
-  // update trackData (info strip) but never change mapHtml → no WebView reload.
-  // Live rider position updates arrive via injectJavaScript from the WebSocket.
-  const mapHtml = useMemo(() => buildMapHtml({
-    riderLat:    initMapData?.riderLat    ?? null,
-    riderLng:    initMapData?.riderLng    ?? null,
-    riderName:   initMapData?.riderName,
-    vehicle:     initMapData?.vehicle,
-    destLat:     initMapData?.destLat     ?? null,
-    destLng:     initMapData?.destLng     ?? null,
-    destAddress: initMapData?.destAddress,
-  }), [initMapData]);
 
   return (
     <View style={styles.screen}>

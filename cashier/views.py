@@ -85,13 +85,16 @@ def cashier_dashboard(request):
     
     # Apply staff filter (by specific user)
     if staff_filter != 'all':
-        orders = orders.filter(ordered_by_id=staff_filter)
+        try:
+            orders = orders.filter(ordered_by_id=int(staff_filter))
+        except (ValueError, TypeError):
+            pass
     # Apply staff role filter (by role type)
     elif staff_role == 'customer_care':
         orders = orders.filter(ordered_by__role__name='customer_care')
     elif staff_role == 'cashier':
         orders = orders.filter(ordered_by__role__name='cashier')
-    
+
     # Apply filters
     if table_filter:
         orders = orders.filter(table_info__tbl_no__icontains=table_filter)
@@ -317,20 +320,53 @@ def process_payment(request, order_id):
         
         # If specific items selected, create item payment records
         if selected_items:
-            total_item_amount = Decimal('0.00')
+            # Validate all quantities before any DB writes
             for item_data in selected_items:
-                order_item = get_object_or_404(OrderItem, id=item_data['id'], order=order)
+                try:
+                    qty = int(item_data.get('quantity', 0))
+                except (ValueError, TypeError):
+                    qty = 0
+                if qty <= 0:
+                    payment.delete()
+                    return JsonResponse({'error': 'Item quantity must be positive'}, status=400)
+
+            # Batch-load all requested order items in a single query
+            item_ids = [item_data['id'] for item_data in selected_items]
+            items_by_id = {
+                oi.id: oi for oi in OrderItem.objects.filter(id__in=item_ids, order=order)
+            }
+
+            # Compute total and cache resolved items without writing yet
+            total_item_amount = Decimal('0.00')
+            item_details = []
+            for item_data in selected_items:
+                order_item = items_by_id.get(item_data['id'])
+                if order_item is None:
+                    payment.delete()
+                    return JsonResponse({'error': 'Invalid item selected'}, status=400)
                 quantity_paid = int(item_data['quantity'])
                 item_amount = order_item.unit_price * quantity_paid
-                
+                total_item_amount += item_amount
+                item_details.append((order_item, quantity_paid, item_amount))
+
+            if total_item_amount <= 0:
+                payment.delete()
+                return JsonResponse({'error': 'Item quantity must be positive'}, status=400)
+
+            if total_item_amount > remaining_balance:
+                payment.delete()
+                return JsonResponse({
+                    'error': f'Selected items total (${total_item_amount}) exceeds remaining balance (${remaining_balance})'
+                }, status=400)
+
+            for order_item, quantity_paid, item_amount in item_details:
                 OrderItemPayment.objects.create(
                     payment=payment,
                     order_item=order_item,
                     quantity_paid=quantity_paid,
                     amount_paid=item_amount
                 )
-                total_item_amount += item_amount
-            
+
             # Update payment amount to match selected items
             payment.amount = total_item_amount
             payment.save()
@@ -385,7 +421,7 @@ def process_payment(request, order_id):
         
         return JsonResponse({
             'success': True,
-            'message': f'Payment of ${amount} processed successfully',
+            'message': f'Payment of ${payment.amount} processed successfully',
             'payment_id': payment.id,
             'new_balance': float(order.total_amount - total_paid),
             'receipt_printed': receipt_printed
@@ -509,7 +545,7 @@ def transfer_table(request, order_id):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    order = get_object_or_404(Order.objects.filter(_oq_tt), id=order_id)
+    order = get_object_or_404(Order.objects.select_for_update().filter(_oq_tt), id=order_id)
 
     if order.status == 'cancelled':
         return JsonResponse({'error': 'Cannot transfer a cancelled order'}, status=400)
@@ -530,7 +566,7 @@ def transfer_table(request, order_id):
         Q(restaurant__main_owner=owner) |
         Q(restaurant__branch_owner=owner)
     )
-    target_table = get_object_or_404(TableInfo.objects.filter(_ttq).distinct(), id=target_table_id)
+    target_table = get_object_or_404(TableInfo.objects.select_for_update().filter(_ttq).distinct(), id=target_table_id)
 
     if target_table.id == order.table_info_id:
         return JsonResponse({'error': 'Order is already on this table'}, status=400)
@@ -676,16 +712,21 @@ def generate_receipt(request, payment_id):
         Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
         Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    payment = get_object_or_404(Payment.objects.filter(_pq_gr), id=payment_id)
-    
-    # Fetch order with prefetch to avoid repeated order_items queries when calling get_total()
-    order = Order.objects.prefetch_related('order_items__product').get(pk=payment.order_id)
+    payment = get_object_or_404(
+        Payment.objects.select_related('order')
+            .prefetch_related('order__order_items__product')
+            .filter(_pq_gr),
+        id=payment_id,
+    )
+    order = payment.order
     
     # Calculate change and remaining balance (compute total once)
     order_total = order.get_total()
     change_amount = payment.amount - order_total if payment.payment_method == 'cash' and payment.amount > order_total else Decimal('0.00')
-    remaining_balance = order_total - payment.amount if payment.amount < order_total else Decimal('0.00')
-    
+    total_paid = order.payments.filter(is_voided=False).aggregate(
+        total=Sum('amount'))['total'] or Decimal('0.00')
+    remaining_balance = max(order_total - total_paid, Decimal('0.00'))
+
     context = {
         'payment': payment,
         'order': order,
@@ -712,19 +753,25 @@ def reprint_receipt(request, payment_id):
         Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
         Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    payment = get_object_or_404(Payment.objects.filter(_pq_rr), id=payment_id)
-    
+    payment = get_object_or_404(
+        Payment.objects.select_related('order')
+            .prefetch_related('order__order_items__product')
+            .filter(_pq_rr),
+        id=payment_id,
+    )
+
     # Add a message indicating this is a reprint
     messages.info(request, f"Reprinting receipt #{payment.id:06d}")
-    
-    # Fetch order with prefetch to avoid repeated order_items queries when calling get_total()
-    order = Order.objects.prefetch_related('order_items__product').get(pk=payment.order_id)
+
+    order = payment.order
     
     # Calculate change and remaining balance (compute total once)
     order_total = order.get_total()
     change_amount = payment.amount - order_total if payment.payment_method == 'cash' and payment.amount > order_total else Decimal('0.00')
-    remaining_balance = order_total - payment.amount if payment.amount < order_total else Decimal('0.00')
-    
+    total_paid = order.payments.filter(is_voided=False).aggregate(
+        total=Sum('amount'))['total'] or Decimal('0.00')
+    remaining_balance = max(order_total - total_paid, Decimal('0.00'))
+
     context = {
         'payment': payment,
         'order': order,
@@ -890,13 +937,16 @@ def cashier_reports(request):
     
     # Apply staff filter (by specific user)
     if staff_filter != 'all':
-        orders = orders.filter(ordered_by_id=staff_filter)
+        try:
+            orders = orders.filter(ordered_by_id=int(staff_filter))
+        except (ValueError, TypeError):
+            pass
     # Apply staff role filter (by role type)
     elif staff_role == 'customer_care':
         orders = orders.filter(ordered_by__role__name='customer_care')
     elif staff_role == 'cashier':
         orders = orders.filter(ordered_by__role__name='cashier')
-    
+
     # Apply period filter (only today and weekly) — use local EAT date so midnight-to-3am orders aren't lost
     from django.utils.timezone import localtime
     today = localtime(timezone.now()).date()

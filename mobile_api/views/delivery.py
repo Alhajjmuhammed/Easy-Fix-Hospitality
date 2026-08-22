@@ -168,11 +168,19 @@ def assign_rider(request):
     if not order_id or not rider_id:
         return Response({'error': 'order_id and rider_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    rider = get_object_or_404(DeliveryRider, id=rider_id, is_active=True)
+    from django.db.models import Q as _Q
+    owner = get_restaurant_owner(request)
+    rider = get_object_or_404(
+        DeliveryRider.objects.filter(
+            _Q(owner=owner) | _Q(owner__isnull=True)
+        ),
+        id=rider_id,
+        is_active=True,
+    )
 
     if not user.is_administrator():
-        from django.db.models import Q as _Q
-        owner = get_restaurant_owner(request)
+        if owner is None:
+            return Response({'error': 'Restaurant not found.'}, status=status.HTTP_404_NOT_FOUND)
         order_scope = (
             _Q(table_info__owner=owner) |
             _Q(table_info__restaurant__main_owner=owner) |
@@ -182,12 +190,17 @@ def assign_rider(request):
         )
         order = get_object_or_404(Order, order_scope, id=order_id, order_type='delivery')
     else:
+        owner = None
         order = get_object_or_404(Order, id=order_id, order_type='delivery')
 
     try:
         with transaction.atomic():
-            # Re-fetch with row lock — prevents two cashiers assigning the same
-            # global rider simultaneously (critical for cross-restaurant pool).
+            # Lock both the order and the rider so two concurrent assign_rider calls
+            # (different riders, same order) cannot create two active assignments.
+            from orders.models import Order as _Order
+            order = _Order.objects.select_for_update().get(pk=order.pk)
+            if order.status not in ('pending', 'confirmed', 'preparing', 'ready'):
+                raise ValueError(f'Cannot assign rider to an order with status "{order.status}".')
             rider = DeliveryRider.objects.select_for_update().get(id=rider.id)
             if not rider.is_available:
                 raise ValueError('This rider just became unavailable. Please select another.')
@@ -228,9 +241,22 @@ def auto_assign_rider(request):
     if not order_id:
         return Response({'error': 'order_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    order = get_object_or_404(Order, id=order_id, order_type='delivery')
-
     owner = get_restaurant_owner(request)
+
+    if not user.is_administrator():
+        from django.db.models import Q as _Q
+        if owner is None:
+            return Response({'error': 'Restaurant not found.'}, status=status.HTTP_404_NOT_FOUND)
+        order_scope = (
+            _Q(table_info__owner=owner) |
+            _Q(table_info__restaurant__main_owner=owner) |
+            _Q(table_info__restaurant__branch_owner=owner) |
+            _Q(ordered_by__owner=owner) |
+            _Q(ordered_by__owner__managed_restaurant__main_owner=owner)
+        )
+        order = get_object_or_404(Order, order_scope, id=order_id, order_type='delivery')
+    else:
+        order = get_object_or_404(Order, id=order_id, order_type='delivery')
 
     from django.db.models import Q as _Q
     available_qs = DeliveryRider.objects.select_related('user', 'owner').filter(
@@ -266,6 +292,10 @@ def auto_assign_rider(request):
     assignment = None
     try:
         with transaction.atomic():
+            from orders.models import Order as _Order
+            order = _Order.objects.select_for_update().get(pk=order.pk)
+            if order.status not in ('pending', 'confirmed', 'preparing', 'ready'):
+                raise ValueError(f'Cannot assign rider to an order with status "{order.status}".')
             locked = DeliveryRider.objects.select_related('user', 'owner').select_for_update().filter(
                 id=rider.id, is_available=True
             ).first()
@@ -312,6 +342,15 @@ def update_location(request):
     lng = request.data.get('lng')
     if lat is None or lng is None:
         return Response({'error': 'lat and lng are required.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError):
+        return Response({'error': 'lat and lng must be numeric.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not (-90 <= lat <= 90):
+        return Response({'error': 'lat must be between -90 and 90.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not (-180 <= lng <= 180):
+        return Response({'error': 'lng must be between -180 and 180.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         rider = user.rider_profile
@@ -390,7 +429,8 @@ def track_order(request, order_id):
             can_view = Order.objects.filter(_stq, id=order.id).exists()
 
     if not can_view:
-        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+        # Return 404 (not 403) to avoid confirming the order's existence to unauthorized callers.
+        return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     try:
         assignment = DeliveryAssignment.objects.select_related(
@@ -421,19 +461,18 @@ def mark_picked_up(request, order_id):
     if not user.is_delivery_rider():
         return Response({'error': 'Only delivery riders can call this.'}, status=status.HTTP_403_FORBIDDEN)
 
-    order = get_object_or_404(Order, id=order_id)
-    try:
-        assignment = DeliveryAssignment.objects.select_related('rider__user').get(order=order)
-    except DeliveryAssignment.DoesNotExist:
-        return Response({'error': 'No assignment found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if assignment.rider.user != user:
-        return Response({'error': 'You are not the assigned rider.'}, status=status.HTTP_403_FORBIDDEN)
-
-    if assignment.status != 'assigned':
-        return Response({'error': f'Cannot pick up — current status is {assignment.status}.'}, status=status.HTTP_400_BAD_REQUEST)
+    # Fetch the assignment scoped to this rider — so a rider cannot probe other orders.
+    assignment = get_object_or_404(
+        DeliveryAssignment.objects.select_related('order', 'rider__user'),
+        order_id=order_id,
+        rider__user=user,
+    )
+    order = assignment.order
 
     with transaction.atomic():
+        assignment = DeliveryAssignment.objects.select_for_update().get(pk=assignment.pk)
+        if assignment.status != 'assigned':
+            return Response({'error': f'Cannot pick up — current status is {assignment.status}.'}, status=status.HTTP_400_BAD_REQUEST)
         assignment.status = 'picked_up'
         assignment.picked_up_at = timezone.now()
         assignment.save(update_fields=['status', 'picked_up_at'])
@@ -455,19 +494,18 @@ def mark_delivered(request, order_id):
     if not user.is_delivery_rider():
         return Response({'error': 'Only delivery riders can call this.'}, status=status.HTTP_403_FORBIDDEN)
 
-    order = get_object_or_404(Order, id=order_id)
-    try:
-        assignment = DeliveryAssignment.objects.select_related('rider__user').get(order=order)
-    except DeliveryAssignment.DoesNotExist:
-        return Response({'error': 'No assignment found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if assignment.rider.user != user:
-        return Response({'error': 'You are not the assigned rider.'}, status=status.HTTP_403_FORBIDDEN)
-
-    if assignment.status not in ('assigned', 'picked_up'):
-        return Response({'error': f'Cannot complete — status is {assignment.status}.'}, status=status.HTTP_400_BAD_REQUEST)
+    # Fetch the assignment scoped to this rider — so a rider cannot probe other orders.
+    assignment = get_object_or_404(
+        DeliveryAssignment.objects.select_related('order', 'rider__user'),
+        order_id=order_id,
+        rider__user=user,
+    )
+    order = assignment.order
 
     with transaction.atomic():
+        assignment = DeliveryAssignment.objects.select_for_update().get(pk=assignment.pk)
+        if assignment.status not in ('assigned', 'picked_up'):
+            return Response({'error': f'Cannot complete — status is {assignment.status}.'}, status=status.HTTP_400_BAD_REQUEST)
         assignment.status = 'delivered'
         assignment.delivered_at = timezone.now()
         assignment.save(update_fields=['status', 'delivered_at'])
@@ -477,11 +515,18 @@ def mark_delivered(request, order_id):
         rider.is_available = True
         rider.save(update_fields=['is_available'])
 
-        # Update the order to delivered
-        order.status = 'delivered'
-        order.save(update_fields=['status', 'updated_at'])
+        # Re-fetch order under lock so a concurrent cancel cannot be overwritten.
+        from orders.models import Order as _DeliveredOrder
+        order = _DeliveredOrder.objects.select_for_update().get(pk=order.pk)
+        order_was_cancelled = order.status == 'cancelled'
+        if not order_was_cancelled:
+            order.status = 'delivered'
+            order.save(update_fields=['status', 'updated_at'])
 
-    _notify_delivery_status(order.id, 'delivered', 'Delivered')
+    # Only notify "delivered" if the order wasn't already cancelled — otherwise
+    # the customer would briefly see a false "Delivered!" banner before the next poll.
+    if not order_was_cancelled:
+        _notify_delivery_status(order.id, 'delivered', 'Delivered')
     return Response({'success': True, 'status': 'delivered'})
 
 
@@ -533,6 +578,13 @@ def toggle_availability(request):
     except DeliveryRider.DoesNotExist:
         return Response({'error': 'Rider profile not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    rider.is_available = not rider.is_available
-    rider.save(update_fields=['is_available'])
+    from django.db.models import Case as _Case, When as _When, Value as _Value, BooleanField as _BF
+    DeliveryRider.objects.filter(pk=rider.pk).update(
+        is_available=_Case(
+            _When(is_available=True, then=_Value(False)),
+            default=_Value(True),
+            output_field=_BF(),
+        )
+    )
+    rider.refresh_from_db(fields=['is_available'])
     return Response({'success': True, 'is_available': rider.is_available})

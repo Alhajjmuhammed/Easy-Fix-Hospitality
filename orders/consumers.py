@@ -136,6 +136,12 @@ class OrderConsumer(AsyncWebsocketConsumer):
             # Get the restaurant this table belongs to
             table = order.table_info
             if not table:
+                order_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                if order_owner:
+                    if order_owner == user:
+                        return True
+                    if getattr(user, 'owner', None) and user.owner == order_owner:
+                        return True
                 return False
 
             # Check via restaurant FK (new system)
@@ -296,6 +302,20 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error sending cancellation notification: {str(e)}")
 
+    async def order_status_update(self, event):
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'order_status_update',
+                'order_id': event.get('order_id'),
+                'order_number': event.get('order_number'),
+                'status': event.get('status'),
+                'status_display': event.get('status_display'),
+                'updated_by': event.get('updated_by'),
+                'timestamp': event.get('timestamp'),
+            }))
+        except Exception as e:
+            logger.error(f"Error sending order_status_update to restaurant group: {e}")
+
     @database_sync_to_async
     def check_restaurant_access(self, user, owner_id):
         """Check if user has access to this restaurant"""
@@ -407,9 +427,12 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
             msg_type = data.get('type')
 
             if msg_type == 'location_update':
-                lat = data.get('lat')
-                lng = data.get('lng')
-                if lat is None or lng is None:
+                try:
+                    lat = float(data.get('lat'))
+                    lng = float(data.get('lng'))
+                except (TypeError, ValueError):
+                    return
+                if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
                     return
 
                 user = self.scope.get('user')
@@ -470,13 +493,21 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
                 return True
             if order.ordered_by == user:
                 return True
-            # Restaurant staff
+            # Restaurant staff (dine-in orders have table_info)
             owner = order.table_info.owner if order.table_info else None
             if owner:
                 if owner == user:
                     return True
                 if hasattr(user, 'owner') and user.owner == owner:
                     return True
+            # Delivery/pickup orders have no table_info — check via ordered_by.owner
+            if not owner and order.order_type in ('delivery', 'pickup'):
+                order_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                if order_owner:
+                    if order_owner == user:
+                        return True
+                    if hasattr(user, 'owner') and user.owner == order_owner:
+                        return True
             # The assigned rider
             try:
                 assignment = order.delivery_assignment
