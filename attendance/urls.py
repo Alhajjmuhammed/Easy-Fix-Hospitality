@@ -13,6 +13,8 @@ urlpatterns = [
     path('qr/',           views_web.attendance_qr,            name='qr'),
     path('qr/regenerate/',views_web.attendance_qr_regenerate, name='qr_regenerate'),
     path('checkin/',      views_web.attendance_web_checkin,   name='web_checkin'),
+    path('checkin/qr-scan/', views_web.attendance_qr_web_scan, name='qr_web_scan'),
+    path('policy/',       views_web.attendance_policy_toggle, name='policy_toggle'),
     path('my/',           views_web.attendance_my,            name='my'),
 ]
 # Mobile API paths are registered directly in mobile_api/urls.py

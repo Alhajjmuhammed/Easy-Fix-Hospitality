@@ -114,6 +114,52 @@
     </div>
 </div>
 
+{% if can_web_checkin and policy %}
+<div class="px-3 pb-2">
+    <div class="card border-0 shadow-sm" style="border-radius:12px;">
+        <div class="card-body py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+                <div class="fw-semibold" style="color:var(--primary-color);font-size:0.95rem;">
+                    <i class="bi bi-shield-lock me-2" style="color:var(--accent-color);"></i>Require Check-In Before Work
+                </div>
+                <div class="text-muted small mt-1">
+                    When <strong>ON</strong>, staff cannot access their work panels until they scan the attendance QR code today.
+                    <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">Default: OFF</span>
+                </div>
+            </div>
+            <div class="form-check form-switch mb-0" style="min-width:60px;">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="policyToggle"
+                       style="width:3em;height:1.5em;cursor:pointer;"
+                       {% if policy.require_checkin_before_work %}checked{% endif %}>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var toggle = document.getElementById('policyToggle');
+    if (!toggle) return;
+    toggle.addEventListener('change', function() {
+        var val = this.checked ? '1' : '0';
+        fetch("{% url 'attendance:policy_toggle' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'require_checkin_before_work=' + val,
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.success) { toggle.checked = !toggle.checked; }
+        })
+        .catch(function() { toggle.checked = !toggle.checked; });
+    });
+})();
+</script>
+{% endif %}
+
 <div class="content-wrapper">
 
     <!-- Stat Cards -->

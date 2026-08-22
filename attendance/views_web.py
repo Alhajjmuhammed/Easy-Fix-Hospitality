@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
-from .models import AttendanceQRToken, AttendanceRecord, Shift
+from .models import AttendanceQRToken, AttendanceRecord, Shift, AttendancePolicy
 
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
@@ -126,6 +126,10 @@ def attendance_dashboard(request):
 
     can_web_checkin = request.user.is_any_owner()
 
+    policy = None
+    if can_web_checkin:
+        policy, _ = AttendancePolicy.objects.get_or_create(owner=request.user)
+
     context = {
         'today': today,
         'records': records,
@@ -134,6 +138,7 @@ def attendance_dashboard(request):
         'checked_out_count': sum(1 for r in records if r['check_out'] != '—'),
         'late_count': sum(1 for r in records if r['is_late']),
         'can_web_checkin': can_web_checkin,
+        'policy': policy,
     }
     return render(request, 'admin_panel/attendance_dashboard.html', context)
 
@@ -452,3 +457,92 @@ def attendance_my(request):
         'today': today,
     }
     return render(request, 'admin_panel/attendance_my.html', context)
+
+
+# ─── web QR scan (camera-based check-in from browser) ─────────────────────────
+
+@login_required
+def attendance_qr_web_scan(request):
+    """
+    Staff scan the restaurant QR code via their browser camera.
+    POST: { qr_token } → JSON { success, action, message }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    from django.db import IntegrityError
+    from .views_mobile import _best_shift
+
+    token_str = (request.POST.get('qr_token') or '').strip()
+    if not token_str:
+        return JsonResponse({'error': 'qr_token is required'}, status=400)
+
+    try:
+        qr = AttendanceQRToken.objects.select_related('owner', 'restaurant').get(token=token_str)
+    except AttendanceQRToken.DoesNotExist:
+        return JsonResponse({'error': 'Invalid QR code. Please ask your manager for the correct QR.'}, status=404)
+
+    user = request.user
+    owner = user.get_owner()
+    if qr.owner != owner:
+        return JsonResponse({'error': 'This QR code does not belong to your restaurant.'}, status=403)
+
+    today = timezone.localdate()
+    now = timezone.now()
+    now_time = timezone.localtime().time()
+    restaurant = qr.restaurant
+    shift = _best_shift(owner, restaurant, now_time)
+
+    try:
+        record, created = AttendanceRecord.objects.get_or_create(
+            staff=user, date=today,
+            defaults={'owner': owner, 'restaurant': restaurant, 'shift': shift},
+        )
+    except IntegrityError:
+        record = AttendanceRecord.objects.get(staff=user, date=today)
+        created = False
+
+    if not record.check_in:
+        record.check_in = now
+        record.check_in_via = 'web'
+        if not record.shift:
+            record.shift = shift
+        record.save()
+        return JsonResponse({
+            'success': True,
+            'action': 'check_in',
+            'message': f"Checked in at {timezone.localtime(now).strftime('%H:%M')}",
+        })
+    elif not record.check_out:
+        record.check_out = now
+        record.check_out_via = 'web'
+        record.compute_metrics()
+        record.save()
+        return JsonResponse({
+            'success': True,
+            'action': 'check_out',
+            'message': f"Checked out at {timezone.localtime(now).strftime('%H:%M')}",
+        })
+    else:
+        return JsonResponse({
+            'success': False,
+            'action': 'already_done',
+            'message': 'You have already completed your attendance for today.',
+        })
+
+
+# ─── attendance policy (require check-in before work) ─────────────────────────
+
+@login_required
+@require_POST
+def attendance_policy_toggle(request):
+    """Owner toggles the 'require check-in before work' policy."""
+    if not request.user.is_any_owner():
+        return JsonResponse({'error': 'Access denied'}, status=403)
+
+    owner = request.user
+    policy, _ = AttendancePolicy.objects.get_or_create(owner=owner)
+    value = request.POST.get('require_checkin_before_work') == '1'
+    policy.require_checkin_before_work = value
+    policy.save()
+    return JsonResponse({'success': True, 'require_checkin_before_work': value})

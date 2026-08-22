@@ -63,6 +63,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'restaurant_system.session_timeout_middleware.SessionTimeoutMiddleware',  # Auto-logout after 15 min inactivity
     'restaurant_system.subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
+    'attendance.middleware.AttendanceEnforcementMiddleware',  # Optional: block uncheck-in staff (default OFF)
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',  # Django-axes for failed login tracking

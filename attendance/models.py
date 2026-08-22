@@ -147,3 +147,21 @@ class AttendanceRecord(models.Model):
             if self.check_out > expected_out:
                 self.is_overtime = True
                 self.overtime_minutes = int((self.check_out - expected_out).total_seconds() / 60)
+
+
+class AttendancePolicy(models.Model):
+    """Per-owner attendance policy settings."""
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='attendance_policy',
+    )
+    # When True, staff cannot access work panels until they check in today
+    require_checkin_before_work = models.BooleanField(
+        default=False,
+        help_text='Block staff from working until they scan the attendance QR code.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Policy [{self.owner.username}] require={self.require_checkin_before_work}"

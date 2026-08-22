@@ -132,10 +132,25 @@
                         </button>
                     </form>
                     {% else %}
-                    <div class="alert alert-info text-start" style="border-radius:10px;">
-                        <i class="bi bi-qr-code-scan me-2 fs-5"></i>
-                        <strong>Scan QR Code</strong><br>
-                        <span class="small">Open the mobile app and scan the restaurant QR code to check in.</span>
+                    <!-- Camera QR scanner for non-owners -->
+                    <div id="qr-scanner-section">
+                        <div id="qr-video-wrap" style="position:relative;width:100%;max-width:320px;margin:0 auto 1rem;border-radius:12px;overflow:hidden;background:#000;">
+                            <video id="qr-video" style="width:100%;display:block;" playsinline autoplay muted></video>
+                            <canvas id="qr-canvas" style="display:none;"></canvas>
+                            <!-- corner brackets -->
+                            <div style="position:absolute;inset:0;pointer-events:none;">
+                                <div style="position:absolute;top:12px;left:12px;width:28px;height:28px;border-top:3px solid #fff;border-left:3px solid #fff;border-radius:3px 0 0 0;"></div>
+                                <div style="position:absolute;top:12px;right:12px;width:28px;height:28px;border-top:3px solid #fff;border-right:3px solid #fff;border-radius:0 3px 0 0;"></div>
+                                <div style="position:absolute;bottom:12px;left:12px;width:28px;height:28px;border-bottom:3px solid #fff;border-left:3px solid #fff;border-radius:0 0 0 3px;"></div>
+                                <div style="position:absolute;bottom:12px;right:12px;width:28px;height:28px;border-bottom:3px solid #fff;border-right:3px solid #fff;border-radius:0 0 3px 0;"></div>
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-3">Point your camera at the restaurant QR code</p>
+                        <div id="qr-status" class="mb-2" style="min-height:1.5rem;font-weight:600;"></div>
+                        <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
+                            <i class="bi bi-camera-video-off me-2"></i>
+                            Camera not available. Please use the mobile app to scan.
+                        </div>
                     </div>
                     {% endif %}
 
@@ -157,7 +172,7 @@
                         </span>
                     </div>
                     {% endif %}
-                    <p class="text-muted small mb-4">You are currently on the clock. Check out when your shift ends.</p>
+                    <p class="text-muted small mb-4">You are currently on the clock. Scan the QR code to check out.</p>
                     {% if can_web_checkin %}
                     <form method="post">
                         {% csrf_token %}
@@ -168,10 +183,24 @@
                         </button>
                     </form>
                     {% else %}
-                    <div class="alert alert-info text-start" style="border-radius:10px;">
-                        <i class="bi bi-qr-code-scan me-2 fs-5"></i>
-                        <strong>Scan QR Code to Check Out</strong><br>
-                        <span class="small">Open the mobile app and scan the restaurant QR code to check out.</span>
+                    <!-- Camera QR scanner for checkout -->
+                    <div id="qr-scanner-section">
+                        <div id="qr-video-wrap" style="position:relative;width:100%;max-width:320px;margin:0 auto 1rem;border-radius:12px;overflow:hidden;background:#000;">
+                            <video id="qr-video" style="width:100%;display:block;" playsinline autoplay muted></video>
+                            <canvas id="qr-canvas" style="display:none;"></canvas>
+                            <div style="position:absolute;inset:0;pointer-events:none;">
+                                <div style="position:absolute;top:12px;left:12px;width:28px;height:28px;border-top:3px solid #fff;border-left:3px solid #fff;border-radius:3px 0 0 0;"></div>
+                                <div style="position:absolute;top:12px;right:12px;width:28px;height:28px;border-top:3px solid #fff;border-right:3px solid #fff;border-radius:0 3px 0 0;"></div>
+                                <div style="position:absolute;bottom:12px;left:12px;width:28px;height:28px;border-bottom:3px solid #fff;border-left:3px solid #fff;border-radius:0 0 0 3px;"></div>
+                                <div style="position:absolute;bottom:12px;right:12px;width:28px;height:28px;border-bottom:3px solid #fff;border-right:3px solid #fff;border-radius:0 0 3px 0;"></div>
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-3">Point your camera at the restaurant QR code to check out</p>
+                        <div id="qr-status" class="mb-2" style="min-height:1.5rem;font-weight:600;"></div>
+                        <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
+                            <i class="bi bi-camera-video-off me-2"></i>
+                            Camera not available. Please use the mobile app to scan.
+                        </div>
                     </div>
                     {% endif %}
 
@@ -264,6 +293,103 @@
     var m = mins % 60;
     var el = document.getElementById('hoursDisplay');
     if (el) { el.textContent = h + 'h ' + m + 'm'; }
+})();
+{% endif %}
+
+{% if not can_web_checkin and not record or not can_web_checkin and record and record.check_in and not record.check_out %}
+// Camera QR scanner using jsQR
+(function() {
+    var QR_SCAN_URL = "{% url 'attendance:qr_web_scan' %}";
+    var CSRF = "{{ csrf_token }}";
+    var video = document.getElementById('qr-video');
+    var canvas = document.getElementById('qr-canvas');
+    var statusEl = document.getElementById('qr-status');
+    var errorEl = document.getElementById('qr-cam-error');
+    var scanning = true;
+    var submitted = false;
+
+    if (!video) return; // already done / owner view
+
+    function setStatus(msg, color) {
+        if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || 'inherit'; }
+    }
+
+    // Load jsQR dynamically
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+    s.onload = startCamera;
+    s.onerror = function() { showError(); };
+    document.head.appendChild(s);
+
+    function startCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError(); return;
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(function(stream) {
+                video.srcObject = stream;
+                video.play();
+                requestAnimationFrame(tick);
+            })
+            .catch(function() { showError(); });
+    }
+
+    function tick() {
+        if (!scanning || submitted) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width  = video.videoWidth;
+            canvas.height = video.videoHeight;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            if (window.jsQR) {
+                var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+                if (code && code.data && code.data.startsWith('ATT-')) {
+                    scanning = false;
+                    stopCamera();
+                    submitToken(code.data);
+                    return;
+                }
+            }
+        }
+        requestAnimationFrame(tick);
+    }
+
+    function stopCamera() {
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(function(t) { t.stop(); });
+        }
+    }
+
+    function submitToken(token) {
+        if (submitted) return;
+        submitted = true;
+        setStatus('QR detected — recording...', '#1565C0');
+        fetch(QR_SCAN_URL, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'qr_token=' + encodeURIComponent(token),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                setStatus('✓ ' + data.message, '#2E7D32');
+                setTimeout(function() { window.location.reload(); }, 1500);
+            } else {
+                setStatus(data.message || data.error || 'Could not record attendance.', '#c0392b');
+                setTimeout(function() { scanning = true; submitted = false; startCamera(); }, 3000);
+            }
+        })
+        .catch(function() {
+            setStatus('Network error. Please try again.', '#c0392b');
+            setTimeout(function() { scanning = true; submitted = false; startCamera(); }, 3000);
+        });
+    }
+
+    function showError() {
+        if (video) video.style.display = 'none';
+        if (errorEl) errorEl.classList.remove('d-none');
+    }
 })();
 {% endif %}
 </script>
