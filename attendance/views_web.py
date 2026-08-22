@@ -38,6 +38,15 @@ def _require_owner_or_manager(request):
     return u.is_any_owner() or u.is_manager()
 
 
+# Roles whose attendance records are only visible to main owners / owners
+_OWNER_ROLES = {'main_owner', 'branch_owner', 'owner'}
+
+
+def _hide_owner_records(user):
+    """Return True if this viewer should NOT see owner-level attendance records."""
+    return not user.is_any_owner()
+
+
 def _get_or_create_qr(owner, restaurant):
     qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=restaurant).first()
     if not qr:
@@ -97,6 +106,10 @@ def attendance_dashboard(request):
     if restaurant:
         records_qs = records_qs.filter(restaurant=restaurant)
 
+    # Non-owner viewers (managers, cashiers, etc.) cannot see owner-level records
+    if _hide_owner_records(request.user):
+        records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
+
     records = [_record_to_dict(r) for r in records_qs]
 
     # Staff who haven't checked in yet
@@ -104,12 +117,14 @@ def attendance_dashboard(request):
     absent_staff = User.objects.filter(
         owner=owner, is_active=True, is_active_staff=True
     ).exclude(id__in=staff_ids_present).exclude(id=owner.id)
-    # Only show non-customer, non-admin roles
+    # Exclude customer/admin roles; also exclude owner-level roles for non-owner viewers
     EXCLUDED_ROLES = {'customer', 'administrator', 'main_owner', 'branch_owner', 'owner'}
     absent_staff = [
         u for u in absent_staff
         if not u.role or u.role.name not in EXCLUDED_ROLES
     ]
+
+    can_web_checkin = request.user.is_any_owner()
 
     context = {
         'today': today,
@@ -118,6 +133,7 @@ def attendance_dashboard(request):
         'checked_in_count': sum(1 for r in records if r['check_in'] != '—'),
         'checked_out_count': sum(1 for r in records if r['check_out'] != '—'),
         'late_count': sum(1 for r in records if r['is_late']),
+        'can_web_checkin': can_web_checkin,
     }
     return render(request, 'admin_panel/attendance_dashboard.html', context)
 
@@ -215,9 +231,11 @@ def attendance_calendar(request):
 
     records_qs = AttendanceRecord.objects.filter(
         owner=owner, date__range=(first_day, last_day)
-    ).select_related('staff', 'shift')
+    ).select_related('staff', 'staff__role', 'shift')
     if restaurant:
         records_qs = records_qs.filter(restaurant=restaurant)
+    if _hide_owner_records(request.user):
+        records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
 
     # Group by date
     by_date = {}
@@ -276,6 +294,8 @@ def attendance_day_records(request):
     ).select_related('staff', 'staff__role', 'shift', 'restaurant')
     if restaurant:
         records_qs = records_qs.filter(restaurant=restaurant)
+    if _hide_owner_records(request.user):
+        records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
 
     return JsonResponse({'records': [_record_to_dict(r) for r in records_qs]})
 
@@ -325,11 +345,10 @@ def attendance_qr_regenerate(request):
 
 @login_required
 def attendance_web_checkin(request):
-    """Staff can check in or check out via the web browser."""
+    """Web check-in/out — only owners may use click-based check-in; others must scan QR."""
     user = request.user
+    can_web_checkin = user.is_any_owner()
     today = timezone.localdate()
-    now = timezone.now()
-    now_time = timezone.localtime().time()
     owner = user.get_owner()
 
     # Try to determine restaurant from session
@@ -339,6 +358,7 @@ def attendance_web_checkin(request):
 
     # Find appropriate shift
     from .views_mobile import _best_shift
+    now_time = timezone.localtime().time()
     shift = _best_shift(owner, restaurant, now_time)
 
     try:
@@ -347,6 +367,11 @@ def attendance_web_checkin(request):
         record = None
 
     if request.method == 'POST':
+        if not can_web_checkin:
+            messages.error(request, 'Please use the QR code in the mobile app to check in or out.')
+            return redirect('attendance:web_checkin')
+
+        now = timezone.now()
         action = request.POST.get('action')
 
         if action == 'check_in':
@@ -389,6 +414,7 @@ def attendance_web_checkin(request):
         'record': record,
         'shift': shift,
         'current_time': timezone.localtime().strftime('%H:%M'),
+        'can_web_checkin': can_web_checkin,
     }
     return render(request, 'admin_panel/attendance_checkin.html', context)
 

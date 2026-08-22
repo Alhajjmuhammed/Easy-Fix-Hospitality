@@ -105,9 +105,11 @@
             <a href="{% url 'attendance:qr' %}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-qr-code me-1"></i>QR Code
             </a>
+            {% if can_web_checkin %}
             <a href="{% url 'attendance:web_checkin' %}" class="btn btn-sm" style="background-color: var(--accent-color); color: #fff;">
                 <i class="bi bi-box-arrow-in-right me-1"></i>Web Check-In
             </a>
+            {% endif %}
         </div>
     </div>
 </div>
