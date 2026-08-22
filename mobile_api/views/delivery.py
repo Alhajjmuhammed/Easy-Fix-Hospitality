@@ -18,7 +18,7 @@ from .helpers import get_restaurant_owner
 logger = logging.getLogger(__name__)
 
 
-def _notify_delivery_status(order_id, assignment_status, status_display):
+def _notify_delivery_status(order_id, assignment_status, status_display, rider_name='', vehicle=''):
     """Broadcast a delivery status change to the delivery WS group."""
     def _send():
         try:
@@ -31,6 +31,8 @@ def _notify_delivery_status(order_id, assignment_status, status_display):
                     'type': 'delivery_status_update',
                     'status': assignment_status,
                     'status_display': status_display,
+                    'rider_name': rider_name,
+                    'vehicle': vehicle,
                     'timestamp': timezone.now().isoformat(),
                 },
             )
@@ -217,7 +219,11 @@ def assign_rider(request):
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
 
-    _notify_delivery_status(order.id, 'assigned', 'Assigned')
+    _notify_delivery_status(
+        order.id, 'assigned', 'Assigned',
+        rider_name=rider.user.get_full_name() or rider.user.username,
+        vehicle=rider.get_vehicle_type_display(),
+    )
     return Response({'success': True, 'assignment': _assignment_data(assignment)})
 
 
@@ -318,7 +324,11 @@ def auto_assign_rider(request):
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
 
-    _notify_delivery_status(order.id, 'assigned', 'Assigned')
+    _notify_delivery_status(
+        order.id, 'assigned', 'Assigned',
+        rider_name=rider.user.get_full_name() or rider.user.username,
+        vehicle=rider.get_vehicle_type_display(),
+    )
     return Response({
         'success': True,
         'source': source,
@@ -495,7 +505,11 @@ def mark_picked_up(request, order_id):
         assignment.picked_up_at = timezone.now()
         assignment.save(update_fields=['status', 'picked_up_at'])
 
-    _notify_delivery_status(order.id, 'picked_up', 'Picked Up')
+    _notify_delivery_status(
+        order.id, 'picked_up', 'Picked Up',
+        rider_name=user.get_full_name() or user.username,
+        vehicle=assignment.rider.get_vehicle_type_display(),
+    )
     return Response({'success': True, 'status': 'picked_up'})
 
 
@@ -544,7 +558,11 @@ def mark_delivered(request, order_id):
     # Only notify "delivered" if the order wasn't already cancelled — otherwise
     # the customer would briefly see a false "Delivered!" banner before the next poll.
     if not order_was_cancelled:
-        _notify_delivery_status(order.id, 'delivered', 'Delivered')
+        _notify_delivery_status(
+            order.id, 'delivered', 'Delivered',
+            rider_name=user.get_full_name() or user.username,
+            vehicle=rider.get_vehicle_type_display(),
+        )
     return Response({'success': True, 'status': 'delivered'})
 
 

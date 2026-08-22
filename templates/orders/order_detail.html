@@ -251,11 +251,14 @@
                 <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
                     <i class="bi bi-bicycle me-2"></i><strong>Out for delivery!</strong> Your order is on the way.
                 </div>
+                {% elif order.status == 'delivered' and ot == 'delivery' %}
+                <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
+                    <i class="bi bi-check-circle-fill me-2"></i><strong>Delivered!</strong> Enjoy your meal.
+                </div>
                 {% elif order.status == 'served' %}
                 <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
                     <i class="bi bi-check-circle-fill me-2"></i>
-                    {% if ot == 'delivery' %}<strong>Delivered!</strong> Enjoy your meal.
-                    {% elif ot == 'pickup' %}<strong>Picked up!</strong> Thank you for your order.
+                    {% if ot == 'pickup' %}<strong>Picked up!</strong> Thank you for your order.
                     {% else %}<strong>Served!</strong> Thank you for dining with us. Enjoy your meal!{% endif %}
                 </div>
                 {% endif %}
@@ -454,12 +457,12 @@
   var ORDER_ID = card.dataset.orderId;
 
   /* ── Leaflet map ─────────────────────────────────────────────── */
-  var map = L.map('delivery-map', { zoomControl: true, attributionControl: false });
+  var map = L.map('delivery-map', { zoomControl: true });
+  map.setView([0, 0], 2);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom: 19
   }).addTo(map);
-  L.control.attribution({ prefix: false }).addTo(map);
 
   var riderMarker = null, destMarker = null, hasCoords = false;
   var placeholder    = document.getElementById('map-placeholder');
@@ -558,18 +561,20 @@
         if (msg.rider_name && riderLabel) {
           riderLabel.textContent = msg.rider_name + (msg.vehicle ? '  ·  ' + msg.vehicle : '');
         }
-        if (msg.lat != null && msg.lng != null && isFinite(msg.lat) && isFinite(msg.lng)) {
-          moveRider(msg.lat, msg.lng);
+        var _slat = parseFloat(msg.lat), _slng = parseFloat(msg.lng);
+        if (isFinite(_slat) && isFinite(_slng)) {
+          moveRider(_slat, _slng);
         }
         if (msg.delivery_lat != null) {
-          placeDestination(msg.delivery_lat, msg.delivery_lng, msg.delivery_address);
+          placeDestination(parseFloat(msg.delivery_lat), parseFloat(msg.delivery_lng), msg.delivery_address);
         }
         if (msg.status === 'delivered') markDelivered();
       }
 
       if (msg.type === 'location_update' || msg.type === 'location_broadcast') {
-        if (msg.lat != null && isFinite(msg.lat) && msg.lng != null && isFinite(msg.lng)) {
-          moveRider(msg.lat, msg.lng);
+        var _lat = parseFloat(msg.lat), _lng = parseFloat(msg.lng);
+        if (isFinite(_lat) && isFinite(_lng)) {
+          moveRider(_lat, _lng);
         }
       }
 

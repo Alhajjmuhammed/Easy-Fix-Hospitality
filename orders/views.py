@@ -2033,6 +2033,27 @@ def update_order_status(request, order_id):
             except Exception as ws_err:
                 logger.warning(f"WS restaurant notify failed (non-critical): {ws_err}")
 
+        # Notify delivery WebSocket group when a delivery/pickup order status changes
+        if order.order_type in ('delivery', 'pickup'):
+            try:
+                from .models import DeliveryAssignment
+                _da = DeliveryAssignment.objects.select_related('rider__user').filter(
+                    order=order, status__in=['assigned', 'picked_up', 'delivered']
+                ).order_by('-assigned_at').first()
+                async_to_sync(channel_layer.group_send)(
+                    f'delivery_{order.id}',
+                    {
+                        'type': 'delivery_status_update',
+                        'status': order.status,
+                        'status_display': order.get_status_display(),
+                        'rider_name': (_da.rider.user.get_full_name() or _da.rider.user.username) if _da else '',
+                        'vehicle': _da.rider.get_vehicle_type_display() if _da else '',
+                        'timestamp': timezone.now().isoformat(),
+                    }
+                )
+            except Exception as _ws_err:
+                logger.warning(f"WS delivery notify failed (non-critical): {_ws_err}")
+
         # Return appropriate response based on request type
         if request.content_type == 'application/json':
             return JsonResponse({

@@ -481,6 +481,8 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
                 'type': 'delivery_status',
                 'status': event['status'],
                 'status_display': event['status_display'],
+                'rider_name': event.get('rider_name', ''),
+                'vehicle': event.get('vehicle', ''),
                 'timestamp': event['timestamp'],
             }))
         except Exception as e:
@@ -588,7 +590,7 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
                 'rider__user', 'order'
             ).filter(
                 order_id=order_id,
-                status__in=['assigned', 'picked_up'],
+                status__in=['assigned', 'picked_up', 'delivered'],
             ).order_by('-assigned_at').first()
             if assignment is None:
                 return None
