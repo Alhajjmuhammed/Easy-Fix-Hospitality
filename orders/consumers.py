@@ -520,7 +520,10 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
 
             # Delivery/pickup orders — use same ownership filter as track_order REST endpoint
             # so cashiers, managers, and branch owners can connect to the delivery WS.
-            if order.order_type in ('delivery', 'pickup'):
+            # Guard: customers must not pass through the staff ownership filter — the _stq
+            # pattern matches all delivery orders from a restaurant, letting any customer
+            # subscribe to a stranger's GPS stream if they have owner_id set.
+            if order.order_type in ('delivery', 'pickup') and not user.is_customer():
                 _owner_user = None
                 if getattr(user, 'owner_id', None):
                     _owner_user = user.owner  # staff → their restaurant owner
@@ -583,7 +586,12 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
         try:
             assignment = DeliveryAssignment.objects.select_related(
                 'rider__user', 'order'
-            ).get(order_id=order_id)
+            ).filter(
+                order_id=order_id,
+                status__in=['assigned', 'picked_up'],
+            ).order_by('-assigned_at').first()
+            if assignment is None:
+                return None
             rider = assignment.rider
             return {
                 'status': assignment.status,
@@ -591,10 +599,10 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
                 'vehicle': rider.get_vehicle_type_display(),
                 'lat': float(rider.current_lat) if rider.current_lat is not None else None,
                 'lng': float(rider.current_lng) if rider.current_lng is not None else None,
+                'delivery_lat': float(assignment.order.delivery_lat) if assignment.order.delivery_lat is not None else None,
+                'delivery_lng': float(assignment.order.delivery_lng) if assignment.order.delivery_lng is not None else None,
                 'delivery_address': assignment.order.delivery_address,
             }
-        except DeliveryAssignment.DoesNotExist:
-            return None
         except Exception as e:
             logger.error(f"get_tracking_snapshot error: {e}")
             return None

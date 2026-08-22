@@ -185,6 +185,25 @@ export default function RiderActiveDeliveryScreen({ route }) {
       const ws = new WebSocket(`${wsUrl}/ws/delivery/${assignmentOrderId}/?token=${encodeURIComponent(token)}`);
       wsRef.current = ws;
 
+      ws.onerror = () => {
+        if (!active) return;
+        setSnack('Live tracking connection failed — your location may not update in real time');
+      };
+      ws.onclose = (e) => {
+        if (!active || e.code === 1000) return;
+        setSnack('Live tracking disconnected');
+      };
+      ws.onmessage = (e) => {
+        if (!active) return;
+        try {
+          const m = JSON.parse(e.data);
+          if (m.type === 'delivery_status' && m.status === 'cancelled') {
+            setSnack('This order has been cancelled by the restaurant');
+            loadAssignment();
+          }
+        } catch { /* ignore */ }
+      };
+
       // Subscribe to GPS updates
       const sub = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.High, distanceInterval: 10, timeInterval: 5000 },
@@ -223,7 +242,7 @@ export default function RiderActiveDeliveryScreen({ route }) {
     try {
       await apiMarkPickedUp(assignmentOrderId);
       setSnack('Marked as picked up!');
-      loadAssignment();
+      await loadAssignment();
     } catch (e) {
       setSnack(e.response?.data?.error || 'Could not update status');
     } finally {
@@ -248,11 +267,13 @@ export default function RiderActiveDeliveryScreen({ route }) {
               await apiMarkDelivered(assignmentOrderId);
               setSnack('Delivery complete!');
               setTimeout(() => navigation.goBack(), 1500);
+              // Don't clear actioning on success — component navigates away in 1.5s
+              // and clearing it briefly re-enables the button before unmount.
+              return;
             } catch (e) {
               setSnack(e.response?.data?.error || 'Could not complete delivery');
-            } finally {
-              setActioning(false);
             }
+            setActioning(false);
           },
         },
       ]

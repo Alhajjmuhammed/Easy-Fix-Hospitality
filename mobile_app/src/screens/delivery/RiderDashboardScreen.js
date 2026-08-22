@@ -165,7 +165,7 @@ export default function RiderDashboardScreen() {
       <FlatList
         data={[...active, ...(recent.length > 0 ? [{ _divider: true }] : []), ...recent]}
         keyExtractor={(item, i) => item._divider ? 'div' : String(item.order_id ?? i)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
         renderItem={({ item }) => {
           if (item._divider) {
             return (

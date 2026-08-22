@@ -181,16 +181,21 @@ export default function DeliveryTrackingScreen({ route }) {
           }
         }
 
-        if (msg.type === 'delivery_status' && msg.status === 'delivered') {
-          setDelivered(true);
-          webViewRef.current?.injectJavaScript(
-            `document.getElementById('info').textContent='✅ Delivered!';
-             document.getElementById('info').style.color='#2E7D32'; true;`
-          );
+        if (msg.type === 'delivery_status') {
+          if (msg.status === 'delivered') {
+            setDelivered(true);
+            webViewRef.current?.injectJavaScript(
+              `document.getElementById('info').textContent='✅ Delivered!';
+               document.getElementById('info').style.color='#2E7D32'; true;`
+            );
+          }
+          // Refresh status card for ALL transitions (assigned, picked_up, delivered)
+          // rather than waiting for the 15-second REST poll.
           loadTrack();
         }
 
         if (msg.type === 'snapshot') {
+          if (msg.status === 'delivered') setDelivered(true);
           if (typeof msg.lat === 'number' && typeof msg.lng === 'number' &&
               isFinite(msg.lat) && isFinite(msg.lng)) {
             webViewRef.current?.injectJavaScript(`moveRider(${msg.lat}, ${msg.lng}); true;`);
@@ -199,7 +204,7 @@ export default function DeliveryTrackingScreen({ route }) {
       } catch { /* ignore parse errors */ }
     };
 
-    ws.onerror = () => setSnack('Live tracking disconnected — auto-refreshing');
+    ws.onerror = () => { setSnack('Live tracking disconnected — auto-refreshing'); loadTrack(); };
 
     // Fallback poll every 15 s when WS is unavailable
     const poll = setInterval(loadTrack, 15_000);

@@ -62,6 +62,8 @@ export default function DeliveryInfoScreen({ route, navigation }) {
   const [snack,   setSnack]     = useState('');
 
   const reverseTimerRef = useRef(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   // Must be before any early returns — hooks must run unconditionally
   // Only generates HTML once initPos is set; stable reference thereafter
@@ -76,21 +78,26 @@ export default function DeliveryInfoScreen({ route, navigation }) {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
+        if (!mounted) return;
         if (status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (!mounted) return;
           setInitPos({ lat: loc.coords.latitude, lng: loc.coords.longitude });
         } else {
           setInitPos({ lat: -1.286389, lng: 36.817223 });
         }
       } catch {
+        if (!mounted) return;
         setInitPos({ lat: -1.286389, lng: 36.817223 });
       } finally {
-        setLocating(false);
+        if (mounted) setLocating(false);
       }
     })();
+    return () => { mounted = false; };
   }, []);
 
   const handleMapMessage = (e) => {
@@ -99,8 +106,10 @@ export default function DeliveryInfoScreen({ route, navigation }) {
       setCoords({ lat, lng });
       clearTimeout(reverseTimerRef.current);
       reverseTimerRef.current = setTimeout(async () => {
-        const addr = await reverseGeocode(lat, lng);
-        if (addr) setAddress(addr);
+        try {
+          const addr = await reverseGeocode(lat, lng);
+          if (addr && mountedRef.current) setAddress(addr);
+        } catch { /* ignore reverse geocode failures — address stays empty */ }
       }, 700);
     } catch {}
   };

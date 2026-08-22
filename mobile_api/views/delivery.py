@@ -425,6 +425,12 @@ def track_order(request, order_id):
         except DeliveryAssignment.DoesNotExist:
             pass
 
+    # Customers who aren't the order owner must not reach the staff ownership
+    # check — the _stq filter matches ALL orders from their restaurant, so any
+    # customer could read a stranger's GPS coordinates and delivery address.
+    if not can_view and user.is_customer():
+        return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+
     if not can_view:
         # Staff: verify the order belongs to their restaurant using the same ownership
         # filter pattern as _list_orders (covers dine-in, delivery, and pickup).
