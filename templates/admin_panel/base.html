@@ -709,23 +709,16 @@
                 <div class="nav-section">
                     <div class="nav-section-title">Attendance</div>
                     {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
-                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'attendance:dashboard' %}" data-tooltip="Attendance">
+                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name != 'my' %}active{% endif %}" href="{% url 'attendance:dashboard' %}" data-tooltip="Attendance">
                         <i class="fas fa-clipboard-list"></i>
                         <span>Attendance</span>
                     </a>
-                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'shifts' %}active{% endif %}" href="{% url 'attendance:shifts' %}" data-tooltip="Manage Shifts">
-                        <i class="fas fa-business-time"></i>
-                        <span>Shifts</span>
-                    </a>
-                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name in 'calendar day_records' %}active{% endif %}" href="{% url 'attendance:calendar' %}" data-tooltip="Attendance Calendar">
-                        <i class="fas fa-calendar-check"></i>
-                        <span>Calendar</span>
-                    </a>
-                    {% endif %}
-                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'my' %}active{% endif %}" href="{% url 'attendance:my' %}" data-tooltip="My Attendance">
+                    {% else %}
+                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' %}active{% endif %}" href="{% url 'attendance:my' %}" data-tooltip="My Attendance">
                         <i class="fas fa-user-clock"></i>
                         <span>My Attendance</span>
                     </a>
+                    {% endif %}
                 </div>
 
                 <!-- System Section -->
@@ -740,10 +733,6 @@
                     <a class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" href="{% url 'admin_panel:profile' %}" data-tooltip="My Profile">
                         <i class="fas fa-user-circle"></i>
                         <span>My Profile</span>
-                    </a>
-                    <a class="nav-link" href="{% url 'restaurant:home' %}" data-tooltip="View Site">
-                        <i class="fas fa-external-link-alt"></i>
-                        <span>View Site</span>
                     </a>
                     <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
                         {% csrf_token %}
