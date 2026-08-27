@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Card, Button, useTheme } from 'react-native-paper';
+import { Text, Card, Button, Snackbar, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -28,9 +28,15 @@ export default function OrderTypeScreen({ route, navigation }) {
   const { restaurant } = route.params;   // { id, name, address, ... }
   const { setRemoteOrder } = useCartStore();
   const { setRestaurant } = useAuthStore();
+  const [snack, setSnack] = useState('');
 
   const handleSelect = async (type) => {
-    await setRestaurant(restaurant.id);
+    try {
+      await setRestaurant(restaurant.id);
+    } catch {
+      setSnack('Could not save restaurant. Please try again.');
+      return;
+    }
     if (type === 'delivery') {
       navigation.navigate('DeliveryInfo', { restaurant, orderType: type });
     } else {
@@ -41,6 +47,7 @@ export default function OrderTypeScreen({ route, navigation }) {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
         <MaterialCommunityIcons name="silverware-fork-knife" size={40} color="#2c3e50" />
@@ -80,6 +87,10 @@ export default function OrderTypeScreen({ route, navigation }) {
         Back
       </Button>
     </ScrollView>
+    <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
+      {snack}
+    </Snackbar>
+    </View>
   );
 }
 

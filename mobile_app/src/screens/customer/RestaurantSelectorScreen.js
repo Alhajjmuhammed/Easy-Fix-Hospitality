@@ -25,17 +25,19 @@ export default function RestaurantSelectorScreen({ navigation }) {
   const [scanLoading,  setScanLoading]  = useState(false);
   const [permission,   requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);   // prevent duplicate scans
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const data = await apiRestaurants();
+      if (!mountedRef.current) return;
       setRestaurants(data || []);
     } catch {
-      setSnack('Could not load restaurants. Check your connection.');
+      if (mountedRef.current) setSnack('Could not load restaurants. Check your connection.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
@@ -80,15 +82,17 @@ export default function RestaurantSelectorScreen({ navigation }) {
       if (urlMatch) code = urlMatch[1];
 
       const restaurant = await apiRestaurantByQR(code);
+      if (!mountedRef.current) return;
       setScannerOpen(false);
       await setRestaurant(restaurant.id);
       navigation.replace('TableSelection');
     } catch (err) {
+      if (!mountedRef.current) return;
       const msg = err?.response?.data?.error || 'QR code not recognised. Please try again.';
       setSnack(msg);
       scannedRef.current = false;  // allow retry
     } finally {
-      setScanLoading(false);
+      if (mountedRef.current) setScanLoading(false);
     }
   };
 
@@ -97,7 +101,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
   const filtered = restaurants.filter((r) =>
     r.allow_remote_orders && (
       r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.address.toLowerCase().includes(search.toLowerCase())
+      (r.address || '').toLowerCase().includes(search.toLowerCase())
     )
   );
 

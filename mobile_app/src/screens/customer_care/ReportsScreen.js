@@ -12,10 +12,11 @@ import {
   Banner,
   Button,
   Checkbox,
+  Portal,
 } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
-import { getOfflinePendingOrders, getSyncMeta, setSyncMeta, getLocalReportStats } from '../../database/operations';
+import { getOfflinePendingOrders, getSyncMeta, setSyncMeta, getLocalReportStats, getProducts } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -52,10 +53,12 @@ export default function CCReportsScreen() {
   const [selectedPids,   setSelectedPids]   = useState([]);
   const [tempPids,       setTempPids]       = useState([]);
   const [showPicker,     setShowPicker]     = useState(false);
+  const [products,       setProducts]       = useState([]);
   const { format } = useCurrency();
   // Ref so fetchReport can always read the latest pids without being a closure dep
   const selectedPidsRef = useRef([]);
-  useEffect(() => { selectedPidsRef.current = selectedPids; }, [selectedPids]);
+  const setSelectedPidsSync = (pids) => { selectedPidsRef.current = pids; setSelectedPids(pids); };
+  useEffect(() => { getProducts().then(setProducts).catch(() => {}); }, []);
 
   const fetchReport = useCallback(async (silent = false, pids) => {
     // pids passed explicitly (Apply/Clear); fall back to ref for initial/refresh fetches
@@ -64,14 +67,25 @@ export default function CCReportsScreen() {
     try {
       const net = await NetInfo.fetch();
       if (!net.isConnected) {
-        const [cached, cachedTs, pending] = await Promise.all([
+        const [cached, cachedTs, cachedPeriod, pending] = await Promise.all([
           getSyncMeta('cc_report_cache'),
           getSyncMeta('cc_report_cache_ts'),
+          getSyncMeta('cc_report_cache_period'),
           getOfflinePendingOrders(),
         ]);
         if (cached) {
-          setData(JSON.parse(cached));
-          setCacheTimestamp(cachedTs || null);
+          try {
+            setData(JSON.parse(cached));
+            setCacheTimestamp(cachedTs || null);
+            if (cachedPeriod && cachedPeriod !== period) {
+              setSnack(`Offline – showing cached "${cachedPeriod}" data (not "${period}")`);
+            }
+          } catch (_) {
+            await setSyncMeta('cc_report_cache', '').catch(() => {});
+            const localStats = await getLocalReportStats();
+            setData(localStats);
+            setCacheTimestamp(null);
+          }
         } else {
           const localStats = await getLocalReportStats();
           setData(localStats);
@@ -92,6 +106,7 @@ export default function CCReportsScreen() {
         await Promise.all([
           setSyncMeta('cc_report_cache', JSON.stringify(res.data)),
           setSyncMeta('cc_report_cache_ts', new Date().toISOString()),
+          setSyncMeta('cc_report_cache_period', period),
         ]);
       }
     } catch {
@@ -102,9 +117,17 @@ export default function CCReportsScreen() {
           getOfflinePendingOrders(),
         ]);
         if (cached) {
-          setData(JSON.parse(cached));
-          setCacheTimestamp(cachedTs || null);
-          setSnack('Using cached data – could not reach server');
+          try {
+            setData(JSON.parse(cached));
+            setCacheTimestamp(cachedTs || null);
+            setSnack('Using cached data – could not reach server');
+          } catch (_) {
+            await setSyncMeta('cc_report_cache', '').catch(() => {});
+            const localStats = await getLocalReportStats();
+            setData(localStats);
+            setCacheTimestamp(null);
+            setSnack('Cache corrupted – showing locally computed data');
+          }
         } else {
           const localStats = await getLocalReportStats();
           setData(localStats);
@@ -141,6 +164,7 @@ export default function CCReportsScreen() {
   const offlineTotal  = pendingOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       contentContainerStyle={styles.container}
       refreshControl={
@@ -158,7 +182,7 @@ export default function CCReportsScreen() {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={data?.products || []}
+              data={products}
               keyExtractor={(item) => String(item.id)}
               style={{ maxHeight: 360 }}
               ListEmptyComponent={() => (
@@ -176,7 +200,7 @@ export default function CCReportsScreen() {
                     <Checkbox status={checked ? 'checked' : 'unchecked'} />
                     <View style={{ flex: 1 }}>
                       <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold' }} numberOfLines={1}>{item.name}</Text>
-                      <Text variant="bodySmall" style={{ opacity: 0.55, fontSize: 11 }}>{item['main_category__name']}</Text>
+                      <Text variant="bodySmall" style={{ opacity: 0.55, fontSize: 11 }}>{item.category_name}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -186,7 +210,7 @@ export default function CCReportsScreen() {
             <View style={styles.pickerActions}>
               <Button mode="outlined" onPress={() => setTempPids([])} style={{ flex: 1 }}>Clear</Button>
               <Button mode="contained" onPress={() => {
-                setSelectedPids(tempPids);
+                setSelectedPidsSync(tempPids);
                 setShowPicker(false);
                 fetchReport(false, tempPids);
               }} style={{ flex: 1 }}>Apply</Button>
@@ -328,7 +352,7 @@ export default function CCReportsScreen() {
                 : `${selectedPids.length} Product${selectedPids.length > 1 ? 's' : ''} Selected`}
             </Chip>
             {selectedPids.length > 0 && (
-              <TouchableOpacity onPress={() => { setSelectedPids([]); fetchReport(false, []); }} style={{ marginLeft: 6 }}>
+              <TouchableOpacity onPress={() => { setSelectedPidsSync([]); fetchReport(false, []); }} style={{ marginLeft: 6 }}>
                 <MaterialCommunityIcons name="close-circle" size={18} color="#C62828" />
               </TouchableOpacity>
             )}
@@ -414,10 +438,11 @@ export default function CCReportsScreen() {
         </>
       ) : null}
 
-      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
-      </Snackbar>
     </ScrollView>
+    <Portal>
+      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{snack}</Snackbar>
+    </Portal>
+    </View>
   );
 }
 

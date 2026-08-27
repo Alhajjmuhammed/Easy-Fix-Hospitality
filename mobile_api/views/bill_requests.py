@@ -87,21 +87,25 @@ def _create_bill_request(request):
         )
 
     # Mirror web's request_bill: prevent duplicate pending bill requests.
-    existing = BillRequest.objects.filter(table_info=table, status='pending').first()
-    if existing:
-        return Response(
-            {
-                'bill_request': BillRequestSerializer(existing).data,
-                'message': f'Bill already requested for Table {table.tbl_no}. Staff will bring it shortly.',
-            },
-            status=status.HTTP_200_OK,
-        )
+    # Wrapped in a transaction with select_for_update to prevent TOCTOU duplicates
+    # from two simultaneous POST requests from the same table.
+    from django.db import transaction as _tx
+    with _tx.atomic():
+        existing = BillRequest.objects.select_for_update().filter(table_info=table, status='pending').first()
+        if existing:
+            return Response(
+                {
+                    'bill_request': BillRequestSerializer(existing).data,
+                    'message': f'Bill already requested for Table {table.tbl_no}. Staff will bring it shortly.',
+                },
+                status=status.HTTP_200_OK,
+            )
 
-    br = BillRequest.objects.create(
-        table_info=table,
-        requested_by=user,
-        status='pending',
-    )
+        br = BillRequest.objects.create(
+            table_info=table,
+            requested_by=user,
+            status='pending',
+        )
     logger.info('Bill request created: table %s by %s', table.tbl_no, user.username)
 
     return Response(
@@ -125,10 +129,15 @@ def complete_bill_request(request, request_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner)
     )
+    from django.db import transaction as _tx2
     br = get_object_or_404(BillRequest.objects.filter(_tq).distinct(), id=request_id)
-    br.status = 'completed'
-    br.completed_by = request.user
-    br.completed_at = timezone.now()
-    br.save()
+    with _tx2.atomic():
+        br = BillRequest.objects.select_for_update().get(pk=br.pk)
+        if br.status == 'completed':
+            return Response({'message': 'Already completed.'})
+        br.status = 'completed'
+        br.completed_by = request.user
+        br.completed_at = timezone.now()
+        br.save(update_fields=['status', 'completed_by', 'completed_at'])
 
     return Response({'message': 'Bill request marked as completed.'})

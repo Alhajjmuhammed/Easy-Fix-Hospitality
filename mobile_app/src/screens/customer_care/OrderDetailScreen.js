@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Text,
@@ -23,15 +23,7 @@ import { getOrderById } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
-
-const STATUS_COLORS = {
-  pending:   '#FFA000',
-  confirmed: '#2c3e50',
-  preparing: '#6A1B9A',
-  ready:     '#2E7D32',
-  served:    '#00796B',
-  cancelled: '#B71C1C',
-};
+import { STATUS_COLORS } from '../../constants/statusColors';
 
 const PAYMENT_COLORS = {
   unpaid:          '#E65100',
@@ -43,8 +35,11 @@ const PAYMENT_COLORS = {
 export default function OrderDetailScreen({ route, navigation }) {
   const { orderId } = route.params;
   const theme = useTheme();
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [printBillId, setPrintBillId] = useState(null);
   const [error, setError] = useState('');
   const [isOffline, setIsOffline] = useState(false);
   const [cancelDialog, setCancelDialog] = useState(false);
@@ -71,34 +66,29 @@ export default function OrderDetailScreen({ route, navigation }) {
   const fetchOrder = useCallback(async () => {
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (!net.isConnected) {
         const cached = await getOrderById(orderId);
-        if (cached) {
-          setOrder(cached);
-          setIsOffline(true);
-        } else {
-          setError('Order not available offline.');
-        }
+        if (!mountedRef.current) return;
+        if (cached) { setOrder(cached); setIsOffline(true); }
+        else { setError('Order not available offline.'); }
         return;
       }
       const data = await apiOrderDetail(orderId);
+      if (!mountedRef.current) return;
       setOrder(data);
       setIsOffline(false);
     } catch {
-      // Network error — try SQLite cache before giving up
       try {
         const cached = await getOrderById(orderId);
-        if (cached) {
-          setOrder(cached);
-          setIsOffline(true);
-        } else {
-          setError('Could not load order.');
-        }
+        if (!mountedRef.current) return;
+        if (cached) { setOrder(cached); setIsOffline(true); }
+        else { setError('Could not load order.'); }
       } catch {
-        setError('Could not load order.');
+        if (mountedRef.current) setError('Could not load order.');
       }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [orderId]);
 
@@ -113,50 +103,57 @@ export default function OrderDetailScreen({ route, navigation }) {
   const handleCancelItem = async () => {
     if (!cancelItemTarget) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to remove item'); setCancelItemDialog(false); return; }
     setCancellingItem(true);
     try {
       const res = await apiCancelOrderItem(cancelItemTarget.id, cancelItemReason);
+      if (!mountedRef.current) return;
       setCancelItemDialog(false);
       setSnack(res.message || `"${cancelItemTarget.product_name}" removed`);
       fetchOrder();
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Could not cancel item');
+      if (mountedRef.current) setSnack(err.response?.data?.error || 'Could not cancel item');
     } finally {
-      setCancellingItem(false);
+      if (mountedRef.current) setCancellingItem(false);
     }
   };
 
   const handleCancel = async () => {
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to cancel order'); setCancelDialog(false); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(orderId, cancelReason || 'Cancelled by customer care');
+      if (!mountedRef.current) return;
       setCancelDialog(false);
       setSnack('Order cancelled');
       fetchOrder();
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Could not cancel order');
+      if (mountedRef.current) setSnack(err.response?.data?.error || 'Could not cancel order');
     } finally {
-      setCancelling(false);
+      if (mountedRef.current) setCancelling(false);
     }
   };
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async () => {
+    if (mountedRef.current) setPrintBillId(orderId);
     const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
     try {
       const ok = await printReceipt({
         orderId: isOffline ? undefined : orderId,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
-        currencySymbol: '',
+        currencySymbol: user?.currency_symbol || '',
         staffName,
       });
-      if (ok) setSnack('Bill sent to printer');
+      if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
-      setSnack('Print failed: ' + (err.message || 'unknown error'));
+      if (mountedRef.current) setSnack('Print failed: ' + (err.message || 'unknown error'));
+    } finally {
+      if (mountedRef.current) setPrintBillId(null);
     }
   };
 
@@ -165,28 +162,34 @@ export default function OrderDetailScreen({ route, navigation }) {
     setTransferDialog(true);
     setTargetTable(null);
     setTableMenuVisible(false);
+    const currentTblNum = String(order?.table_number ?? '');
     try {
       const t = await apiTables();
-      setTables((t || []).filter((tb) => tb.is_available === true));
+      if (mountedRef.current) setTables((t || []).filter((tb) =>
+        tb.is_available === true &&
+        String(tb.table_number ?? tb.tbl_no) !== currentTblNum,
+      ));
     } catch {
-      setTables([]);
+      if (mountedRef.current) setTables([]);
     }
   };
 
   const handleTransfer = async () => {
     if (!targetTable) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(false); return; }
     setTransferring(true);
     try {
       await apiTransferTable(orderId, targetTable.id);
+      if (!mountedRef.current) return;
       setTransferDialog(false);
       setSnack('Table transferred');
       fetchOrder();
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Transfer failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Transfer failed');
     } finally {
-      setTransferring(false);
+      if (mountedRef.current) setTransferring(false);
     }
   };
 
@@ -228,7 +231,7 @@ export default function OrderDetailScreen({ route, navigation }) {
                   <Button compact icon="dots-vertical" onPress={() => setMenuOpen(true)} />
                 }
               >
-                <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpen(false); handlePrintBill(); }} />
+                <Menu.Item leadingIcon="printer" title="Print Bill" disabled={printBillId !== null} onPress={() => { setMenuOpen(false); handlePrintBill(); }} />
                 <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpen(false); openTransfer(); }} disabled={order.payment_status === 'paid' || order.status === 'cancelled'} />
                 <Divider />
                 <Menu.Item leadingIcon="close-circle-outline" title="Cancel Order" titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpen(false); setCancelDialog(true); }} disabled={order.status === 'cancelled' || order.payment_status === 'paid'} />
@@ -249,14 +252,14 @@ export default function OrderDetailScreen({ route, navigation }) {
               style={[styles.chip, { backgroundColor: statusColor + '22' }]}
               textStyle={{ color: statusColor, fontFamily: 'Poppins_700Bold', fontSize: 11 }}
             >
-              {order.status.replace('_', ' ').toUpperCase()}
+              {(order.status || 'unknown').replace('_', ' ').toUpperCase()}
             </Chip>
             <Chip
               mode="flat"
               style={[styles.chip, { backgroundColor: payColor + '22' }]}
               textStyle={{ color: payColor, fontFamily: 'Poppins_700Bold', fontSize: 11 }}
             >
-              {order.payment_status.replace('_', ' ').toUpperCase()}
+              {(order.payment_status || 'unknown').replace('_', ' ').toUpperCase()}
             </Chip>
           </View>
         </Card.Content>
@@ -343,14 +346,18 @@ export default function OrderDetailScreen({ route, navigation }) {
       </Card>
 
       {/* Special instructions */}
-      {!!order.special_instructions && (
-        <Card style={styles.card}>
-          <Card.Title title="Notes" />
-          <Card.Content>
-            <Text variant="bodyMedium">{order.special_instructions}</Text>
-          </Card.Content>
-        </Card>
-      )}
+      {(() => {
+        const note = (order.special_instructions || '')
+          .replace(/\[offline(?:-append)?:[^\]]*\]/g, '').trim();
+        return note ? (
+          <Card style={styles.card}>
+            <Card.Title title="Notes" />
+            <Card.Content>
+              <Text variant="bodyMedium">{note}</Text>
+            </Card.Content>
+          </Card>
+        ) : null;
+      })()}
 
       {/* Payments / Receipt */}
       {order.payments?.length > 0 && (
@@ -358,16 +365,17 @@ export default function OrderDetailScreen({ route, navigation }) {
           <Card.Title title="Payments" />
           <Card.Content>
             {order.payments.map((p, idx) => (
-              <View key={p.id}>
+              <View key={p.id ?? idx}>
                 {idx > 0 && <Divider style={styles.divider} />}
                 <View style={styles.summaryRow}>
                   <Text variant="bodyMedium">
-                    #{String(p.id).padStart(4, '0')} · {p.payment_method}
+                    {p.id != null ? `#${String(p.id).padStart(4, '0')} · ` : ''}{p.payment_method}
                   </Text>
                   <Button
                     compact
                     mode="outlined"
                     icon="receipt"
+                    disabled={p.id == null}
                     onPress={() => navigation.navigate('Receipt', { paymentId: p.id })}
                   >
                     View

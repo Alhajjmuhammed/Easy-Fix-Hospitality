@@ -36,7 +36,7 @@ export function buildReceiptHtml({
     const name  = item.product_name || item.name || '';
     const qty   = item.quantity || 1;
     const price = parseFloat(item.unit_price || item.price || 0);
-    const total = parseFloat(item.total_price || price * qty);
+    const total = item.total_price != null ? parseFloat(item.total_price) : price * qty;
     return `<tr>
       <td style="padding:4px 2px;">${qty}x ${name}</td>
       <td style="padding:4px 2px;text-align:right;">${currencySymbol}${fmt(total)}</td>
@@ -87,7 +87,7 @@ export function buildReceiptHtml({
   // Titles and footers — match web exactly
   const titleLine = isBill ? '** BILL **' : 'RECEIPT / TAX INVOICE';
   const refLine   = payment
-    ? `RECEIPT #${String(payment.id || Date.now()).padStart(6, '0')}`
+    ? `RECEIPT #${payment.id ? String(payment.id).padStart(6, '0') : '------'}`
     : `ORDER #${orderNumber}`;
   const totalLabel  = isBill ? 'TOTAL DUE' : 'TOTAL';
   const footerHtml  = isBill
@@ -209,7 +209,7 @@ export function buildOrderTicketHtml({ order, restaurantName = 'Restaurant', sta
   const tableNumber = order.table_number ?? order.table_no ?? '';
   const allItems    = order.items || order.order_items || [];
   const items       = stationFilter
-    ? allItems.filter(i => (i.station || i.product?.station) === stationFilter)
+    ? allItems.filter(i => (i.station || i.product?.station || 'kitchen') === stationFilter)
     : allItems;
   const notes       = (order.special_instructions || '').trim();
   const totalItems  = items.length;

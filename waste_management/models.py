@@ -60,7 +60,11 @@ class FoodWasteLog(models.Model):
     @property
     def owner(self):
         if self.order and self.order.table_info:
-            return self.order.table_info.owner
+            ti = self.order.table_info
+            if ti.owner:
+                return ti.owner
+            if ti.restaurant:
+                return ti.restaurant.main_owner or ti.restaurant.branch_owner
         if self.product:
             return self.product.owner
         return None

@@ -60,8 +60,10 @@ export function usePushNotifications(navigationRef = null) {
       if (status !== 'granted' || cancelled) return;
 
       // Get Expo push token and save to backend
+      // projectId is required for standalone/production builds (Expo SDK 49+)
       try {
-        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
         if (!cancelled) {
           await apiSavePushToken(tokenData.data);
         }
@@ -70,15 +72,21 @@ export function usePushNotifications(navigationRef = null) {
       }
     })();
 
-    // Handle notification tap → navigate to MyOrders
+    // Handle notification tap → navigate to order tracking or orders list
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const orderId = response.notification.request.content.data?.orderId;
-        if (orderId && navigationRef?.current) {
-          navigationRef.current.navigate('Customer', {
-            screen: 'MyOrders',
-          });
-        }
+        if (!navigationRef?.current) return;
+        try {
+          if (orderId) {
+            navigationRef.current.navigate('Customer', {
+              screen: 'OrderTracking',
+              params: { orderId },
+            });
+          } else {
+            navigationRef.current.navigate('Customer', { screen: 'MyOrders' });
+          }
+        } catch { /* navigation not ready */ }
       },
     );
 

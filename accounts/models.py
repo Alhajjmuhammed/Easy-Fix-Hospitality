@@ -1,6 +1,6 @@
 import logging
 from django.contrib.auth.models import AbstractUser
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from decimal import Decimal
@@ -665,63 +665,65 @@ class RestaurantSubscription(models.Model):
     
     def block_restaurant(self, reason="Blocked by administrator", blocked_by=None):
         """Block restaurant access"""
-        old_status = self.subscription_status
-        self.is_blocked_by_admin = True
-        self.block_reason = reason
-        self.subscription_status = 'blocked'
-        
-        # Block all related users
-        self.restaurant_owner.is_active = False
-        self.restaurant_owner.save()
-        
-        # Block all staff under this owner
-        staff_users = self.restaurant_owner.owned_users.all()
-        staff_users.update(is_active=False)
-        
-        self.save()
-        
-        # Log the action
-        SubscriptionLog.objects.create(
-            subscription=self,
-            action='blocked',
-            description=f"Restaurant blocked: {reason}",
-            old_status=old_status,
-            new_status='blocked',
-            performed_by=blocked_by
-        )
+        with transaction.atomic():
+            old_status = self.subscription_status
+            self.is_blocked_by_admin = True
+            self.block_reason = reason
+            self.subscription_status = 'blocked'
+
+            # Block all related users
+            self.restaurant_owner.is_active = False
+            self.restaurant_owner.save()
+
+            # Block all staff under this owner
+            staff_users = self.restaurant_owner.owned_users.all()
+            staff_users.update(is_active=False)
+
+            self.save()
+
+            # Log the action
+            SubscriptionLog.objects.create(
+                subscription=self,
+                action='blocked',
+                description=f"Restaurant blocked: {reason}",
+                old_status=old_status,
+                new_status='blocked',
+                performed_by=blocked_by
+            )
     
     def unblock_restaurant(self, unblocked_by=None):
         """Unblock restaurant access"""
-        old_status = self.subscription_status
-        
-        self.is_blocked_by_admin = False
-        self.block_reason = ""
-        
-        # Admin can unblock regardless of subscription period validity
-        # If subscription period is valid, make it active; otherwise keep current status
-        if self.is_subscription_period_valid():
-            self.subscription_status = 'active'
-        
-        # Always reactivate users when admin unblocks (admin override)
-        # Unblock owner
-        self.restaurant_owner.is_active = True
-        self.restaurant_owner.save()
-        
-        # Unblock all staff under this owner
-        staff_users = self.restaurant_owner.owned_users.all()
-        staff_users.update(is_active=True)
-        
-        self.save()
-        
-        # Log the action
-        SubscriptionLog.objects.create(
-            subscription=self,
-            action='unblocked',
-            description="Restaurant unblocked by administrator",
-            old_status=old_status,
-            new_status=self.subscription_status,
-            performed_by=unblocked_by
-        )
+        with transaction.atomic():
+            old_status = self.subscription_status
+
+            self.is_blocked_by_admin = False
+            self.block_reason = ""
+
+            # Admin can unblock regardless of subscription period validity
+            # If subscription period is valid, make it active; otherwise keep current status
+            if self.is_subscription_period_valid():
+                self.subscription_status = 'active'
+
+            # Always reactivate users when admin unblocks (admin override)
+            # Unblock owner
+            self.restaurant_owner.is_active = True
+            self.restaurant_owner.save()
+
+            # Unblock all staff under this owner
+            staff_users = self.restaurant_owner.owned_users.all()
+            staff_users.update(is_active=True)
+
+            self.save()
+
+            # Log the action
+            SubscriptionLog.objects.create(
+                subscription=self,
+                action='unblocked',
+                description="Restaurant unblocked by administrator",
+                old_status=old_status,
+                new_status=self.subscription_status,
+                performed_by=unblocked_by
+            )
     
     def is_subscription_period_valid(self):
         """Check if subscription period is valid (ignoring block status)"""
@@ -735,48 +737,50 @@ class RestaurantSubscription(models.Model):
     
     def update_subscription_status(self):
         """Update subscription status based on current date"""
-        today = date.today()
-        old_status = self.subscription_status
+        with transaction.atomic():
+            locked = self.__class__.objects.select_for_update(of=('self',)).get(pk=self.pk)
+            today = date.today()
+            old_status = locked.subscription_status
 
-        # Fast-path: already expired and owner deactivated — nothing left to do.
-        # Without this guard every authenticated request creates a duplicate SubscriptionLog row.
-        if self.subscription_status == 'expired' and not self.restaurant_owner.is_active:
-            return
+            # Fast-path: already expired and owner deactivated — nothing left to do.
+            # Without this guard every authenticated request creates a duplicate SubscriptionLog row.
+            if locked.subscription_status == 'expired' and not self.restaurant_owner.is_active:
+                return
 
-        # Don't change status if blocked by admin
-        if self.is_blocked_by_admin:
-            return
-        
-        # Check if subscription hasn't started yet
-        if today < self.subscription_start_date:
-            # Keep current status if before start date
-            return
-        
-        # Check if subscription has expired
-        if today > self.subscription_end_date:
-            grace_end_date = self.subscription_end_date + timedelta(days=self.grace_period_days)
-            
-            if today > grace_end_date:
-                # Fully expired, block access
-                self.subscription_status = 'expired'
-                self.restaurant_owner.is_active = False
-                self.restaurant_owner.save()
-                
-                # Block all staff
-                staff_users = self.restaurant_owner.owned_users.all()
-                staff_users.update(is_active=False)
-                
-                self.save()
-                
-                # Log the expiration
-                SubscriptionLog.objects.create(
-                    subscription=self,
-                    action='expired',
-                    description="Subscription expired and access blocked",
-                    old_status=old_status,
-                    new_status='expired'
-                )
-            # else: in grace period, keep status as 'active'
+            # Don't change status if blocked by admin
+            if locked.is_blocked_by_admin:
+                return
+
+            # Check if subscription hasn't started yet
+            if today < locked.subscription_start_date:
+                # Keep current status if before start date
+                return
+
+            # Check if subscription has expired
+            if today > locked.subscription_end_date:
+                grace_end_date = locked.subscription_end_date + timedelta(days=locked.grace_period_days)
+
+                if today > grace_end_date:
+                    # Fully expired, block access
+                    self.subscription_status = 'expired'
+                    self.restaurant_owner.is_active = False
+                    self.restaurant_owner.save()
+
+                    # Block all staff
+                    staff_users = self.restaurant_owner.owned_users.all()
+                    staff_users.update(is_active=False)
+
+                    self.save()
+
+                    # Log the expiration
+                    SubscriptionLog.objects.create(
+                        subscription=self,
+                        action='expired',
+                        description="Subscription expired and access blocked",
+                        old_status=old_status,
+                        new_status='expired'
+                    )
+                # else: in grace period, keep status as 'active'
         
     def get_subscription_info(self):
         """Get comprehensive subscription information"""

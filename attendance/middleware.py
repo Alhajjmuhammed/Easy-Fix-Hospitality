@@ -5,9 +5,13 @@ checked in today are redirected to the attendance check-in page instead
 of their work panels.  Default is OFF — no impact on current behaviour.
 """
 
+import logging
+
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 # Paths that should NEVER be blocked (even when enforcement is on)
@@ -54,8 +58,9 @@ class AttendanceEnforcementMiddleware:
                     checkin_url = reverse('attendance:web_checkin')
                     if request.path != checkin_url:
                         return redirect(checkin_url)
-            except Exception:
-                pass  # any error → allow through (never block due to a bug)
+            except Exception as _e:
+                logger.warning("Attendance enforcement error for %s: %s", user, _e, exc_info=True)
+                pass  # fail open — never block staff due to a middleware bug
 
         return self.get_response(request)
 

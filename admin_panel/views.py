@@ -876,7 +876,7 @@ def manage_orders(request):
         # Eager-load related objects once — prevents N+1 queries in the template
         base_orders = base_orders.select_related(
             'table_info', 'table_info__owner', 'ordered_by', 'confirmed_by', 'entered_by'
-        ).prefetch_related('order_items__product')
+        ).prefetch_related('order_items__product', 'payments')
 
         # Apply search filter
         if search_query:
@@ -951,12 +951,29 @@ def manage_orders(request):
             _per_page = 25
     except (ValueError, TypeError):
         _per_page = 25
-    pending_page   = Paginator(pending_orders,   _per_page).get_page(request.GET.get('pending_page',   1))
-    confirmed_page = Paginator(confirmed_orders, _per_page).get_page(request.GET.get('confirmed_page', 1))
-    preparing_page = Paginator(preparing_orders, _per_page).get_page(request.GET.get('preparing_page', 1))
-    ready_page     = Paginator(ready_orders,     _per_page).get_page(request.GET.get('ready_page',     1))
-    served_page    = Paginator(served_orders,    _per_page).get_page(request.GET.get('served_page',    1))
-    cancelled_page = Paginator(cancelled_orders, _per_page).get_page(request.GET.get('cancelled_page', 1))
+    pending_paginator   = Paginator(pending_orders,   _per_page)
+    pending_paginator._count = _counts.get('pending', 0)
+    pending_page        = pending_paginator.get_page(request.GET.get('pending_page',   1))
+
+    confirmed_paginator = Paginator(confirmed_orders, _per_page)
+    confirmed_paginator._count = _counts.get('confirmed', 0)
+    confirmed_page      = confirmed_paginator.get_page(request.GET.get('confirmed_page', 1))
+
+    preparing_paginator = Paginator(preparing_orders, _per_page)
+    preparing_paginator._count = _counts.get('preparing', 0)
+    preparing_page      = preparing_paginator.get_page(request.GET.get('preparing_page', 1))
+
+    ready_paginator     = Paginator(ready_orders,     _per_page)
+    ready_paginator._count = _counts.get('ready', 0)
+    ready_page          = ready_paginator.get_page(request.GET.get('ready_page',     1))
+
+    served_paginator    = Paginator(served_orders,    _per_page)
+    served_paginator._count = _counts.get('served', 0)
+    served_page         = served_paginator.get_page(request.GET.get('served_page',    1))
+
+    cancelled_paginator = Paginator(cancelled_orders, _per_page)
+    cancelled_paginator._count = _counts.get('cancelled', 0)
+    cancelled_page      = cancelled_paginator.get_page(request.GET.get('cancelled_page', 1))
 
     context = {
         'pending_orders':   pending_page,
@@ -1069,8 +1086,10 @@ def manage_tables(request):
             elif status_filter == 'occupied':
                 tables = tables.filter(is_available=False)
             
-        # Custom sorting to handle T01, T02, T10, T011 properly
-        tables = sorted(tables, key=lambda x: (len(x.tbl_no), x.tbl_no))
+        # Custom sorting to handle T01, T02, T10, T011 properly — done in SQL
+        # so the paginator can apply LIMIT/OFFSET without loading the full queryset.
+        from django.db.models.functions import Length
+        tables = tables.annotate(tbl_no_len=Length('tbl_no')).order_by('tbl_no_len', 'tbl_no')
         
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
@@ -2723,14 +2742,16 @@ def update_user(request, user_id):
                         'message': 'Managers can only assign staff roles (kitchen, bar, cashier, customer_care, service, buffet).'
                     })
         
-        # Get restaurant context for subscription plan validation
         from restaurant.models_restaurant import Restaurant
         target_restaurant = None
-        
-        # Try to get target restaurant from request or user's current context
+
         if restaurant_id:
             try:
                 target_restaurant = Restaurant.objects.get(id=restaurant_id)
+                # Access check BEFORE using target_restaurant for any info (prevents subscription plan disclosure)
+                accessible_restaurants = Restaurant.get_accessible_restaurants(request.user)
+                if not accessible_restaurants.filter(id=target_restaurant.id).exists():
+                    return JsonResponse({'success': False, 'message': 'You do not have permission to assign users to this restaurant'})
             except Restaurant.DoesNotExist:
                 pass
         
@@ -2762,15 +2783,9 @@ def update_user(request, user_id):
                     'message': 'Cannot assign owner roles for SINGLE plan restaurants. Upgrade to PRO plan to assign branch owners.'
                 })
         
-        # Handle restaurant assignment if provided
-        from restaurant.models_restaurant import Restaurant
-        if restaurant_id:
+        # Handle restaurant assignment if provided (target_restaurant already fetched and access-checked above)
+        if restaurant_id and target_restaurant:
             try:
-                target_restaurant = Restaurant.objects.get(id=restaurant_id)
-                # Verify user has permission to assign to this restaurant
-                accessible_restaurants = Restaurant.get_accessible_restaurants(request.user)
-                if not accessible_restaurants.filter(id=target_restaurant.id).exists():
-                    return JsonResponse({'success': False, 'message': 'You do not have permission to assign users to this restaurant'})
                 
                 # Update owner relationship for staff roles
                 if role_name not in ['main_owner', 'branch_owner']:
@@ -5145,13 +5160,17 @@ def export_products_csv(request):
     # Get products based on restaurant context
     if view_all_restaurants:
         # Export from all accessible restaurants
-        products = Product.objects.filter(main_category__restaurant__in=accessible_restaurants)
+        products = Product.objects.filter(
+            main_category__restaurant__in=accessible_restaurants
+        ).select_related('main_category', 'sub_category')
     elif current_restaurant:
         # Export from current restaurant only
-        products = Product.objects.filter(main_category__restaurant=current_restaurant)
+        products = Product.objects.filter(
+            main_category__restaurant=current_restaurant
+        ).select_related('main_category', 'sub_category')
     else:
         products = Product.objects.none()
-    
+
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="products_export.csv"'
     
@@ -5202,13 +5221,17 @@ def export_products_excel(request):
     # Get products based on restaurant context
     if view_all_restaurants:
         # Export from all accessible restaurants
-        products = Product.objects.filter(main_category__restaurant__in=accessible_restaurants)
+        products = Product.objects.filter(
+            main_category__restaurant__in=accessible_restaurants
+        ).select_related('main_category', 'sub_category')
     elif current_restaurant:
         # Export from current restaurant only
-        products = Product.objects.filter(main_category__restaurant=current_restaurant)
+        products = Product.objects.filter(
+            main_category__restaurant=current_restaurant
+        ).select_related('main_category', 'sub_category')
     else:
         products = Product.objects.none()
-    
+
     workbook = openpyxl.Workbook()
     worksheet = workbook.active
     worksheet.title = "Products Export"
@@ -5267,14 +5290,14 @@ def export_products_pdf(request):
     
     # Get user's products
     if request.user.is_administrator():
-        products = Product.objects.all()
+        products = Product.objects.all().select_related('main_category', 'sub_category')
         restaurant_name = "All Restaurants"
     else:
         products = Product.objects.filter(
             Q(main_category__owner=request.user) |
             Q(main_category__restaurant__main_owner=request.user) |
             Q(main_category__restaurant__branch_owner=request.user)
-        ).distinct()
+        ).select_related('main_category', 'sub_category').distinct()
         restaurant_name = request.user.restaurant_name or "Restaurant"
     
     # Create response

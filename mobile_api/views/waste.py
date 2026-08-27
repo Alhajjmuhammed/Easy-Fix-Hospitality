@@ -58,7 +58,10 @@ def _list_waste(request, owner):
             'disposal_method': log.disposal_method,
             'total_cost': float(log.total_cost),
             'notes': log.notes,
-            'recorded_by': log.recorded_by.get_full_name() or log.recorded_by.username,
+            'recorded_by': (
+                log.recorded_by.get_full_name() or log.recorded_by.username
+                if log.recorded_by else '[deleted user]'
+            ),
             'created_at': log.created_at.isoformat(),
         })
     return Response({'waste_logs': data})
@@ -70,7 +73,7 @@ def _record_waste(request, owner):
     quantity = request.data.get('quantity_wasted')
     waste_reason = request.data.get('waste_reason', 'other')
     disposal_method = request.data.get('disposal_method', 'waste_bin')
-    notes = request.data.get('notes', '')
+    notes = (request.data.get('notes', '') or '')[:1000]
 
     if not product_id or not quantity:
         return Response({'error': 'product_id and quantity_wasted are required.'}, status=status.HTTP_400_BAD_REQUEST)

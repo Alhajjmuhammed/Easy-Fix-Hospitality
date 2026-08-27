@@ -12,7 +12,19 @@ export const apiPrintBill = (orderId) =>
   client.post(`/orders/${orderId}/print-bill/`).then((r) => {
     const data = r.data;
     if (data && data.success === false) {
-      return Promise.reject({ response: { data: { error: data.message || 'Print failed' } } });
+      const err = new Error(data.message || 'Print failed');
+      err.response = { data: { error: err.message } };
+      return Promise.reject(err);
+    }
+    return data;
+  });
+export const apiPrintStationTicket = (orderId) =>
+  client.post(`/orders/${orderId}/print-station-ticket/`).then((r) => {
+    const data = r.data;
+    if (data && data.success === false) {
+      const err = new Error(data.message || 'Print failed');
+      err.response = { data: { error: err.message } };
+      return Promise.reject(err);
     }
     return data;
   });

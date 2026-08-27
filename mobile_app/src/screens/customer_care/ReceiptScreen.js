@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import {
   Text,
@@ -16,8 +16,6 @@ import { apiPaymentReceipt, apiReprintReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
 import { printReceipt }     from '../../utils/printer';
 import { useAuthStore }     from '../../store/useAuthStore';
-import { usePrinterStore }  from '../../store/usePrinterStore';
-
 const METHOD_LABEL = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
 
 export default function ReceiptScreen({ route }) {
@@ -31,6 +29,9 @@ export default function ReceiptScreen({ route }) {
   const [snack, setSnack] = useState('');
   const [data, setData] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
+
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const fetchReceipt = useCallback(async () => {
     try {
@@ -52,15 +53,16 @@ export default function ReceiptScreen({ route }) {
 
   const handleReprint = async () => {
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to reprint'); return; }
     setReprinting(true);
     try {
       await apiReprintReceipt(paymentId);
-      setSnack('Receipt sent to printer');
+      if (mountedRef.current) setSnack('Receipt sent to printer');
     } catch (err) {
-      setSnack(err.response?.data?.error || err.response?.data?.message || 'Reprint failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.message || 'Reprint failed');
     } finally {
-      setReprinting(false);
+      if (mountedRef.current) setReprinting(false);
     }
   };
 
@@ -79,10 +81,11 @@ export default function ReceiptScreen({ route }) {
         currencySymbol: user?.currency_symbol || '',
         staffName,
       });
+      if (mountedRef.current) setSnack('Receipt sent to printer');
     } catch (err) {
-      setSnack('Print failed: ' + (err?.message || 'Unknown error'));
+      if (mountedRef.current) setSnack('Print failed: ' + (err?.message || 'Unknown error'));
     } finally {
-      setPrinting(false);
+      if (mountedRef.current) setPrinting(false);
     }
   };
 
@@ -104,6 +107,14 @@ export default function ReceiptScreen({ route }) {
 
   const { payment, order, change_amount, remaining_balance } = data;
 
+  if (!payment || !order) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ fontFamily: 'Poppins_400Regular' }}>Receipt data incomplete</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* Header */}
@@ -118,7 +129,7 @@ export default function ReceiptScreen({ route }) {
           </Text>
           <View style={styles.rowBetween}>
             <Text variant="bodyMedium">Order</Text>
-            <Text variant="bodyMedium" style={{ fontWeight: 'bold' }}>
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_700Bold' }}>
               #{order.order_number}
             </Text>
           </View>
@@ -174,7 +185,7 @@ export default function ReceiptScreen({ route }) {
           <Divider style={styles.divider} />
           <View style={styles.rowBetween}>
             <Text variant="titleMedium">Amount Paid</Text>
-            <Text variant="titleMedium" style={{ color: '#2E7D32', fontWeight: 'bold' }}>
+            <Text variant="titleMedium" style={{ color: '#2E7D32', fontFamily: 'Poppins_700Bold' }}>
               {format(payment.amount)}
             </Text>
           </View>
@@ -186,10 +197,10 @@ export default function ReceiptScreen({ route }) {
           )}
           {remaining_balance > 0 && (
             <View style={styles.rowBetween}>
-              <Text variant="bodyMedium" style={{ color: '#E65100', fontWeight: 'bold' }}>
+              <Text variant="bodyMedium" style={{ color: '#E65100', fontFamily: 'Poppins_700Bold' }}>
                 Remaining Balance
               </Text>
-              <Text variant="bodyMedium" style={{ color: '#E65100', fontWeight: 'bold' }}>
+              <Text variant="bodyMedium" style={{ color: '#E65100', fontFamily: 'Poppins_700Bold' }}>
                 {format(remaining_balance)}
               </Text>
             </View>

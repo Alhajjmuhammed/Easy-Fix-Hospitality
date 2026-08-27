@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, ScrollView } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, FlatList, StyleSheet, RefreshControl, ScrollView, Alert } from 'react-native';
 import {
   Text, Card, Button, TextInput, Dialog, Portal, Chip,
   ActivityIndicator, Snackbar, useTheme, SegmentedButtons, FAB, Divider, Menu,
@@ -8,7 +8,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable } from '../../api/orders';
 import NetInfo from '@react-native-community/netinfo';
-import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder } from '../../database/operations';
+import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, updateOfflineOrderStatus, getTables } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
@@ -17,6 +17,7 @@ import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
+import { STATUS_COLORS } from '../../constants/statusColors';
 
 const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
@@ -30,17 +31,6 @@ const STATUS_NEXT = {
   confirmed: 'preparing',
   preparing: 'ready',
   ready:     'served',
-};
-
-const STATUS_COLORS = {
-  pending:          '#FFA000',
-  confirmed:        '#2c3e50',
-  preparing:        '#6A1B9A',
-  ready:            '#2E7D32',
-  served:           '#00796B',
-  out_for_delivery: '#1565C0',
-  delivered:        '#2E7D32',
-  cancelled:        '#B71C1C',
 };
 
 export default function CashierMyOrdersScreen({ navigation }) {
@@ -91,6 +81,10 @@ export default function CashierMyOrdersScreen({ navigation }) {
   // Per-card action menus
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [printBillId, setPrintBillId] = useState(null);
+
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const buildParams = useCallback(() => {
     const params = { my_orders: 'true' };
@@ -103,11 +97,13 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (!silent) setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (!net.isConnected) {
         const [offlinePending, cached] = await Promise.all([
           getOfflinePendingOrders(),
           getOrders(null),
         ]);
+        if (!mountedRef.current) return;
         setOrders([...offlinePending, ...cached]);
         setIsOffline(true);
         return;
@@ -116,6 +112,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
         getOfflinePendingOrders(),
         apiOrders(buildParams()),
       ]);
+      if (!mountedRef.current) return;
       const fetched = Array.isArray(data) ? data : data.results || [];
       setOrders([...offlinePending, ...fetched]);
       setIsOffline(false);
@@ -126,15 +123,17 @@ export default function CashierMyOrdersScreen({ navigation }) {
           getOfflinePendingOrders(),
           getOrders(null),
         ]);
+        if (!mountedRef.current) return;
         setOrders([...offlinePending, ...cached]);
       } catch {
-        setOrders([]);
+        if (mountedRef.current) setOrders([]);
       }
-      setIsOffline(true);
-      setSnack('Could not load orders — showing cached data');
+      if (mountedRef.current) {
+        setIsOffline(true);
+        setSnack('Could not load orders — showing cached data');
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
   }, [buildParams]);
 
@@ -144,33 +143,49 @@ export default function CashierMyOrdersScreen({ navigation }) {
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  useEffect(() => { fetchOrders(true); }, [pendingCount, lastSyncTime]);
+  // Keep a stable ref so the sync effect can call the latest fetchOrders
+  // without listing it as a dep (which would cause a double-fetch on period change).
+  const fetchOrdersRef = useRef(fetchOrders);
+  useEffect(() => { fetchOrdersRef.current = fetchOrders; }, [fetchOrders]);
+
+  // Debounce sync-triggered refreshes so a sync event that fires while the
+  // interval is already fetching does not start a second concurrent request.
+  const syncRefreshTimer = useRef(null);
+  useEffect(() => {
+    clearTimeout(syncRefreshTimer.current);
+    syncRefreshTimer.current = setTimeout(() => fetchOrdersRef.current(true), 300);
+    return () => clearTimeout(syncRefreshTimer.current);
+  }, [pendingCount, lastSyncTime]);
 
   // ── Status advance ─────────────────────────────────────────────────────────
   const handleStatusAdvance = async (order) => {
     const next = STATUS_NEXT[order.status];
     if (!next) return;
     if (order._is_offline_pending) {
-      setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, status: next } : o));
+      await updateOfflineOrderStatus(order.offline_id, next).catch(() => {});
+      if (!mountedRef.current) return;
+      setOrders((prev) => prev.map((o) => o.offline_id === order.offline_id ? { ...o, status: next } : o));
       return;
     }
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to update order status'); return; }
     setUpdatingStatus(order.id);
     try {
       await apiUpdateOrderStatus(order.id, next);
+      if (!mountedRef.current) return;
       fetchOrders(true);
     } catch {
-      setSnack('Could not update status');
+      if (mountedRef.current) setSnack('Could not update status');
     } finally {
-      setUpdatingStatus(null);
+      if (mountedRef.current) setUpdatingStatus(null);
     }
   };
 
   // ── Payment ────────────────────────────────────────────────────────────────
   const openPayment = (order) => {
     setPayDialog(order);
-    setAmount(String(order.balance_due > 0 ? order.balance_due : order.total ?? ''));
+    setAmount(String(order.balance_due > 0 ? order.balance_due : order.total ?? 0));
     setMethod('cash');
     setReference('');
   };
@@ -191,9 +206,10 @@ export default function CashierMyOrdersScreen({ navigation }) {
           notes:             '',
         });
         await useSyncStore.getState().refreshPendingCount();
+        if (!mountedRef.current) return;
         setOrders((prev) =>
           prev.map((o) => {
-            if (o.id !== payDialog.id) return o;
+            if (o.offline_id !== payDialog.offline_id) return o;
             const newPaid = (o.total_paid ?? 0) + parsed;
             const newDue  = Math.max(0, (o.balance_due ?? o.total ?? 0) - parsed);
             const newStatus = newDue <= 0 ? 'paid' : newPaid > 0 ? 'partial' : o.payment_status;
@@ -201,16 +217,17 @@ export default function CashierMyOrdersScreen({ navigation }) {
           })
         );
         const paidOrder   = payDialog;
-        const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
+        const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
         return;
       }
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (!net.isConnected) {
         await saveOfflinePayment({
           order_id:         payDialog.id,
@@ -221,6 +238,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
           notes:            '',
         });
         await useSyncStore.getState().refreshPendingCount();
+        if (!mountedRef.current) return;
         setOrders((prev) =>
           prev.map((o) => {
             if (o.id !== payDialog.id) return o;
@@ -231,29 +249,30 @@ export default function CashierMyOrdersScreen({ navigation }) {
           })
         );
         const paidOrder   = payDialog;
-        const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
+        const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
         setSnack('No internet – payment saved and will sync automatically');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
         return;
       }
-      await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });
+      const payRes = await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });
+      if (!mountedRef.current) return;
       const paidOrder   = payDialog;
-      const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: Date.now() };
+      const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: payRes?.payment?.id ?? null };
       const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       setPayDialog(null);
       setSnack('Payment recorded');
       if (usePrinterStore.getState().autoPrintAfterPayment) {
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
       }
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.detail || err.response?.data?.error || 'Payment failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || err.response?.data?.error || 'Payment failed');
     } finally {
-      setPaying(false);
+      if (mountedRef.current) setPaying(false);
     }
   };
 
@@ -268,17 +287,19 @@ export default function CashierMyOrdersScreen({ navigation }) {
   const handleVoid = async () => {
     if (!voidDialog) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to void a payment'); setVoidDialog(null); return; }
     setVoiding(true);
     try {
       await apiVoidPayment(voidDialog.paymentId, voidReason.trim());
+      if (!mountedRef.current) return;
       setVoidDialog(null);
       setSnack('Payment voided');
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Void failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Void failed');
     } finally {
-      setVoiding(false);
+      if (mountedRef.current) setVoiding(false);
     }
   };
 
@@ -288,17 +309,19 @@ export default function CashierMyOrdersScreen({ navigation }) {
   const handleCancel = async () => {
     if (!cancelDialog) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(cancelDialog.id, cancelReason.trim());
+      if (!mountedRef.current) return;
       setCancelDialog(null);
       setSnack('Order cancelled');
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Cancel failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Cancel failed');
     } finally {
-      setCancelling(false);
+      if (mountedRef.current) setCancelling(false);
     }
   };
 
@@ -307,45 +330,65 @@ export default function CashierMyOrdersScreen({ navigation }) {
     setTransferDialog(order);
     setTargetTable(null);
     setTableMenuVisible(false);
+    const currentTblNum = String(order.table_number ?? '');
     try {
       const t = await apiTables();
-      setTables((t || []).filter((tb) => tb.is_available === true));
+      if (!mountedRef.current) return;
+      setTables((t || []).filter((tb) =>
+        tb.is_available === true &&
+        String(tb.table_number ?? tb.tbl_no) !== currentTblNum,
+      ));
     } catch {
-      setTables([]);
+      // Offline fallback: use SQLite-cached table list
+      try {
+        const t = await getTables();
+        if (!mountedRef.current) return;
+        setTables(t.filter((tb) =>
+          tb.is_available &&
+          String(tb.table_number ?? tb.tbl_no) !== currentTblNum,
+        ));
+      } catch {
+        if (mountedRef.current) setTables([]);
+      }
     }
   };
 
   const handleTransfer = async () => {
     if (!transferDialog || !targetTable) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       await apiTransferTable(transferDialog.id, targetTable.id);
+      if (!mountedRef.current) return;
       setTransferDialog(null);
       setSnack('Table transferred');
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Transfer failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Transfer failed');
     } finally {
-      setTransferring(false);
+      if (mountedRef.current) setTransferring(false);
     }
   };
 
   // ── Print bill ─────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
+    if (mountedRef.current) setPrintBillId(order.id);
     const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
     try {
       const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
-        currencySymbol: '',
+        currencySymbol: user?.currency_symbol || '',
         staffName,
       });
-      if (ok) setSnack('Bill sent to printer');
+      if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
-      setSnack('Print failed: ' + (err.message || 'unknown error'));
+      if (mountedRef.current) setSnack('Print failed: ' + (err.message || 'unknown error'));
+    } finally {
+      if (mountedRef.current) setPrintBillId(null);
     }
   };
 
@@ -355,20 +398,22 @@ export default function CashierMyOrdersScreen({ navigation }) {
     setSelectedRider(null);
     try {
       const riders = await apiRidersList(true, true);
+      if (!mountedRef.current) return;
       setRiderOptions(riders || []);
     } catch {
-      setSnack('Could not load riders');
-      setAssignDialog(null);
+      if (mountedRef.current) { setSnack('Could not load riders'); setAssignDialog(null); }
     }
   };
 
   const handleAutoAssign = async () => {
     if (!assignDialog) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to auto-assign a rider'); setAssignDialog(null); return; }
     setAutoAssigning(true);
     try {
       const res = await apiAutoAssign(assignDialog.id);
+      if (!mountedRef.current) return;
       setAssignDialog(null);
       const label = res.is_cross_restaurant
         ? `Assigned to ${res.rider_name} (${res.rider_restaurant}) from global pool`
@@ -376,26 +421,28 @@ export default function CashierMyOrdersScreen({ navigation }) {
       setSnack(label);
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Auto-assign failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || 'Auto-assign failed');
     } finally {
-      setAutoAssigning(false);
+      if (mountedRef.current) setAutoAssigning(false);
     }
   };
 
   const handleAssignRider = async () => {
     if (!assignDialog || !selectedRider) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to assign a rider'); setAssignDialog(null); return; }
     setAssigning(true);
     try {
       await apiAssignRider(assignDialog.id, selectedRider);
+      if (!mountedRef.current) return;
       setAssignDialog(null);
       setSnack('Rider assigned!');
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Could not assign rider');
+      if (mountedRef.current) setSnack(err.response?.data?.error || 'Could not assign rider');
     } finally {
-      setAssigning(false);
+      if (mountedRef.current) setAssigning(false);
     }
   };
 
@@ -425,7 +472,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
 
       <FlatList
         data={orders}
-        keyExtractor={(o) => String(o.id)}
+        keyExtractor={(o) => o._is_offline_pending ? `offline_${o.offline_id}` : String(o.id)}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchOrders(true); }} />
@@ -445,7 +492,8 @@ export default function CashierMyOrdersScreen({ navigation }) {
           const isPaid        = order.payment_status === 'paid';
           const hasPay        = order.balance_due > 0 || (!isPaid && order.status !== 'cancelled');
           const hasPayment    = order.payments && order.payments.length > 0;
-          const isMenuOpen    = menuOpenId === order.id;
+          const orderId       = order._is_offline_pending ? `offline_${order.offline_id}` : order.id;
+          const isMenuOpen    = menuOpenId === orderId;
 
           const isExpanded = expandedId === order.id;
 
@@ -464,7 +512,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                       visible={isMenuOpen}
                       onDismiss={() => setMenuOpenId(null)}
                       anchor={
-                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : orderId)} />
                       }
                     >
                       <Menu.Item
@@ -480,7 +528,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                         }}
                       />
                       <Divider />
-                      <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
+                      <Menu.Item leadingIcon="printer" title="Print Bill" disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
                       <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled' || order._is_offline_pending} />
                       {hasPayment && !order._is_offline_pending && (
                         <Menu.Item leadingIcon="cancel" title="Void Payment" onPress={() => { setMenuOpenId(null); openVoid(order); }} />
@@ -493,7 +541,20 @@ export default function CashierMyOrdersScreen({ navigation }) {
                         onPress={() => {
                           setMenuOpenId(null);
                           if (order._is_offline_pending) {
-                            deleteOfflineOrder(order.offline_id).then(() => fetchOrders(true));
+                            Alert.alert(
+                              'Delete Queued Order',
+                              'This order has not been synced yet. Delete it permanently?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Delete',
+                                  style: 'destructive',
+                                  onPress: () => deleteOfflineOrder(order.offline_id)
+                                    .then(() => fetchOrders(true))
+                                    .catch(() => setSnack('Could not delete queued order')),
+                                },
+                              ],
+                            );
                           } else {
                             openCancel(order);
                           }
@@ -525,7 +586,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                   </Chip>
                 )}
                 <Text variant="bodySmall" style={styles.meta}>
-                  {isDelivery ? '🚴 Delivery' : `Table ${order.table_number}`} · {order.items_count} item{order.items_count !== 1 ? 's' : ''} · Total: {format(order.total)}
+                  {isDelivery ? '🚴 Delivery' : `Table ${order.table_number}`} · {order.items_count ?? order.items?.length ?? '?'} item{(order.items_count ?? order.items?.length ?? 0) !== 1 ? 's' : ''} · Total: {format(order.total)}
                 </Text>
                 {order.balance_due > 0 && (
                   <Text variant="bodySmall" style={{ color: theme.colors.error, fontFamily: 'Poppins_600SemiBold' }}>
@@ -540,9 +601,21 @@ export default function CashierMyOrdersScreen({ navigation }) {
                     {(order.items || []).map((item, i) => (
                       <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
                         <Text variant="bodySmall" style={{ flex: 1 }}>{item.quantity}× {item.name || `Item #${item.product_id}`}</Text>
-                        <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold' }}>{format(item.price * item.quantity)}</Text>
+                        <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold' }}>{format((parseFloat(item.price) || 0) * (item.quantity || 0))}</Text>
                       </View>
                     ))}
+                    {order.subtotal > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#eee' }}>
+                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>Subtotal</Text>
+                        <Text variant="bodySmall">{format(order.subtotal)}</Text>
+                      </View>
+                    )}
+                    {order.tax_amount > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>Tax</Text>
+                        <Text variant="bodySmall">{format(order.tax_amount)}</Text>
+                      </View>
+                    )}
                     {!!order.special_instructions && (
                       <Text variant="bodySmall" style={{ opacity: 0.6, marginTop: 4 }}>Note: {order.special_instructions}</Text>
                     )}

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator
 from restaurant.models import TableInfo, Product
 from decimal import Decimal
 
@@ -134,7 +135,7 @@ class Order(models.Model):
         """Mark the table as occupied by this order"""
         if self.table_info and self.is_table_occupying():
             self.table_info.is_available = False
-            self.table_info.save()
+            self.table_info.save(update_fields=['is_available'])
 
     def release_table(self):
         """Release the table when order is completed or cancelled"""
@@ -150,7 +151,7 @@ class Order(models.Model):
         # Only release table if no other active orders
         if not other_active_orders.exists():
             self.table_info.is_available = True
-            self.table_info.save()
+            self.table_info.save(update_fields=['is_available'])
     
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -175,7 +176,7 @@ class Order(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items')
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True)
-    quantity = models.IntegerField(default=1)
+    quantity = models.IntegerField(default=1, validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     special_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -251,7 +252,7 @@ class DeliveryRider(models.Model):
         User, on_delete=models.CASCADE, related_name='rider_profile'
     )
     owner = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='delivery_riders',
+        User, on_delete=models.SET_NULL, related_name='delivery_riders',
         limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']},
         null=True, blank=True,
     )

@@ -14,17 +14,16 @@ import {
   getSyncMeta,
   setSyncMeta,
 } from '../database/operations';
-
-const MAX_RETRIES = 3;
+import { dbExec, dbQuery } from '../database/db';
 
 /**
  * Returns total count of items waiting to sync.
  */
 export async function getPendingCount() {
   const [orders, payments, billRequests] = await Promise.all([
-    getPendingOrders(),
-    getPendingPayments(),
-    getPendingBillRequests(),
+    getPendingOrders().catch(() => []),
+    getPendingPayments().catch(() => []),
+    getPendingBillRequests().catch(() => []),
   ]);
   return orders.length + payments.length + billRequests.length;
 }
@@ -33,7 +32,6 @@ export async function getPendingCount() {
  * Returns true if any items have been in error state.
  */
 export async function hasErrors() {
-  const { dbQuery } = await import('../database/db');
   const [errOrders, errPayments] = await Promise.all([
     dbQuery("SELECT 1 FROM offline_orders WHERE sync_status='error' LIMIT 1"),
     dbQuery("SELECT 1 FROM offline_payments WHERE sync_status='error' LIMIT 1"),
@@ -46,7 +44,6 @@ export async function hasErrors() {
  * Call this if the user taps "Retry Sync" in the UI.
  */
 export async function resetErrors() {
-  const { dbExec } = await import('../database/db');
   await dbExec(
     "UPDATE offline_orders SET sync_status='pending', error_message=NULL WHERE sync_status='error'",
   );
@@ -62,7 +59,8 @@ export async function resetErrors() {
 export async function timeSinceLastSync() {
   const last = await getSyncMeta('last_sync');
   if (!last) return Infinity;
-  return Date.now() - new Date(last).getTime();
+  const ms = Date.now() - new Date(last).getTime();
+  return isNaN(ms) ? Infinity : ms;
 }
 
 /**

@@ -36,6 +36,14 @@ from django.utils import timezone
 from django.db.models import Sum
 from decimal import Decimal
 import textwrap
+import re
+
+def _strip_sync_tags(text):
+    """Strip offline dedup tags from special_instructions before printing on tickets."""
+    if not text:
+        return text
+    return re.sub(r'\[offline(?:-append)?:[^\]]*\]', '', text).strip()
+
 
 
 def get_restaurant_display_name(order):
@@ -157,7 +165,10 @@ def get_restaurant_print_settings(order):
         }
 
     # Fallback to User (owner) settings
-    owner = table.owner if table is not None else None
+    # For delivery/pickup orders table is None — resolve owner via the ordering user
+    owner = (table.owner if table is not None else None) \
+            or getattr(getattr(order, 'ordered_by', None), 'owner', None) \
+            or getattr(order, 'ordered_by', None)
     if owner:
         return {
             'source': 'owner',
@@ -797,7 +808,7 @@ class ThermalPrinter:
             
             # Special instructions if any
             if order.special_instructions:
-                wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+                wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
                 for line in wrapped:
                     lines.append(f"     {line}")
         
@@ -870,7 +881,7 @@ class ThermalPrinter:
             
             # Special instructions if any
             if order.special_instructions:
-                wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+                wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
                 for line in wrapped:
                     lines.append(f"     {line}")
         
@@ -943,7 +954,7 @@ class ThermalPrinter:
             
             # Special instructions if any
             if order.special_instructions:
-                wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+                wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
                 for line in wrapped:
                     lines.append(f"     {line}")
         
@@ -1016,7 +1027,7 @@ class ThermalPrinter:
             
             # Special instructions if any
             if order.special_instructions:
-                wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+                wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
                 for line in wrapped:
                     lines.append(f"     {line}")
         
@@ -1242,7 +1253,87 @@ def auto_print_order(order):
     except Exception as e:
         result['errors'].append('Print operation failed')
         logger.error(f" Print error: {str(e)}", exc_info=True)
-    
+
+    return result
+
+
+def reprint_station_ticket(order, station):
+    """
+    Reprint a single station ticket (KOT/BOT/Buffet/Service) on demand.
+    Bypasses auto_print_* flags — always prints when items exist for that station.
+
+    Args:
+        order:   Order instance (order_items should be prefetched)
+        station: str — one of 'kitchen', 'bar', 'buffet', 'service'
+
+    Returns:
+        dict: {'printed': bool, 'errors': list}
+    """
+    from django.conf import settings
+
+    GENERATORS = {
+        'kitchen': _generate_kot_content,
+        'bar':     _generate_bot_content,
+        'buffet':  _generate_buffet_content,
+        'service': _generate_service_content,
+    }
+    PRINTER_METHODS = {
+        'kitchen': 'print_kot',
+        'bar':     'print_bot',
+        'buffet':  'print_buffet',
+        'service': 'print_service',
+    }
+    PRINTER_NAME_KEYS = {
+        'kitchen': 'kitchen_printer_name',
+        'bar':     'bar_printer_name',
+        'buffet':  'buffet_printer_name',
+        'service': 'service_printer_name',
+    }
+    JOB_TYPES = {
+        'kitchen': 'kot',
+        'bar':     'bot',
+        'buffet':  'buffet',
+        'service': 'service',
+    }
+
+    result = {'printed': False, 'errors': []}
+
+    if station not in GENERATORS:
+        result['errors'].append(f'Unknown station: {station}')
+        return result
+
+    try:
+        all_items = list(order.order_items.select_related('product').all())
+        has_items = any(
+            item.product and item.product.station == station
+            for item in all_items
+        )
+        if not has_items:
+            result['errors'].append(f'No {station} items in this order')
+            return result
+
+        print_settings = get_restaurant_print_settings(order)
+        use_queue = getattr(settings, 'USE_PRINT_QUEUE', False)
+
+        if use_queue:
+            content = GENERATORS[station](order)
+            printer_name = print_settings.get(PRINTER_NAME_KEYS[station])
+            owner = print_settings['owner']
+            job = create_print_job(owner, JOB_TYPES[station], content, order=order, printer_name=printer_name)
+            result['printed'] = True
+            logger.info(f'Queued {station.upper()} reprint job #{job.id} for Order #{order.order_number}')
+        else:
+            printer = ThermalPrinter()
+            method = getattr(printer, PRINTER_METHODS[station])
+            success = method(order)
+            result['printed'] = success
+            if not success:
+                result['errors'].append(f'{station.upper()} print failed')
+
+    except Exception as e:
+        result['errors'].append('Print operation failed')
+        logger.error(f'reprint_station_ticket error for order {order.id}: {e}', exc_info=True)
+
     return result
 
 
@@ -1391,7 +1482,9 @@ def _generate_bill_content(order, printed_by=None):
     
     lines = []
     width = 48  # 80mm thermal printer - full width utilization
-    restaurant = order.table_info.owner if order.table_info else None
+    # For delivery/pickup orders table_info is None — fall back to the staff member
+    # who placed the order so we still get the correct restaurant name and currency.
+    restaurant = order.table_info.owner if order.table_info else order.ordered_by
 
     # Get currency symbol for this owner/restaurant
     currency_symbol = '$'  # Default
@@ -1483,7 +1576,9 @@ def _generate_bill_content(order, printed_by=None):
     lines.append("-" * width)
 
     # Evaluate items once — reuse for display AND totals (avoids re-querying order_items)
-    _items = list(order.order_items.select_related('product').all())
+    _items = list(order.order_items.select_related(
+        'product', 'product__main_category', 'product__sub_category'
+    ).all())
 
     # Items list with better alignment
     for item in _items:
@@ -1504,6 +1599,50 @@ def _generate_bill_content(order, printed_by=None):
     # Totals — compute directly from already-fetched items (no extra SQL)
     from decimal import Decimal as _D
     subtotal = sum(item.get_subtotal() for item in _items)
+
+    # Prefetch all active promotions in one query to avoid N+1 per line item
+    _products_with_promo = [item.product for item in _items if item.product]
+    if _products_with_promo:
+        from django.utils import timezone as _tz
+        from restaurant.models import HappyHourPromotion
+        _now = _tz.localtime(_tz.now())
+        _cur_day = str(_now.weekday() + 1)
+        _cur_time = _now.time()
+        _pid_set = [p.id for p in _products_with_promo]
+        _cid_set = [p.main_category_id for p in _products_with_promo if p.main_category_id]
+        _sid_set = [p.sub_category_id for p in _products_with_promo if p.sub_category_id]
+        from django.db.models import Q as _Q
+        _all_promos = list(
+            HappyHourPromotion.objects.filter(
+                is_active=True,
+                days_of_week__contains=_cur_day,
+            ).filter(
+                _Q(products__id__in=_pid_set) |
+                _Q(main_categories__id__in=_cid_set) |
+                _Q(sub_categories__id__in=_sid_set)
+            ).prefetch_related('products', 'main_categories', 'sub_categories')
+            .order_by('-discount_percentage')
+            .distinct()
+        )
+        for _prod in _products_with_promo:
+            _best = None
+            for _hp in _all_promos:
+                _t_ok = (
+                    (_hp.start_time <= _hp.end_time and _hp.start_time <= _cur_time <= _hp.end_time) or
+                    (_hp.start_time > _hp.end_time and (_cur_time >= _hp.start_time or _cur_time <= _hp.end_time))
+                )
+                if not _t_ok:
+                    continue
+                _match = (
+                    any(p.id == _prod.id for p in _hp.products.all()) or
+                    (_prod.main_category_id and any(c.id == _prod.main_category_id for c in _hp.main_categories.all())) or
+                    (_prod.sub_category_id and any(s.id == _prod.sub_category_id for s in _hp.sub_categories.all()))
+                )
+                if _match:
+                    _best = _hp
+                    break
+            _prod._active_promotion_cache = _best
+
     discount = _D('0')
     for item in _items:
         if item.product and hasattr(item.product, 'get_active_promotion'):
@@ -1634,7 +1773,7 @@ def _generate_kot_content(order):
 
         # Special instructions if any
         if order.special_instructions:
-            wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+            wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
             for line in wrapped:
                 lines.append(f"     {line}")
     
@@ -1708,7 +1847,7 @@ def _generate_bot_content(order):
         
         # Special instructions if any
         if order.special_instructions:
-            wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+            wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
             for line in wrapped:
                 lines.append(f"     {line}")
     
@@ -1782,7 +1921,7 @@ def _generate_buffet_content(order):
         
         # Special instructions if any
         if order.special_instructions:
-            wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+            wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
             for line in wrapped:
                 lines.append(f"     {line}")
     
@@ -1856,7 +1995,7 @@ def _generate_service_content(order):
         
         # Special instructions if any
         if order.special_instructions:
-            wrapped = textwrap.wrap(f"Note: {order.special_instructions}", width=width-6)
+            wrapped = textwrap.wrap(f"Note: {_strip_sync_tags(order.special_instructions)}", width=width-6)
             for line in wrapped:
                 lines.append(f"     {line}")
     
@@ -2248,12 +2387,18 @@ def auto_print_new_items(order, new_items):
                 logger.warning("Windows printing not available - skipping direct print")
                 return result
             
+            def _resolve_printer(name):
+                """Return ThermalPrinter for name if it exists, else auto-detect."""
+                if name:
+                    _check = ThermalPrinter()
+                    if _check._printer_exists(name):
+                        return ThermalPrinter(printer_name=name)
+                return ThermalPrinter()
+
             if has_kitchen_items and print_settings['auto_print_kot']:
                 content = _generate_kot_content_for_items(order, new_items)
                 printer_name = print_settings['kitchen_printer_name']
-                
-                # Use ThermalPrinter class for direct printing with ESC/POS formatting
-                printer = ThermalPrinter(printer_name)
+                printer = _resolve_printer(printer_name)
                 thermal_content = printer._format_for_thermal(content, "KOT")
                 success = printer.print_text(thermal_content, job_name=f"Additional-KOT-{order.order_number}")
                 if success:
@@ -2261,13 +2406,11 @@ def auto_print_new_items(order, new_items):
                     logger.info(f"Printed additional KOT for Order #{order.order_number}")
                 else:
                     result['errors'].append('KOT print failed')
-            
+
             if has_bar_items and print_settings['auto_print_bot']:
                 content = _generate_bot_content_for_items(order, new_items)
                 printer_name = print_settings['bar_printer_name']
-                
-                # Use ThermalPrinter class for direct printing with ESC/POS formatting
-                printer = ThermalPrinter(printer_name)
+                printer = _resolve_printer(printer_name)
                 thermal_content = printer._format_for_thermal(content, "BOT")
                 success = printer.print_text(thermal_content, job_name=f"Additional-BOT-{order.order_number}")
                 if success:
@@ -2275,13 +2418,11 @@ def auto_print_new_items(order, new_items):
                     logger.info(f"Printed additional BOT for Order #{order.order_number}")
                 else:
                     result['errors'].append('BOT print failed')
-            
+
             if has_buffet_items and print_settings.get('auto_print_buffet', False):
                 content = _generate_buffet_content_for_items(order, new_items)
                 printer_name = print_settings.get('buffet_printer_name')
-                
-                # Use ThermalPrinter class for direct printing with ESC/POS formatting
-                printer = ThermalPrinter(printer_name)
+                printer = _resolve_printer(printer_name)
                 thermal_content = printer._format_for_thermal(content, "BUFFET")
                 success = printer.print_text(thermal_content, job_name=f"Additional-BUFFET-{order.order_number}")
                 if success:
@@ -2289,13 +2430,11 @@ def auto_print_new_items(order, new_items):
                     logger.info(f"Printed additional BUFFET for Order #{order.order_number}")
                 else:
                     result['errors'].append('BUFFET print failed')
-            
+
             if has_service_items and print_settings.get('auto_print_service', False):
                 content = _generate_service_content_for_items(order, new_items)
                 printer_name = print_settings.get('service_printer_name')
-                
-                # Use ThermalPrinter class for direct printing with ESC/POS formatting
-                printer = ThermalPrinter(printer_name)
+                printer = _resolve_printer(printer_name)
                 thermal_content = printer._format_for_thermal(content, "SERVICE")
                 success = printer.print_text(thermal_content, job_name=f"Additional-SERVICE-{order.order_number}")
                 if success:
@@ -2320,7 +2459,9 @@ def _generate_receipt_content(payment):
     lines = []
     width = 48  # 80mm thermal printer - full width utilization
     order = payment.order
-    restaurant = order.table_info.owner if order.table_info else None
+    # For delivery/pickup orders table_info is None — fall back to the staff member
+    # who placed the order so we still get the correct restaurant name and currency.
+    restaurant = order.table_info.owner if order.table_info else order.ordered_by
 
     # Get currency symbol for this owner/restaurant
     currency_symbol = '$'  # Default

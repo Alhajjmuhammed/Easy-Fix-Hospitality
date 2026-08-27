@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 
 // Mirrors accounts/models.py CURRENCY_SYMBOLS
@@ -35,11 +36,11 @@ export function useCurrency() {
 
   const decimals = NO_DECIMAL.includes(code) ? 0 : 2;
 
-  const format = (amount) => {
+  const format = useCallback((amount) => {
     const n = Number(amount);
     if (isNaN(n)) return `${symbol}0`;
     return `${symbol}${n.toFixed(decimals)}`;
-  };
+  }, [symbol, decimals]);
 
-  return { symbol, code, format };
+  return useMemo(() => ({ symbol, code, format, decimals }), [symbol, code, format, decimals]);
 }

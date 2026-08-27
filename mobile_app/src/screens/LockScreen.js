@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,42 +18,81 @@ const PAD = [
 
 export default function LockScreen({ onUnlock }) {
   const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
+  const [lockedOutUntil, setLockedOutUntil] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const timerRef = useRef(null);
+  const wrongPinTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(wrongPinTimeoutRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!lockedOutUntil) return;
+    const tick = () => {
+      const remaining = Math.ceil((lockedOutUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockedOutUntil(null);
+        setSecondsLeft(0);
+        setError('');
+        clearInterval(timerRef.current);
+      } else {
+        setSecondsLeft(remaining);
+      }
+    };
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [lockedOutUntil]);
+
+  const isLockedOut = lockedOutUntil && Date.now() < lockedOutUntil;
 
   const handleDigit = async (digit) => {
-    if (checking) return;
+    if (checking || isLockedOut) return;
     const newPin = pin + digit;
     setPin(newPin);
-    setError(false);
+    setError('');
 
     if (newPin.length === 4) {
       setChecking(true);
-      const ok = await onUnlock(newPin);
-      if (!ok) {
-        setError(true);
-        Vibration.vibrate(400);
-        setTimeout(() => {
-          setPin('');
-          setError(false);
-          setChecking(false);
-        }, 800);
+      try {
+        const result = await onUnlock(newPin);
+        if (!result.success) {
+          Vibration.vibrate(400);
+          if (result.lockedOutUntil) {
+            setLockedOutUntil(result.lockedOutUntil);
+            setError('Too many attempts — locked out');
+          } else {
+            setError(`Wrong PIN — ${result.attemptsLeft} attempt${result.attemptsLeft !== 1 ? 's' : ''} left`);
+          }
+          wrongPinTimeoutRef.current = setTimeout(() => {
+            setPin('');
+            setChecking(false);
+          }, 800);
+        }
+        // If success, parent unmounts this screen — no need to reset checking
+      } catch (_) {
+        // SecureStore / Keystore hardware error — reset so the keypad stays usable
+        setError('Could not verify PIN. Try again.');
+        setPin('');
+        setChecking(false);
       }
-      // If ok, parent will unmount this screen — no need to reset
     }
   };
 
   const handleDelete = () => {
-    if (checking) return;
+    if (checking || isLockedOut) return;
     setPin((p) => p.slice(0, -1));
-    setError(false);
+    setError('');
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Ionicons name="lock-closed" size={52} color="#2c3e50" style={styles.lockIcon} />
       <Text style={styles.title}>Screen Locked</Text>
-      <Text style={styles.subtitle}>Enter your 4-digit PIN</Text>
+      <Text style={styles.subtitle}>{isLockedOut ? `Try again in ${secondsLeft}s` : 'Enter your 4-digit PIN'}</Text>
 
       {/* PIN dots */}
       <View style={styles.dotsRow}>
@@ -68,7 +107,7 @@ export default function LockScreen({ onUnlock }) {
         ))}
       </View>
 
-      {error && <Text style={styles.errorText}>Wrong PIN — try again</Text>}
+      {!!error && <Text style={styles.errorText}>{error}</Text>}
 
       {/* Number pad */}
       {PAD.map((row, ri) => (
@@ -79,22 +118,24 @@ export default function LockScreen({ onUnlock }) {
               return (
                 <TouchableOpacity
                   key={ki}
-                  style={styles.key}
+                  style={[styles.key, (isLockedOut || checking) && styles.keyDisabled]}
                   onPress={handleDelete}
                   activeOpacity={0.6}
+                  disabled={!!isLockedOut || checking}
                 >
-                  <Ionicons name="backspace-outline" size={26} color="#2c3e50" />
+                  <Ionicons name="backspace-outline" size={26} color={isLockedOut ? '#bbb' : '#2c3e50'} />
                 </TouchableOpacity>
               );
             }
             return (
               <TouchableOpacity
                 key={ki}
-                style={styles.key}
+                style={[styles.key, (isLockedOut || checking) && styles.keyDisabled]}
                 onPress={() => handleDigit(key)}
                 activeOpacity={0.6}
+                disabled={!!isLockedOut || checking}
               >
-                <Text style={styles.keyText}>{key}</Text>
+                <Text style={[styles.keyText, isLockedOut && styles.keyTextDisabled]}>{key}</Text>
               </TouchableOpacity>
             );
           })}
@@ -172,4 +213,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
   },
+  keyDisabled: { backgroundColor: '#e8e8e8', elevation: 0 },
+  keyTextDisabled: { color: '#bbb' },
 });

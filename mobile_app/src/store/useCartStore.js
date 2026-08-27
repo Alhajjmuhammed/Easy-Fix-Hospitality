@@ -26,18 +26,19 @@ export const useCartStore = create(
         set({ existingOrderId: orderId }),
 
       addItem: (product, quantity = 1) => {
+        const qty = Math.max(1, Math.round(quantity));
         const items = get().items;
         const existing = items.find((i) => i.product.id === product.id);
         if (existing) {
           set({
             items: items.map((i) =>
               i.product.id === product.id
-                ? { ...i, quantity: i.quantity + quantity }
+                ? { ...i, quantity: i.quantity + qty }
                 : i,
             ),
           });
         } else {
-          set({ items: [...items, { product, quantity }] });
+          set({ items: [...items, { product, quantity: qty }] });
         }
       },
 
@@ -68,7 +69,7 @@ export const useCartStore = create(
       clearCart: () => set({ items: [], tableId: null, tableName: '', restaurantId: null, existingOrderId: null, orderType: 'dine-in', deliveryAddress: '', deliveryPhone: '', deliveryLat: null, deliveryLng: null }),
 
       getSubtotal: () =>
-        get().items.reduce((sum, i) => sum + i.product.current_price * i.quantity, 0),
+        get().items.reduce((sum, i) => sum + parseFloat(i.product.current_price || 0) * i.quantity, 0),
 
       getItemCount: () =>
         get().items.reduce((sum, i) => sum + i.quantity, 0),

@@ -34,8 +34,14 @@ export default function RegisterScreen() {
   });
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [localError, setLocalError] = useState('');
 
-  const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
+  const set = (field) => (value) => {
+    setLocalError('');
+    setForm((f) => ({ ...f, [field]: value }));
+  };
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const isValid =
     form.first_name.trim() &&
@@ -47,6 +53,19 @@ export default function RegisterScreen() {
 
   const handleRegister = () => {
     if (!isValid) return;
+    if (!EMAIL_RE.test(form.email.trim())) {
+      setLocalError('Please enter a valid email address.');
+      return;
+    }
+    if (form.password.length < 8) {
+      setLocalError('Password must be at least 8 characters.');
+      return;
+    }
+    if (form.password !== form.confirm_password) {
+      setLocalError('Passwords do not match.');
+      return;
+    }
+    setLocalError('');
     register({
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
@@ -153,9 +172,9 @@ export default function RegisterScreen() {
             }
           />
 
-          {error ? (
+          {(localError || error) ? (
             <HelperText type="error" visible>
-              {error}
+              {localError || error}
             </HelperText>
           ) : null}
 

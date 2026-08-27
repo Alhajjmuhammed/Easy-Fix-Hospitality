@@ -82,21 +82,21 @@ def detect_automatic_waste():
                 if (order.id, item.product_id) in existing_keys:
                     continue
 
-                waste_log = FoodWasteLog.objects.create(
+                log, created = FoodWasteLog.objects.get_or_create(
                     order=order,
                     product=item.product,
-                    quantity_wasted=item.quantity,
                     waste_reason='customer_left',
-                    disposal_method='waste_bin',
-                    notes=f'🤖 Auto-detected: Order #{order.id} abandoned after 2 hours',
-                    recorded_by=system_user
+                    defaults={
+                        'quantity_wasted': item.quantity,
+                        'disposal_method': 'waste_bin',
+                        'notes': f'🤖 Auto-detected: Order #{order.id} abandoned after 2 hours',
+                        'recorded_by': system_user,
+                    }
                 )
-
-                # Calculate costs
-                waste_log.calculate_costs()
-                waste_log.save()
-
-                auto_waste_count += 1
+                if created:
+                    log.calculate_costs()
+                    log.save()
+                    auto_waste_count += 1
     
     return auto_waste_count
 
@@ -1038,8 +1038,9 @@ def edit_waste_log(request, log_id):
             waste_log.labor_cost = (waste_log.labor_cost * ratio).quantize(Decimal('0.01'))
             waste_log.overhead_cost = (waste_log.overhead_cost * ratio).quantize(Decimal('0.01'))
             waste_log.total_cost = waste_log.ingredient_cost + waste_log.labor_cost + waste_log.overhead_cost
-        else:
+        elif waste_log.product:
             waste_log.total_cost = Decimal('0.00')  # trigger full recalculation via save()
+        # else: product deleted and quantity unchanged — preserve existing costs as-is
 
         waste_log.save()
 
@@ -1147,9 +1148,15 @@ def waste_reports(request):
             date_from = today.replace(month=1, day=1)
             date_to = today
     else:
-        date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
-        date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
-    
+        try:
+            date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            date_from = None
+        try:
+            date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            date_to = None
+
     # Build queryset with restaurant context
     if request.user.is_administrator():
         waste_logs = FoodWasteLog.objects.all()
@@ -1394,9 +1401,15 @@ def export_waste_report(request):
     
     # Parse dates
     if date_from:
-        date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+        try:
+            date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            date_from = None
     if date_to:
-        date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+        try:
+            date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            date_to = None
     
     # Get restaurant context
     session_restaurant_id = request.session.get('selected_restaurant')
@@ -1514,7 +1527,7 @@ def export_csv(report_data, date_from, date_to):
             f"${log.overhead_cost:.2f}",
             f"${log.total_cost:.2f}",
             log.order.order_number if log.order else '',
-            _safe_csv(log.recorded_by.username),
+            _safe_csv(log.recorded_by.username if log.recorded_by else ''),
             _safe_csv(log.notes),
         ])
     
@@ -1601,7 +1614,7 @@ def export_excel(report_data, date_from, date_to):
         logs_sheet.cell(row=row, column=8, value=float(log.overhead_cost))
         logs_sheet.cell(row=row, column=9, value=float(log.total_cost))
         logs_sheet.cell(row=row, column=10, value=log.order.order_number if log.order else '')
-        logs_sheet.cell(row=row, column=11, value=log.recorded_by.username)
+        logs_sheet.cell(row=row, column=11, value=log.recorded_by.username if log.recorded_by else '')
         logs_sheet.cell(row=row, column=12, value=log.notes)
         
         # Format currency columns

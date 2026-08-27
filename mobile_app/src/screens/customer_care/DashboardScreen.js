@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ScrollView, View, StyleSheet, RefreshControl, Image } from 'react-native';
 import {
   Text,
@@ -26,6 +26,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
+import { STATUS_COLORS } from '../../constants/statusColors';
 
 function stringToColor(str = '') {
   const PALETTE = ['#2c3e50', '#AD1457', '#6A1B9A', '#00838F', '#2E7D32', '#E65100', '#4527A0', '#37474F'];
@@ -126,20 +127,15 @@ const bannerStyles = StyleSheet.create({
   },
 });
 
-const STATUS_COLORS = {
-  pending:   '#FF8F00',
-  confirmed: '#2c3e50',
-  preparing: '#6A1B9A',
-  ready:     '#2E7D32',
-  served:    '#2E7D32',
-  cancelled: '#C62828',
-};
-
 export default function CCDashboardScreen({ navigation }) {
   const theme = useTheme();
   const { format } = useCurrency();
   const { pendingCount, lastSyncTime } = useSyncStore();
   const { user } = useAuthStore();
+
+  const mountedRef = useRef(true);
+  const _syncRefreshTimer = useRef(null);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
@@ -149,6 +145,7 @@ export default function CCDashboardScreen({ navigation }) {
   const [completing, setCompleting]     = useState(null);
   const [snack, setSnack]               = useState('');
   const [isOffline, setIsOffline]       = useState(false);
+  const [printBillId, setPrintBillId]   = useState(null);
 
   // Per-card action menus
   const [menuOpenId, setMenuOpenId]       = useState(null);
@@ -164,16 +161,19 @@ export default function CCDashboardScreen({ navigation }) {
   const [transferring, setTransferring]         = useState(false);
 
   const fetchAll = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent && mountedRef.current) setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       const offlinePending = await getOfflinePendingOrders();
+      if (!mountedRef.current) return;
 
       if (net.isConnected) {
         const [ordersData, billData] = await Promise.all([
           apiOrders({ period: 'today' }),
           apiBillRequests(),
         ]);
+        if (!mountedRef.current) return;
         const orders = Array.isArray(ordersData) ? ordersData : [];
         const allOrders = [...offlinePending, ...orders];
         setBillRequests(billData.bill_requests || []);
@@ -181,20 +181,21 @@ export default function CCDashboardScreen({ navigation }) {
         setStats({
           total:     allOrders.length,
           pending:   allOrders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
-          completed: allOrders.filter((o) => o.status === 'served').length,
+          completed: allOrders.filter((o) => o.status === 'served' || o.status === 'delivered').length,
           cancelled: allOrders.filter((o) => o.status === 'cancelled').length,
         });
         setIsOffline(false);
         try { await cacheOrders(orders); } catch { /* best-effort */ }
       } else {
         const cached = await getOrders();
+        if (!mountedRef.current) return;
         const allOrders = [...offlinePending, ...cached];
         setRecentOrders(allOrders.slice(0, 10));
         setBillRequests([]);
         setStats({
           total:     allOrders.length,
           pending:   allOrders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
-          completed: allOrders.filter((o) => o.status === 'served').length,
+          completed: allOrders.filter((o) => o.status === 'served' || o.status === 'delivered').length,
           cancelled: allOrders.filter((o) => o.status === 'cancelled').length,
         });
         setIsOffline(true);
@@ -203,23 +204,22 @@ export default function CCDashboardScreen({ navigation }) {
       try {
         const offlinePending = await getOfflinePendingOrders();
         const cached = await getOrders();
+        if (!mountedRef.current) return;
         const allOrders = [...offlinePending, ...cached];
         setRecentOrders(allOrders.slice(0, 10));
         setBillRequests([]);
         setStats({
           total:     allOrders.length,
           pending:   allOrders.filter((o) => ['pending', 'confirmed'].includes(o.status)).length,
-          completed: allOrders.filter((o) => o.status === 'served').length,
+          completed: allOrders.filter((o) => o.status === 'served' || o.status === 'delivered').length,
           cancelled: allOrders.filter((o) => o.status === 'cancelled').length,
         });
       } catch {
-        setRecentOrders([]);
-        setBillRequests([]);
+        if (mountedRef.current) { setRecentOrders([]); setBillRequests([]); }
       }
-      setIsOffline(true);
+      if (mountedRef.current) setIsOffline(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
@@ -229,46 +229,55 @@ export default function CCDashboardScreen({ navigation }) {
     return () => clearInterval(interval);
   }, [fetchAll]);
 
-  useEffect(() => { fetchAll(true); }, [pendingCount, lastSyncTime]);
+  useEffect(() => {
+    clearTimeout(_syncRefreshTimer.current);
+    _syncRefreshTimer.current = setTimeout(() => fetchAll(true), 300);
+    return () => clearTimeout(_syncRefreshTimer.current);
+  }, [pendingCount, lastSyncTime, fetchAll]);
 
   const handleComplete = async (id) => {
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to complete a bill request'); return; }
     setCompleting(id);
     try {
       await apiCompleteBillRequest(id);
+      if (!mountedRef.current) return;
       setBillRequests((prev) => prev.filter((r) => r.id !== id));
       setSnack('Bill request marked as complete');
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Could not complete request');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Could not complete request');
     } finally {
-      setCompleting(null);
+      if (mountedRef.current) setCompleting(null);
     }
   };
 
   // ── Print bill ──────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
+    if (mountedRef.current) setPrintBillId(order.id);
     const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
     try {
       const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
-        currencySymbol: '',
+        currencySymbol: user?.currency_symbol || '',
         staffName,
       });
-      if (ok) setSnack('Bill sent to printer');
+      if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
-      setSnack('Print failed: ' + (err.message || 'unknown error'));
+      if (mountedRef.current) setSnack('Print failed: ' + (err.message || 'unknown error'));
+    } finally {
+      if (mountedRef.current) setPrintBillId(null);
     }
   };
 
   const handleDismissError = useCallback(async (offlineId) => {
     try {
       await deleteOfflineOrder(offlineId);
-      fetchAll(true);
+      if (mountedRef.current) fetchAll(true);
     } catch {
-      setSnack('Could not dismiss order');
+      if (mountedRef.current) setSnack('Could not dismiss order');
     }
   }, [fetchAll]);
 
@@ -278,17 +287,19 @@ export default function CCDashboardScreen({ navigation }) {
   const handleCancel = async () => {
     if (!cancelDialog) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(cancelDialog.id, cancelReason.trim());
+      if (!mountedRef.current) return;
       setCancelDialog(null);
       setSnack('Order cancelled');
       fetchAll(true);
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Cancel failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Cancel failed');
     } finally {
-      setCancelling(false);
+      if (mountedRef.current) setCancelling(false);
     }
   };
 
@@ -297,9 +308,14 @@ export default function CCDashboardScreen({ navigation }) {
     setTransferDialog(order);
     setTargetTable(null);
     setTableMenuVisible(false);
+    const currentTblNum = String(order.table_number ?? '');
     try {
       const t = await apiTables();
-      setTables((t || []).filter((tb) => tb.is_available === true));
+      if (!mountedRef.current) return;
+      setTables((t || []).filter((tb) =>
+        tb.is_available === true &&
+        String(tb.table_number ?? tb.tbl_no) !== currentTblNum,
+      ));
     } catch {
       setTables([]);
     }
@@ -308,17 +324,19 @@ export default function CCDashboardScreen({ navigation }) {
   const handleTransfer = async () => {
     if (!transferDialog || !targetTable) return;
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       await apiTransferTable(transferDialog.id, targetTable.id);
+      if (!mountedRef.current) return;
       setTransferDialog(null);
       setSnack('Table transferred');
       fetchAll(true);
     } catch (err) {
-      setSnack(err.response?.data?.detail || 'Transfer failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Transfer failed');
     } finally {
-      setTransferring(false);
+      if (mountedRef.current) setTransferring(false);
     }
   };
 
@@ -434,10 +452,11 @@ export default function CCDashboardScreen({ navigation }) {
         </Card>
       ) : (
         recentOrders.map((order) => {
-          const isMenuOpen = menuOpenId === order.id;
+          const orderId    = order._is_offline_pending ? `offline_${order.offline_id}` : order.id;
+          const isMenuOpen = menuOpenId === orderId;
           const isPaid = order.payment_status === 'paid';
           return (
-            <Card key={order.id} style={styles.card}>
+            <Card key={orderId} style={styles.card}>
               <Card.Content>
                 <View style={styles.row}>
                   <Text variant="titleSmall" style={{ fontFamily: 'Poppins_700Bold' }}>
@@ -456,10 +475,10 @@ export default function CCDashboardScreen({ navigation }) {
                       visible={isMenuOpen}
                       onDismiss={() => setMenuOpenId(null)}
                       anchor={
-                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : order.id)} />
+                        <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : orderId)} />
                       }
                     >
-                      <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
+                      <Menu.Item leadingIcon="printer" title="Print Bill" disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
                       <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled'} />
                       <Divider />
                       <Menu.Item leadingIcon="close-circle-outline" title="Cancel Order" titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpenId(null); openCancel(order); }} disabled={order.status === 'cancelled' || isPaid} />
@@ -496,7 +515,7 @@ export default function CCDashboardScreen({ navigation }) {
                   </Chip>
                 )}
                 <Text variant="bodySmall" style={styles.meta}>
-                  Table {order.table_number} · {order.items_count} item{order.items_count !== 1 ? 's' : ''}
+                  {order.order_type === 'delivery' ? '🚴 Delivery' : `Table ${order.table_number ?? '?'}`} · {order.items_count} item{order.items_count !== 1 ? 's' : ''}
                 </Text>
                 <View style={styles.row}>
                   <Text variant="bodySmall">Total: {format(order.total)}</Text>
@@ -510,7 +529,7 @@ export default function CCDashboardScreen({ navigation }) {
               </Card.Content>
               {order._is_offline_pending && !order._is_sync_error && (
                 <Card.Actions>
-                  <Button compact mode="outlined" icon="printer" onPress={() => handlePrintBill(order)}>Print</Button>
+                  <Button compact mode="outlined" icon="printer" disabled={printBillId === order.id} loading={printBillId === order.id} onPress={() => handlePrintBill(order)}>Print</Button>
                   <Button compact mode="text" onPress={() => navigation.navigate('Payments')}>Pay / Manage</Button>
                 </Card.Actions>
               )}

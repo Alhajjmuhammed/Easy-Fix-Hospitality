@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import {
   Text,
@@ -51,16 +51,22 @@ export default function ProfileScreen() {
   const [user, setUser] = useState(cachedUser);
   const [refreshing, setRefreshing] = useState(false);
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
+    setFetchError(false);
     try {
       const fresh = await apiMe();
+      if (!mountedRef.current) return;
       setUser(fresh.data);
     } catch {
-      // keep cached data on error
+      if (mountedRef.current && !user) setFetchError(true);
     } finally {
-      setRefreshing(false);
+      if (mountedRef.current) setRefreshing(false);
     }
   }, []);
 
@@ -76,6 +82,18 @@ export default function ProfileScreen() {
   };
 
   if (!user) {
+    if (fetchError) {
+      return (
+        <View style={styles.center}>
+          <Text style={{ fontFamily: P400, color: '#757575', marginBottom: 16 }}>
+            Could not load profile
+          </Text>
+          <Button mode="outlined" icon="refresh" onPress={refresh}>
+            Retry
+          </Button>
+        </View>
+      );
+    }
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />

@@ -316,7 +316,7 @@ async function printNetwork(orderId) {
  *
  * Fallback chain:
  *   'auto'      → BT Classic SPP → Network (if orderId) → System dialog
- *   'bluetooth' → BT Classic SPP → System dialog
+ *   'bluetooth' → BT Classic SPP → (fail) returns false, NO system dialog
  *   'network'   → Network → System dialog
  *   'system'    → System dialog (no fallback needed)
  *
@@ -508,6 +508,7 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
  * @returns {Promise<boolean>}
  */
 export async function printOrderTicket(order, restaurantName = '', stationFilter = null, orderedBy = '') {
+  await settingsReadyPromise;
   const { mode } = usePrinterStore.getState();
   const opts = { order, restaurantName, stationFilter, orderedBy };
 

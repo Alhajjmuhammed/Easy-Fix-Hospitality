@@ -10,6 +10,7 @@ import {
   markPaymentSynced,
   markPaymentError,
   markBillRequestSynced,
+  markBillRequestError,
   saveCategories,
   saveTables,
   saveOrders,
@@ -40,12 +41,18 @@ export const useSyncStore = create((set, get) => ({
   },
 
   triggerSync: async () => {
-    if (get().isSyncing) return;
+    // Atomically claim the sync lock before the first await so two callers
+    // that both see isSyncing===false cannot both proceed past the guard.
+    const claimed = !get().isSyncing;
+    if (!claimed) return;
+    set({ isSyncing: true });
 
     const netState = await NetInfo.fetch();
-    if (!netState.isConnected) return;
-
-    set({ isSyncing: true, syncErrors: [] });
+    if (!netState.isConnected) {
+      set({ isSyncing: false });
+      return;
+    }
+    set({ syncErrors: [] });
     try {
       // --- PUSH ---
       const [pendingOrders, pendingPayments, pendingBillRequests] =
@@ -60,11 +67,25 @@ export const useSyncStore = create((set, get) => ({
         pendingPayments.length ||
         pendingBillRequests.length
       ) {
+        // Pre-filter orders: skip any with corrupted items_json
+        const validOrders = [];
+        for (const o of pendingOrders) {
+          let items;
+          try { items = JSON.parse(o.items_json); } catch (_) { items = null; }
+          if (!Array.isArray(items)) {
+            await markOrderError(o.offline_id, 'Corrupted order data — cannot sync');
+            continue;
+          }
+          validOrders.push({ ...o, _parsedItems: items });
+        }
+
         const payload = {
-          orders: pendingOrders.map((o) => ({
+          orders: validOrders.map((o) => ({
             offline_id: o.offline_id,
+            existing_order_id: o.existing_order_id ?? null,
+            local_print: !!(o.local_print_fired),
             table_id: o.table_id ?? null,
-            items: JSON.parse(o.items_json),
+            items: o._parsedItems,
             special_instructions: o.special_instructions || '',
             restaurant_id: o.restaurant_id,
             order_type: o.order_type || 'dine-in',
@@ -96,22 +117,31 @@ export const useSyncStore = create((set, get) => ({
               notes: p.notes || '',
             });
           } else {
-            // Payment for an offline order — check if already synced
+            // Payment for an offline order — check its sync state
             const rows = await dbQuery(
-              "SELECT server_order_id FROM offline_orders WHERE offline_id = ? AND sync_status = 'synced'",
+              'SELECT server_order_id, sync_status FROM offline_orders WHERE offline_id = ?',
               [p.offline_order_ref],
             );
-            if (rows.length && rows[0].server_order_id) {
+            const orderRow = rows[0];
+            if (orderRow && orderRow.sync_status === 'synced' && orderRow.server_order_id) {
+              // Order already on server — include payment directly
               payload.payments.push({
                 offline_id: p.offline_id,
-                order_id: rows[0].server_order_id,
+                order_id: orderRow.server_order_id,
                 amount: p.amount,
                 payment_method: p.payment_method,
                 reference_number: p.reference_number || '',
                 notes: p.notes || '',
               });
+            } else if (orderRow && orderRow.sync_status === 'error') {
+              // Order permanently failed — mark payment as error so it is not
+              // deferred forever. Staff must dismiss the order to resolve.
+              await markPaymentError(
+                p.offline_id,
+                'Cannot sync: parent order failed to sync. Dismiss the order to resolve.',
+              );
             } else {
-              // Order not yet synced — defer until after this push's order results arrive
+              // Order not yet synced this cycle — defer until after push results arrive
               deferredPayments.push(p);
             }
           }
@@ -141,6 +171,9 @@ export const useSyncStore = create((set, get) => ({
         for (const r of results.bill_requests || []) {
           if (r.status === 'created' || r.status === 'duplicate') {
             await markBillRequestSynced(r.offline_id, r.bill_request_id);
+          } else {
+            await markBillRequestError(r.offline_id, r.error);
+            set((s) => ({ syncErrors: [...s.syncErrors, { type: 'bill_request', ...r }] }));
           }
         }
 
@@ -173,18 +206,23 @@ export const useSyncStore = create((set, get) => ({
                   await markPaymentSynced(r.offline_id, r.payment_id);
                 } else {
                   await markPaymentError(r.offline_id, r.error);
+                  set((s) => ({ syncErrors: [...s.syncErrors, { type: 'payment', ...r }] }));
                 }
               }
-            } catch { /* deferred payments will retry on next sync cycle */ }
+            } catch {
+              for (const p of resolvedNow) {
+                await markPaymentError(p.offline_id, 'Deferred sync failed — will retry');
+              }
+            }
           }
         }
       }
 
       // --- PULL ---
       const pullData = await apiSyncPull();
-      if (pullData.categories) await saveCategories(pullData.categories);
-      if (pullData.tables) await saveTables(pullData.tables);
-      if (pullData.active_orders) await saveOrders(pullData.active_orders);
+      if (Array.isArray(pullData.categories)) await saveCategories(pullData.categories);
+      if (Array.isArray(pullData.tables)) await saveTables(pullData.tables);
+      if (Array.isArray(pullData.active_orders)) await saveOrders(pullData.active_orders);
 
       const now = new Date().toISOString();
       await setSyncMeta('last_sync', now);

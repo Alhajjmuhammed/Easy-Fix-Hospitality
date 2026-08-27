@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -30,7 +30,7 @@ import { apiOrders, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
-import { saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, getOrders, cacheOrders, getOfflinePendingOrders } from '../../database/operations';
+import { saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, getOrders, cacheOrders, getOfflinePendingOrders, getTables } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -70,6 +70,9 @@ export default function CCPaymentsScreen({ navigation }) {
   const { format } = useCurrency();
   const { user } = useAuthStore();
   const { pendingCount, lastSyncTime } = useSyncStore();
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const [orders, setOrders]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,6 +91,7 @@ export default function CCPaymentsScreen({ navigation }) {
   const [reference, setReference] = useState('');
   const [notes, setNotes]         = useState('');
   const [paying, setPaying]       = useState(false);
+  const [printBillId, setPrintBillId] = useState(null);
 
   // Transfer dialog
   const [transferDialog, setTransferDialog] = useState(null); // order
@@ -105,11 +109,13 @@ export default function CCPaymentsScreen({ navigation }) {
     if (!silent) setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (!net.isConnected) {
         const [offlinePending, cached] = await Promise.all([
           getOfflinePendingOrders(),
           getOrders(null),
         ]);
+        if (!mountedRef.current) return;
         const allOrders = [...offlinePending, ...cached];
         const filtered = statusFilter
           ? allOrders.filter((o) => o.payment_status === statusFilter)
@@ -124,6 +130,7 @@ export default function CCPaymentsScreen({ navigation }) {
         getOfflinePendingOrders(),
         apiOrders(params),
       ]);
+      if (!mountedRef.current) return;
       const fetched = Array.isArray(data) ? data : [];
       setOrders([...offlinePending, ...fetched]);
       setIsOffline(false);
@@ -134,16 +141,21 @@ export default function CCPaymentsScreen({ navigation }) {
           getOfflinePendingOrders(),
           getOrders(null),
         ]);
+        if (!mountedRef.current) return;
         const allOrders = [...offlinePending, ...cached];
         setOrders(statusFilter ? allOrders.filter((o) => o.payment_status === statusFilter) : allOrders);
       } catch {
-        setOrders([]);
+        if (mountedRef.current) setOrders([]);
       }
-      setIsOffline(true);
-      setSnack('Could not load orders — showing cached data');
+      if (mountedRef.current) {
+        setIsOffline(true);
+        setSnack('Could not load orders — showing cached data');
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [statusFilter]);
 
@@ -155,17 +167,22 @@ export default function CCPaymentsScreen({ navigation }) {
   );
 
   // Immediately refresh when an offline order is placed or sync completes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchOrders(true); }, [pendingCount, lastSyncTime]);
 
-  // Load table list once for the dropdown filter
+  // Load table list once for the dropdown filter; fall back to SQLite when offline
   useEffect(() => {
-    apiTables().then((data) => setAllTables(Array.isArray(data) ? data : [])).catch(() => {});
+    apiTables()
+      .then((data) => setAllTables(Array.isArray(data) ? data : []))
+      .catch(() => getTables().then((rows) => setAllTables(rows)).catch(() => {}));
   }, []);
 
   // â”€â”€ Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openPayment = (order) => {
     setPayDialog(order);
-    setAmount(String(order.balance_due > 0 ? order.balance_due.toFixed(2) : order.total?.toFixed(2) ?? ''));
+    const due = parseFloat(order.balance_due);
+    const tot = parseFloat(order.total || 0);
+    setAmount(String(due > 0 ? due.toFixed(2) : tot.toFixed(2)));
     setMethod('cash');
     setReference('');
     setNotes('');
@@ -188,25 +205,30 @@ export default function CCPaymentsScreen({ navigation }) {
           notes:             notes.trim(),
         });
         await useSyncStore.getState().refreshPendingCount();
+        if (!mountedRef.current) return;
         setOrders((prev) => prev.map((o) => {
-          if (o.id !== payDialog.id) return o;
+          const matched = o._is_offline_pending
+            ? o.offline_id === payDialog.offline_id
+            : o.id === payDialog.id;
+          if (!matched) return o;
           const newPaid = (o.total_paid ?? 0) + parsedAmount;
           const newDue = Math.max(0, (o.balance_due ?? o.total ?? 0) - parsedAmount);
           const newStatus = newDue <= 0 ? 'paid' : newPaid > 0 ? 'partial' : o.payment_status;
           return { ...o, total_paid: newPaid, balance_due: newDue, payment_status: newStatus };
         }));
         const paidOrder   = payDialog;
-        const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: Date.now() };
+        const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
         return;
       }
 
       const netState = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (!netState.isConnected) {
         await saveOfflinePayment({
           order_id:         payDialog.id,
@@ -217,9 +239,13 @@ export default function CCPaymentsScreen({ navigation }) {
           notes:            notes.trim(),
         });
         await useSyncStore.getState().refreshPendingCount();
+        if (!mountedRef.current) return;
         setOrders((prev) =>
           prev.map((o) => {
-            if (o.id !== payDialog.id) return o;
+            const matched = o._is_offline_pending
+              ? o.offline_id === payDialog.offline_id
+              : o.id === payDialog.id;
+            if (!matched) return o;
             const newPaid   = (o.total_paid   ?? 0) + parsedAmount;
             const newDue    = Math.max(0, (o.balance_due ?? o.total ?? 0) - parsedAmount);
             const newStatus = newDue <= 0 ? 'paid' : newPaid > 0 ? 'partial' : o.payment_status;
@@ -227,57 +253,61 @@ export default function CCPaymentsScreen({ navigation }) {
           })
         );
         const paidOrder   = payDialog;
-        const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: Date.now() };
+        const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
         setSnack('No internet — payment saved offline and will sync automatically');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
         return;
       }
-      await apiProcessPayment({
+      const payRes = await apiProcessPayment({
         order_id:         payDialog.id,
         amount:           parsedAmount,
         payment_method:   method,
         reference_number: reference.trim(),
         notes:            notes.trim(),
       });
+      if (!mountedRef.current) return;
       const paidOrder   = payDialog;
-      const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: Date.now() };
+      const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: payRes?.payment?.id ?? null };
       const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       setPayDialog(null);
       setSnack('Payment recorded successfully');
       if (usePrinterStore.getState().autoPrintAfterPayment) {
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: '', staffName }).catch(() => {});
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
       }
       fetchOrders(true);
     } catch (err) {
-      setSnack(
+      if (mountedRef.current) setSnack(
         err.response?.data?.error ||
         err.response?.data?.detail ||
         err.response?.data?.amount?.[0] ||
         'Payment failed'
       );
     } finally {
-      setPaying(false);
+      if (mountedRef.current) setPaying(false);
     }
   };
 
   // ── Print Bill ────────────────────────────────────────────────────────────
   const handlePrintBill = async (order) => {
+    if (mountedRef.current) setPrintBillId(order.id);
     const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
     try {
       const ok = await printReceipt({
         orderId: order._is_offline_pending ? undefined : order.id,
         order,
         restaurantName: user?.restaurant_name || 'Restaurant',
-        currencySymbol: '',
+        currencySymbol: user?.currency_symbol || '',
         staffName,
       });
-      if (ok) setSnack('Bill sent to printer');
+      if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
-      setSnack('Print failed: ' + (err.message || 'unknown error'));
+      if (mountedRef.current) setSnack('Print failed: ' + (err.message || 'unknown error'));
+    } finally {
+      if (mountedRef.current) setPrintBillId(null);
     }
   };
 
@@ -297,19 +327,26 @@ export default function CCPaymentsScreen({ navigation }) {
   const handleTransfer = async () => {
     if (!selectedTableId) { setSnack('Please select a destination table'); return; }
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       const res = await apiTransferTable(transferDialog.id, parseInt(selectedTableId));
+      if (!mountedRef.current) return;
       setTransferDialog(null);
       setSnack(res.message || 'Order transferred');
       fetchOrders(true);
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Transfer failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || 'Transfer failed');
     } finally {
-      setTransferring(false);
+      if (mountedRef.current) setTransferring(false);
     }
   };
+
+  const filteredOrders = useMemo(
+    () => tableFilter ? orders.filter((o) => String(o.table_number) === String(tableFilter)) : orders,
+    [orders, tableFilter]
+  );
 
   if (loading) {
     return (
@@ -319,12 +356,8 @@ export default function CCPaymentsScreen({ navigation }) {
     );
   }
 
-  const filteredOrders = tableFilter
-    ? orders.filter((o) => String(o.table_number) === String(tableFilter))
-    : orders;
-
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Banner
         visible={isOffline}
         icon="wifi-off"
@@ -419,7 +452,10 @@ export default function CCPaymentsScreen({ navigation }) {
 
       <FlatList
         data={filteredOrders}
-        keyExtractor={(o) => String(o.id)}
+        keyExtractor={(o) => o._is_offline_pending ? `offline_${o.offline_id}` : String(o.id)}
+        removeClippedSubviews
+        maxToRenderPerBatch={10}
+        windowSize={7}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl
@@ -473,13 +509,13 @@ export default function CCPaymentsScreen({ navigation }) {
                     {!isCancelled && !isPaid && (
                       <Menu.Item leadingIcon="cash" title="Pay" onPress={() => { setMenuOpenId(null); openPayment(order); }} />
                     )}
-                    <Menu.Item leadingIcon="printer" title="Print Bill" onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
+                    <Menu.Item leadingIcon="printer" title="Print Bill" disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
                     {!isCancelled && !isPaid && !order._is_offline_pending && (
                       <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpenId(null); openTransfer(order); }} />
                     )}
                     {order._is_offline_pending && (
                       <Menu.Item leadingIcon="delete-outline" title="Delete Queued Order" titleStyle={{ color: '#E53935' }}
-                        onPress={() => { setMenuOpenId(null); deleteOfflineOrder(order.offline_id).then(() => fetchOrders(true)); }} />
+                        onPress={() => { setMenuOpenId(null); deleteOfflineOrder(order.offline_id).then(() => fetchOrders(true)).catch(() => setSnack('Could not delete queued order')); }} />
                     )}
                   </Menu>
                 </View>
@@ -517,7 +553,7 @@ export default function CCPaymentsScreen({ navigation }) {
                   {!isPaid && (
                     <Button compact mode="contained" onPress={() => openPayment(order)}>Pay</Button>
                   )}
-                  <Button compact mode="outlined" icon="printer" onPress={() => handlePrintBill(order)}>Print</Button>
+                  <Button compact mode="outlined" icon="printer" disabled={printBillId === order.id} loading={printBillId === order.id} onPress={() => handlePrintBill(order)}>Print</Button>
                   {isPaid && (
                     <Text variant="bodySmall" style={{ color: '#2E7D32', paddingHorizontal: 8 }}>✓ Paid (queued)</Text>
                   )}
@@ -583,7 +619,7 @@ export default function CCPaymentsScreen({ navigation }) {
                 <Text variant="labelMedium" style={styles.methodLabel}>Select destination table:</Text>
                 <View style={styles.tableGrid}>
                   {tables
-                    .filter((t) => String(t.id) !== String(transferDialog?.table_info))
+                    .filter((t) => String(t.table_number ?? t.tbl_no) !== String(transferDialog?.table_number))
                     .map((t) => (
                       <Chip
                         key={t.id}
@@ -627,7 +663,7 @@ export default function CCPaymentsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#f5f5f5' },
+  container:    { flex: 1 },
   center:       { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   empty:        { flex: 1, alignItems: 'center', paddingTop: 60 },
   filterBox:    { padding: 12, backgroundColor: '#fff' },

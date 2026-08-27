@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -21,11 +21,14 @@ import { useAuthStore } from '../../store/useAuthStore';
 export default function LoginScreen() {
   const theme = useTheme();
   const navigation = useNavigation();
-  const { login, isLoading, error } = useAuthStore();
+  const { login, isLoading, error, clearError } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const passwordRef = useRef();
+
+  const handleChange = (setter) => (v) => { if (error) clearError(); setter(v); };
 
   const handleLogin = () => {
     if (!username.trim() || !password.trim()) return;
@@ -49,19 +52,26 @@ export default function LoginScreen() {
           <TextInput
             label="Username"
             value={username}
-            onChangeText={setUsername}
+            onChangeText={handleChange(setUsername)}
             autoCapitalize="none"
             autoCorrect={false}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            textContentType="username"
             style={styles.input}
             mode="outlined"
             left={<TextInput.Icon icon="account" />}
           />
 
           <TextInput
+            ref={passwordRef}
             label="Password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handleChange(setPassword)}
             secureTextEntry={!passwordVisible}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+            textContentType="password"
             style={styles.input}
             mode="outlined"
             left={<TextInput.Icon icon="lock" />}

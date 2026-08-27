@@ -409,6 +409,7 @@ def owner_dashboard(request):
     
     # Get owner filter for data isolation
     from accounts.models import get_owner_filter
+    owner_filter = None
     try:
         owner_filter = get_owner_filter(request.user)
         
@@ -1145,16 +1146,21 @@ def manage_events(request):
     # Calculate summary statistics
     all_events = Event.objects.filter(owner=owner_filter)
     
-    # Fully paid events - total amount from completed payments
+    # Fully paid events
     fully_paid_events = all_events.filter(payment_status='fully_paid')
     paid_amount = fully_paid_events.aggregate(total=Sum('amount_paid'))['total'] or 0
-    
+
     # Unpaid events - total balance due
     unpaid_events_list = all_events.filter(payment_status='unpaid').exclude(status='cancelled')
     unpaid_amount = sum(event.price_per_pax * event.total_pax for event in unpaid_events_list)
-    
-    # Total revenue: sum of paid + unpaid (total potential revenue)
-    total_revenue = paid_amount + unpaid_amount
+
+    # Partially-paid / deposit-paid events also contribute to total potential revenue
+    partial_events = all_events.filter(
+        payment_status__in=['partially_paid', 'deposit_paid']
+    ).exclude(status='cancelled')
+    partial_revenue = sum(event.price_per_pax * event.total_pax for event in partial_events)
+
+    total_revenue = paid_amount + unpaid_amount + partial_revenue
     
     # Pending payments: sum of balance due for events not fully paid or cancelled
     from django.db.models import F
@@ -1537,8 +1543,14 @@ def record_event_payment(request, event_id):
         if payment_amount <= 0:
             return JsonResponse({'success': False, 'message': 'Invalid payment amount.'})
         
-        # Update payment amounts
-        event.amount_paid += payment_amount
+        # Update payment amounts — guard against overpayment
+        new_total = event.amount_paid + payment_amount
+        if new_total > event.total_amount:
+            return JsonResponse({
+                'success': False,
+                'message': f'Payment would exceed total event cost ({event.total_amount}).'
+            })
+        event.amount_paid = new_total
         
         if is_deposit and event.deposit_amount == 0:
             event.deposit_amount = payment_amount

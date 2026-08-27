@@ -1,0 +1,302 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}Attendance — {{ day_label }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .day-stat-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        overflow: hidden;
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.78rem;
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .day-nav-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0.35rem 0.75rem;
+        border-radius: 8px;
+        border: 1.5px solid #dee2e6;
+        background: #fff;
+        color: #495057;
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+    }
+    .day-nav-btn:hover {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+        background: rgba(52,152,219,0.05);
+    }
+    .attendance-table th {
+        background: #f8f9fa;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6c757d;
+        border-top: none;
+    }
+    .attendance-table td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+    .absent-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.82rem;
+        color: #6c757d;
+        flex-shrink: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="d-flex align-items-start align-items-sm-center justify-content-between flex-wrap gap-2">
+        <div>
+            <div class="mb-1">
+                <a href="{% url 'attendance:calendar' %}" class="text-decoration-none text-muted small me-2">
+                    <i class="bi bi-arrow-left me-1"></i>Calendar
+                </a>
+            </div>
+            <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
+                <i class="bi bi-calendar-day me-2" style="color: var(--accent-color);"></i>
+                {{ day_label }}
+                {% if is_today %}<span class="badge ms-2" style="background:var(--accent-color);font-size:0.65rem;vertical-align:middle;">Today</span>{% endif %}
+            </h4>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'attendance:day_detail' %}?date={{ prev_day }}" class="day-nav-btn">
+                <i class="bi bi-chevron-left"></i> Prev
+            </a>
+            {% if not is_today and not is_future %}
+            <a href="{% url 'attendance:day_detail' %}?date={{ next_day }}" class="day-nav-btn">
+                Next <i class="bi bi-chevron-right"></i>
+            </a>
+            {% elif not is_future %}
+            <span class="day-nav-btn" style="opacity:0.4;cursor:default;">Next <i class="bi bi-chevron-right"></i></span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card day-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(52,152,219,0.12);color:var(--accent-color);">
+                        <i class="bi bi-box-arrow-in-right"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--accent-color);">{{ checked_in_count }}</div>
+                        <div class="stat-label">Checked In</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card day-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(39,174,96,0.12);color:var(--success-color);">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--success-color);">{{ checked_out_count }}</div>
+                        <div class="stat-label">Checked Out</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card day-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(243,156,18,0.12);color:var(--warning-color);">
+                        <i class="bi bi-alarm"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--warning-color);">{{ late_count }}</div>
+                        <div class="stat-label">Late</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card day-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(231,76,60,0.12);color:var(--danger-color);">
+                        <i class="bi bi-lightning"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--danger-color);">{{ overtime_count }}</div>
+                        <div class="stat-label">Overtime</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-4 col-lg-4">
+            <div class="card day-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(155,89,182,0.12);color:#9b59b6;">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:#9b59b6;font-size:1.4rem;">{{ total_work_display }}</div>
+                        <div class="stat-label">Total Hours Worked</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Table -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+            <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
+                <i class="bi bi-people me-2" style="color:var(--accent-color);"></i>
+                Attendance Records
+                <span class="badge bg-secondary ms-2" style="font-size:0.75rem;">{{ records|length }}</span>
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            {% if records %}
+            <div class="table-responsive">
+                <table class="table table-hover attendance-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Staff Name</th>
+                            <th>Role</th>
+                            <th>Shift</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th>Hours</th>
+                            <th>Status</th>
+                            <th>Via</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in records %}
+                        <tr>
+                            <td class="ps-4 fw-semibold">{{ rec.staff_name }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ rec.staff_role }}</span></td>
+                            <td><span class="text-muted small">{{ rec.shift_name }}</span></td>
+                            <td>
+                                {% if rec.check_in != '—' %}
+                                    <span class="fw-semibold">{{ rec.check_in }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.check_out != '—' %}
+                                    <span class="fw-semibold">{{ rec.check_out }}</span>
+                                {% else %}
+                                    <span class="text-muted small fst-italic">Still in</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ rec.work_display }}</td>
+                            <td>
+                                {% if rec.is_late %}
+                                    <span class="badge bg-warning text-dark me-1">
+                                        <i class="bi bi-clock-history me-1"></i>Late
+                                        {% if rec.late_minutes %}(+{{ rec.late_minutes }}m){% endif %}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success me-1">
+                                        <i class="bi bi-check-circle me-1"></i>On Time
+                                    </span>
+                                {% endif %}
+                                {% if rec.is_overtime %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-lightning me-1"></i>OT +{{ rec.overtime_minutes }}m
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rec.check_in_via == 'mobile' %}
+                                    <span class="badge bg-primary"><i class="bi bi-phone me-1"></i>Mobile</span>
+                                {% else %}
+                                    <span class="badge bg-secondary"><i class="bi bi-globe me-1"></i>Web</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-calendar-x display-5 mb-2 d-block" style="opacity:0.3;"></i>
+                <p class="mb-0">No attendance records for this day.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if is_today and absent_staff %}
+    <!-- Not Yet Checked In (today only) -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
+                <i class="bi bi-person-x me-2" style="color:var(--danger-color);"></i>
+                Not Yet Checked In
+                <span class="badge ms-2" style="background:var(--danger-color);font-size:0.75rem;">{{ absent_staff|length }}</span>
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                {% for staff in absent_staff %}
+                <div class="col-12 col-md-6 col-xl-4">
+                    <div class="d-flex align-items-center gap-3 py-2 border-bottom">
+                        <div class="absent-avatar">
+                            {{ staff.get_full_name|default:staff.username|slice:":1"|upper }}
+                        </div>
+                        <div>
+                            <div class="fw-semibold" style="font-size:0.9rem;">
+                                {{ staff.get_full_name|default:staff.username }}
+                            </div>
+                            <div class="text-muted" style="font-size:0.78rem;">
+                                {% if staff.role %}{{ staff.role.name }}{% else %}Staff{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

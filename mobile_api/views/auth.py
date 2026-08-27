@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
@@ -52,30 +53,42 @@ def login(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # Check subscription for staff users
+    # Resolve the owning restaurant for subscription check and response
+    owner = user.get_owner() if hasattr(user, 'get_owner') else getattr(user, 'owner', None)
+
+    # Check subscription for non-customer users
     if not user.is_customer():
-        owner = user.get_owner()
         if owner:
             try:
                 sub = owner.subscription
-                if sub.subscription_status in ('expired', 'blocked'):
+                # Only 'active' is allowed; suspended/expired/blocked/cancelled all deny access
+                if sub.subscription_status not in ('active',):
                     return Response(
-                        {'error': 'Restaurant subscription has expired. Contact your administrator.'},
+                        {'error': 'Your restaurant subscription is not active. Please contact support.'},
                         status=status.HTTP_403_FORBIDDEN,
                     )
             except Exception:
-                pass
+                # No subscription record — deny access rather than silently allowing
+                return Response(
+                    {'error': 'No subscription found for this restaurant. Please contact support.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
     # Always create a fresh token on login so the 15-day expiry clock resets.
     # get_or_create would return a stale token (possibly already expired) which
     # causes an immediate 401 on the very next API call → instant logout.
-    Token.objects.filter(user=user).delete()
-    token = Token.objects.create(user=user)
+    # Wrapped in atomic to prevent duplicate-token race on concurrent logins.
+    with transaction.atomic():
+        Token.objects.filter(user=user).delete()
+        token = Token.objects.create(user=user)
     logger.info('Mobile login success: %s', username)
+
+    restaurant_id = owner.id if owner else (user.id if user.is_owner() else None)
 
     return Response({
         'token': token.key,
         'user': UserSerializer(user, context={'request': request}).data,
+        'restaurant_id': restaurant_id,
     })
 
 
@@ -101,9 +114,12 @@ def me(request):
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
 def save_push_token(request):
     """Save the Expo push token for the current user (for push notifications)."""
+    import re as _re
     token = request.data.get('token', '').strip()
     if not token:
         return Response({'error': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(token) > 200 or not _re.match(r'^Expo(?:nent)?PushToken\[.+\]$', token):
+        return Response({'error': 'Invalid Expo push token format.'}, status=status.HTTP_400_BAD_REQUEST)
     request.user.expo_push_token = token
     request.user.save(update_fields=['expo_push_token'])
     return Response({'message': 'Push token saved.'})
@@ -143,22 +159,25 @@ def register(request):
             {'error': 'Username may only contain letters, numbers, and underscores (3–150 chars).'},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    if User.objects.filter(username__iexact=username).exists():
-        return Response({'error': 'This username is already taken.'}, status=status.HTTP_400_BAD_REQUEST)
-
     if not email:
         return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
     try:
         validate_email(email)
     except ValidationError:
         return Response({'error': 'Enter a valid email address.'}, status=status.HTTP_400_BAD_REQUEST)
-    if User.objects.filter(email__iexact=email).exists():
-        return Response({'error': 'This email is already registered.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if (User.objects.filter(username__iexact=username).exists() or
+            User.objects.filter(email__iexact=email).exists()):
+        return Response({'error': 'Username or email is already registered.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if not first_name:
         return Response({'error': 'First name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(first_name) > 150:
+        return Response({'error': 'First name must be 150 characters or fewer.'}, status=status.HTTP_400_BAD_REQUEST)
     if not last_name:
         return Response({'error': 'Last name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(last_name) > 150:
+        return Response({'error': 'Last name must be 150 characters or fewer.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if not password:
         return Response({'error': 'Password is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -169,7 +188,10 @@ def register(request):
     except ValidationError as exc:
         return Response({'error': ' '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
-    # --- Create user ---
+    # --- Create user (wrapped in a transaction so the IntegrityError from a
+    # concurrent registration with the same username/email surfaces as a clean 400,
+    # not a 500 crash). ---
+    from django.db import IntegrityError as _IE, transaction as _tx
     customer_role, _ = Role.objects.get_or_create(
         name='customer',
         defaults={'description': 'Customer'},
@@ -184,7 +206,11 @@ def register(request):
         owner=None,  # Universal customer — not tied to a specific restaurant
     )
     user.set_password(password)
-    user.save()
+    try:
+        with _tx.atomic():
+            user.save()
+    except _IE:
+        return Response({'error': 'This username or email is already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
     token, _ = Token.objects.get_or_create(user=user)
     logger.info('Mobile customer registered: %s', username)

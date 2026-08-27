@@ -11,7 +11,7 @@ from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import F, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from channels.layers import get_channel_layer
@@ -430,6 +430,10 @@ def _place_order(request):
             if _dup:
                 raise _DuplicateOrder(_dup)
 
+        # Lock the table row to prevent double-booking by concurrent requests
+        if table is not None:
+            table = TableInfo.objects.select_for_update(of=('self',)).get(pk=table.pk)
+
         validated_items = []
         for pv in pre_validated:
             # Re-fetch with row lock to prevent overselling under concurrent load
@@ -477,8 +481,9 @@ def _place_order(request):
             )
             p = item['product']
             if p.available_in_stock is not None:
-                p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
-                p.save(update_fields=['available_in_stock'])
+                Product.objects.filter(pk=p.pk).update(
+                    available_in_stock=F('available_in_stock') - item['quantity']
+                )
         # Mark table unavailable only for dine-in orders
         if table is not None:
             table.is_available = False
@@ -1158,8 +1163,9 @@ def add_items_to_order(request, order_id):
             )
             new_items.append(oi)
             if p.available_in_stock is not None:
-                p.available_in_stock = max(0, p.available_in_stock - item['quantity'])
-                p.save(update_fields=['available_in_stock'])
+                Product.objects.filter(pk=p.pk).update(
+                    available_in_stock=F('available_in_stock') - item['quantity']
+                )
         added = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated)
         order.total_amount = _Dec(str(order.total_amount)) + added * (_Dec('1') + _add_tax_rate)
         extra_notes = sanitize_special_instructions(

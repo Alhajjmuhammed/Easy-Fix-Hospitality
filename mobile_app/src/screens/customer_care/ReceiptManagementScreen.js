@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import {
   Text,
@@ -29,10 +29,20 @@ export default function ReceiptManagementScreen({ navigation }) {
   const [snack, setSnack] = useState('');
   const [isOffline, setIsOffline] = useState(false);
 
+  // Refs hold the latest filter values so fetchPayments has a stable identity
+  // and does NOT fire on every keystroke.
+  const searchRef   = useRef('');
+  const dateFromRef = useRef('');
+  const dateToRef   = useRef('');
+
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (!net.isConnected) {
         setIsOffline(true);
         setPayments([]);
@@ -40,21 +50,23 @@ export default function ReceiptManagementScreen({ navigation }) {
       }
       setIsOffline(false);
       const params = {};
-      if (search.trim()) params.search = search.trim();
-      if (dateFrom.trim()) params.date_from = dateFrom.trim();
-      if (dateTo.trim()) params.date_to = dateTo.trim();
+      if (searchRef.current.trim())   params.search    = searchRef.current.trim();
+      if (dateFromRef.current.trim()) params.date_from = dateFromRef.current.trim();
+      if (dateToRef.current.trim())   params.date_to   = dateToRef.current.trim();
       const data = await apiPayments(params);
-      setPayments(data || []);
+      if (!mountedRef.current) return;
+      setPayments(Array.isArray(data) ? data : (data?.results || []));
     } catch {
-      setSnack('Could not load receipts');
+      if (mountedRef.current) setSnack('Could not load receipts');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
-  }, [search, dateFrom, dateTo]);
+  }, []); // stable — reads refs at call time
 
-  useEffect(() => { fetchPayments(); }, []);
+  // Run once on mount only
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
-  const renderItem = ({ item }) => (
+  const renderItem = useCallback(({ item }) => (
     <Card
       style={styles.card}
       onPress={() => navigation.navigate('Receipt', { paymentId: item.id })}
@@ -62,7 +74,7 @@ export default function ReceiptManagementScreen({ navigation }) {
       <Card.Content>
         <View style={styles.rowBetween}>
           <Text variant="titleSmall">#{item.order_number}</Text>
-          <Text variant="titleSmall" style={{ color: '#2E7D32', fontWeight: 'bold' }}>
+          <Text variant="titleSmall" style={{ color: '#2E7D32', fontFamily: 'Poppins_700Bold' }}>
             {format(item.amount)}
           </Text>
         </View>
@@ -71,7 +83,7 @@ export default function ReceiptManagementScreen({ navigation }) {
             {METHOD_LABEL[item.payment_method] || item.payment_method}
           </Chip>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            {new Date(item.created_at).toLocaleString()}
+            {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
           </Text>
         </View>
         {item.processed_by_name ? (
@@ -81,7 +93,7 @@ export default function ReceiptManagementScreen({ navigation }) {
         ) : null}
       </Card.Content>
     </Card>
-  );
+  ), [format, navigation, theme]);
 
   return (
     <View style={styles.container}>
@@ -98,7 +110,7 @@ export default function ReceiptManagementScreen({ navigation }) {
         <TextInput
           label="Search order #"
           value={search}
-          onChangeText={setSearch}
+          onChangeText={(v) => { setSearch(v); searchRef.current = v; }}
           mode="outlined"
           dense
           style={styles.searchInput}
@@ -112,7 +124,7 @@ export default function ReceiptManagementScreen({ navigation }) {
         <TextInput
           label="From (YYYY-MM-DD)"
           value={dateFrom}
-          onChangeText={setDateFrom}
+          onChangeText={(v) => { setDateFrom(v); dateFromRef.current = v; }}
           mode="outlined"
           dense
           style={styles.dateInput}
@@ -120,7 +132,7 @@ export default function ReceiptManagementScreen({ navigation }) {
         <TextInput
           label="To (YYYY-MM-DD)"
           value={dateTo}
-          onChangeText={setDateTo}
+          onChangeText={(v) => { setDateTo(v); dateToRef.current = v; }}
           mode="outlined"
           dense
           style={styles.dateInput}

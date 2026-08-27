@@ -7,12 +7,12 @@ from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Prefetch, Sum, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from orders.models import Order
-from cashier.models import Payment
+from cashier.models import Payment, VoidTransaction
 from ..serializers import PaymentSerializer, ProcessPaymentSerializer
 from .helpers import get_restaurant_owner
 from .orders import _notify_ws
@@ -67,12 +67,21 @@ def _list_payments(request):
             _Q(id=search if search.isdigit() else 0)
         )
 
+    from datetime import datetime as _dt_parse
     date_from = request.GET.get('date_from', '')
     if date_from:
+        try:
+            date_from = _dt_parse.strptime(date_from, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date_from. Use YYYY-MM-DD.'}, status=400)
         qs = qs.filter(created_at__date__gte=date_from)
 
     date_to = request.GET.get('date_to', '')
     if date_to:
+        try:
+            date_to = _dt_parse.strptime(date_to, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date_to. Use YYYY-MM-DD.'}, status=400)
         qs = qs.filter(created_at__date__lte=date_to)
 
     qs = qs[:50]
@@ -91,15 +100,6 @@ def _process_payment(request):
     data = s.validated_data
     offline_id = data.get('offline_id', '').strip()
 
-    # De-duplication for offline payments
-    if offline_id:
-        existing = Payment.objects.filter(notes__contains=f'[offline:{offline_id}]').first()
-        if existing:
-            return Response({
-                'payment': PaymentSerializer(existing).data,
-                'already_synced': True,
-            })
-
     owner = get_restaurant_owner(request)
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
@@ -111,36 +111,53 @@ def _process_payment(request):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    order = get_object_or_404(Order.objects.filter(_tq).distinct(), id=data['order_id'])
 
-    if request.user.is_customer_care() and order.ordered_by != request.user:
+    # Quick access check before acquiring lock (avoids holding lock during CC IDOR check)
+    order_check = get_object_or_404(Order.objects.filter(_tq).distinct(), id=data['order_id'])
+    if request.user.is_customer_care() and order_check.ordered_by != request.user:
         return Response({'error': 'Access denied.'}, status=403)
-
-    if order.status == 'cancelled':
-        return Response({'error': 'Cannot process payment for a cancelled order.'}, status=400)
-
-    total_paid = order.payments.filter(is_voided=False).aggregate(
-        t=Sum('amount')
-    )['t'] or Decimal('0.00')
 
     amount = Decimal(str(data['amount']))
     if amount <= 0:
         return Response({'error': 'Payment amount must be positive.'}, status=400)
 
-    # Reject overpayment — mirrors web's cashier process_payment check.
-    remaining_balance = order.total_amount - total_paid
-    if amount > remaining_balance:
-        return Response(
-            {'error': f'Payment amount ({amount}) exceeds remaining balance ({remaining_balance}).'},
-            status=400,
-        )
-
     notes = data.get('notes', '')
     if offline_id:
         notes = f'[offline:{offline_id}] {notes}'.strip()
 
-    # ── DB writes inside atomic block — no _notify_ws inside (PostgreSQL safe) ──
+    # ── DB writes inside atomic block with row lock — prevents concurrent double-payment ──
     with transaction.atomic():
+        # Acquire the row lock FIRST so that the dedup check runs with a fully
+        # serialized view — two concurrent identical offline POSTs cannot both pass
+        # the filter before either has committed (TOCTOU fix).
+        # No distinct() — FOR UPDATE + DISTINCT is forbidden in PostgreSQL.
+        order = get_object_or_404(
+            Order.objects.select_for_update(of=('self',)).filter(_tq),
+            id=data['order_id'],
+        )
+        # Dedup check AFTER the lock so the second duplicate request sees the
+        # Payment row the first already created.
+        if offline_id:
+            _existing = Payment.objects.filter(notes__contains=f'[offline:{offline_id}]', processed_by=request.user).first()
+            if _existing:
+                return Response({'payment': PaymentSerializer(_existing).data, 'already_synced': True})
+
+        if order.status == 'cancelled':
+            return Response({'error': 'Cannot process payment for a cancelled order.'}, status=400)
+
+        # Re-read total_paid inside the lock so the overpayment check is race-free
+        total_paid = order.payments.filter(is_voided=False).aggregate(
+            t=Sum('amount')
+        )['t'] or Decimal('0.00')
+
+        # Reject overpayment — mirrors web's cashier process_payment check.
+        remaining_balance = order.total_amount - total_paid
+        if amount > remaining_balance:
+            return Response(
+                {'error': f'Payment amount ({amount}) exceeds remaining balance ({remaining_balance}).'},
+                status=400,
+            )
+
         payment = Payment.objects.create(
             order=order,
             amount=amount,
@@ -196,32 +213,53 @@ def void_payment(request, payment_id):
         Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
         Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    payment = get_object_or_404(Payment.objects.filter(_otq3).distinct(), id=payment_id)
-
-    if payment.is_voided:
-        return Response({'error': 'Payment is already voided.'}, status=400)
 
     reason = request.data.get('reason', '').strip()
     if not reason:
         return Response({'error': 'Void reason is required.'}, status=400)
 
     with transaction.atomic():
+        payment = get_object_or_404(
+            Payment.objects.select_for_update(of=('self',)).filter(_otq3),
+            id=payment_id,
+        )
+
+        if request.user.is_customer_care() and payment.order.ordered_by != request.user:
+            return Response({'error': 'Access denied.'}, status=403)
+
+        if payment.is_voided:
+            return Response({'error': 'Payment is already voided.'}, status=400)
+
+        # Lock the order row so a concurrent _process_payment cannot commit
+        # 'paid' while void_payment is recalculating the payment_status.
+        from orders.models import Order as _Order
+        order = _Order.objects.select_for_update(of=('self',)).get(pk=payment.order_id)
+
+        VoidTransaction.objects.create(
+            original_payment=payment,
+            voided_by=request.user,
+            void_reason=reason,
+            refund_amount=payment.amount,
+            refund_method=payment.payment_method,
+        )
+
         payment.is_voided = True
         payment.void_reason = reason
         payment.voided_by = request.user
         payment.voided_at = timezone.now()
-        payment.save()
+        payment.save(update_fields=['is_voided', 'void_reason', 'voided_by', 'voided_at'])
 
-        # Recalculate payment status on the order
-        still_paid = payment.order.payments.filter(is_voided=False).aggregate(
+        # Recalculate payment status on the order (re-query after voiding this payment)
+        still_paid = Payment.objects.filter(order=order, is_voided=False).aggregate(
             t=Sum('amount')
         )['t'] or Decimal('0.00')
 
-        order = payment.order
         if still_paid <= 0:
             order.payment_status = 'unpaid'
+            order.occupy_table()
         elif still_paid < order.total_amount:
             order.payment_status = 'partial'
+            order.occupy_table()
         else:
             order.payment_status = 'paid'
         order.save(update_fields=['payment_status', 'updated_at'])
@@ -260,10 +298,20 @@ def payment_receipt(request, payment_id):
         id=payment_id,
     )
 
-    order = _Order.objects.prefetch_related('order_items__product').get(pk=payment.order_id)
+    if request.user.is_customer_care() and payment.order.ordered_by != request.user:
+        return Response({'error': 'Access denied.'}, status=403)
+
+    order = _Order.objects.select_related(
+        'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
+    ).prefetch_related(
+        Prefetch('payments', queryset=Payment.objects.select_related('processed_by')),
+        'order_items__product',
+        'table_info__bill_requests',
+    ).get(pk=payment.order_id)
     order_total = _Dec(str(order.get_total()))
-    change_amount = float(payment.amount - order_total) if payment.payment_method == 'cash' and payment.amount > order_total else 0.0
-    remaining_balance = float(order_total - payment.amount) if payment.amount < order_total else 0.0
+    total_paid = sum((p.amount for p in order.payments.all() if not p.is_voided), _Dec('0'))
+    change_amount = float(total_paid - order_total) if payment.payment_method == 'cash' and total_paid > order_total else 0.0
+    remaining_balance = float(order_total - total_paid) if total_paid < order_total else 0.0
 
     return Response({
         'payment': PaymentSerializer(payment).data,
@@ -292,9 +340,12 @@ def reprint_receipt(request, payment_id):
         Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
     )
     payment = get_object_or_404(
-        Payment.objects.filter(_otq2).distinct(),
+        Payment.objects.filter(_otq2).distinct().select_related('order'),
         id=payment_id,
     )
+
+    if request.user.is_customer_care() and payment.order.ordered_by != request.user:
+        return Response({'error': 'Access denied.'}, status=403)
 
     try:
         from orders.printing import auto_print_receipt

@@ -1,6 +1,7 @@
 """Web views for Staff Attendance management in admin panel."""
 
 import json
+from collections import defaultdict
 from datetime import date, timedelta
 from calendar import monthrange, Calendar
 
@@ -530,6 +531,184 @@ def attendance_qr_web_scan(request):
             'action': 'already_done',
             'message': 'You have already completed your attendance for today.',
         })
+
+
+# ─── day detail & reports ────────────────────────────────────────────────────
+
+@login_required
+def attendance_day_detail(request):
+    """Full-page attendance report for a specific date."""
+    if not _require_can_manage(request):
+        messages.error(request, 'Access denied.')
+        return redirect('admin_panel:admin_dashboard')
+
+    owner, restaurant = _get_owner_and_restaurant(request)
+    today = timezone.localdate()
+
+    day_str = request.GET.get('date', today.isoformat())
+    try:
+        day = date.fromisoformat(day_str)
+    except ValueError:
+        day = today
+
+    records_qs = AttendanceRecord.objects.filter(
+        owner=owner, date=day
+    ).select_related('staff', 'staff__role', 'shift', 'restaurant').order_by('check_in')
+
+    if restaurant:
+        records_qs = records_qs.filter(restaurant=restaurant)
+    if _hide_owner_records(request.user):
+        records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
+
+    records = [_record_to_dict(r) for r in records_qs]
+
+    total_work_minutes = sum(r['work_minutes'] or 0 for r in records if r['work_minutes'])
+    th, tm = divmod(total_work_minutes, 60)
+    total_work_display = f"{th}h {tm}m" if th else (f"{tm}m" if tm else '—')
+
+    absent_staff = []
+    if day == today:
+        staff_ids_present = AttendanceRecord.objects.filter(
+            owner=owner, date=today, check_in__isnull=False
+        ).values_list('staff_id', flat=True)
+        absent_qs = User.objects.filter(
+            owner=owner, is_active=True, is_active_staff=True
+        ).exclude(id__in=staff_ids_present).exclude(id=owner.id)
+        EXCLUDED_ROLES = {'customer', 'administrator', 'main_owner', 'branch_owner', 'owner'}
+        absent_staff = [u for u in absent_qs if not u.role or u.role.name not in EXCLUDED_ROLES]
+
+    prev_day = day - timedelta(days=1)
+    next_day = day + timedelta(days=1)
+
+    context = {
+        'day': day,
+        'day_label': day.strftime('%A, %B %d, %Y'),
+        'records': records,
+        'checked_in_count': sum(1 for r in records if r['check_in'] != '—'),
+        'checked_out_count': sum(1 for r in records if r['check_out'] != '—'),
+        'late_count': sum(1 for r in records if r['is_late']),
+        'overtime_count': sum(1 for r in records if r['is_overtime']),
+        'total_work_display': total_work_display,
+        'absent_staff': absent_staff,
+        'prev_day': prev_day.isoformat(),
+        'next_day': next_day.isoformat(),
+        'is_today': day == today,
+        'is_future': day > today,
+        'today': today,
+    }
+    return render(request, 'admin_panel/attendance_day_detail.html', context)
+
+
+@login_required
+def attendance_reports(request):
+    """Attendance summary reports with date-range filtering."""
+    if not _require_can_manage(request):
+        messages.error(request, 'Access denied.')
+        return redirect('admin_panel:admin_dashboard')
+
+    owner, restaurant = _get_owner_and_restaurant(request)
+    today = timezone.localdate()
+
+    try:
+        date_from = date.fromisoformat(request.GET.get('date_from', ''))
+    except ValueError:
+        date_from = date(today.year, today.month, 1)
+    try:
+        date_to = date.fromisoformat(request.GET.get('date_to', ''))
+    except ValueError:
+        date_to = today
+
+    if date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    records_qs = AttendanceRecord.objects.filter(
+        owner=owner,
+        date__range=(date_from, date_to),
+    ).select_related('staff', 'staff__role', 'shift')
+
+    if restaurant:
+        records_qs = records_qs.filter(restaurant=restaurant)
+    if _hide_owner_records(request.user):
+        records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
+
+    all_records = list(records_qs.order_by('date', 'check_in'))
+
+    staff_map = {}
+    for rec in all_records:
+        sid = rec.staff_id
+        if sid not in staff_map:
+            staff_map[sid] = {
+                'name': rec.staff.get_full_name() or rec.staff.username,
+                'role': rec.staff.role.name if rec.staff.role else '—',
+                'days_present': 0, 'days_late': 0,
+                'total_minutes': 0, 'overtime_minutes': 0,
+            }
+        staff_map[sid]['days_present'] += 1
+        if rec.is_late:
+            staff_map[sid]['days_late'] += 1
+        staff_map[sid]['total_minutes'] += rec.work_minutes or 0
+        if rec.is_overtime:
+            staff_map[sid]['overtime_minutes'] += rec.overtime_minutes
+
+    staff_summary = []
+    for data in staff_map.values():
+        avg_mins = data['total_minutes'] // data['days_present'] if data['days_present'] else 0
+        th, tm = divmod(data['total_minutes'], 60)
+        ah, am = divmod(avg_mins, 60)
+        oth, otm = divmod(data['overtime_minutes'], 60)
+        staff_summary.append({
+            **data,
+            'on_time': data['days_present'] - data['days_late'],
+            'total_display': f"{th}h {tm}m" if th else f"{tm}m",
+            'avg_display': f"{ah}h {am}m" if ah else f"{am}m",
+            'overtime_display': f"{oth}h {otm}m" if (oth or otm) else '—',
+        })
+    staff_summary.sort(key=lambda x: x['days_present'], reverse=True)
+
+    daily_map = defaultdict(lambda: {'present': 0, 'late': 0, 'total_minutes': 0})
+    for rec in all_records:
+        daily_map[rec.date]['present'] += 1
+        if rec.is_late:
+            daily_map[rec.date]['late'] += 1
+        daily_map[rec.date]['total_minutes'] += rec.work_minutes or 0
+
+    daily_summary = []
+    cur = date_from
+    while cur <= date_to:
+        d = daily_map[cur]
+        h, m = divmod(d['total_minutes'], 60)
+        daily_summary.append({
+            'date': cur,
+            'date_str': cur.isoformat(),
+            'present': d['present'],
+            'late': d['late'],
+            'total_display': f"{h}h {m}m" if (h or m) else '—',
+        })
+        cur += timedelta(days=1)
+
+    total_records = len(all_records)
+    total_late = sum(1 for r in all_records if r.is_late)
+    total_work_minutes = sum(r.work_minutes or 0 for r in all_records)
+    th, tm = divmod(total_work_minutes, 60)
+    total_days_range = (date_to - date_from).days + 1
+    total_staff = len(staff_map)
+    attendance_rate = round(
+        total_records / (total_days_range * total_staff) * 100, 1
+    ) if total_staff else 0
+
+    context = {
+        'date_from': date_from.isoformat(),
+        'date_to': date_to.isoformat(),
+        'total_records': total_records,
+        'total_late': total_late,
+        'total_work_display': f"{th}h {tm}m" if th else f"{tm}m" if tm else '0m',
+        'total_staff': total_staff,
+        'attendance_rate': attendance_rate,
+        'staff_summary': staff_summary,
+        'daily_summary': daily_summary,
+        'today': today,
+    }
+    return render(request, 'admin_panel/attendance_reports.html', context)
 
 
 # ─── attendance policy (require check-in before work) ─────────────────────────

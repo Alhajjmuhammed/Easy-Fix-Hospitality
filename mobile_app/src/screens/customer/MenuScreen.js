@@ -40,31 +40,39 @@ export default function MenuScreen({ navigation }) {
   // localQtys: { [productId]: qty } â€” quantity picker value before tapping "Add"
   const [localQtys, setLocalQtys] = useState({});
 
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   const loadMenu = useCallback(async () => {
     setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (net.isConnected) {
         const data = await apiMenu();
+        if (!mountedRef.current) return;
         await saveCategories(data);
         setCategories(data);
       } else {
         const local = await getCategories();
+        if (!mountedRef.current) return;
         setCategories(local);
         const lastSynced = await getSyncMeta('menu_last_synced');
+        if (!mountedRef.current) return;
         if (lastSynced) {
           const age = Date.now() - new Date(lastSynced).getTime();
           if (age > MENU_STALE_THRESHOLD_MS) {
-            setSnack('Menu may be outdated â€“ you are offline');
+            setSnack('Menu may be outdated â€” you are offline');
           }
         }
       }
     } catch {
       const local = await getCategories();
+      if (!mountedRef.current) return;
       setCategories(local);
       setSnack('Could not refresh menu');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
@@ -237,7 +245,7 @@ export default function MenuScreen({ navigation }) {
           </View>
         )}
         renderItem={({ item: product }) => {
-          const outOfStock = product.available_in_stock === 0;
+          const outOfStock = product.available_in_stock != null && Number(product.available_in_stock) <= 0;
           const localQty = getLocalQty(product.id);
           const cartQty = getCartQty(product.id);
 

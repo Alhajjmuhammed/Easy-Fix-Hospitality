@@ -264,19 +264,12 @@ def owner_reports(request):
     # Per-staff cashier breakdown
     from django.db.models import Sum as _Sum
     from cashier.models import Payment
-    if restaurant_obj:
-        cashier_table_q = (
-            Q(order__table_info__restaurant=restaurant_obj) |
-            Q(order__table_info__owner=owner, order__table_info__restaurant__isnull=True) |
-            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
-        )
-    else:
-        cashier_table_q = (
-            Q(order__table_info__owner=owner) |
-            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
-        )
+    cashier_table_q = (
+        Q(order__table_info__restaurant__in=owned_restaurants) |
+        Q(order__table_info__owner=owner, order__table_info__restaurant__isnull=True) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
+        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+    )
     cashier_totals = (
         Payment.objects.filter(
             cashier_table_q,

@@ -301,7 +301,7 @@ class OrderSerializer(serializers.ModelSerializer):
         return float(obj.delivery_lng) if obj.delivery_lng is not None else None
 
     def get_items_count(self, obj):
-        return obj.order_items.count()
+        return len(obj.order_items.all())
 
     def get_ordered_by_name(self, obj):
         if not obj.ordered_by:
@@ -350,38 +350,28 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_pending_bill_requested(self, obj):
         try:
-            from orders.models import BillRequest
             if obj.table_info:
-                return BillRequest.objects.filter(
-                    table_info=obj.table_info,
-                    status='pending'
-                ).exists()
+                return any(br.status == 'pending' for br in obj.table_info.bill_requests.all())
             return False
         except Exception:
             return False
 
     def get_pending_bill_requested_at(self, obj):
         try:
-            from orders.models import BillRequest
             if obj.table_info:
-                br = BillRequest.objects.filter(
-                    table_info=obj.table_info,
-                    status='pending'
-                ).order_by('created_at').first()
-                if br:
-                    return br.created_at.isoformat()
+                pending = sorted(
+                    (br for br in obj.table_info.bill_requests.all() if br.status == 'pending'),
+                    key=lambda br: br.created_at,
+                )
+                if pending:
+                    return pending[0].created_at.isoformat()
             return None
         except Exception:
             return None
 
     def get_total_paid(self, obj):
         try:
-            from django.db.models import Sum
-            from decimal import Decimal
-            total = obj.payments.filter(is_voided=False).aggregate(
-                t=Sum('amount')
-            )['t'] or Decimal('0.00')
-            return float(total)
+            return round(sum(float(p.amount) for p in obj.payments.all() if not p.is_voided), 2)
         except Exception:
             return 0.0
 
@@ -389,12 +379,16 @@ class OrderSerializer(serializers.ModelSerializer):
         try:
             total = self.get_total(obj)
             paid = self.get_total_paid(obj)
-            return max(0.0, total - paid)
+            return max(0.0, round(total - paid, 2))
         except Exception:
             return 0.0
 
     def get_payments(self, obj):
         try:
+            payments = sorted(
+                (p for p in obj.payments.all() if not p.is_voided),
+                key=lambda p: p.created_at,
+            )
             return [
                 {
                     'id': p.id,
@@ -405,17 +399,27 @@ class OrderSerializer(serializers.ModelSerializer):
                     'notes': p.notes or '',
                     'created_at': p.created_at.isoformat(),
                 }
-                for p in obj.payments.filter(is_voided=False).order_by('created_at')
+                for p in payments
             ]
         except Exception:
             return []
 
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Strip internal offline sync dedup tags that should never be visible to users.
+        import re
+        if data.get('special_instructions'):
+            cleaned = re.sub(r'\[offline(?:-append)?:[^\]]*\]', '', data['special_instructions']).strip()
+            data['special_instructions'] = cleaned or ''
+        return data
+
+
 class PlaceOrderSerializer(serializers.Serializer):
     table_id = serializers.IntegerField(required=False, allow_null=True)
     items = serializers.ListField(child=serializers.DictField(), min_length=1)
-    special_instructions = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='')
-    offline_id = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='')
+    special_instructions = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='', max_length=1000)
+    offline_id = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='', max_length=64)
     restaurant_id = serializers.IntegerField(required=False, allow_null=True)
     order_type = serializers.ChoiceField(
         choices=['dine-in', 'delivery', 'pickup'],
@@ -423,7 +427,7 @@ class PlaceOrderSerializer(serializers.Serializer):
         default='dine-in',
         allow_null=True,
     )
-    delivery_address = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='')
+    delivery_address = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='', max_length=500)
     delivery_phone = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='', max_length=30)
     delivery_lat = serializers.FloatField(required=False, allow_null=True, default=None)
     delivery_lng = serializers.FloatField(required=False, allow_null=True, default=None)
@@ -439,10 +443,34 @@ class PlaceOrderSerializer(serializers.Serializer):
     def validate_delivery_address(self, value):
         return value or ''
 
+    def validate_delivery_lat(self, value):
+        if value is not None and not (-90 <= value <= 90):
+            raise serializers.ValidationError('lat must be between -90 and 90.')
+        return value
+
+    def validate_delivery_lng(self, value):
+        if value is not None and not (-180 <= value <= 180):
+            raise serializers.ValidationError('lng must be between -180 and 180.')
+        return value
+
     def validate_delivery_phone(self, value):
         if value is None:
             return ''
         return value[:30]  # truncate silently if somehow > 30 chars
+
+    def validate_items(self, value):
+        for i, item in enumerate(value):
+            product_id = item.get('product_id')
+            quantity = item.get('quantity', 1)
+            if not isinstance(product_id, int) or product_id <= 0:
+                raise serializers.ValidationError(
+                    f'Item {i+1}: product_id must be a positive integer.'
+                )
+            if not isinstance(quantity, int) or quantity <= 0 or quantity > 100:
+                raise serializers.ValidationError(
+                    f'Item {i+1}: quantity must be an integer between 1 and 100.'
+                )
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +480,7 @@ class PlaceOrderSerializer(serializers.Serializer):
 class PaymentSerializer(serializers.ModelSerializer):
     order_number = serializers.SerializerMethodField()
     processed_by_name = serializers.SerializerMethodField()
+    table_number = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -460,6 +489,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'payment_method', 'processed_by_name',
             'reference_number', 'notes',
             'is_voided', 'void_reason', 'created_at',
+            'table_number',
         ]
 
     def get_order_number(self, obj):
@@ -470,14 +500,19 @@ class PaymentSerializer(serializers.ModelSerializer):
             return obj.processed_by.get_full_name() or obj.processed_by.username
         return ''
 
+    def get_table_number(self, obj):
+        if obj.order and obj.order.table_info:
+            return obj.order.table_info.tbl_no
+        return None
+
 
 class ProcessPaymentSerializer(serializers.Serializer):
     order_id = serializers.IntegerField()
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)
     payment_method = serializers.ChoiceField(choices=['cash', 'card', 'digital', 'voucher'])
-    reference_number = serializers.CharField(allow_blank=True, required=False, default='')
-    notes = serializers.CharField(allow_blank=True, required=False, default='')
-    offline_id = serializers.CharField(allow_blank=True, required=False, default='')
+    reference_number = serializers.CharField(allow_blank=True, required=False, default='', max_length=100)
+    notes = serializers.CharField(allow_blank=True, required=False, default='', max_length=500)
+    offline_id = serializers.CharField(allow_blank=True, required=False, default='', max_length=64)
 
 
 # ---------------------------------------------------------------------------
@@ -509,6 +544,9 @@ class BillRequestSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class SyncPushSerializer(serializers.Serializer):
-    orders = serializers.ListField(child=serializers.DictField(), required=False, default=list)
-    payments = serializers.ListField(child=serializers.DictField(), required=False, default=list)
-    bill_requests = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    # DictField with no child constraint — each dict can contain mixed types
+    # (strings, ints, lists for 'items').  Size limits are enforced at the list
+    # level (max_length) and in the view logic.
+    orders        = serializers.ListField(child=serializers.DictField(), required=False, default=list, max_length=50)
+    payments      = serializers.ListField(child=serializers.DictField(), required=False, default=list, max_length=100)
+    bill_requests = serializers.ListField(child=serializers.DictField(), required=False, default=list, max_length=20)

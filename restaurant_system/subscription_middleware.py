@@ -163,25 +163,28 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                 from datetime import timedelta
                 
                 try:
-                    subscription = RestaurantSubscription.objects.create(
+                    subscription, _created = RestaurantSubscription.objects.get_or_create(
                         restaurant_owner=restaurant_owner,
-                        subscription_start_date=timezone.now().date(),
-                        subscription_end_date=timezone.now().date() + timedelta(days=30),
-                        subscription_status='active',
-                        created_by=restaurant_owner,  # Self-created for existing restaurants
-                        is_blocked_by_admin=False
+                        defaults={
+                            'subscription_start_date': timezone.now().date(),
+                            'subscription_end_date': timezone.now().date() + timedelta(days=30),
+                            'subscription_status': 'active',
+                            'created_by': None,
+                            'is_blocked_by_admin': False,
+                        }
                     )
-                    
-                    # Log the auto-creation
-                    from accounts.models import SubscriptionLog
-                    SubscriptionLog.objects.create(
-                        subscription=subscription,
-                        action='auto_created',
-                        description=f"Auto-created default 30-day subscription for existing restaurant",
-                        old_status='none',
-                        new_status='active',
-                        performed_by=restaurant_owner
-                    )
+
+                    # Log the auto-creation (only when a new record was actually created)
+                    if _created:
+                        from accounts.models import SubscriptionLog
+                        SubscriptionLog.objects.create(
+                            subscription=subscription,
+                            action='auto_created',
+                            description=f"Auto-created default 30-day subscription for existing restaurant",
+                            old_status='none',
+                            new_status='active',
+                            performed_by=None
+                        )
                     
                     logger.info(f"Default subscription created successfully for {restaurant_owner.username}")
                 except Exception as create_error:
@@ -205,9 +208,9 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                 return self._redirect_to_blocked_page(request, reason)
                 
         except Exception as e:
-            logger.error(f"Error checking subscription access for {request.user.username}: {e}")
-            # In case of error, allow access to prevent system breakdown
-            return None
+            logger.error(f"Subscription check error for {getattr(request.user, 'username', 'unknown')}: {e}")
+            # Fail closed: deny access on system error
+            return self._redirect_to_blocked_page(request, "System error verifying subscription. Please try again.")
             
         return None
     

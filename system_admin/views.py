@@ -83,7 +83,6 @@ def get_restaurant_owner_by_id(restaurant_id):
     return get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
 
 @login_required
-@login_required
 def system_dashboard(request):
     """System-wide dashboard for administrators"""
     if not request.user.is_administrator():

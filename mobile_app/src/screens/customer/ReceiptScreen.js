@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Text,
@@ -15,6 +15,7 @@ import { apiOrderDetail } from '../../api/orders';
 import { getOrderById } from '../../database/operations';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
+import { useCurrency } from '../../hooks/useCurrency';
 
 const PAYMENT_METHOD_LABELS = {
   cash:    'Cash',
@@ -29,6 +30,11 @@ export default function ReceiptScreen({ route }) {
   const navigation = useNavigation();
   const user = useAuthStore((s) => s.user);
 
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
+  const { format: fmt, decimals } = useCurrency();
+
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
@@ -38,20 +44,25 @@ export default function ReceiptScreen({ route }) {
     (async () => {
       try {
         const net = await NetInfo.fetch();
+        if (!mountedRef.current) return;
         if (!net.isConnected) {
+          setIsOffline(true);
           const cached = await getOrderById(orderId);
-          if (cached) { setOrder(cached); setIsOffline(true); }
+          if (!mountedRef.current) return;
+          if (cached) { setOrder(cached); }
         } else {
           const data = await apiOrderDetail(orderId);
+          if (!mountedRef.current) return;
           setOrder(data);
         }
       } catch {
         try {
           const cached = await getOrderById(orderId);
+          if (!mountedRef.current) return;
           if (cached) { setOrder(cached); setIsOffline(true); }
         } catch {}
       } finally {
-        setLoading(false);
+        if (mountedRef.current) setLoading(false);
       }
     })();
   }, [orderId]);
@@ -83,24 +94,25 @@ export default function ReceiptScreen({ route }) {
     setPrinting(true);
     try {
       const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
+      const allPayments = (order?.payments || []).filter((p) => !p.is_voided);
+      const aggregatedPayment = allPayments.length > 0 ? {
+        ...allPayments[allPayments.length - 1],
+        amount: allPayments.reduce((s, p) => s + parseFloat(p.amount || 0), 0),
+      } : null;
       await printReceipt({
         orderId:        order?.id,
         order,
-        payment:        order?.payments?.[0] || null,
+        payment:        aggregatedPayment,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
-    } catch (err) {
-      // user cancelled or error — silently ignore cancel
+    } catch {
+      // user cancelled or printer error — silently ignore
     } finally {
-      setPrinting(false);
+      if (mountedRef.current) setPrinting(false);
     }
-  };
-
-  const fmt = (v) => {
-    const n = parseFloat(v);
-    return isNaN(n) ? '0.00' : n.toFixed(2);
   };
 
   const createdAt = order.created_at
@@ -145,6 +157,14 @@ export default function ReceiptScreen({ route }) {
               {order.order_type === 'delivery' ? 'Delivery' : order.order_type === 'pickup' ? 'Pickup' : `Table ${order.table_number}`}
             </Text>
           </View>
+          {order.order_type === 'delivery' && order.delivery_address ? (
+            <View style={styles.infoRow}>
+              <Text style={{ fontFamily: P600 }}>Address</Text>
+              <Text style={{ fontFamily: P400, flex: 1, textAlign: 'right' }}>
+                {order.delivery_address}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.infoRow}>
             <Text style={{ fontFamily: P600 }}>Date & Time</Text>
             <Text style={{ fontFamily: P400, flex: 1, textAlign: 'right' }}>{createdAt}</Text>
@@ -161,7 +181,9 @@ export default function ReceiptScreen({ route }) {
           </View>
           <View style={styles.infoRow}>
             <Text style={{ fontFamily: P600 }}>Payment</Text>
-            <Text style={{ fontFamily: P600, color: '#2E7D32' }}>Paid</Text>
+            <Text style={{ fontFamily: P600, color: order.payment_status === 'paid' ? '#2E7D32' : '#FF8F00' }}>
+              {order.payment_status ? order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1) : '—'}
+            </Text>
           </View>
         </Card.Content>
       </Card>
@@ -214,7 +236,7 @@ export default function ReceiptScreen({ route }) {
           <View style={styles.infoRow}>
             <Text style={{ fontFamily: P700, fontSize: 16 }}>Total Paid</Text>
             <Text style={{ fontFamily: P700, fontSize: 16, color: '#2E7D32' }}>
-              {fmt(order.total)}
+              {fmt(order.total_paid ?? order.total)}
             </Text>
           </View>
         </Card.Content>
@@ -265,16 +287,18 @@ export default function ReceiptScreen({ route }) {
       )}
 
       {/* ── Special Instructions ── */}
-      {order.special_instructions ? (
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text variant="labelLarge" style={styles.sectionLabel}>SPECIAL INSTRUCTIONS</Text>
-            <Text variant="bodyMedium" style={{ fontFamily: P400 }}>
-              {order.special_instructions}
-            </Text>
-          </Card.Content>
-        </Card>
-      ) : null}
+      {(() => {
+        const note = (order.special_instructions || '')
+          .replace(/\[offline(?:-append)?:[^\]]*\]/g, '').trim();
+        return note ? (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="labelLarge" style={styles.sectionLabel}>SPECIAL INSTRUCTIONS</Text>
+              <Text variant="bodyMedium" style={{ fontFamily: P400 }}>{note}</Text>
+            </Card.Content>
+          </Card>
+        ) : null;
+      })()}
 
       {/* ── Thank you message ── */}
       <View style={[styles.thankYou, { backgroundColor: '#E8F5E9' }]}>

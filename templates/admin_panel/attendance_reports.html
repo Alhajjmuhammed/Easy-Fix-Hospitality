@@ -1,0 +1,392 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}Attendance Reports{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rpt-stat-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        overflow: hidden;
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.78rem;
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .rpt-table th {
+        background: #f8f9fa;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6c757d;
+        border-top: none;
+        white-space: nowrap;
+    }
+    .rpt-table td {
+        vertical-align: middle;
+        font-size: 0.88rem;
+    }
+    .progress-bar-wrap {
+        background: #e9ecef;
+        border-radius: 6px;
+        height: 6px;
+        width: 80px;
+        overflow: hidden;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 6px;
+        background: var(--accent-color);
+    }
+    .filter-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .daily-date-link {
+        color: var(--accent-color);
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .daily-date-link:hover {
+        text-decoration: underline;
+    }
+    .tab-pills .nav-link {
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #6c757d;
+        padding: 0.4rem 1rem;
+    }
+    .tab-pills .nav-link.active {
+        background: var(--accent-color);
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <a href="{% url 'attendance:dashboard' %}" class="text-decoration-none text-muted small me-2">
+                <i class="bi bi-arrow-left me-1"></i>Attendance
+            </a>
+            <h4 class="mb-0 fw-bold d-inline-block" style="color:var(--primary-color);">
+                <i class="bi bi-bar-chart-line me-2" style="color:var(--accent-color);"></i>Attendance Reports
+            </h4>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'attendance:calendar' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-calendar3 me-1"></i>Calendar
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+
+    <!-- Date Filter -->
+    <div class="card filter-card mb-4">
+        <div class="card-body py-3 px-4">
+            <form method="get" class="d-flex align-items-end gap-3 flex-wrap">
+                <div>
+                    <label class="form-label small fw-semibold mb-1" style="color:var(--primary-color);">From</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" style="min-width:140px;">
+                </div>
+                <div>
+                    <label class="form-label small fw-semibold mb-1" style="color:var(--primary-color);">To</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" style="min-width:140px;">
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-sm" style="background:var(--accent-color);color:#fff;min-width:80px;">
+                        <i class="bi bi-funnel me-1"></i>Filter
+                    </button>
+                    <a href="{% url 'attendance:reports' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+                </div>
+                <div class="ms-auto d-flex gap-2 flex-wrap">
+                    <button type="submit" name="date_from" value="{{ today|date:'Y-m-01' }}" class="btn btn-sm btn-outline-secondary">
+                        This Month
+                    </button>
+                    <button type="button" onclick="setLastNDays(7)" class="btn btn-sm btn-outline-secondary">Last 7 days</button>
+                    <button type="button" onclick="setLastNDays(30)" class="btn btn-sm btn-outline-secondary">Last 30 days</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card rpt-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(52,152,219,0.12);color:var(--accent-color);">
+                        <i class="bi bi-calendar-check"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--accent-color);">{{ total_records }}</div>
+                        <div class="stat-label">Total Check-Ins</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card rpt-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(39,174,96,0.12);color:var(--success-color);">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--success-color);">{{ total_staff }}</div>
+                        <div class="stat-label">Active Staff</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card rpt-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(243,156,18,0.12);color:var(--warning-color);">
+                        <i class="bi bi-alarm"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--warning-color);">{{ total_late }}</div>
+                        <div class="stat-label">Late Arrivals</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-lg-2">
+            <div class="card rpt-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(155,89,182,0.12);color:#9b59b6;">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:#9b59b6;font-size:1.3rem;">{{ total_work_display }}</div>
+                        <div class="stat-label">Total Hours</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-4 col-lg-4">
+            <div class="card rpt-stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
+                    <div class="stat-icon" style="background:rgba(52,152,219,0.12);color:var(--accent-color);">
+                        <i class="bi bi-graph-up"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" style="color:var(--accent-color);">{{ attendance_rate }}%</div>
+                        <div class="stat-label">Attendance Rate</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav tab-pills mb-3" id="rptTabs">
+        <li class="nav-item">
+            <button class="nav-link active" data-tab="staff">
+                <i class="bi bi-person-lines-fill me-1"></i>By Staff
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-tab="daily">
+                <i class="bi bi-calendar-week me-1"></i>By Day
+            </button>
+        </li>
+    </ul>
+
+    <!-- Staff Summary Table -->
+    <div id="tab-staff" class="rpt-section">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
+                    <i class="bi bi-person-lines-fill me-2" style="color:var(--accent-color);"></i>
+                    Staff Attendance Summary
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                {% if staff_summary %}
+                <div class="table-responsive">
+                    <table class="table table-hover rpt-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Staff Name</th>
+                                <th>Role</th>
+                                <th>Days Present</th>
+                                <th>On Time</th>
+                                <th>Late</th>
+                                <th>Overtime Days</th>
+                                <th>Total Hours</th>
+                                <th>Avg / Day</th>
+                                <th>Punctuality</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in staff_summary %}
+                            <tr>
+                                <td class="ps-4 fw-semibold">{{ s.name }}</td>
+                                <td><span class="badge bg-light text-dark border">{{ s.role }}</span></td>
+                                <td>
+                                    <span class="fw-semibold">{{ s.days_present }}</span>
+                                </td>
+                                <td>
+                                    <span class="text-success fw-semibold">{{ s.on_time }}</span>
+                                </td>
+                                <td>
+                                    {% if s.days_late %}
+                                        <span class="badge bg-warning text-dark">{{ s.days_late }}</span>
+                                    {% else %}
+                                        <span class="text-muted">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if s.overtime_minutes %}
+                                        <span class="badge bg-danger">{{ s.overtime_display }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-semibold">{{ s.total_display }}</td>
+                                <td class="text-muted">{{ s.avg_display }}</td>
+                                <td>
+                                    {% if s.days_present %}
+                                    {% widthratio s.on_time s.days_present 100 as pct %}
+                                    <span class="me-2" style="font-size:0.82rem;">{{ pct }}%</span>
+                                    <div class="progress-bar-wrap">
+                                        <div class="progress-bar-fill" style="width:{{ pct }}%;background:{% if pct|add:'0' >= 90 %}var(--success-color){% elif pct|add:'0' >= 70 %}var(--warning-color){% else %}var(--danger-color){% endif %};"></div>
+                                    </div>
+                                    {% else %}—{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox display-5 mb-2 d-block" style="opacity:0.3;"></i>
+                    <p class="mb-0">No attendance records found for this period.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Summary Table -->
+    <div id="tab-daily" class="rpt-section d-none">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
+                    <i class="bi bi-calendar-week me-2" style="color:var(--accent-color);"></i>
+                    Daily Attendance Summary
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                {% if daily_summary %}
+                <div class="table-responsive">
+                    <table class="table table-hover rpt-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Date</th>
+                                <th>Day</th>
+                                <th>Present</th>
+                                <th>Late</th>
+                                <th>Total Hours</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in daily_summary %}
+                            <tr {% if not d.present %}style="opacity:0.5;"{% endif %}>
+                                <td class="ps-4 fw-semibold">{{ d.date|date:"N j, Y" }}</td>
+                                <td class="text-muted">{{ d.date|date:"l" }}</td>
+                                <td>
+                                    {% if d.present %}
+                                        <span class="badge" style="background:rgba(39,174,96,0.15);color:var(--success-color);font-weight:700;">{{ d.present }}</span>
+                                    {% else %}
+                                        <span class="text-muted">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if d.late %}
+                                        <span class="badge bg-warning text-dark">{{ d.late }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-semibold">{{ d.total_display }}</td>
+                                <td>
+                                    {% if d.present %}
+                                    <a href="{% url 'attendance:day_detail' %}?date={{ d.date_str }}" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.78rem;">
+                                        <i class="bi bi-eye me-1"></i>View
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox display-5 mb-2 d-block" style="opacity:0.3;"></i>
+                    <p class="mb-0">No attendance records found for this period.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function() {
+    var tabs = document.querySelectorAll('#rptTabs .nav-link');
+    tabs.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var target = this.dataset.tab;
+            tabs.forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            document.querySelectorAll('.rpt-section').forEach(function(s) { s.classList.add('d-none'); });
+            var sec = document.getElementById('tab-' + target);
+            if (sec) sec.classList.remove('d-none');
+        });
+    });
+
+    function setLastNDays(n) {
+        var today = new Date();
+        var from = new Date(today);
+        from.setDate(from.getDate() - n + 1);
+        document.querySelector('[name=date_from]').value = from.toISOString().slice(0, 10);
+        document.querySelector('[name=date_to]').value = today.toISOString().slice(0, 10);
+        document.querySelector('[name=date_from]').closest('form').submit();
+    }
+    window.setLastNDays = setLastNDays;
+})();
+</script>
+{% endblock %}

@@ -144,16 +144,21 @@
                 <i class="bi bi-calendar3 me-2" style="color: var(--accent-color);"></i>Attendance Calendar
             </h4>
         </div>
-        <div class="cal-nav">
-            <a href="{% url 'attendance:calendar' %}?year={{ prev_year }}&month={{ prev_month }}"
-               title="Previous month">
-                <i class="bi bi-chevron-left"></i>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{% url 'attendance:reports' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-bar-chart-line me-1"></i>Reports
             </a>
-            <span class="cal-month-label">{{ month_name }}</span>
-            <a href="{% url 'attendance:calendar' %}?year={{ next_year }}&month={{ next_month }}"
-               title="Next month">
-                <i class="bi bi-chevron-right"></i>
-            </a>
+            <div class="cal-nav ms-2">
+                <a href="{% url 'attendance:calendar' %}?year={{ prev_year }}&month={{ prev_month }}"
+                   title="Previous month">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+                <span class="cal-month-label">{{ month_name }}</span>
+                <a href="{% url 'attendance:calendar' %}?year={{ next_year }}&month={{ next_month }}"
+                   title="Next month">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -179,8 +184,8 @@
                 {% for day in week %}
                 <div class="cal-day{% if not day.in_month %} out-of-month{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.in_month and day.total > 0 %} has-records{% endif %}"
                      {% if day.in_month and day.total > 0 %}
-                     onclick="loadDayRecords('{{ day.date|date:"Y-m-d" }}', '{{ day.date|date:"N j, Y" }}')"
-                     title="Click to view records"
+                     onclick="window.location='{% url 'attendance:day_detail' %}?date={{ day.date|date:"Y-m-d" }}'"
+                     title="View records for {{ day.date|date:"N j, Y" }}"
                      {% endif %}>
                     <div class="cal-date-num">{{ day.date.day }}</div>
                     {% if day.in_month and day.total > 0 %}
@@ -216,105 +221,4 @@
     </div>
 </div>
 
-<!-- Day Records Modal -->
-<div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom" style="background: var(--primary-color);">
-                <h5 class="modal-title text-white" id="dayModalLabel">
-                    <i class="bi bi-calendar-day me-2"></i>
-                    <span id="dayModalDate">Records</span>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0" id="dayModalBody">
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="text-muted mt-2 mb-0 small">Loading records…</p>
-                </div>
-            </div>
-            <div class="modal-footer border-top">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-const dayModal = new bootstrap.Modal(document.getElementById('dayModal'));
-const DAY_RECORDS_URL = "{% url 'attendance:day_records' %}";
-
-function loadDayRecords(dateStr, dateLabel) {
-    document.getElementById('dayModalDate').textContent = dateLabel;
-    document.getElementById('dayModalBody').innerHTML = `
-        <div class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="text-muted mt-2 mb-0 small">Loading records…</p>
-        </div>`;
-    dayModal.show();
-
-    fetch(DAY_RECORDS_URL + '?date=' + dateStr, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(function(res) {
-        if (!res.ok) throw new Error('Server error: ' + res.status);
-        return res.json();
-    })
-    .then(function(data) {
-        if (!data.records || data.records.length === 0) {
-            document.getElementById('dayModalBody').innerHTML =
-                '<div class="text-center text-muted py-4"><i class="bi bi-inbox display-6 d-block mb-2" style="opacity:0.3;"></i>No records for this day.</div>';
-            return;
-        }
-        let rows = data.records.map(function(r) {
-            const lateB = r.is_late
-                ? '<span class="badge bg-warning text-dark me-1">Late</span>'
-                : '<span class="badge bg-success me-1">On Time</span>';
-            const otB = r.is_overtime ? '<span class="badge bg-danger">OT</span>' : '';
-            const viaB = r.check_in_via === 'mobile'
-                ? '<span class="badge bg-primary">Mobile</span>'
-                : '<span class="badge bg-secondary">Web</span>';
-            return `<tr>
-                <td class="ps-3 fw-semibold">${escHtml(r.staff_name)}</td>
-                <td><span class="badge bg-light text-dark border">${escHtml(r.staff_role)}</span></td>
-                <td>${r.check_in || '—'}</td>
-                <td>${r.check_out || '—'}</td>
-                <td>${r.work_display || '—'}</td>
-                <td>${lateB}${otB}</td>
-                <td>${viaB}</td>
-            </tr>`;
-        }).join('');
-        document.getElementById('dayModalBody').innerHTML = `
-            <div class="table-responsive">
-                <table class="table table-hover day-records-table mb-0">
-                    <thead>
-                        <tr>
-                            <th class="ps-3">Name</th>
-                            <th>Role</th>
-                            <th>Check In</th>
-                            <th>Check Out</th>
-                            <th>Hours</th>
-                            <th>Status</th>
-                            <th>Via</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            </div>`;
-    })
-    .catch(function(err) {
-        document.getElementById('dayModalBody').innerHTML =
-            '<div class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle me-1"></i>Failed to load records. Please try again.</div>';
-    });
-}
-
-function escHtml(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-</script>
 {% endblock %}

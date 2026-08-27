@@ -2,8 +2,8 @@ import csv
 from io import BytesIO
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum
-from django.db.models.functions import Abs
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum, Value
+from django.db.models.functions import Abs, Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -62,12 +62,13 @@ def dashboard(request):
         # administrator sees everything
         items_qs = InventoryItem.objects.filter(is_active=True).select_related('owner')
 
-    # Annotate each item with current_stock (calling property in Python, not DB)
+    # Annotate current stock from records in a single query to avoid N+1
+    items_qs = items_qs.annotate(stock_total=Coalesce(Sum('records__quantity_change'), Value(0)))
     items_data = []
     low_stock_count = 0
     out_of_stock_count = 0
     for item in items_qs:
-        stock = item.current_stock
+        stock = item.stock_total
         is_low = item.is_low_stock
         is_out = item.is_out_of_stock
         if is_low:
@@ -263,7 +264,8 @@ def manage_items(request):
     if category_filter:
         qs = qs.filter(category__iexact=category_filter)
 
-    items_data = [{'item': item, 'stock': item.current_stock} for item in qs]
+    qs = qs.annotate(stock_total=Coalesce(Sum('records__quantity_change'), Value(0)))
+    items_data = [{'item': item, 'stock': item.stock_total} for item in qs]
 
     # Managed lists from InventoryCategory / InventoryUnit
     item_owner = owner if owner else request.user
@@ -521,11 +523,12 @@ def _get_item_for_user(item_id, owner, user):
     if not item_id:
         return None
     try:
+        item_id = int(item_id)
         if owner:
             return InventoryItem.objects.get(id=item_id, owner=owner)
         else:
             return InventoryItem.objects.get(id=item_id)
-    except InventoryItem.DoesNotExist:
+    except (InventoryItem.DoesNotExist, ValueError, TypeError):
         return None
 
 
@@ -795,16 +798,22 @@ def manage_settings(request):
         categories = InventoryCategory.objects.all().select_related('owner')
         units      = InventoryUnit.objects.all().select_related('owner')
 
-    # Annotate each with how many items use it
-    cat_data = []
-    for cat in categories:
-        count = InventoryItem.objects.filter(owner=item_owner, category=cat.name).count()
-        cat_data.append({'obj': cat, 'in_use': count})
+    # Bulk-aggregate item counts to avoid N+1 queries (2 queries total instead of N)
+    cat_counts = dict(
+        InventoryItem.objects.filter(owner=item_owner)
+        .values('category')
+        .annotate(n=Count('id'))
+        .values_list('category', 'n')
+    )
+    unit_counts = dict(
+        InventoryItem.objects.filter(owner=item_owner)
+        .values('unit')
+        .annotate(n=Count('id'))
+        .values_list('unit', 'n')
+    )
 
-    unit_data = []
-    for unit in units:
-        count = InventoryItem.objects.filter(owner=item_owner, unit=unit.name).count()
-        unit_data.append({'obj': unit, 'in_use': count})
+    cat_data = [{'obj': cat, 'in_use': cat_counts.get(cat.name, 0)} for cat in categories]
+    unit_data = [{'obj': unit, 'in_use': unit_counts.get(unit.name, 0)} for unit in units]
 
     restaurant_context = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
 

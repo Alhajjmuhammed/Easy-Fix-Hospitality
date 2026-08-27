@@ -25,7 +25,8 @@ export default function CartScreen({ navigation }) {
   const [removeId, setRemoveId] = useState(null);
 
   const subtotal = getSubtotal();
-  const taxRate = parseFloat(user?.tax_rate) || 0;   // stored as decimal fraction: 0.08 = 8%
+  // stored as decimal fraction: 0.08 = 8%; clamp to [0, 1] to guard against server data-entry errors
+  const taxRate = Math.min(1, Math.max(0, parseFloat(user?.tax_rate) || 0));
   const taxAmount = subtotal * taxRate;
   const finalTotal = subtotal + taxAmount;
 
@@ -156,6 +157,7 @@ export default function CartScreen({ navigation }) {
           <Dialog.Actions>
             <Button onPress={() => setRemoveId(null)}>Cancel</Button>
             <Button
+              textColor={theme.colors.error}
               onPress={() => {
                 removeItem(removeId);
                 setRemoveId(null);

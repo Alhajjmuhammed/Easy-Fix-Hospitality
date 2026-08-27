@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import {
   Text, Card, Button, TextInput, ActivityIndicator,
@@ -58,6 +58,9 @@ function ChipPicker({ items, selected, onSelect }) {
 export default function CashierWasteScreen() {
   const theme = useTheme();
 
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   // Products loaded from menu API
   const [products,        setProducts]        = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -82,10 +85,12 @@ export default function CashierWasteScreen() {
     (async () => {
       try {
         const net = await NetInfo.fetch();
+        if (!mountedRef.current) return;
         if (!net.isConnected) {
           setIsOffline(true);
           // Fall back to SQLite cached menu
           const cached = await getCategories();
+          if (!mountedRef.current) return;
           const flat = [];
           cached.forEach((cat) => {
             (cat.subcategories || []).forEach((sub) => {
@@ -97,6 +102,7 @@ export default function CashierWasteScreen() {
           return;
         }
         const data = await apiMenu();
+        if (!mountedRef.current) return;
         const flat = [];
         const categories = data || [];
         categories.forEach((cat) => {
@@ -109,8 +115,8 @@ export default function CashierWasteScreen() {
       } catch {
         // Network error — try SQLite cache
         try {
-          setIsOffline(true);
           const cached = await getCategories();
+          if (!mountedRef.current) return;
           const flat = [];
           cached.forEach((cat) => {
             (cat.subcategories || []).forEach((sub) => {
@@ -118,19 +124,27 @@ export default function CashierWasteScreen() {
             });
             (cat.products || []).forEach((p) => flat.push(p));
           });
-          setProducts(flat);
+          if (mountedRef.current) {
+            setIsOffline(true);
+            setProducts(flat);
+          }
         } catch {
-          setSnack('Could not load menu');
-          setSnackColor('#E53935');
+          if (mountedRef.current) {
+            setSnack('Could not load menu');
+            setSnackColor('#E53935');
+          }
         }
       } finally {
-        setLoadingProducts(false);
+        if (mountedRef.current) setLoadingProducts(false);
       }
     })();
   }, []);
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase())
+  const filteredProducts = useMemo(
+    () => products.filter((p) =>
+      (p.name || '').toLowerCase().includes(productSearch.toLowerCase())
+    ),
+    [products, productSearch]
   );
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -139,6 +153,7 @@ export default function CashierWasteScreen() {
     const qty = parseInt(quantity, 10);
     if (!qty || qty <= 0) { setSnack('Enter a valid quantity'); setSnackColor('#E53935'); return; }
     const net = await NetInfo.fetch();
+    if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to submit waste record'); setSnackColor('#E53935'); return; }
 
     setSubmitting(true);
@@ -150,6 +165,7 @@ export default function CashierWasteScreen() {
         disposal_method: disposalMethod,
         notes:           notes.trim(),
       });
+      if (!mountedRef.current) return;
       setSnack('Waste record saved');
       setSnackColor('#2E7D32');
       // Reset form
@@ -160,10 +176,12 @@ export default function CashierWasteScreen() {
       setDisposalMethod('waste_bin');
       setNotes('');
     } catch (err) {
-      setSnack(err.response?.data?.error || 'Could not save waste record');
-      setSnackColor('#E53935');
+      if (mountedRef.current) {
+        setSnack(err.response?.data?.error || 'Could not save waste record');
+        setSnackColor('#E53935');
+      }
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) setSubmitting(false);
     }
   };
 

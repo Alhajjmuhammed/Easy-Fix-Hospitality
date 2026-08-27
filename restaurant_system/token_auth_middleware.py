@@ -30,10 +30,16 @@ from django.contrib.auth.models import AnonymousUser
 
 @database_sync_to_async
 def _get_user_from_token(token_key: str):
-    """Return the user for the given DRF token key, or AnonymousUser."""
+    from rest_framework.authtoken.models import Token
+    from django.utils import timezone
+    from datetime import timedelta
+    TOKEN_EXPIRY_DAYS = 15
     try:
-        from rest_framework.authtoken.models import Token
         token = Token.objects.select_related('user').get(key=token_key)
+        if not token.user.is_active:
+            return AnonymousUser()
+        if timezone.now() > token.created + timedelta(days=TOKEN_EXPIRY_DAYS):
+            return AnonymousUser()
         return token.user
     except Exception:
         return AnonymousUser()
