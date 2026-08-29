@@ -567,9 +567,9 @@ def attendance_day_detail(request):
     total_work_display = f"{th}h {tm}m" if th else (f"{tm}m" if tm else '—')
 
     absent_staff = []
-    if day == today:
+    if not day > today:
         staff_ids_present = AttendanceRecord.objects.filter(
-            owner=owner, date=today, check_in__isnull=False
+            owner=owner, date=day, check_in__isnull=False
         ).values_list('staff_id', flat=True)
         absent_qs = User.objects.filter(
             owner=owner, is_active=True, is_active_staff=True

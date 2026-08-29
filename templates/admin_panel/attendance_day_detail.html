@@ -3,200 +3,531 @@
 {% block title %}Attendance — {{ day_label }}{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap">
 <style>
-    .day-stat-card {
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-        overflow: hidden;
+:root {
+    --dd-bg:        #f5f6fa;
+    --dd-surface:   #ffffff;
+    --dd-border:    #e4e6ed;
+    --dd-text:      #1a1d2e;
+    --dd-muted:     #6b7280;
+    --dd-muted2:    #9ca3af;
+    --dd-green:     #16a34a;
+    --dd-green-bg:  #dcfce7;
+    --dd-amber:     #d97706;
+    --dd-amber-bg:  #fef3c7;
+    --dd-red:       #dc2626;
+    --dd-red-bg:    #fee2e2;
+    --dd-blue:      #2563eb;
+    --dd-blue-bg:   #dbeafe;
+    --dd-purple:    #7c3aed;
+    --dd-purple-bg: #ede9fe;
+    --dd-nav-bg:    #ffffff;
+    --dd-row-hover: #f8f9ff;
+    --dd-absent-bg: #fff9f9;
+    --dd-shadow:    0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+    --dd-shadow-md: 0 4px 12px rgba(0,0,0,.08);
+    --dd-radius:    10px;
+    --dd-font:      'DM Sans', system-ui, sans-serif;
+    --dd-mono:      'DM Mono', 'Menlo', monospace;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --dd-bg:        #0f1117;
+        --dd-surface:   #1a1d2e;
+        --dd-border:    #2d3148;
+        --dd-text:      #e8eaf2;
+        --dd-muted:     #8b91a8;
+        --dd-muted2:    #5a6078;
+        --dd-green-bg:  rgba(22,163,74,.18);
+        --dd-amber-bg:  rgba(217,119,6,.18);
+        --dd-red-bg:    rgba(220,38,38,.18);
+        --dd-blue-bg:   rgba(37,99,235,.18);
+        --dd-purple-bg: rgba(124,58,237,.18);
+        --dd-nav-bg:    #1a1d2e;
+        --dd-row-hover: #1e2135;
+        --dd-absent-bg: rgba(220,38,38,.05);
+        --dd-shadow:    0 1px 3px rgba(0,0,0,.3);
+        --dd-shadow-md: 0 4px 12px rgba(0,0,0,.3);
     }
-    .stat-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.3rem;
-        flex-shrink: 0;
-    }
-    .stat-number {
-        font-size: 1.8rem;
-        font-weight: 700;
-        line-height: 1;
-    }
-    .stat-label {
-        font-size: 0.78rem;
-        color: #6c757d;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-    .day-nav-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 0.35rem 0.75rem;
-        border-radius: 8px;
-        border: 1.5px solid #dee2e6;
-        background: #fff;
-        color: #495057;
-        text-decoration: none;
-        font-size: 0.85rem;
-        transition: all 0.15s;
-    }
-    .day-nav-btn:hover {
-        border-color: var(--accent-color);
-        color: var(--accent-color);
-        background: rgba(52,152,219,0.05);
-    }
-    .attendance-table th {
-        background: #f8f9fa;
-        font-size: 0.78rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: #6c757d;
-        border-top: none;
-    }
-    .attendance-table td {
-        vertical-align: middle;
-        font-size: 0.9rem;
-    }
-    .absent-avatar {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        background: #f0f0f0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: 0.82rem;
-        color: #6c757d;
-        flex-shrink: 0;
-    }
+}
+:root[data-theme="dark"] {
+    --dd-bg:        #0f1117;
+    --dd-surface:   #1a1d2e;
+    --dd-border:    #2d3148;
+    --dd-text:      #e8eaf2;
+    --dd-muted:     #8b91a8;
+    --dd-muted2:    #5a6078;
+    --dd-green-bg:  rgba(22,163,74,.18);
+    --dd-amber-bg:  rgba(217,119,6,.18);
+    --dd-red-bg:    rgba(220,38,38,.18);
+    --dd-blue-bg:   rgba(37,99,235,.18);
+    --dd-purple-bg: rgba(124,58,237,.18);
+    --dd-nav-bg:    #1a1d2e;
+    --dd-row-hover: #1e2135;
+    --dd-absent-bg: rgba(220,38,38,.05);
+    --dd-shadow:    0 1px 3px rgba(0,0,0,.3);
+    --dd-shadow-md: 0 4px 12px rgba(0,0,0,.3);
+}
+
+.dd-wrap { font-family: var(--dd-font); color: var(--dd-text); }
+
+/* ── Header ─────────────────────────────────────────────── */
+.dd-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0 0 1.5rem;
+}
+.dd-back {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .82rem;
+    font-weight: 500;
+    color: var(--dd-muted);
+    text-decoration: none;
+    margin-bottom: .3rem;
+}
+.dd-back:hover { color: var(--dd-blue); }
+.dd-date-label {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.1;
+    color: var(--dd-text);
+    text-wrap: balance;
+}
+.dd-today-badge {
+    display: inline-block;
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: .15rem .55rem;
+    border-radius: 99px;
+    background: var(--dd-blue);
+    color: #fff;
+    vertical-align: middle;
+    margin-left: .5rem;
+    position: relative;
+    top: -2px;
+}
+.dd-nav {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-shrink: 0;
+}
+.dd-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .45rem .9rem;
+    font-family: var(--dd-font);
+    font-size: .82rem;
+    font-weight: 600;
+    border: 1.5px solid var(--dd-border);
+    border-radius: 8px;
+    background: var(--dd-surface);
+    color: var(--dd-text);
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color .15s, background .15s, color .15s, box-shadow .15s;
+    box-shadow: var(--dd-shadow);
+}
+.dd-nav-btn:hover { border-color: var(--dd-blue); color: var(--dd-blue); background: var(--dd-blue-bg); }
+.dd-nav-btn.disabled {
+    opacity: .35;
+    pointer-events: none;
+    cursor: default;
+}
+
+/* ── Stat cards ──────────────────────────────────────────── */
+.dd-stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+}
+@media (max-width: 900px) { .dd-stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .dd-stats { grid-template-columns: repeat(2, 1fr); } }
+
+.dd-stat {
+    background: var(--dd-surface);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    box-shadow: var(--dd-shadow);
+    padding: 1rem 1rem .85rem;
+    position: relative;
+    overflow: hidden;
+}
+.dd-stat::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 99px 99px 0 0;
+}
+.dd-stat--blue::before   { background: var(--dd-blue); }
+.dd-stat--green::before  { background: var(--dd-green); }
+.dd-stat--amber::before  { background: var(--dd-amber); }
+.dd-stat--red::before    { background: var(--dd-red); }
+.dd-stat--purple::before { background: var(--dd-purple); }
+
+.dd-stat-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    margin-bottom: .6rem;
+}
+.dd-stat--blue   .dd-stat-icon { background: var(--dd-blue-bg);   color: var(--dd-blue); }
+.dd-stat--green  .dd-stat-icon { background: var(--dd-green-bg);  color: var(--dd-green); }
+.dd-stat--amber  .dd-stat-icon { background: var(--dd-amber-bg);  color: var(--dd-amber); }
+.dd-stat--red    .dd-stat-icon { background: var(--dd-red-bg);    color: var(--dd-red); }
+.dd-stat--purple .dd-stat-icon { background: var(--dd-purple-bg); color: var(--dd-purple); }
+
+.dd-stat-val {
+    font-size: 1.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--dd-text);
+    font-family: var(--dd-font);
+}
+.dd-stat--purple .dd-stat-val { font-size: 1.3rem; font-family: var(--dd-mono); }
+.dd-stat-lbl {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--dd-muted);
+    margin-top: .2rem;
+}
+
+/* ── Main layout ─────────────────────────────────────────── */
+.dd-body {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1.25rem;
+    align-items: start;
+}
+@media (max-width: 960px) { .dd-body { grid-template-columns: 1fr; } }
+
+/* ── Records panel ───────────────────────────────────────── */
+.dd-panel {
+    background: var(--dd-surface);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    box-shadow: var(--dd-shadow);
+    overflow: hidden;
+}
+.dd-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .9rem 1.25rem;
+    border-bottom: 1px solid var(--dd-border);
+}
+.dd-panel-title {
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--dd-text);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.dd-count-badge {
+    font-size: .72rem;
+    font-weight: 700;
+    padding: .1rem .45rem;
+    border-radius: 99px;
+    background: var(--dd-border);
+    color: var(--dd-muted);
+    font-family: var(--dd-mono);
+}
+
+/* ── Records table ───────────────────────────────────────── */
+.dd-table-wrap { overflow-x: auto; }
+.dd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .855rem;
+}
+.dd-table thead th {
+    background: var(--dd-bg);
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--dd-muted);
+    padding: .55rem 1rem;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--dd-border);
+}
+.dd-table thead th:first-child { padding-left: 1.25rem; }
+.dd-table tbody tr {
+    border-bottom: 1px solid var(--dd-border);
+    transition: background .12s;
+}
+.dd-table tbody tr:last-child { border-bottom: none; }
+.dd-table tbody tr:hover { background: var(--dd-row-hover); }
+.dd-table td {
+    padding: .75rem 1rem;
+    vertical-align: middle;
+    color: var(--dd-text);
+}
+.dd-table td:first-child { padding-left: 1.25rem; }
+
+.dd-staff-cell {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+}
+.dd-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--dd-blue-bg);
+    color: var(--dd-blue);
+    font-size: .78rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: 0;
+}
+.dd-staff-name {
+    font-weight: 600;
+    font-size: .875rem;
+    line-height: 1.2;
+}
+.dd-role-chip {
+    display: inline-block;
+    font-size: .68rem;
+    font-weight: 600;
+    padding: .1rem .4rem;
+    border-radius: 4px;
+    border: 1px solid var(--dd-border);
+    color: var(--dd-muted);
+    background: var(--dd-bg);
+    letter-spacing: .02em;
+    margin-top: .15rem;
+}
+.dd-time {
+    font-family: var(--dd-mono);
+    font-size: .855rem;
+    font-weight: 500;
+    color: var(--dd-text);
+}
+.dd-time--muted { color: var(--dd-muted2); font-style: italic; font-family: var(--dd-font); font-size: .8rem; }
+
+.dd-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .28rem;
+    font-size: .75rem;
+    font-weight: 600;
+    padding: .22rem .6rem;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+.dd-pill-green  { background: var(--dd-green-bg);  color: var(--dd-green); }
+.dd-pill-amber  { background: var(--dd-amber-bg);  color: var(--dd-amber); }
+.dd-pill-red    { background: var(--dd-red-bg);    color: var(--dd-red); }
+.dd-pill-blue   { background: var(--dd-blue-bg);   color: var(--dd-blue); }
+.dd-pill-purple { background: var(--dd-purple-bg); color: var(--dd-purple); }
+
+.dd-via-badge {
+    font-size: .72rem;
+    font-weight: 600;
+    padding: .18rem .5rem;
+    border-radius: 6px;
+    letter-spacing: .02em;
+}
+.dd-via-mobile  { background: var(--dd-blue-bg);  color: var(--dd-blue); }
+.dd-via-web     { background: var(--dd-border);    color: var(--dd-muted); }
+
+.dd-hours-cell { font-family: var(--dd-mono); font-size: .82rem; color: var(--dd-muted); }
+
+.dd-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--dd-muted);
+}
+.dd-empty i { font-size: 2rem; opacity: .3; display: block; margin-bottom: .75rem; }
+.dd-empty p { font-size: .9rem; margin: 0; }
+
+/* ── Absent sidebar ──────────────────────────────────────── */
+.dd-absent-panel {
+    background: var(--dd-surface);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    box-shadow: var(--dd-shadow);
+    overflow: hidden;
+}
+.dd-absent-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .9rem 1.1rem;
+    border-bottom: 1px solid var(--dd-border);
+    background: var(--dd-absent-bg);
+}
+.dd-absent-title {
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--dd-red);
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+.dd-absent-badge {
+    font-size: .72rem;
+    font-weight: 700;
+    padding: .1rem .45rem;
+    border-radius: 99px;
+    background: var(--dd-red-bg);
+    color: var(--dd-red);
+    font-family: var(--dd-mono);
+}
+.dd-absent-list { padding: .5rem .75rem; }
+.dd-absent-item {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    padding: .55rem .35rem;
+    border-bottom: 1px solid var(--dd-border);
+}
+.dd-absent-item:last-child { border-bottom: none; }
+.dd-absent-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--dd-red-bg);
+    color: var(--dd-red);
+    font-size: .75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.dd-absent-name {
+    font-size: .855rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--dd-text);
+}
+.dd-absent-role {
+    font-size: .72rem;
+    color: var(--dd-muted);
+    margin-top: .1rem;
+}
+.dd-all-present {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--dd-green);
+}
+.dd-all-present i { font-size: 1.8rem; display: block; margin-bottom: .5rem; }
+.dd-all-present p { font-size: .83rem; font-weight: 600; margin: 0; color: var(--dd-muted); }
+
+/* ── Future state ────────────────────────────────────────── */
+.dd-future-panel {
+    background: var(--dd-surface);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    color: var(--dd-muted);
+}
+.dd-future-panel i { font-size: 2rem; opacity: .3; display: block; margin-bottom: .75rem; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="content-header">
-    <div class="d-flex align-items-start align-items-sm-center justify-content-between flex-wrap gap-2">
+<div class="dd-wrap">
+
+    <!-- Header -->
+    <div class="dd-header">
         <div>
-            <div class="mb-1">
-                <a href="{% url 'attendance:calendar' %}" class="text-decoration-none text-muted small me-2">
-                    <i class="bi bi-arrow-left me-1"></i>Calendar
-                </a>
-            </div>
-            <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
-                <i class="bi bi-calendar-day me-2" style="color: var(--accent-color);"></i>
+            <a href="{% url 'attendance:calendar' %}" class="dd-back">
+                <i class="bi bi-arrow-left"></i> Calendar
+            </a>
+            <div class="dd-date-label">
                 {{ day_label }}
-                {% if is_today %}<span class="badge ms-2" style="background:var(--accent-color);font-size:0.65rem;vertical-align:middle;">Today</span>{% endif %}
-            </h4>
+                {% if is_today %}<span class="dd-today-badge">Today</span>{% endif %}
+            </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <a href="{% url 'attendance:day_detail' %}?date={{ prev_day }}" class="day-nav-btn">
+        <div class="dd-nav">
+            <a href="{% url 'attendance:day_detail' %}?date={{ prev_day }}" class="dd-nav-btn">
                 <i class="bi bi-chevron-left"></i> Prev
             </a>
             {% if not is_today and not is_future %}
-            <a href="{% url 'attendance:day_detail' %}?date={{ next_day }}" class="day-nav-btn">
-                Next <i class="bi bi-chevron-right"></i>
-            </a>
+                <a href="{% url 'attendance:day_detail' %}?date={{ next_day }}" class="dd-nav-btn">
+                    Next <i class="bi bi-chevron-right"></i>
+                </a>
             {% elif not is_future %}
-            <span class="day-nav-btn" style="opacity:0.4;cursor:default;">Next <i class="bi bi-chevron-right"></i></span>
+                <span class="dd-nav-btn disabled">Next <i class="bi bi-chevron-right"></i></span>
             {% endif %}
         </div>
     </div>
-</div>
 
-<div class="content-wrapper">
-
-    <!-- Stats -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-sm-4 col-lg-2">
-            <div class="card day-stat-card h-100">
-                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
-                    <div class="stat-icon" style="background:rgba(52,152,219,0.12);color:var(--accent-color);">
-                        <i class="bi bi-box-arrow-in-right"></i>
-                    </div>
-                    <div>
-                        <div class="stat-number" style="color:var(--accent-color);">{{ checked_in_count }}</div>
-                        <div class="stat-label">Checked In</div>
-                    </div>
-                </div>
-            </div>
+    <!-- Stat strip -->
+    <div class="dd-stats">
+        <div class="dd-stat dd-stat--blue">
+            <div class="dd-stat-icon"><i class="bi bi-box-arrow-in-right"></i></div>
+            <div class="dd-stat-val">{{ checked_in_count }}</div>
+            <div class="dd-stat-lbl">Checked In</div>
         </div>
-        <div class="col-6 col-sm-4 col-lg-2">
-            <div class="card day-stat-card h-100">
-                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
-                    <div class="stat-icon" style="background:rgba(39,174,96,0.12);color:var(--success-color);">
-                        <i class="bi bi-box-arrow-right"></i>
-                    </div>
-                    <div>
-                        <div class="stat-number" style="color:var(--success-color);">{{ checked_out_count }}</div>
-                        <div class="stat-label">Checked Out</div>
-                    </div>
-                </div>
-            </div>
+        <div class="dd-stat dd-stat--green">
+            <div class="dd-stat-icon"><i class="bi bi-box-arrow-right"></i></div>
+            <div class="dd-stat-val">{{ checked_out_count }}</div>
+            <div class="dd-stat-lbl">Checked Out</div>
         </div>
-        <div class="col-6 col-sm-4 col-lg-2">
-            <div class="card day-stat-card h-100">
-                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
-                    <div class="stat-icon" style="background:rgba(243,156,18,0.12);color:var(--warning-color);">
-                        <i class="bi bi-alarm"></i>
-                    </div>
-                    <div>
-                        <div class="stat-number" style="color:var(--warning-color);">{{ late_count }}</div>
-                        <div class="stat-label">Late</div>
-                    </div>
-                </div>
-            </div>
+        <div class="dd-stat dd-stat--amber">
+            <div class="dd-stat-icon"><i class="bi bi-alarm"></i></div>
+            <div class="dd-stat-val">{{ late_count }}</div>
+            <div class="dd-stat-lbl">Late</div>
         </div>
-        <div class="col-6 col-sm-4 col-lg-2">
-            <div class="card day-stat-card h-100">
-                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
-                    <div class="stat-icon" style="background:rgba(231,76,60,0.12);color:var(--danger-color);">
-                        <i class="bi bi-lightning"></i>
-                    </div>
-                    <div>
-                        <div class="stat-number" style="color:var(--danger-color);">{{ overtime_count }}</div>
-                        <div class="stat-label">Overtime</div>
-                    </div>
-                </div>
-            </div>
+        <div class="dd-stat dd-stat--red">
+            <div class="dd-stat-icon"><i class="bi bi-lightning-charge"></i></div>
+            <div class="dd-stat-val">{{ overtime_count }}</div>
+            <div class="dd-stat-lbl">Overtime</div>
         </div>
-        <div class="col-12 col-sm-4 col-lg-4">
-            <div class="card day-stat-card h-100">
-                <div class="card-body d-flex align-items-center gap-3 py-3 px-3">
-                    <div class="stat-icon" style="background:rgba(155,89,182,0.12);color:#9b59b6;">
-                        <i class="bi bi-clock-history"></i>
-                    </div>
-                    <div>
-                        <div class="stat-number" style="color:#9b59b6;font-size:1.4rem;">{{ total_work_display }}</div>
-                        <div class="stat-label">Total Hours Worked</div>
-                    </div>
-                </div>
-            </div>
+        <div class="dd-stat dd-stat--purple">
+            <div class="dd-stat-icon"><i class="bi bi-clock-history"></i></div>
+            <div class="dd-stat-val">{{ total_work_display }}</div>
+            <div class="dd-stat-lbl">Hours Worked</div>
         </div>
     </div>
 
-    <!-- Records Table -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white border-bottom py-3">
-            <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
-                <i class="bi bi-people me-2" style="color:var(--accent-color);"></i>
-                Attendance Records
-                <span class="badge bg-secondary ms-2" style="font-size:0.75rem;">{{ records|length }}</span>
-            </h6>
-        </div>
-        <div class="card-body p-0">
+    <!-- Body: records + absent sidebar -->
+    <div class="dd-body">
+
+        <!-- Attendance Records -->
+        <div class="dd-panel">
+            <div class="dd-panel-head">
+                <div class="dd-panel-title">
+                    <i class="bi bi-people" style="color:var(--dd-blue);"></i>
+                    Attendance Records
+                    <span class="dd-count-badge">{{ records|length }}</span>
+                </div>
+            </div>
             {% if records %}
-            <div class="table-responsive">
-                <table class="table table-hover attendance-table mb-0">
+            <div class="dd-table-wrap">
+                <table class="dd-table">
                     <thead>
                         <tr>
-                            <th class="ps-4">Staff Name</th>
-                            <th>Role</th>
+                            <th>Staff</th>
                             <th>Shift</th>
                             <th>Check In</th>
                             <th>Check Out</th>
@@ -208,46 +539,61 @@
                     <tbody>
                         {% for rec in records %}
                         <tr>
-                            <td class="ps-4 fw-semibold">{{ rec.staff_name }}</td>
-                            <td><span class="badge bg-light text-dark border">{{ rec.staff_role }}</span></td>
-                            <td><span class="text-muted small">{{ rec.shift_name }}</span></td>
+                            <td>
+                                <div class="dd-staff-cell">
+                                    <div class="dd-avatar">{{ rec.staff_name|slice:":1"|upper }}</div>
+                                    <div>
+                                        <div class="dd-staff-name">{{ rec.staff_name }}</div>
+                                        <div><span class="dd-role-chip">{{ rec.staff_role }}</span></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if rec.shift_name %}
+                                    <span style="font-size:.82rem;color:var(--dd-muted);">{{ rec.shift_name }}</span>
+                                {% else %}
+                                    <span style="color:var(--dd-muted2);">—</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if rec.check_in != '—' %}
-                                    <span class="fw-semibold">{{ rec.check_in }}</span>
+                                    <span class="dd-time">{{ rec.check_in }}</span>
                                 {% else %}
-                                    <span class="text-muted">—</span>
+                                    <span class="dd-time--muted">—</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if rec.check_out != '—' %}
-                                    <span class="fw-semibold">{{ rec.check_out }}</span>
+                                    <span class="dd-time">{{ rec.check_out }}</span>
                                 {% else %}
-                                    <span class="text-muted small fst-italic">Still in</span>
+                                    <span class="dd-time--muted">Still in</span>
                                 {% endif %}
                             </td>
-                            <td>{{ rec.work_display }}</td>
+                            <td class="dd-hours-cell">{{ rec.work_display }}</td>
                             <td>
-                                {% if rec.is_late %}
-                                    <span class="badge bg-warning text-dark me-1">
-                                        <i class="bi bi-clock-history me-1"></i>Late
-                                        {% if rec.late_minutes %}(+{{ rec.late_minutes }}m){% endif %}
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-success me-1">
-                                        <i class="bi bi-check-circle me-1"></i>On Time
-                                    </span>
-                                {% endif %}
-                                {% if rec.is_overtime %}
-                                    <span class="badge bg-danger">
-                                        <i class="bi bi-lightning me-1"></i>OT +{{ rec.overtime_minutes }}m
-                                    </span>
-                                {% endif %}
+                                <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+                                    {% if rec.is_late %}
+                                        <span class="dd-status-pill dd-pill-amber">
+                                            <i class="bi bi-clock-history"></i>
+                                            Late{% if rec.late_minutes %} +{{ rec.late_minutes }}m{% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="dd-status-pill dd-pill-green">
+                                            <i class="bi bi-check-circle"></i> On Time
+                                        </span>
+                                    {% endif %}
+                                    {% if rec.is_overtime %}
+                                        <span class="dd-status-pill dd-pill-purple">
+                                            <i class="bi bi-lightning-charge"></i> OT +{{ rec.overtime_minutes }}m
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
                                 {% if rec.check_in_via == 'mobile' %}
-                                    <span class="badge bg-primary"><i class="bi bi-phone me-1"></i>Mobile</span>
+                                    <span class="dd-via-badge dd-via-mobile"><i class="bi bi-phone me-1"></i>Mobile</span>
                                 {% else %}
-                                    <span class="badge bg-secondary"><i class="bi bi-globe me-1"></i>Web</span>
+                                    <span class="dd-via-badge dd-via-web"><i class="bi bi-globe me-1"></i>Web</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -256,47 +602,53 @@
                 </table>
             </div>
             {% else %}
-            <div class="text-center py-5 text-muted">
-                <i class="bi bi-calendar-x display-5 mb-2 d-block" style="opacity:0.3;"></i>
-                <p class="mb-0">No attendance records for this day.</p>
+            <div class="dd-empty">
+                <i class="bi bi-calendar-x"></i>
+                <p>No attendance records for this day.</p>
             </div>
             {% endif %}
         </div>
-    </div>
 
-    {% if is_today and absent_staff %}
-    <!-- Not Yet Checked In (today only) -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white border-bottom py-3">
-            <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
-                <i class="bi bi-person-x me-2" style="color:var(--danger-color);"></i>
-                Not Yet Checked In
-                <span class="badge ms-2" style="background:var(--danger-color);font-size:0.75rem;">{{ absent_staff|length }}</span>
-            </h6>
-        </div>
-        <div class="card-body">
-            <div class="row g-2">
+        <!-- Absent / Not checked in sidebar -->
+        {% if not is_future %}
+        <div class="dd-absent-panel">
+            <div class="dd-absent-head">
+                <div class="dd-absent-title">
+                    <i class="bi bi-person-x"></i>
+                    {% if is_today %}Not Yet In{% else %}Did Not Attend{% endif %}
+                </div>
+                {% if absent_staff %}
+                    <span class="dd-absent-badge">{{ absent_staff|length }}</span>
+                {% endif %}
+            </div>
+            {% if absent_staff %}
+            <div class="dd-absent-list">
                 {% for staff in absent_staff %}
-                <div class="col-12 col-md-6 col-xl-4">
-                    <div class="d-flex align-items-center gap-3 py-2 border-bottom">
-                        <div class="absent-avatar">
-                            {{ staff.get_full_name|default:staff.username|slice:":1"|upper }}
-                        </div>
-                        <div>
-                            <div class="fw-semibold" style="font-size:0.9rem;">
-                                {{ staff.get_full_name|default:staff.username }}
-                            </div>
-                            <div class="text-muted" style="font-size:0.78rem;">
-                                {% if staff.role %}{{ staff.role.name }}{% else %}Staff{% endif %}
-                            </div>
-                        </div>
+                <div class="dd-absent-item">
+                    <div class="dd-absent-avatar">
+                        {{ staff.get_full_name|default:staff.username|slice:":1"|upper }}
+                    </div>
+                    <div>
+                        <div class="dd-absent-name">{{ staff.get_full_name|default:staff.username }}</div>
+                        <div class="dd-absent-role">{% if staff.role %}{{ staff.role.name }}{% else %}Staff{% endif %}</div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
+            {% else %}
+            <div class="dd-all-present">
+                <i class="bi bi-patch-check-fill"></i>
+                <p>All staff attended</p>
+            </div>
+            {% endif %}
         </div>
-    </div>
-    {% endif %}
+        {% else %}
+        <div class="dd-future-panel">
+            <i class="bi bi-calendar-event"></i>
+            <p style="font-size:.88rem;margin:0;">This day hasn't happened yet.</p>
+        </div>
+        {% endif %}
 
-</div>
+    </div><!-- /.dd-body -->
+</div><!-- /.dd-wrap -->
 {% endblock %}
