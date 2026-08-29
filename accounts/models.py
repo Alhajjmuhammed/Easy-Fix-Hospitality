@@ -666,7 +666,8 @@ class RestaurantSubscription(models.Model):
     def block_restaurant(self, reason="Blocked by administrator", blocked_by=None):
         """Block restaurant access"""
         with transaction.atomic():
-            old_status = self.subscription_status
+            locked = self.__class__.objects.select_for_update(of=('self',)).get(pk=self.pk)
+            old_status = locked.subscription_status
             self.is_blocked_by_admin = True
             self.block_reason = reason
             self.subscription_status = 'blocked'
@@ -679,7 +680,7 @@ class RestaurantSubscription(models.Model):
             staff_users = self.restaurant_owner.owned_users.all()
             staff_users.update(is_active=False)
 
-            self.save()
+            self.save(update_fields=['is_blocked_by_admin', 'block_reason', 'subscription_status'])
 
             # Log the action
             SubscriptionLog.objects.create(
@@ -694,14 +695,17 @@ class RestaurantSubscription(models.Model):
     def unblock_restaurant(self, unblocked_by=None):
         """Unblock restaurant access"""
         with transaction.atomic():
-            old_status = self.subscription_status
+            locked = self.__class__.objects.select_for_update(of=('self',)).get(pk=self.pk)
+            old_status = locked.subscription_status
 
             self.is_blocked_by_admin = False
             self.block_reason = ""
 
-            # Admin can unblock regardless of subscription period validity
-            # If subscription period is valid, make it active; otherwise keep current status
-            if self.is_subscription_period_valid():
+            # Admin can unblock regardless of subscription period validity.
+            # Use the locked (fresh) date fields for the validity decision.
+            today = date.today()
+            grace_end = locked.subscription_end_date + timedelta(days=locked.grace_period_days)
+            if locked.subscription_start_date <= today <= grace_end:
                 self.subscription_status = 'active'
 
             # Always reactivate users when admin unblocks (admin override)
@@ -713,7 +717,7 @@ class RestaurantSubscription(models.Model):
             staff_users = self.restaurant_owner.owned_users.all()
             staff_users.update(is_active=True)
 
-            self.save()
+            self.save(update_fields=['is_blocked_by_admin', 'block_reason', 'subscription_status'])
 
             # Log the action
             SubscriptionLog.objects.create(
@@ -738,7 +742,7 @@ class RestaurantSubscription(models.Model):
     def update_subscription_status(self):
         """Update subscription status based on current date"""
         with transaction.atomic():
-            locked = self.__class__.objects.select_for_update(of=('self',)).get(pk=self.pk)
+            locked = self.__class__.objects.select_for_update(of=('self',)).select_related('restaurant_owner').get(pk=self.pk)
             today = date.today()
             old_status = locked.subscription_status
 
@@ -770,7 +774,7 @@ class RestaurantSubscription(models.Model):
                     staff_users = self.restaurant_owner.owned_users.all()
                     staff_users.update(is_active=False)
 
-                    self.save()
+                    self.save(update_fields=['subscription_status'])
 
                     # Log the expiration
                     SubscriptionLog.objects.create(
