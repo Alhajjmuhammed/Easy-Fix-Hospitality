@@ -91,7 +91,7 @@ def _create_bill_request(request):
     # from two simultaneous POST requests from the same table.
     from django.db import transaction as _tx
     with _tx.atomic():
-        existing = BillRequest.objects.select_for_update().filter(table_info=table, status='pending').first()
+        existing = BillRequest.objects.select_for_update(of=('self',)).filter(table_info=table, status='pending').first()
         if existing:
             return Response(
                 {
@@ -132,7 +132,7 @@ def complete_bill_request(request, request_id):
     from django.db import transaction as _tx2
     br = get_object_or_404(BillRequest.objects.filter(_tq).distinct(), id=request_id)
     with _tx2.atomic():
-        br = BillRequest.objects.select_for_update().get(pk=br.pk)
+        br = BillRequest.objects.select_for_update(of=('self',)).get(pk=br.pk)
         if br.status == 'completed':
             return Response({'message': 'Already completed.'})
         br.status = 'completed'

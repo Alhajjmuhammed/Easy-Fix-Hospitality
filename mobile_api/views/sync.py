@@ -265,7 +265,7 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
 
     # Find the target order — must belong to this restaurant.
     # Q(ordered_by__owner=owner) covers delivery/pickup orders where table_info is None.
-    order = Order.objects.select_for_update().filter(
+    order = Order.objects.select_for_update(of=('self',)).filter(
         Q(ordered_by__owner=owner) | Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner),
@@ -394,7 +394,7 @@ def _sync_payment(user, owner, data):
     with transaction.atomic():
         # Lock the order row first, then dedup-check — this serialises concurrent
         # sync pushes so only one can create a payment for a given offline_id.
-        order = Order.objects.select_for_update().get(pk=order.pk)
+        order = Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
         if offline_id:
             existing = Payment.objects.filter(notes__contains=f'[offline:{offline_id}]', processed_by=user).first()
             if existing:
@@ -462,7 +462,7 @@ def _sync_bill_request(user, owner, data):
     # syncs from the same table cannot both pass the exists() check.
     from django.db import transaction as _tx
     with _tx.atomic():
-        existing = BillRequest.objects.select_for_update().filter(table_info=table, status='pending').first()
+        existing = BillRequest.objects.select_for_update(of=('self',)).filter(table_info=table, status='pending').first()
         if existing:
             return {'status': 'duplicate', 'bill_request_id': existing.id}
         br = BillRequest.objects.create(table_info=table, requested_by=user, status='pending')

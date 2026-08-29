@@ -1916,9 +1916,9 @@ def update_order_status(request, order_id):
                 Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
                 Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
-            order = get_object_or_404(Order.objects.select_for_update().filter(_oq_uos3), id=order_id)
+            order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_uos3), id=order_id)
         else:
-            order = get_object_or_404(Order.objects.select_for_update(), id=order_id)
+            order = get_object_or_404(Order.objects.select_for_update(of=('self',)), id=order_id)
         
         # Load order items once — avoids up to 4 separate queries for station checks
         _order_items = list(order.order_items.select_related('product').all())
@@ -2145,7 +2145,7 @@ def cancel_order(request, order_id):
                     for item in order.order_items.select_related('product').all():
                         product = item.product
                         if product and product.available_in_stock is not None:
-                            product = Product.objects.select_for_update().get(pk=product.pk)
+                            product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
                             product.available_in_stock += item.quantity
                             product.save(update_fields=['available_in_stock'])
 
@@ -2173,7 +2173,7 @@ def cancel_order(request, order_id):
                 for item in order.order_items.select_related('product').all():
                     product = item.product
                     if product and product.available_in_stock is not None:
-                        product = Product.objects.select_for_update().get(pk=product.pk)
+                        product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
                         product.available_in_stock += item.quantity
                         product.save(update_fields=['available_in_stock'])
                 
@@ -2242,7 +2242,7 @@ def customer_cancel_order(request, order_id):
                     for item in order.order_items.select_related('product').all():
                         product = item.product
                         if product and product.available_in_stock is not None:
-                            product = Product.objects.select_for_update().get(pk=product.pk)
+                            product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
                             product.available_in_stock += item.quantity
                             product.save(update_fields=['available_in_stock'])
 
@@ -2271,7 +2271,7 @@ def customer_cancel_order(request, order_id):
                 for item in order.order_items.select_related('product').all():
                     product = item.product
                     if product and product.available_in_stock is not None:
-                        product = Product.objects.select_for_update().get(pk=product.pk)
+                        product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
                         product.available_in_stock += item.quantity
                         product.save(update_fields=['available_in_stock'])
                 
@@ -3576,7 +3576,7 @@ def handle_add_to_existing_order(request, order_id, cart):
     try:
         with transaction.atomic():
             # Get the order — accept orders placed by OR entered by this user
-            order = Order.objects.select_for_update().filter(
+            order = Order.objects.select_for_update(of=('self',)).filter(
                 Q(ordered_by=request.user) | Q(entered_by=request.user),
                 id=order_id,
                 status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
@@ -4094,7 +4094,7 @@ def cancel_order_item(request, item_id):
             # Restore stock if product stock tracking is enabled
             if item.product:
                 from restaurant.models import Product
-                product = Product.objects.select_for_update().get(id=item.product.id)
+                product = Product.objects.select_for_update(of=('self',)).get(id=item.product.id)
                 if product.available_in_stock is not None:
                     product.available_in_stock += item.quantity
                     product.save(update_fields=['available_in_stock'])

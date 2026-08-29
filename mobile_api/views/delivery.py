@@ -200,10 +200,10 @@ def assign_rider(request):
             # Lock both the order and the rider so two concurrent assign_rider calls
             # (different riders, same order) cannot create two active assignments.
             from orders.models import Order as _Order
-            order = _Order.objects.select_for_update().get(pk=order.pk)
+            order = _Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
             if order.status not in ('pending', 'confirmed', 'preparing', 'ready'):
                 raise ValueError(f'Cannot assign rider to an order with status "{order.status}".')
-            rider = DeliveryRider.objects.select_for_update().get(id=rider.id)
+            rider = DeliveryRider.objects.select_for_update(of=('self',)).get(id=rider.id)
             if not rider.is_available:
                 raise ValueError('This rider just became unavailable. Please select another.')
 
@@ -302,10 +302,10 @@ def auto_assign_rider(request):
     try:
         with transaction.atomic():
             from orders.models import Order as _Order
-            order = _Order.objects.select_for_update().get(pk=order.pk)
+            order = _Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
             if order.status not in ('pending', 'confirmed', 'preparing', 'ready'):
                 raise ValueError(f'Cannot assign rider to an order with status "{order.status}".')
-            locked = DeliveryRider.objects.select_related('user', 'owner').select_for_update().filter(
+            locked = DeliveryRider.objects.select_related('user', 'owner').select_for_update(of=('self',)).filter(
                 id=rider.id, is_available=True
             ).first()
             if not locked:
@@ -498,7 +498,7 @@ def mark_picked_up(request, order_id):
     order = assignment.order
 
     with transaction.atomic():
-        assignment = DeliveryAssignment.objects.select_for_update().get(pk=assignment.pk)
+        assignment = DeliveryAssignment.objects.select_for_update(of=('self',)).get(pk=assignment.pk)
         if assignment.status != 'assigned':
             return Response({'error': f'Cannot pick up — current status is {assignment.status}.'}, status=status.HTTP_400_BAD_REQUEST)
         assignment.status = 'picked_up'
@@ -535,7 +535,7 @@ def mark_delivered(request, order_id):
     order = assignment.order
 
     with transaction.atomic():
-        assignment = DeliveryAssignment.objects.select_for_update().get(pk=assignment.pk)
+        assignment = DeliveryAssignment.objects.select_for_update(of=('self',)).get(pk=assignment.pk)
         if assignment.status not in ('assigned', 'picked_up'):
             return Response({'error': f'Cannot complete — status is {assignment.status}.'}, status=status.HTTP_400_BAD_REQUEST)
         assignment.status = 'delivered'
@@ -549,7 +549,7 @@ def mark_delivered(request, order_id):
 
         # Re-fetch order under lock so a concurrent cancel cannot be overwritten.
         from orders.models import Order as _DeliveredOrder
-        order = _DeliveredOrder.objects.select_for_update().get(pk=order.pk)
+        order = _DeliveredOrder.objects.select_for_update(of=('self',)).get(pk=order.pk)
         order_was_cancelled = order.status == 'cancelled'
         if not order_was_cancelled:
             order.status = 'delivered'

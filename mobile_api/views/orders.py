@@ -670,7 +670,7 @@ def update_order_status(request, order_id):
         # Re-fetch under lock so two concurrent status transitions cannot both pass
         # the guard (TOCTOU fix). Use the same import pattern as cancel_order_item.
         from orders.models import Order as _Order
-        order = _Order.objects.select_for_update().get(pk=order.pk)
+        order = _Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
         # Re-check inside the lock — the status may have changed since the prefetch.
         # Return immediately so we release the lock as fast as possible on error paths.
         _allowed = valid_transitions.get(order.status, [])
@@ -877,10 +877,10 @@ def transfer_table(request, order_id):
         # same tables don't double-assign or leave is_available in a bad state.
         from restaurant.models import TableInfo as _TI
         locked_tables = list(
-            _TI.objects.select_for_update().filter(id__in=[order.table_info_id, target_table.id])
+            _TI.objects.select_for_update(of=('self',)).filter(id__in=[order.table_info_id, target_table.id])
         )
         from orders.models import Order as _Order
-        order = _Order.objects.select_for_update().get(pk=order.pk)
+        order = _Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
 
         old_table = order.table_info
         order.table_info = target_table
@@ -974,7 +974,7 @@ def cancel_order(request, order_id):
         from orders.models import Order as _CancelOrder
         from restaurant.models import Product as _Product
         from django.db.models import F as _F
-        order = _CancelOrder.objects.select_for_update().get(pk=order.pk)
+        order = _CancelOrder.objects.select_for_update(of=('self',)).get(pk=order.pk)
         # Re-check status inside the lock — a concurrent request may have changed it.
         if order.status == 'cancelled':
             return Response({'error': 'Order is already cancelled.'}, status=400)
@@ -1337,12 +1337,12 @@ def cancel_order_item(request, item_id):
         # Re-fetch order with row lock so two concurrent cancel-item requests
         # cannot both pass the last-item guard simultaneously.
         from orders.models import Order as _Order, OrderItem as _OItem
-        order = _Order.objects.select_for_update().get(pk=order.pk)
+        order = _Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
         if order.order_items.count() <= 1:
             return Response({'error': 'Cannot cancel the last item. Please cancel the whole order instead.'}, status=400)
 
         # Re-fetch item inside the lock — a concurrent request may have already deleted it.
-        item = _OItem.objects.select_for_update().filter(
+        item = _OItem.objects.select_for_update(of=('self',)).filter(
             order=order, id=item_id
         ).select_related('product').first()
         if item is None:

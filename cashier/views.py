@@ -478,7 +478,7 @@ def void_payment(request, payment_id):
         payment.save()
         
         # Update order payment status — lock the order row to prevent concurrent payment/void races
-        order = Order.objects.select_for_update().get(pk=payment.order_id)
+        order = Order.objects.select_for_update(of=('self',)).get(pk=payment.order_id)
         total_paid = order.payments.filter(is_voided=False).aggregate(
             total=Sum('amount'))['total'] or Decimal('0.00')
         
@@ -546,7 +546,7 @@ def transfer_table(request, order_id):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    order = get_object_or_404(Order.objects.select_for_update().filter(_oq_tt), id=order_id)
+    order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_tt), id=order_id)
 
     if order.status == 'cancelled':
         return JsonResponse({'error': 'Cannot transfer a cancelled order'}, status=400)
@@ -567,7 +567,7 @@ def transfer_table(request, order_id):
         Q(restaurant__main_owner=owner) |
         Q(restaurant__branch_owner=owner)
     )
-    target_table = get_object_or_404(TableInfo.objects.select_for_update().filter(_ttq).distinct(), id=target_table_id)
+    target_table = get_object_or_404(TableInfo.objects.select_for_update(of=('self',)).filter(_ttq).distinct(), id=target_table_id)
 
     if order.table_info is None:
         return JsonResponse({'error': 'Delivery and pickup orders cannot be transferred to a table'}, status=400)
@@ -623,7 +623,7 @@ def cancel_order(request, order_id):
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
         Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
     )
-    order = get_object_or_404(Order.objects.select_for_update().filter(_oq_co), id=order_id)
+    order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_co), id=order_id)
 
     # Check if order status allows cancellation (mirrors mobile API and kitchen staff logic)
     if order.status in ['served', 'cancelled']:
