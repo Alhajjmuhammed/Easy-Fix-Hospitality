@@ -214,6 +214,7 @@ export const initDatabase = async () => {
     `CREATE INDEX IF NOT EXISTS idx_offline_orders_sync ON offline_orders (sync_status)`,
     `CREATE INDEX IF NOT EXISTS idx_offline_payments_sync ON offline_payments (sync_status)`,
     `CREATE INDEX IF NOT EXISTS idx_offline_payments_offline_order_ref ON offline_payments (offline_order_ref)`,
+    `CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`,
   ]) {
     try { await db.runAsync(stmt); } catch (_) {}
   }

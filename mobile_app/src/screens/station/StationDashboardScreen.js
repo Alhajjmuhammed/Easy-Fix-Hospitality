@@ -273,7 +273,7 @@ export default function StationDashboardScreen() {
           // Network failure — optimistic update + SQLite write; server wins on reconnect
           applyLocalUpdate();
           try { await updateCachedOrderStatus(orderId, newStatus); } catch { /* best-effort */ }
-          setSnack('Saved locally — will sync when reconnected');
+          setSnack('Saved locally — reconnect and update again to sync.');
         } else {
           setSnack(err?.response?.data?.error || 'Failed to update status');
         }

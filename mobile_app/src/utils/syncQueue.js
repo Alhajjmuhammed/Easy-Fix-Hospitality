@@ -52,20 +52,3 @@ export async function resetErrors() {
   );
 }
 
-/**
- * Returns time since the last successful sync in milliseconds,
- * or Infinity if it has never synced.
- */
-export async function timeSinceLastSync() {
-  const last = await getSyncMeta('last_sync');
-  if (!last) return Infinity;
-  const ms = Date.now() - new Date(last).getTime();
-  return isNaN(ms) ? Infinity : ms;
-}
-
-/**
- * Persist the last successful sync timestamp.
- */
-export async function recordSyncSuccess() {
-  await setSyncMeta('last_sync', new Date().toISOString());
-}

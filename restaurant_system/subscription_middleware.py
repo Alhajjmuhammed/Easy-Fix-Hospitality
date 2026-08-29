@@ -249,6 +249,7 @@ def check_restaurant_subscription(restaurant_owner):
         subscription = RestaurantSubscription.objects.get(
             restaurant_owner=restaurant_owner
         )
+        subscription.update_subscription_status()
         return subscription.is_active
     except RestaurantSubscription.DoesNotExist:
         return False

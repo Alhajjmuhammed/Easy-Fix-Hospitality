@@ -384,8 +384,8 @@ def process_payment(request, order_id):
             order.payment_status = 'partial'
         else:
             order.payment_status = 'unpaid'
-        
-        order.save()
+
+        order.save(update_fields=['payment_status'])
         
         # Log payment event for audit trail
         try:
@@ -641,6 +641,14 @@ def cancel_order(request, order_id):
         order.status = 'cancelled'
         order.payment_status = 'unpaid'
         order.reason_if_cancelled = cancel_reason
+        # Restore stock for each item — atomic per-product update
+        from restaurant.models import Product as _Product
+        from django.db.models import F as _F
+        for item in order.order_items.select_related('product').all():
+            if item.product_id and item.product and item.product.available_in_stock is not None:
+                _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
+                    available_in_stock=_F('available_in_stock') + item.quantity
+                )
         # Release the table when order is cancelled
         order.release_table()
         order.save()

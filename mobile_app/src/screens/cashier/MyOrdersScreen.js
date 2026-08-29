@@ -55,13 +55,15 @@ export default function CashierMyOrdersScreen({ navigation }) {
   const [paying,    setPaying]    = useState(false);
 
   // Void dialog
-  const [voidDialog, setVoidDialog] = useState(null);
-  const [voidReason, setVoidReason] = useState('');
-  const [voiding,    setVoiding]    = useState(false);
+  const [voidDialog,         setVoidDialog]         = useState(null);
+  const [voidReason,         setVoidReason]         = useState('');
+  const [voiding,            setVoiding]            = useState(false);
+  const [paymentPickerDialog, setPaymentPickerDialog] = useState(null); // order with multiple payments
 
   // Cancel dialog
   const [cancelDialog, setCancelDialog] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [cancelError,  setCancelError]  = useState('');
   const [cancelling,   setCancelling]   = useState(false);
 
   // Transfer dialog
@@ -278,10 +280,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
 
   // ── Void ───────────────────────────────────────────────────────────────────
   const openVoid = (order) => {
-    const payment = order.payments?.[0];
-    if (!payment) { setSnack('No payment to void'); return; }
-    setVoidDialog({ order, paymentId: payment.id });
-    setVoidReason('');
+    const payments = order.payments || [];
+    if (payments.length === 0) { setSnack('No payment to void'); return; }
+    if (payments.length > 1) {
+      setPaymentPickerDialog(order);
+    } else {
+      setVoidDialog({ order, paymentId: payments[0].id });
+      setVoidReason('');
+    }
   };
 
   const handleVoid = async () => {
@@ -304,10 +310,11 @@ export default function CashierMyOrdersScreen({ navigation }) {
   };
 
   // ── Cancel order ───────────────────────────────────────────────────────────
-  const openCancel = (order) => { setCancelDialog(order); setCancelReason(''); };
+  const openCancel = (order) => { setCancelDialog(order); setCancelReason(''); setCancelError(''); };
 
   const handleCancel = async () => {
     if (!cancelDialog) return;
+    if (cancelReason.trim() === '') { setCancelError('A reason is required to cancel this order.'); return; }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
@@ -688,6 +695,36 @@ export default function CashierMyOrdersScreen({ navigation }) {
           </Dialog.Actions>
         </Dialog>
 
+        {/* ── Payment Picker (multiple payments) ──────────────────────── */}
+        <Dialog visible={!!paymentPickerDialog} onDismiss={() => setPaymentPickerDialog(null)}>
+          <Dialog.Title>Select Payment to Void</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
+              Order #{paymentPickerDialog?.order_number || paymentPickerDialog?.id} has multiple payments. Choose one to void.
+            </Text>
+            <FlatList
+              data={paymentPickerDialog?.payments || []}
+              keyExtractor={(p) => String(p.id)}
+              renderItem={({ item: p }) => (
+                <Button
+                  mode="outlined"
+                  style={{ marginBottom: 8 }}
+                  onPress={() => {
+                    setPaymentPickerDialog(null);
+                    setVoidDialog({ order: paymentPickerDialog, paymentId: p.id });
+                    setVoidReason('');
+                  }}
+                >
+                  {p.payment_method || p.method} — {p.amount}
+                </Button>
+              )}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setPaymentPickerDialog(null)}>Cancel</Button>
+          </Dialog.Actions>
+        </Dialog>
+
         {/* ── Void Dialog ─────────────────────────────────────────────── */}
         <Dialog visible={!!voidDialog} onDismiss={() => setVoidDialog(null)}>
           <Dialog.Title>Void Payment</Dialog.Title>
@@ -711,8 +748,12 @@ export default function CashierMyOrdersScreen({ navigation }) {
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
               Order #{cancelDialog?.order_number || cancelDialog?.id} · Table {cancelDialog?.table_number}
             </Text>
-            <TextInput label="Reason (optional)" value={cancelReason}
-              onChangeText={setCancelReason} mode="outlined" multiline numberOfLines={2} />
+            <TextInput label="Reason (required)" value={cancelReason}
+              onChangeText={(v) => { setCancelReason(v); if (cancelError) setCancelError(''); }}
+              mode="outlined" multiline numberOfLines={2} error={!!cancelError} />
+            {!!cancelError && (
+              <Text variant="bodySmall" style={{ color: '#E53935', marginTop: 4 }}>{cancelError}</Text>
+            )}
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setCancelDialog(null)}>Back</Button>
