@@ -201,7 +201,7 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                 if restaurant_owner != request.user:
                     if role_name == 'branch_owner':
                         reason += f" (Main restaurant subscription blocked)"
-                    elif role_name in ['customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier']:
+                    elif role_name in ['customer_care', 'kitchen', 'bar', 'buffet', 'service', 'cashier', 'delivery_rider']:
                         reason += f" (Restaurant owner's subscription blocked)"
                     
                 logger.info(f"Blocking access for {request.user.username}: {reason}")

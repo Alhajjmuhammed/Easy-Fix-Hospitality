@@ -690,11 +690,34 @@ def attendance_reports(request):
     total_late = sum(1 for r in all_records if r.is_late)
     total_work_minutes = sum(r.work_minutes or 0 for r in all_records)
     th, tm = divmod(total_work_minutes, 60)
-    total_days_range = (date_to - date_from).days + 1
+    working_days = sum(
+        1 for i in range((date_to - date_from).days + 1)
+        if (date_from + timedelta(days=i)).weekday() < 5
+    )
     total_staff = len(staff_map)
     attendance_rate = round(
-        total_records / (total_days_range * total_staff) * 100, 1
-    ) if total_staff else 0
+        total_records / (working_days * total_staff) * 100, 1
+    ) if total_staff and working_days else 0
+
+    import csv
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = (
+            f'attachment; filename="attendance_report_{date_from.isoformat()}_{date_to.isoformat()}.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow(['Staff Name', 'Role', 'Days Present', 'On Time', 'Late', 'Avg Hours', 'Total Hours'])
+        for s in staff_summary:
+            writer.writerow([
+                s['name'],
+                s['role'],
+                s['days_present'],
+                s['on_time'],
+                s['days_late'],
+                s['avg_display'],
+                s['total_display'],
+            ])
+        return response
 
     context = {
         'date_from': date_from.isoformat(),
@@ -704,6 +727,7 @@ def attendance_reports(request):
         'total_work_display': f"{th}h {tm}m" if th else f"{tm}m" if tm else '0m',
         'total_staff': total_staff,
         'attendance_rate': attendance_rate,
+        'working_days': working_days,
         'staff_summary': staff_summary,
         'daily_summary': daily_summary,
         'today': today,

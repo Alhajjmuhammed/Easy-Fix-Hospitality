@@ -1005,28 +1005,43 @@ def cashier_reports(request):
         'payments__processed_by',
     ).order_by('-created_at')
     
-    # Calculate statistics
-    total_revenue = Decimal('0.00')
-    paid_amount = Decimal('0.00')
-    unpaid_amount = Decimal('0.00')
-    total_orders = orders.count()
-    total_items = 0
-    
-    for order in orders:
-        # Count all revenue from order
-        total_revenue += order.total_amount
-        total_items += len(order.order_items.all())  # use prefetch cache
-        
-        # Calculate paid and unpaid amounts
-        if order.payment_status == 'paid':
-            paid_amount += order.total_amount
-        elif order.payment_status == 'unpaid':
-            unpaid_amount += order.total_amount
-        elif order.payment_status == 'partial':
-            # For partial payments, use prefetched payments to avoid N+1
-            total_paid = sum(p.amount for p in order.payments.all() if not p.is_voided) or Decimal('0.00')
-            paid_amount += total_paid
-            unpaid_amount += (order.total_amount - total_paid)
+    # Calculate statistics via DB aggregation (no Python iteration over orders)
+    from django.db.models import Case, When, Value, DecimalField
+    agg = Order.objects.filter(id__in=order_ids).aggregate(
+        total_revenue=Sum('total_amount'),
+        total_orders_count=Count('id'),
+        paid_total=Sum(
+            Case(When(payment_status='paid', then='total_amount'),
+                 default=Value(0), output_field=DecimalField())
+        ),
+        unpaid_total=Sum(
+            Case(When(payment_status='unpaid', then='total_amount'),
+                 default=Value(0), output_field=DecimalField())
+        ),
+        partial_total=Sum(
+            Case(When(payment_status='partial', then='total_amount'),
+                 default=Value(0), output_field=DecimalField())
+        ),
+    )
+    total_revenue = agg['total_revenue'] or Decimal('0.00')
+    total_orders = agg['total_orders_count'] or 0
+    paid_amount = agg['paid_total'] or Decimal('0.00')
+    unpaid_amount = agg['unpaid_total'] or Decimal('0.00')
+
+    # Partial orders: sum actual payments collected vs. remaining balance
+    if agg.get('partial_total'):
+        _partial_ids = list(
+            Order.objects.filter(id__in=order_ids, payment_status='partial')
+            .values_list('id', flat=True)
+        )
+        if _partial_ids:
+            _partial_paid = Payment.objects.filter(
+                order_id__in=_partial_ids, is_voided=False
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            paid_amount += _partial_paid
+            unpaid_amount += (agg['partial_total'] - _partial_paid)
+
+    total_items = OrderItem.objects.filter(order_id__in=order_ids).count()
     
     # Handle CSV export
     if export_format == 'csv':

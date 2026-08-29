@@ -125,6 +125,9 @@
                         <i class="bi bi-funnel me-1"></i>Filter
                     </button>
                     <a href="{% url 'attendance:reports' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+                    <a href="#" class="btn btn-sm btn-outline-success" onclick="exportAttendanceCsv(event)">
+                        <i class="bi bi-download me-1"></i>Export CSV
+                    </a>
                 </div>
                 <div class="ms-auto d-flex gap-2 flex-wrap">
                     <button type="button" onclick="setThisMonth()" class="btn btn-sm btn-outline-secondary">This Month</button>
@@ -392,6 +395,15 @@
         document.querySelector('[name=date_from]').closest('form').submit();
     }
     window.setLastNDays = setLastNDays;
+
+    function exportAttendanceCsv(e) {
+        e.preventDefault();
+        var from = document.querySelector('[name=date_from]').value;
+        var to = document.querySelector('[name=date_to]').value;
+        var url = '{% url "attendance:reports" %}?date_from=' + (from || '') + '&date_to=' + (to || '') + '&export=csv';
+        window.location.href = url;
+    }
+    window.exportAttendanceCsv = exportAttendanceCsv;
 
     function setThisMonth() {
         var today = new Date();

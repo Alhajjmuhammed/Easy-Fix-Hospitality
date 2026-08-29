@@ -623,7 +623,17 @@ export const getOfflinePendingOrders = async () => {
     productMap = Object.fromEntries(productRows.map(r => [r.id, r]));
   }
 
-  // ── 4. Build result using maps — no per-row DB calls ─────────────────────
+  // ── 4. Batch-load all pending payments for offline orders (one query) ─────
+  const allPayments = await dbQuery(
+    "SELECT * FROM offline_payments WHERE sync_status = 'pending' ORDER BY created_at ASC", []
+  );
+  const paymentsByRef = {};
+  for (const p of allPayments) {
+    if (!paymentsByRef[p.offline_order_ref]) paymentsByRef[p.offline_order_ref] = [];
+    paymentsByRef[p.offline_order_ref].push(p);
+  }
+
+  // ── 5. Build result using maps — no per-row DB calls ─────────────────────
   const result = [];
   for (let idx = 0; idx < rows.length; idx++) {
     const row = rows[idx];
@@ -657,21 +667,14 @@ export const getOfflinePendingOrders = async () => {
       : (row.total_amount || 0);
     const computedTax = (row.total_amount || 0) - computedSubtotal;
 
-    // Fetch payment detail records for receipt printing (best-effort — non-fatal)
-    let queuedPayments = [];
-    try {
-      const pmtRows = await dbQuery(
-        "SELECT * FROM offline_payments WHERE offline_order_ref = ? AND sync_status = 'pending'",
-        [row.offline_id],
-      );
-      queuedPayments = pmtRows.map((p) => ({
-        id: p.offline_id,
-        amount: p.amount,
-        payment_method: p.payment_method,
-        created_at: p.created_at,
-        _is_offline: true,
-      }));
-    } catch { /* payment details unavailable — totals already read from offline_orders above */ }
+    // Use pre-loaded payment map (batch query above) — no per-row DB call
+    const queuedPayments = (paymentsByRef[row.offline_id] || []).map((p) => ({
+      id: p.offline_id,
+      amount: p.amount,
+      payment_method: p.payment_method,
+      created_at: p.created_at,
+      _is_offline: true,
+    }));
 
     result.push({
       id: `offline_${row.offline_id}`,

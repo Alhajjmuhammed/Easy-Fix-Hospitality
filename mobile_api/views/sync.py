@@ -434,10 +434,6 @@ def _sync_payment(user, owner, data):
 
 
 def _sync_bill_request(user, owner, data):
-    # Only customers may request bills — mirrors _create_bill_request in bill_requests.py.
-    if not user.is_customer():
-        return {'status': 'error', 'error': 'Only customers can request bills.'}
-
     table_id = data.get('table_id')
     table = TableInfo.objects.filter(
         Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
