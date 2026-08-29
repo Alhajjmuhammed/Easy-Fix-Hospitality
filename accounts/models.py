@@ -703,6 +703,8 @@ class RestaurantSubscription(models.Model):
 
             # Admin can unblock regardless of subscription period validity.
             # Use the locked (fresh) date fields for the validity decision.
+            # Always sync status from locked first — self may be stale.
+            self.subscription_status = locked.subscription_status
             today = date.today()
             grace_end = locked.subscription_end_date + timedelta(days=locked.grace_period_days)
             if locked.subscription_start_date <= today <= grace_end:
