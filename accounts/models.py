@@ -744,7 +744,7 @@ class RestaurantSubscription(models.Model):
 
             # Fast-path: already expired and owner deactivated — nothing left to do.
             # Without this guard every authenticated request creates a duplicate SubscriptionLog row.
-            if locked.subscription_status == 'expired' and not self.restaurant_owner.is_active:
+            if locked.subscription_status == 'expired' and not locked.restaurant_owner.is_active:
                 return
 
             # Don't change status if blocked by admin
