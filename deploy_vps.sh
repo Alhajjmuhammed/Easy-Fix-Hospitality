@@ -7,6 +7,8 @@ set -e
 
 cd /var/www/restaurant
 
+source venv/bin/activate
+
 echo "==> Pulling latest code from origin/test..."
 git pull origin test
 
