@@ -127,9 +127,7 @@
                     <a href="{% url 'attendance:reports' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
                 </div>
                 <div class="ms-auto d-flex gap-2 flex-wrap">
-                    <button type="submit" name="date_from" value="{{ today|date:'Y-m-01' }}" class="btn btn-sm btn-outline-secondary">
-                        This Month
-                    </button>
+                    <button type="button" onclick="setThisMonth()" class="btn btn-sm btn-outline-secondary">This Month</button>
                     <button type="button" onclick="setLastNDays(7)" class="btn btn-sm btn-outline-secondary">Last 7 days</button>
                     <button type="button" onclick="setLastNDays(30)" class="btn btn-sm btn-outline-secondary">Last 30 days</button>
                 </div>
@@ -378,15 +376,31 @@
         });
     });
 
+    function localDateStr(d) {
+        // Use local date — NOT toISOString() which returns UTC and can be yesterday for UTC+ timezones
+        return d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    }
+
     function setLastNDays(n) {
         var today = new Date();
         var from = new Date(today);
         from.setDate(from.getDate() - n + 1);
-        document.querySelector('[name=date_from]').value = from.toISOString().slice(0, 10);
-        document.querySelector('[name=date_to]').value = today.toISOString().slice(0, 10);
+        document.querySelector('[name=date_from]').value = localDateStr(from);
+        document.querySelector('[name=date_to]').value = localDateStr(today);
         document.querySelector('[name=date_from]').closest('form').submit();
     }
     window.setLastNDays = setLastNDays;
+
+    function setThisMonth() {
+        var today = new Date();
+        var from = new Date(today.getFullYear(), today.getMonth(), 1);
+        document.querySelector('[name=date_from]').value = localDateStr(from);
+        document.querySelector('[name=date_to]').value = localDateStr(today);
+        document.querySelector('[name=date_from]').closest('form').submit();
+    }
+    window.setThisMonth = setThisMonth;
 })();
 </script>
 {% endblock %}
