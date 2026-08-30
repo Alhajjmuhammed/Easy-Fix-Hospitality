@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import NetInfo from '@react-native-community/netinfo';
 import { apiSyncPush, apiSyncPull } from '../api/sync';
+import { apiUpdateOrderStatus } from '../api/orders';
 import {
   getPendingOrders,
   getPendingPayments,
@@ -15,7 +16,11 @@ import {
   saveTables,
   saveOrders,
   setSyncMeta,
+  getPendingStatusChanges,
+  markStatusChangeSynced,
+  markStatusChangeError,
 } from '../database/operations';
+import { resetErrors } from '../utils/syncQueue';
 import { dbQuery } from '../database/db';
 
 export const useSyncStore = create((set, get) => ({
@@ -54,6 +59,9 @@ export const useSyncStore = create((set, get) => ({
     }
     set({ syncErrors: [] });
     try {
+      // Reset error items from the previous cycle so they are retried automatically
+      await resetErrors();
+
       // --- PUSH ---
       const [pendingOrders, pendingPayments, pendingBillRequests] =
         await Promise.all([
@@ -209,12 +217,28 @@ export const useSyncStore = create((set, get) => ({
                   set((s) => ({ syncErrors: [...s.syncErrors, { type: 'payment', ...r }] }));
                 }
               }
-            } catch {
-              for (const p of resolvedNow) {
-                await markPaymentError(p.offline_id, 'Deferred sync failed — will retry');
+            } catch (err) {
+              const isNetworkError = !err.response;
+              if (!isNetworkError) {
+                // Server/validation error — mark as error so staff can see it
+                for (const p of resolvedNow) {
+                  await markPaymentError(p.offline_id, 'Payment sync failed — tap to delete');
+                }
               }
+              // Network error: leave as pending so the next sync cycle retries automatically
             }
           }
+        }
+      }
+
+      // --- SYNC PENDING STATUS CHANGES (from station offline updates) ---
+      const pendingStatusChanges = await getPendingStatusChanges();
+      for (const change of pendingStatusChanges) {
+        try {
+          await apiUpdateOrderStatus(change.order_id, change.new_status);
+          await markStatusChangeSynced(change.id);
+        } catch (e) {
+          await markStatusChangeError(change.id);
         }
       }
 

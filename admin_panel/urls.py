@@ -70,6 +70,7 @@ urlpatterns = [
     # Table Management
     path('tables/add/', views.add_table, name='add_table'),
     path('tables/get/', views.get_table, name='get_table'),
+    path('tables/list/', views.get_tables_json, name='get_tables_json'),
     path('tables/update/', views.update_table, name='update_table'),
     path('tables/toggle-status/', views.toggle_table_status, name='toggle_table_status'),
     path('tables/delete/', views.delete_table, name='delete_table'),

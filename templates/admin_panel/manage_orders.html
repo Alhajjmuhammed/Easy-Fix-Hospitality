@@ -593,42 +593,43 @@ $(document).ready(function() {
 
     // Load Tables and Customers
     function loadTablesAndCustomers() {
-        // Load tables
         $.ajax({
-            url: '{% url "admin_panel:manage_tables" %}',
+            url: '{% url "admin_panel:get_tables_json" %}',
             type: 'GET',
             success: function(data) {
-                // This would need an API endpoint to return JSON data
-                // For now, we'll populate with static options
-                populateTableSelect();
-                populateCustomerSelect();
+                populateTableSelect(data.tables || []);
+                populateCustomerSelect(data.customers || []);
             },
             error: function() {
-                populateTableSelect();
-                populateCustomerSelect();
+                populateTableSelect([]);
+                populateCustomerSelect([]);
             }
         });
     }
 
-    function populateTableSelect() {
+    function populateTableSelect(tables) {
         const tableSelect = $('#addOrderTable');
         tableSelect.empty();
         tableSelect.append('<option value="">Select Table</option>');
-        // You may need to create an API endpoint to get available tables
-        // For now, adding sample options
-        for (let i = 1; i <= 10; i++) {
-            tableSelect.append(`<option value="${i}">Table T${i.toString().padStart(2, '0')}</option>`);
+        tables.forEach(function(t) {
+            const label = 'Table ' + t.tbl_no + (t.is_available ? '' : ' (Occupied)');
+            tableSelect.append('<option value="' + t.id + '">' + label + '</option>');
+        });
+        if (tables.length === 0) {
+            tableSelect.append('<option value="" disabled>No tables found</option>');
         }
     }
 
-    function populateCustomerSelect() {
+    function populateCustomerSelect(customers) {
         const customerSelect = $('#addOrderCustomer');
         customerSelect.empty();
         customerSelect.append('<option value="">Select Customer</option>');
-        // You may need to create an API endpoint to get customers
-        // For now, adding sample options
-        customerSelect.append('<option value="1">John Doe</option>');
-        customerSelect.append('<option value="2">Jane Smith</option>');
+        customers.forEach(function(c) {
+            customerSelect.append('<option value="' + c.id + '">' + c.name + '</option>');
+        });
+        if (customers.length === 0) {
+            customerSelect.append('<option value="" disabled>No customers found</option>');
+        }
     }
 
     // Clear form when modal is closed

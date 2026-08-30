@@ -494,9 +494,9 @@ def void_payment(request, payment_id):
             order.payment_status = 'unpaid'
             # Re-occupy table if payment becomes unpaid after void
             order.occupy_table()
-        
-        order.save()
-        
+
+        order.save(update_fields=['payment_status'])
+
         # Log void event for audit trail
         try:
             from accounts.security_utils import log_security_event, get_client_ip
@@ -651,8 +651,8 @@ def cancel_order(request, order_id):
                 )
         # Release the table when order is cancelled
         order.release_table()
-        order.save()
-        
+        order.save(update_fields=['status', 'payment_status', 'reason_if_cancelled'])
+
         return JsonResponse({
             'success': True,
             'message': f'Order {order.order_number} cancelled successfully'
@@ -1010,36 +1010,17 @@ def cashier_reports(request):
     agg = Order.objects.filter(id__in=order_ids).aggregate(
         total_revenue=Sum('total_amount'),
         total_orders_count=Count('id'),
-        paid_total=Sum(
-            Case(When(payment_status='paid', then='total_amount'),
-                 default=Value(0), output_field=DecimalField())
-        ),
-        unpaid_total=Sum(
-            Case(When(payment_status='unpaid', then='total_amount'),
-                 default=Value(0), output_field=DecimalField())
-        ),
-        partial_total=Sum(
-            Case(When(payment_status='partial', then='total_amount'),
-                 default=Value(0), output_field=DecimalField())
-        ),
     )
     total_revenue = agg['total_revenue'] or Decimal('0.00')
     total_orders = agg['total_orders_count'] or 0
-    paid_amount = agg['paid_total'] or Decimal('0.00')
-    unpaid_amount = agg['unpaid_total'] or Decimal('0.00')
 
-    # Partial orders: sum actual payments collected vs. remaining balance
-    if agg.get('partial_total'):
-        _partial_ids = list(
-            Order.objects.filter(id__in=order_ids, payment_status='partial')
-            .values_list('id', flat=True)
-        )
-        if _partial_ids:
-            _partial_paid = Payment.objects.filter(
-                order_id__in=_partial_ids, is_voided=False
-            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-            paid_amount += _partial_paid
-            unpaid_amount += (agg['partial_total'] - _partial_paid)
+    # Use actual Payment records for paid/partial orders to keep paid+unpaid=total consistently
+    paid_amount = Payment.objects.filter(
+        order_id__in=order_ids,
+        is_voided=False,
+        order__payment_status__in=['paid', 'partial'],
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    unpaid_amount = total_revenue - paid_amount
 
     total_items = OrderItem.objects.filter(order_id__in=order_ids).count()
     

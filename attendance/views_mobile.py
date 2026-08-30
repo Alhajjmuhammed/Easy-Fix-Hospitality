@@ -2,10 +2,11 @@
 
 from datetime import date, timedelta
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from mobile_api.permissions import IsSubscriptionActive
 from rest_framework.response import Response
 
 from .models import AttendanceQRToken, AttendanceRecord, Shift
@@ -74,7 +75,7 @@ def _record_to_dict(rec):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsSubscriptionActive])
 def attendance_scan(request):
     """
     Validate QR token and return what action the staff should take.
@@ -127,7 +128,7 @@ def attendance_scan(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsSubscriptionActive])
 def attendance_confirm(request):
     """
     Confirm and record the attendance action.
@@ -155,48 +156,49 @@ def attendance_confirm(request):
     restaurant = qr.restaurant
     shift = _best_shift(owner, restaurant, now_time)
 
-    try:
-        record, created = AttendanceRecord.objects.get_or_create(
-            staff=user,
-            date=today,
-            defaults={
-                'owner': owner,
-                'restaurant': restaurant,
-                'shift': shift,
-            },
-        )
-    except IntegrityError:
-        record = AttendanceRecord.objects.get(staff=user, date=today)
-        created = False
+    with transaction.atomic():
+        try:
+            record, created = AttendanceRecord.objects.select_for_update(of=('self',)).get_or_create(
+                staff=user,
+                date=today,
+                defaults={
+                    'owner': owner,
+                    'restaurant': restaurant,
+                    'shift': shift,
+                },
+            )
+        except IntegrityError:
+            record = AttendanceRecord.objects.select_for_update(of=('self',)).get(staff=user, date=today)
+            created = False
 
-    if action == 'check_in':
-        if record.check_in:
-            return Response({'error': 'Already checked in today'}, status=400)
-        record.check_in = now
-        record.check_in_via = 'mobile'
-        if not record.shift:
-            record.shift = shift
-        record.save()
-        return Response({
-            'success': True,
-            'message': f"Checked in at {timezone.localtime(now).strftime('%H:%M')}",
-            'record': _record_to_dict(record),
-        })
+        if action == 'check_in':
+            if record.check_in:
+                return Response({'error': 'Already checked in today'}, status=400)
+            record.check_in = now
+            record.check_in_via = 'mobile'
+            if not record.shift:
+                record.shift = shift
+            record.save()
+            return Response({
+                'success': True,
+                'message': f"Checked in at {timezone.localtime(now).strftime('%H:%M')}",
+                'record': _record_to_dict(record),
+            })
 
-    else:  # check_out
-        if not record.check_in:
-            return Response({'error': 'Not checked in yet today'}, status=400)
-        if record.check_out:
-            return Response({'error': 'Already checked out today'}, status=400)
-        record.check_out = now
-        record.check_out_via = 'mobile'
-        record.compute_metrics()
-        record.save()
-        return Response({
-            'success': True,
-            'message': f"Checked out at {timezone.localtime(now).strftime('%H:%M')}",
-            'record': _record_to_dict(record),
-        })
+        else:  # check_out
+            if not record.check_in:
+                return Response({'error': 'Not checked in yet today'}, status=400)
+            if record.check_out:
+                return Response({'error': 'Already checked out today'}, status=400)
+            record.check_out = now
+            record.check_out_via = 'mobile'
+            record.compute_metrics()
+            record.save()
+            return Response({
+                'success': True,
+                'message': f"Checked out at {timezone.localtime(now).strftime('%H:%M')}",
+                'record': _record_to_dict(record),
+            })
 
 
 @api_view(['GET'])

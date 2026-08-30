@@ -12,6 +12,7 @@ import {
   apiMyAssignments,
   apiToggleAvailability,
 } from '../../api/delivery';
+import { cacheAssignments, getCachedAssignments } from '../../database/operations';
 
 const STATUS_COLOR = {
   assigned:  '#1565C0',
@@ -45,14 +46,22 @@ export default function RiderDashboardScreen() {
       const net = await NetInfo.fetch();
       if (!net.isConnected) {
         setIsOffline(true);
+        try {
+          const cached = await getCachedAssignments();
+          setAssignments(cached);
+        } catch {
+          // best-effort: leave current state
+        }
         setLoading(false);
         setRefreshing(false);
         return;
       }
       setIsOffline(false);
       const data = await apiMyAssignments();
-      setAssignments(data.assignments || []);
+      const fetched = data.assignments || [];
+      setAssignments(fetched);
       setAvailable(data.is_available ?? true);
+      try { await cacheAssignments(fetched); } catch { /* best-effort */ }
     } catch {
       setSnack('Could not load assignments');
     } finally {

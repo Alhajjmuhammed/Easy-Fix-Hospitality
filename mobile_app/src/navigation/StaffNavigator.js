@@ -191,6 +191,7 @@ export default function StaffNavigator() {
   const { user } = useAuthStore();
   const isCashier  = user?.role_name === 'cashier';
   const isStation  = STATION_ROLES.includes(user?.role_name);
+  const isManager  = ['manager', 'branch_owner', 'main_owner', 'owner'].includes(user?.role_name);
 
   // Station staff (kitchen / bar / buffet / service) get Dashboard + Printer Settings
   if (isStation) {
@@ -241,7 +242,7 @@ export default function StaffNavigator() {
         ),
       })}
     >
-      {isCashier ? (
+      {isCashier || isManager ? (
         <>
           <Tab.Screen
             name="Order"

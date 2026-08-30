@@ -5,6 +5,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 from django.http import JsonResponse
+from django.core.cache import cache
 from accounts.models import RestaurantSubscription, User
 import logging
 
@@ -152,7 +153,11 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                 )
                 
                 # Update subscription status automatically to ensure real-time blocking
-                subscription.update_subscription_status()
+                # Cache the check for 5 minutes to avoid a DB lock on every request
+                _cache_key = f'sub_status_ok_{subscription.pk}'
+                if not cache.get(_cache_key):
+                    subscription.update_subscription_status()
+                    cache.set(_cache_key, True, 300)  # 5-minute TTL
                 
                 logger.debug(f"User: {request.user.username}, Checking: {restaurant_owner.username}, Status: {subscription.subscription_status}, Active: {subscription.is_active}")
                 
@@ -188,8 +193,9 @@ class SubscriptionAccessMiddleware(MiddlewareMixin):
                     
                     logger.info(f"Default subscription created successfully for {restaurant_owner.username}")
                 except Exception as create_error:
-                    logger.error(f"Failed to create default subscription for {restaurant_owner.username}: {create_error}")
-                    return self._redirect_to_blocked_page(request, "Unable to create subscription. Please contact administrator.")
+                    logger.error('Failed to get/create subscription for owner %s', restaurant_owner.pk, exc_info=True)
+                    # Don't lock out the owner — continue without subscription check
+                    return self.get_response(request)
                 
             # Check if subscription allows access
             if not subscription.is_active:

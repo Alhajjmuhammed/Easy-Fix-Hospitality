@@ -241,6 +241,18 @@ def _sync_order_atomic(user, owner, data, offline_id):
         table.is_available = False
         table.save(update_fields=['is_available'])
 
+    # If the order was cancelled offline before being synced, cancel it immediately
+    order_status = data.get('status', 'pending')
+    if order_status == 'cancelled':
+        for item in order.order_items.select_related('product'):
+            if item.product:
+                from django.db.models import F
+                item.product.available_in_stock = F('available_in_stock') + item.quantity
+                item.product.save(update_fields=['available_in_stock'])
+        order.status = 'cancelled'
+        order.reason_if_cancelled = data.get('cancel_reason', 'Cancelled offline')
+        order.save(update_fields=['status', 'reason_if_cancelled'])
+
     result = {'status': 'created', 'order_id': order.id, 'order_number': order.order_number}
     if dropped_items:
         result['warning'] = f'{len(dropped_items)} item(s) were unavailable and removed from the order.'
@@ -273,8 +285,11 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
     ).first()
     if not order:
         return {'status': 'error', 'error': f'Order #{existing_order_id} not found.'}
-    if order.status in ('cancelled', 'closed'):
-        return {'status': 'error', 'error': f'Order #{order.order_number} is already {order.status}.'}
+    TERMINAL_STATUSES = {'cancelled', 'delivered', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted', 'out_for_delivery'}
+    if order.status in TERMINAL_STATUSES:
+        return {'status': 'error', 'error': f'Cannot add items to an order with status {order.status}.'}
+    if order.payment_status == 'paid':
+        return {'status': 'error', 'error': 'Cannot add items to a fully paid order.'}
 
     items = data.get('items', [])
     if not items:
@@ -442,16 +457,27 @@ def _sync_bill_request(user, owner, data):
     if table is None:
         return {'status': 'error', 'error': f'Table {table_id} not found.'}
 
-    # Mirror _create_bill_request: the customer must have an active unpaid order here.
+    # Mirror _create_bill_request: verify there is an active unpaid order at the table.
     from orders.models import Order as _Order
-    has_active_order = _Order.objects.filter(
-        table_info=table,
-        ordered_by=user,
-        status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
-        payment_status__in=['unpaid', 'partial'],
-    ).exists()
-    if not has_active_order:
-        return {'status': 'error', 'error': 'You do not have an active order at this table.'}
+    if user.is_customer():
+        # Customer: must have their own order at the table
+        has_active_order = _Order.objects.filter(
+            table_info=table,
+            ordered_by=user,
+            status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
+            payment_status__in=['unpaid', 'partial'],
+        ).exists()
+        if not has_active_order:
+            return {'status': 'error', 'error': 'You do not have an active order at this table.'}
+    else:
+        # Staff (cashier, waiter, etc.): check that any active order exists at the table
+        has_active_order = _Order.objects.filter(
+            table_info=table,
+            status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
+            payment_status__in=['unpaid', 'partial'],
+        ).exists()
+        if not has_active_order:
+            return {'status': 'error', 'error': 'No active order at this table.'}
 
     # Prevent duplicate pending bill requests — mirrors _create_bill_request.
     # Wrap in a transaction with select_for_update so two simultaneous offline

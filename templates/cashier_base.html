@@ -584,32 +584,11 @@
         function loadProductsForWaste() {
             // Check if products are already loaded by page-specific script
             const productSelect = document.getElementById('product_id');
-            if (productSelect && productSelect.children.length > 1) {
+            if (!productSelect || productSelect.children.length > 1) {
                 return;
             }
-            
-            // Fallback to AJAX loading
-            fetch('/admin-panel/get-products/')
-                .then(response => response.json())
-                .then(data => {
-                    productSelect.innerHTML = '<option value="">Select Product</option>';
-                    
-                    if (data.products) {
-                        data.products.forEach(product => {
-                            const option = document.createElement('option');
-                            option.value = product.id;
-                            option.textContent = `${product.name} (${product.category || 'No Category'})`;
-                            productSelect.appendChild(option);
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading products:', error);
-                    // Don't show error toast if products might be loaded another way
-                    if (productSelect && productSelect.children.length <= 1) {
-                        showToast('Error loading products', 'error');
-                    }
-                });
+            // Products are populated server-side; nothing more to load here.
+            console.log('No products available for waste recording');
         }
 
         function submitWasteForm() {

@@ -139,8 +139,10 @@ def main_owner_dashboard(request):
         'current_restaurant': current_restaurant,
         'view_all_restaurants': view_all_restaurants,
         'selected_restaurant_id': selected_restaurant_id,
+        'can_manage_branches': True,  # main owners always can manage branches
+        'can_switch_restaurants': True,
     }
-    
+
     return render(request, 'admin_panel/main_owner_dashboard.html', context)
 
 

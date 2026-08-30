@@ -9,6 +9,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable } from '../../api/orders';
 import NetInfo from '@react-native-community/netinfo';
 import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, updateOfflineOrderStatus, getTables } from '../../database/operations';
+import { resetErrors } from '../../utils/syncQueue';
 import { useSyncStore } from '../../store/useSyncStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
@@ -541,6 +542,19 @@ export default function CashierMyOrdersScreen({ navigation }) {
                         <Menu.Item leadingIcon="cancel" title="Void Payment" onPress={() => { setMenuOpenId(null); openVoid(order); }} />
                       )}
                       <Divider />
+                      {order._is_sync_error && (
+                        <Menu.Item
+                          leadingIcon="refresh"
+                          title="Retry Sync"
+                          onPress={() => {
+                            setMenuOpenId(null);
+                            resetErrors()
+                              .then(() => useSyncStore.getState().triggerSync())
+                              .then(() => fetchOrders(true))
+                              .catch(() => setSnack('Retry failed — try again'));
+                          }}
+                        />
+                      )}
                       <Menu.Item
                         leadingIcon="close-circle-outline"
                         title={order._is_offline_pending ? 'Delete Queued Order' : 'Cancel Order'}

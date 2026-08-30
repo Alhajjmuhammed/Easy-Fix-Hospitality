@@ -141,17 +141,17 @@ class Order(models.Model):
         """Release the table when order is completed or cancelled"""
         if not self.table_info:
             return
-        # Check if any other active orders are using this table
-        other_active_orders = Order.objects.filter(
-            table_info=self.table_info,
-            status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
-            payment_status__in=['unpaid', 'partial']
-        ).exclude(id=self.id)
-
-        # Only release table if no other active orders
-        if not other_active_orders.exists():
-            self.table_info.is_available = True
-            self.table_info.save(update_fields=['is_available'])
+        from django.db import transaction
+        with transaction.atomic():
+            table = TableInfo.objects.select_for_update(of=('self',)).get(pk=self.table_info_id)
+            other_active = Order.objects.filter(
+                table_info=table,
+                status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
+                payment_status__in=['unpaid', 'partial']
+            ).exclude(id=self.id).exists()
+            if not other_active:
+                table.is_available = True
+                table.save(update_fields=['is_available'])
     
     def save(self, *args, **kwargs):
         is_new = self.pk is None

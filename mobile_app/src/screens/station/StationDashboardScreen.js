@@ -14,7 +14,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiUpdateOrderStatus, apiPrintStationTicket } from '../../api/orders';
-import { getOrders, getOfflinePendingOrders, updateCachedOrderStatus } from '../../database/operations';
+import { getOrders, getOfflinePendingOrders, updateCachedOrderStatus, saveOfflineStatusChange } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
@@ -270,10 +270,11 @@ export default function StationDashboardScreen() {
         if (!mountedRef.current) return;
         const isNetworkError = !err.response;
         if (isNetworkError) {
-          // Network failure — optimistic update + SQLite write; server wins on reconnect
+          // Network failure — optimistic update + SQLite writes; synced on reconnect
           applyLocalUpdate();
           try { await updateCachedOrderStatus(orderId, newStatus); } catch { /* best-effort */ }
-          setSnack('Saved locally — reconnect and update again to sync.');
+          try { await saveOfflineStatusChange(orderId, newStatus); } catch { /* best-effort */ }
+          setSnack('Saved locally — will sync when back online.');
         } else {
           setSnack(err?.response?.data?.error || 'Failed to update status');
         }

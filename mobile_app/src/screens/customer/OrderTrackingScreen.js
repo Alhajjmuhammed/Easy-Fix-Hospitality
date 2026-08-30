@@ -168,6 +168,7 @@ export default function OrderTrackingScreen({ route }) {
         await saveOfflineBillRequest(order.table_info);
         await refreshPendingCount();
         if (!mountedRef.current) return;
+        setOrder(prev => prev ? { ...prev, pending_bill_requested: true } : prev);
         setSnack('Bill request saved – will sync when online');
       }
     } catch (err) {

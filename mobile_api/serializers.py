@@ -233,7 +233,7 @@ class TableSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    product_id = serializers.IntegerField(source='product.id', read_only=True)
+    product_id = serializers.SerializerMethodField()
     product_name = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
     station = serializers.SerializerMethodField()
@@ -245,6 +245,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'quantity', 'unit_price', 'total_price',
             'special_notes', 'station',
         ]
+
+    def get_product_id(self, obj):
+        return obj.product.id if obj.product else None
 
     def get_product_name(self, obj):
         return obj.product.name if obj.product else ''
@@ -262,6 +265,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     table_number = serializers.SerializerMethodField()
     ordered_by_name = serializers.SerializerMethodField()
+    ordered_by_id = serializers.SerializerMethodField()
     items = OrderItemSerializer(source='order_items', many=True, read_only=True)
     items_count = serializers.SerializerMethodField()
     subtotal = serializers.SerializerMethodField()
@@ -282,7 +286,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'order_number', 'table_info', 'table_number',
-            'ordered_by_name', 'confirmed_by_name', 'entered_by_name', 'status', 'payment_status',
+            'ordered_by_name', 'ordered_by_id', 'confirmed_by_name', 'entered_by_name', 'status', 'payment_status',
             'order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng',
             'total_amount', 'subtotal', 'tax_amount', 'discount_amount', 'total',
             'total_paid', 'balance_due', 'items_count',
@@ -307,6 +311,9 @@ class OrderSerializer(serializers.ModelSerializer):
         if not obj.ordered_by:
             return 'Unknown'
         return obj.ordered_by.get_full_name() or obj.ordered_by.username
+
+    def get_ordered_by_id(self, obj):
+        return obj.ordered_by.id if obj.ordered_by else None
 
     def get_subtotal(self, obj):
         try:

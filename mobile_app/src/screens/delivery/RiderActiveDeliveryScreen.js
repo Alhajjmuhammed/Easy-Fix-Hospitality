@@ -168,6 +168,7 @@ export default function RiderActiveDeliveryScreen({ route }) {
   // ── Location tracking ────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
+    let reconnectTimeout = null;
 
     async function startTracking() {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -182,29 +183,36 @@ export default function RiderActiveDeliveryScreen({ route }) {
         .replace(/^https/, 'wss')
         .replace(/^http/, 'ws')
         .replace(/\/api\/v1\/?$/, '');
-      const ws = new WebSocket(`${wsUrl}/ws/delivery/${assignmentOrderId}/?token=${encodeURIComponent(token)}`);
-      wsRef.current = ws;
 
-      ws.onerror = () => {
+      function connectWS() {
         if (!active) return;
-        setSnack('Live tracking connection failed — your location may not update in real time');
-      };
-      ws.onclose = (e) => {
-        if (!active || e.code === 1000) return;
-        setSnack('Live tracking disconnected');
-      };
-      ws.onmessage = (e) => {
-        if (!active) return;
-        try {
-          const m = JSON.parse(e.data);
-          if (m.type === 'delivery_status' && m.status === 'cancelled') {
-            setSnack('This order has been cancelled by the restaurant');
-            loadAssignment();
-          }
-        } catch { /* ignore */ }
-      };
+        const ws = new WebSocket(`${wsUrl}/ws/delivery/${assignmentOrderId}/?token=${encodeURIComponent(token)}`);
+        wsRef.current = ws;
 
-      // Subscribe to GPS updates
+        ws.onerror = () => {
+          if (!active) return;
+          setSnack('Live tracking connection issue — reconnecting...');
+        };
+        ws.onclose = (e) => {
+          if (!active || e.code === 1000) return;
+          setSnack('Live tracking reconnecting...');
+          reconnectTimeout = setTimeout(connectWS, 3000);
+        };
+        ws.onmessage = (e) => {
+          if (!active) return;
+          try {
+            const m = JSON.parse(e.data);
+            if (m.type === 'delivery_status' && m.status === 'cancelled') {
+              setSnack('This order has been cancelled by the restaurant');
+              loadAssignment();
+            }
+          } catch { /* ignore */ }
+        };
+      }
+
+      connectWS();
+
+      // Subscribe to GPS updates — use wsRef.current so reconnected sockets are used
       const sub = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.High, distanceInterval: 10, timeInterval: 5000 },
         (loc) => {
@@ -215,8 +223,8 @@ export default function RiderActiveDeliveryScreen({ route }) {
           // Guard against sensor glitches — gate both map injection and WS send on isFinite
           if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
             webViewRef.current?.injectJavaScript(`updateRider(${lat}, ${lng}); true;`);
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'location_update', lat, lng }));
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'location_update', lat, lng }));
             }
           }
         }
@@ -229,8 +237,9 @@ export default function RiderActiveDeliveryScreen({ route }) {
 
     return () => {
       active = false;
+      clearTimeout(reconnectTimeout);
       locSubRef.current?.remove();
-      wsRef.current?.close();
+      if (wsRef.current) wsRef.current.close(1000);
     };
   }, [assignmentOrderId, token]);
 

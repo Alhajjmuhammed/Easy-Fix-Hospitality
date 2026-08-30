@@ -563,11 +563,11 @@ export const getOrders = async (statuses = null) => {
   if (statuses && statuses.length) {
     const placeholders = statuses.map(() => '?').join(',');
     rows = await dbQuery(
-      `SELECT * FROM orders WHERE status IN (${placeholders}) ORDER BY created_at DESC LIMIT 300`,
+      `SELECT * FROM orders WHERE status IN (${placeholders}) ORDER BY created_at DESC LIMIT 1000`,
       statuses,
     );
   } else {
-    rows = await dbQuery('SELECT * FROM orders ORDER BY created_at DESC LIMIT 300');
+    rows = await dbQuery('SELECT * FROM orders ORDER BY created_at DESC LIMIT 1000');
   }
   return rows.map(_parseOrder);
 };
@@ -765,6 +765,62 @@ export const getLocalReportStats = async () => {
   };
 };
 
+// ── Offline Status Changes ────────────────────────────────────────────────────
+
+export async function saveOfflineStatusChange(orderId, newStatus) {
+  await dbExec(
+    "INSERT INTO offline_status_changes (order_id, new_status, sync_status) VALUES (?, ?, 'pending')",
+    [orderId, newStatus],
+  );
+}
+
+export async function getPendingStatusChanges() {
+  return dbQuery(
+    "SELECT * FROM offline_status_changes WHERE sync_status = 'pending' ORDER BY created_at ASC",
+  );
+}
+
+export async function markStatusChangeSynced(id) {
+  await dbExec(
+    "UPDATE offline_status_changes SET sync_status = 'synced' WHERE id = ?",
+    [id],
+  );
+}
+
+export async function markStatusChangeError(id) {
+  await dbExec(
+    "UPDATE offline_status_changes SET sync_status = 'error' WHERE id = ?",
+    [id],
+  );
+}
+
+// ── Cached Delivery Assignments ───────────────────────────────────────────────
+
+export async function cacheAssignments(assignments) {
+  await dbExec('DELETE FROM cached_assignments');
+  for (const a of assignments) {
+    await dbExec(
+      "INSERT OR REPLACE INTO cached_assignments (id, order_id, status, order_data, updated_at) VALUES (?, ?, ?, ?, datetime('now'))",
+      [a.id, a.order?.id ?? null, a.status, JSON.stringify(a)],
+    );
+  }
+}
+
+export async function getCachedAssignments() {
+  const rows = await dbQuery(
+    'SELECT order_data FROM cached_assignments ORDER BY updated_at DESC',
+  );
+  return rows
+    .map((r) => {
+      try {
+        return JSON.parse(r.order_data);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
 // ── Security: clear all user-specific local data on logout ───────────────────
 // Must be called every time a user logs out to prevent data leaking to the
 // next user who logs in on the same device (different user, different restaurant).
@@ -781,5 +837,7 @@ export const clearAllUserData = async () => {
     await db.runAsync('DELETE FROM products');
     await db.runAsync('DELETE FROM tables');
     await db.runAsync('DELETE FROM orders');
+    await db.runAsync('DELETE FROM offline_status_changes');
+    await db.runAsync('DELETE FROM cached_assignments');
   });
 };

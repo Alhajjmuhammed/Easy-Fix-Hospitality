@@ -552,6 +552,8 @@ def mark_delivered(request, order_id):
         order = _DeliveredOrder.objects.select_for_update(of=('self',)).get(pk=order.pk)
         order_was_cancelled = order.status == 'cancelled'
         if not order_was_cancelled:
+            if order.payment_status in ('unpaid', 'partial'):
+                logger.warning('Order %s marked delivered with payment_status=%s', order.id, order.payment_status)
             order.status = 'delivered'
             order.save(update_fields=['status', 'updated_at'])
 

@@ -112,9 +112,12 @@ export default function AttendanceScreen({ navigation }) {
       }
     } catch (err) {
       if (!mountedRef.current) return;
-      const msg = err.response?.data?.error || err.response?.data?.detail || 'Invalid QR code';
+      const isNetworkError = !err.response;
+      const msg = isNetworkError
+        ? 'No internet connection — please connect and try again'
+        : (err.response?.data?.error || err.response?.data?.detail || 'Invalid QR code');
       setSnack(msg);
-      setSnackColor('#E53935');
+      setSnackColor(isNetworkError ? '#FF8F00' : '#E53935');
       // Allow rescanning after error
       setTimeout(() => { scanningRef.current = false; }, 2500);
     }

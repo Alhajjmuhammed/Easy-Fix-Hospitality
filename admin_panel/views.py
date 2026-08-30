@@ -3289,6 +3289,56 @@ def get_table(request):
 
 
 @login_required
+def get_tables_json(request):
+    """Return the owner's tables (and customers) as JSON for the Add Order modal."""
+    try:
+        owner_filter = get_owner_filter(request.user)
+        session_restaurant_id = request.session.get('selected_restaurant_id')
+        restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
+        current_restaurant = restaurant_context.get('current_restaurant')
+
+        if owner_filter:
+            table_q = (
+                Q(owner=owner_filter) |
+                Q(restaurant__main_owner=owner_filter) |
+                Q(restaurant__branch_owner=owner_filter)
+            )
+            if current_restaurant:
+                table_q = (
+                    Q(restaurant=current_restaurant) |
+                    Q(owner=owner_filter, restaurant__isnull=True)
+                )
+            tables = TableInfo.objects.filter(table_q).distinct().order_by('tbl_no')
+        elif request.user.is_administrator():
+            tables = TableInfo.objects.all().order_by('tbl_no')
+        else:
+            tables = TableInfo.objects.none()
+
+        table_list = [
+            {'id': t.id, 'tbl_no': t.tbl_no, 'is_available': t.is_available}
+            for t in tables
+        ]
+
+        # Customers are users linked to this owner
+        if owner_filter:
+            customers = User.objects.filter(
+                owner=owner_filter, is_active=True
+            ).order_by('first_name', 'last_name', 'username')
+        else:
+            customers = User.objects.none()
+
+        customer_list = [
+            {'id': u.id, 'name': u.get_full_name() or u.username}
+            for u in customers
+        ]
+
+        return JsonResponse({'success': True, 'tables': table_list, 'customers': customer_list})
+    except Exception as e:
+        logger.error(f'Error getting tables JSON: {e}')
+        return JsonResponse({'success': False, 'tables': [], 'customers': []})
+
+
+@login_required
 @require_http_methods(["POST"])
 def update_table(request):
     """Update table"""

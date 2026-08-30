@@ -115,6 +115,25 @@ export const initDatabase = async () => {
       error_message TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS offline_status_changes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id    INTEGER NOT NULL,
+      new_status  TEXT    NOT NULL,
+      created_at  TEXT    DEFAULT (datetime('now')),
+      sync_status TEXT    DEFAULT 'pending'
+    );
+
+    CREATE TABLE IF NOT EXISTS cached_assignments (
+      id               INTEGER PRIMARY KEY,
+      order_id         INTEGER,
+      status           TEXT,
+      pickup_address   TEXT,
+      delivery_address TEXT,
+      customer_name    TEXT,
+      order_data       TEXT,
+      updated_at       TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS sync_meta (
       key   TEXT PRIMARY KEY,
       value TEXT
@@ -218,6 +237,36 @@ export const initDatabase = async () => {
   ]) {
     try { await db.runAsync(stmt); } catch (_) {}
   }
+
+  // Migration: offline_status_changes and cached_assignments for existing installs
+  try {
+    await db.runAsync(`
+      CREATE TABLE IF NOT EXISTS offline_status_changes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id    INTEGER NOT NULL,
+        new_status  TEXT    NOT NULL,
+        created_at  TEXT    DEFAULT (datetime('now')),
+        sync_status TEXT    DEFAULT 'pending'
+      )
+    `);
+  } catch (_) {}
+  try {
+    await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_status_changes_sync ON offline_status_changes(sync_status)`);
+  } catch (_) {}
+  try {
+    await db.runAsync(`
+      CREATE TABLE IF NOT EXISTS cached_assignments (
+        id               INTEGER PRIMARY KEY,
+        order_id         INTEGER,
+        status           TEXT,
+        pickup_address   TEXT,
+        delivery_address TEXT,
+        customer_name    TEXT,
+        order_data       TEXT,
+        updated_at       TEXT DEFAULT (datetime('now'))
+      )
+    `);
+  } catch (_) {}
 
   // Migration: add orders cache table for existing installs that pre-date this feature.
   // CREATE TABLE IF NOT EXISTS in the block above already handles fresh installs;

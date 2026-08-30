@@ -10,9 +10,11 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from cashier.views import _safe_csv
 from .models import AttendanceQRToken, AttendanceRecord, Shift, AttendancePolicy
 
 
@@ -116,13 +118,16 @@ def attendance_dashboard(request):
     staff_ids_present = AttendanceRecord.objects.filter(
         owner=owner, date=today, check_in__isnull=False
     ).values_list('staff_id', flat=True)
-    absent_staff = User.objects.filter(
+    absent_staff_qs = User.objects.filter(
         owner=owner, is_active=True, is_active_staff=True
     ).exclude(id__in=staff_ids_present).exclude(id=owner.id)
+    # Restrict to the current restaurant's branch when a restaurant context is set
+    if restaurant and restaurant.branch_owner:
+        absent_staff_qs = absent_staff_qs.filter(owner=restaurant.branch_owner)
     # Exclude customer/admin roles; also exclude owner-level roles for non-owner viewers
     EXCLUDED_ROLES = {'customer', 'administrator', 'main_owner', 'branch_owner', 'owner'}
     absent_staff = [
-        u for u in absent_staff
+        u for u in absent_staff_qs
         if not u.role or u.role.name not in EXCLUDED_ROLES
     ]
 
@@ -463,6 +468,7 @@ def attendance_my(request):
 
 # ─── web QR scan (camera-based check-in from browser) ─────────────────────────
 
+@csrf_protect
 @login_required
 def attendance_qr_web_scan(request):
     """
@@ -574,6 +580,9 @@ def attendance_day_detail(request):
         absent_qs = User.objects.filter(
             owner=owner, is_active=True, is_active_staff=True
         ).exclude(id__in=staff_ids_present).exclude(id=owner.id)
+        # Restrict to the current restaurant's branch when a restaurant context is set
+        if restaurant and restaurant.branch_owner:
+            absent_qs = absent_qs.filter(owner=restaurant.branch_owner)
         EXCLUDED_ROLES = {'customer', 'administrator', 'main_owner', 'branch_owner', 'owner'}
         absent_staff = [u for u in absent_qs if not u.role or u.role.name not in EXCLUDED_ROLES]
 
@@ -709,13 +718,13 @@ def attendance_reports(request):
         writer.writerow(['Staff Name', 'Role', 'Days Present', 'On Time', 'Late', 'Avg Hours', 'Total Hours'])
         for s in staff_summary:
             writer.writerow([
-                s['name'],
-                s['role'],
+                _safe_csv(s['name']),
+                _safe_csv(s['role']),
                 s['days_present'],
                 s['on_time'],
                 s['days_late'],
-                s['avg_display'],
-                s['total_display'],
+                _safe_csv(s['avg_display']),
+                _safe_csv(s['total_display']),
             ])
         return response
 

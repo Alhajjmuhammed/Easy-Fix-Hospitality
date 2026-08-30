@@ -13,7 +13,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
@@ -689,7 +689,7 @@ def place_order(request):
 
                         # Update stock
                         product.available_in_stock -= item['quantity']
-                        product.save()
+                        product.save(update_fields=['available_in_stock'])
 
                         total_amount += float(unit_price_paid) * item['quantity']
 
@@ -880,11 +880,20 @@ def place_order(request):
 @login_required
 def order_confirmation(request, order_id):
     """Order confirmation page"""
-    order = get_object_or_404(
-        Order.objects.prefetch_related('order_items__product'),
-        Q(ordered_by=request.user) | Q(entered_by=request.user),
-        id=order_id,
-    )
+    if request.user.is_owner() or request.user.is_manager() or request.user.is_cashier():
+        # Staff can view any order — verify it belongs to their restaurant
+        order = get_object_or_404(Order.objects.prefetch_related('order_items__product'), id=order_id)
+        order_owner = order.get_owner()
+        user_owner = request.user.get_owner()
+        if order_owner is None or user_owner is None or order_owner != user_owner:
+            from django.http import Http404
+            raise Http404
+    else:
+        order = get_object_or_404(
+            Order.objects.prefetch_related('order_items__product'),
+            Q(ordered_by=request.user) | Q(entered_by=request.user),
+            id=order_id,
+        )
 
     # Check if we should auto-print KOT and/or BOT
     should_auto_print_kot = request.session.pop('print_kot', False)
@@ -1858,9 +1867,9 @@ def confirm_order(request, order_id):
                 Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
                 Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
             )
-            order = get_object_or_404(kitchen_orders.filter(_oq_ko), id=order_id, status='pending')
+            order = get_object_or_404(kitchen_orders.filter(_oq_ko).select_for_update(of=('self',)), id=order_id, status='pending')
         else:
-            order = get_object_or_404(kitchen_orders, id=order_id, status='pending')
+            order = get_object_or_404(kitchen_orders.select_for_update(of=('self',)), id=order_id, status='pending')
 
         order.status = 'confirmed'
         order.confirmed_by = request.user
@@ -1975,16 +1984,23 @@ def update_order_status(request, order_id):
         if new_status == 'cancelled':
             cancel_reason = request.POST.get('cancel_reason', '') if request.content_type != 'application/json' else data.get('cancel_reason', '')
             order.reason_if_cancelled = cancel_reason
-        
+
         order.status = new_status
         if new_status == 'confirmed' and not order.confirmed_by:
             order.confirmed_by = request.user
-        
-        # Release table if order is cancelled through status change
+
+        # Release table and restore stock if order is cancelled through status change
         if new_status == 'cancelled':
+            for item in order.order_items.select_related('product').select_for_update(of=('self',)):
+                if item.product:
+                    item.product.available_in_stock = F('available_in_stock') + item.quantity
+                    item.product.save(update_fields=['available_in_stock'])
             order.release_table()
-            
-        order.save()
+
+        fields_to_update = ['status', 'reason_if_cancelled']
+        if hasattr(order, 'confirmed_by') and order.confirmed_by:
+            fields_to_update.append('confirmed_by')
+        order.save(update_fields=fields_to_update)
 
         # Send real-time notifications (non-critical — Redis failure must not roll back order.save())
         try:
@@ -2141,6 +2157,19 @@ def cancel_order(request, order_id):
                     return JsonResponse({'success': False, 'message': 'Cancellation reason is required.'})
                 
                 with transaction.atomic():
+                    # Re-fetch with row lock to prevent concurrent cancellation race
+                    if owner_filter:
+                        order = get_object_or_404(
+                            Order.objects.select_for_update(of=('self',)).filter(_oq_cobk),
+                            id=order_id
+                        )
+                    else:
+                        order = get_object_or_404(
+                            Order.objects.select_for_update(of=('self',)),
+                            id=order_id
+                        )
+                    if order.status in ['served', 'cancelled']:
+                        return JsonResponse({'success': False, 'message': 'Cannot cancel this order.'})
                     # Restore product stock
                     for item in order.order_items.select_related('product').all():
                         product = item.product
@@ -2154,7 +2183,7 @@ def cancel_order(request, order_id):
                     order.reason_if_cancelled = reason
                     # Release the table when order is cancelled
                     order.release_table()
-                    order.save()
+                    order.save(update_fields=['status', 'reason_if_cancelled'])
 
                     return JsonResponse({
                         'success': True,
@@ -2169,6 +2198,20 @@ def cancel_order(request, order_id):
         form = CancelOrderForm(request.POST)
         if form.is_valid():
             with transaction.atomic():
+                # Re-fetch with row lock to prevent concurrent cancellation race
+                if owner_filter:
+                    order = get_object_or_404(
+                        Order.objects.select_for_update(of=('self',)).filter(_oq_cobk),
+                        id=order_id
+                    )
+                else:
+                    order = get_object_or_404(
+                        Order.objects.select_for_update(of=('self',)),
+                        id=order_id
+                    )
+                if order.status in ['served', 'cancelled']:
+                    messages.error(request, 'Cannot cancel this order.')
+                    return redirect('orders:kitchen_dashboard')
                 # Restore product stock
                 for item in order.order_items.select_related('product').all():
                     product = item.product
@@ -2176,14 +2219,14 @@ def cancel_order(request, order_id):
                         product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
                         product.available_in_stock += item.quantity
                         product.save(update_fields=['available_in_stock'])
-                
+
                 # Update order
                 order.status = 'cancelled'
                 order.reason_if_cancelled = form.cleaned_data['reason']
                 # Release the table when order is cancelled
                 order.release_table()
-                order.save()
-                
+                order.save(update_fields=['status', 'reason_if_cancelled'])
+
                 messages.success(request, f'Order {order.order_number} cancelled successfully.')
                 return redirect('orders:kitchen_dashboard')
     else:
@@ -2238,6 +2281,27 @@ def customer_cancel_order(request, order_id):
                 reason = data.get('reason', 'Cancelled by customer').strip()
                 
                 with transaction.atomic():
+                    # Re-fetch with row lock to prevent concurrent cancellation race
+                    if request.user.is_customer():
+                        order = get_object_or_404(
+                            Order.objects.select_for_update(of=('self',)),
+                            id=order_id, ordered_by=request.user
+                        )
+                    elif owner_filter:
+                        order = get_object_or_404(
+                            Order.objects.select_for_update(of=('self',)).filter(_oq_cco),
+                            id=order_id
+                        )
+                    else:
+                        order = get_object_or_404(
+                            Order.objects.select_for_update(of=('self',)),
+                            id=order_id
+                        )
+                    if order.status != 'pending':
+                        return JsonResponse({
+                            'success': False,
+                            'message': 'Order cannot be cancelled. It has already been confirmed by the kitchen.'
+                        })
                     # Restore product stock
                     for item in order.order_items.select_related('product').all():
                         product = item.product
@@ -2251,7 +2315,7 @@ def customer_cancel_order(request, order_id):
                     order.reason_if_cancelled = reason
                     # Release the table when order is cancelled
                     order.release_table()
-                    order.save()
+                    order.save(update_fields=['status', 'reason_if_cancelled'])
 
                     return JsonResponse({
                         'success': True,
@@ -2267,6 +2331,25 @@ def customer_cancel_order(request, order_id):
 
         try:
             with transaction.atomic():
+                # Re-fetch with row lock to prevent concurrent cancellation race
+                if request.user.is_customer():
+                    order = get_object_or_404(
+                        Order.objects.select_for_update(of=('self',)),
+                        id=order_id, ordered_by=request.user
+                    )
+                elif owner_filter:
+                    order = get_object_or_404(
+                        Order.objects.select_for_update(of=('self',)).filter(_oq_cco),
+                        id=order_id
+                    )
+                else:
+                    order = get_object_or_404(
+                        Order.objects.select_for_update(of=('self',)),
+                        id=order_id
+                    )
+                if order.status != 'pending':
+                    messages.error(request, 'Order cannot be cancelled. It has already been confirmed by the kitchen.')
+                    return redirect('orders:my_orders' if request.user.is_customer() else 'orders:customer_care_dashboard')
                 # Restore product stock
                 for item in order.order_items.select_related('product').all():
                     product = item.product
@@ -2274,14 +2357,14 @@ def customer_cancel_order(request, order_id):
                         product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
                         product.available_in_stock += item.quantity
                         product.save(update_fields=['available_in_stock'])
-                
+
                 # Update order
                 order.status = 'cancelled'
                 order.reason_if_cancelled = reason if reason else 'Cancelled by customer'
                 # Release the table when order is cancelled
                 order.release_table()
                 order.save()
-                
+
                 messages.success(request, f'Order {order.order_number} cancelled successfully.')
                 return redirect('orders:my_orders' if request.user.is_customer() else 'orders:customer_care_dashboard')
         except Exception as e:
@@ -3640,8 +3723,8 @@ def handle_add_to_existing_order(request, order_id, cart):
                 
                 # Update stock
                 product.available_in_stock -= item['quantity']
-                product.save()
-                
+                product.save(update_fields=['available_in_stock'])
+
                 total_added += unit_price_paid * item['quantity']
             
             # Update order total — total_amount is tax-inclusive, so gross the added subtotal

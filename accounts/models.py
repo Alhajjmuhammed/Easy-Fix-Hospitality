@@ -668,17 +668,25 @@ class RestaurantSubscription(models.Model):
         with transaction.atomic():
             locked = self.__class__.objects.select_for_update(of=('self',)).get(pk=self.pk)
             old_status = locked.subscription_status
+            # Sync self from the fresh locked row to avoid operating on stale data
+            self.subscription_status = locked.subscription_status
+            self.is_blocked_by_admin = locked.is_blocked_by_admin
             self.is_blocked_by_admin = True
             self.block_reason = reason
             self.subscription_status = 'blocked'
 
-            # Block all related users
-            self.restaurant_owner.is_active = False
-            self.restaurant_owner.save()
+            # Block all related users — use locked to avoid stale FK traversal
+            owner_user = locked.restaurant_owner
+            owner_user.is_active = False
+            owner_user.save(update_fields=['is_active'])
 
             # Block all staff under this owner
-            staff_users = self.restaurant_owner.owned_users.all()
-            staff_users.update(is_active=False)
+            locked.restaurant_owner.owned_users.all().update(is_active=False)
+
+            # Also deactivate customer accounts linked to this owner
+            from django.contrib.auth import get_user_model as _get_user_model
+            _User = _get_user_model()
+            _User.objects.filter(owner=locked.restaurant_owner, role__name='customer').update(is_active=False)
 
             self.save(update_fields=['is_blocked_by_admin', 'block_reason', 'subscription_status'])
 
@@ -769,12 +777,11 @@ class RestaurantSubscription(models.Model):
                 if today > grace_end_date:
                     # Fully expired, block access
                     self.subscription_status = 'expired'
-                    self.restaurant_owner.is_active = False
-                    self.restaurant_owner.save()
+                    locked.restaurant_owner.is_active = False
+                    locked.restaurant_owner.save(update_fields=['is_active'])
 
                     # Block all staff
-                    staff_users = self.restaurant_owner.owned_users.all()
-                    staff_users.update(is_active=False)
+                    locked.restaurant_owner.owned_users.all().update(is_active=False)
 
                     self.save(update_fields=['subscription_status'])
 
