@@ -150,6 +150,11 @@
                         <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
                             <i class="bi bi-camera-video-off me-2"></i>
                             <span id="qr-cam-error-msg">Camera not available.</span>
+                            <div class="mt-2">
+                                <button id="qr-retry-btn" type="button" class="btn btn-sm btn-warning" onclick="window._qrRetry && window._qrRetry()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Try Camera Again
+                                </button>
+                            </div>
                         </div>
                     </div>
                     {% endif %}
@@ -200,6 +205,11 @@
                         <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
                             <i class="bi bi-camera-video-off me-2"></i>
                             <span id="qr-cam-error-msg">Camera not available.</span>
+                            <div class="mt-2">
+                                <button id="qr-retry-btn" type="button" class="btn btn-sm btn-warning" onclick="window._qrRetry && window._qrRetry()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Try Camera Again
+                                </button>
+                            </div>
                         </div>
                     </div>
                     {% endif %}
@@ -314,19 +324,47 @@
         if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || 'inherit'; }
     }
 
-    // Load jsQR dynamically
-    var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-    s.onload = startCamera;
-    s.onerror = function() { showError(); };
-    document.head.appendChild(s);
+    // Expose retry so the button and visibilitychange can call it
+    window._qrRetry = function() {
+        if (errorEl) errorEl.classList.add('d-none');
+        if (video) video.style.display = 'block';
+        scanning = true;
+        submitted = false;
+        stopCamera();
+        if (window.jsQR) { startCamera(); } else { loadJsQR(); }
+    };
+
+    // When user returns from Chrome Settings after granting permission, auto-retry
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && errorEl && !errorEl.classList.contains('d-none')) {
+            window._qrRetry();
+        }
+    });
+
+    function loadJsQR() {
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+        s.onload = startCamera;
+        s.onerror = function() { showError('cdnfail'); };
+        document.head.appendChild(s);
+    }
+    loadJsQR();
 
     function startCamera() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             showError(); return;
         }
+        // Try rear camera first; fall back to any camera if OverconstrainedError
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .catch(function(err) {
+                if (err && (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError')) {
+                    return navigator.mediaDevices.getUserMedia({ video: true });
+                }
+                return Promise.reject(err);
+            })
             .then(function(stream) {
+                if (errorEl) errorEl.classList.add('d-none');
+                video.style.display = 'block';
                 video.srcObject = stream;
                 video.play();
                 requestAnimationFrame(tick);
@@ -396,12 +434,13 @@
             var msgEl = document.getElementById('qr-cam-error-msg');
             if (msgEl) {
                 if (!window.isSecureContext) {
-                    msgEl.innerHTML = 'Camera requires a secure connection (HTTPS). ' +
-                        'Open the site using <strong>https://</strong> instead of http://, then allow camera access when prompted.';
+                    msgEl.innerHTML = 'Camera requires HTTPS. Open <strong>https://hospitality.easyfixsoft.com</strong> — not http://.';
                 } else if (reason === 'denied') {
-                    msgEl.textContent = 'Camera permission denied. Please tap the camera icon in your browser address bar and allow access, then refresh.';
+                    msgEl.innerHTML = 'Camera access blocked. Tap the <strong>camera icon</strong> in your browser address bar, set it to <strong>Allow</strong>, then tap <em>Try Camera Again</em> below.';
+                } else if (reason === 'cdnfail') {
+                    msgEl.textContent = 'Could not load QR scanner. Please check your internet connection and tap Try Camera Again.';
                 } else {
-                    msgEl.textContent = 'Camera not available on this device or browser.';
+                    msgEl.textContent = 'Camera not available. Tap Try Camera Again, or check that no other app is using your camera.';
                 }
             }
         }
