@@ -63,7 +63,9 @@ def dashboard(request):
         items_qs = InventoryItem.objects.filter(is_active=True).select_related('owner')
 
     # Annotate current stock from records in a single query to avoid N+1
-    items_qs = items_qs.annotate(stock_total=Coalesce(Sum('records__quantity_change'), Value(0)))
+    items_qs = items_qs.annotate(
+        stock_total=Coalesce(Sum('records__quantity_change'), Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)))
+    )
     items_data = []
     low_stock_count = 0
     out_of_stock_count = 0
@@ -264,7 +266,9 @@ def manage_items(request):
     if category_filter:
         qs = qs.filter(category__iexact=category_filter)
 
-    qs = qs.annotate(stock_total=Coalesce(Sum('records__quantity_change'), Value(0)))
+    qs = qs.annotate(
+        stock_total=Coalesce(Sum('records__quantity_change'), Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)))
+    )
     items_data = [{'item': item, 'stock': item.stock_total} for item in qs]
 
     # Managed lists from InventoryCategory / InventoryUnit
