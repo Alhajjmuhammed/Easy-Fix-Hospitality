@@ -855,9 +855,11 @@
                         mainContent.classList.add('expanded');
                     }
                 } else {
-                    // Mobile - remove desktop classes
+                    // Mobile - remove desktop classes and ensure sidebar is hidden
                     sidebar.classList.remove('collapsed');
+                    sidebar.classList.remove('show');
                     mainContent.classList.remove('expanded');
+                    if (sidebarOverlay) sidebarOverlay.classList.remove('show');
                 }
             });
         });

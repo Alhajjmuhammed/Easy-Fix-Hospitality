@@ -673,12 +673,18 @@
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const mainContent = document.getElementById('mainContent');
-            
+
+            if (window.innerWidth <= 768) {
+                // On mobile use the mobile sidebar instead
+                toggleMobileSidebar();
+                return;
+            }
+
             sidebar.classList.toggle('collapsed');
             mainContent.classList.toggle('expanded');
-            
-            // Save state to localStorage
-            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+
+            // Use a separate key so it doesn't affect admin_panel sidebar state
+            localStorage.setItem('sysAdminSidebarCollapsed', sidebar.classList.contains('collapsed'));
         }
 
         function toggleMobileSidebar() {
@@ -703,7 +709,7 @@
 
         // Restore sidebar state on page load
         document.addEventListener('DOMContentLoaded', function() {
-            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            const isCollapsed = localStorage.getItem('sysAdminSidebarCollapsed') === 'true';
             if (isCollapsed && window.innerWidth > 768) {
                 document.getElementById('sidebar').classList.add('collapsed');
                 document.getElementById('mainContent').classList.add('expanded');

@@ -149,7 +149,7 @@
                         <div id="qr-status" class="mb-2" style="min-height:1.5rem;font-weight:600;"></div>
                         <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
                             <i class="bi bi-camera-video-off me-2"></i>
-                            Camera not available. Please use the mobile app to scan.
+                            <span id="qr-cam-error-msg">Camera not available.</span>
                         </div>
                     </div>
                     {% endif %}
@@ -199,7 +199,7 @@
                         <div id="qr-status" class="mb-2" style="min-height:1.5rem;font-weight:600;"></div>
                         <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
                             <i class="bi bi-camera-video-off me-2"></i>
-                            Camera not available. Please use the mobile app to scan.
+                            <span id="qr-cam-error-msg">Camera not available.</span>
                         </div>
                     </div>
                     {% endif %}
@@ -331,7 +331,10 @@
                 video.play();
                 requestAnimationFrame(tick);
             })
-            .catch(function() { showError(); });
+            .catch(function(err) {
+                var denied = err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
+                showError(denied ? 'denied' : '');
+            });
     }
 
     function tick() {
@@ -386,9 +389,22 @@
         });
     }
 
-    function showError() {
+    function showError(reason) {
         if (video) video.style.display = 'none';
-        if (errorEl) errorEl.classList.remove('d-none');
+        if (errorEl) {
+            errorEl.classList.remove('d-none');
+            var msgEl = document.getElementById('qr-cam-error-msg');
+            if (msgEl) {
+                if (!window.isSecureContext) {
+                    msgEl.innerHTML = 'Camera requires a secure connection (HTTPS). ' +
+                        'Open the site using <strong>https://</strong> instead of http://, then allow camera access when prompted.';
+                } else if (reason === 'denied') {
+                    msgEl.textContent = 'Camera permission denied. Please tap the camera icon in your browser address bar and allow access, then refresh.';
+                } else {
+                    msgEl.textContent = 'Camera not available on this device or browser.';
+                }
+            }
+        }
     }
 })();
 {% endif %}
