@@ -238,7 +238,12 @@ export const useSyncStore = create((set, get) => ({
           await apiUpdateOrderStatus(change.order_id, change.new_status);
           await markStatusChangeSynced(change.id);
         } catch (e) {
-          await markStatusChangeError(change.id);
+          // Only permanently mark as error for definitive server rejections (4xx).
+          // Network errors (no response) leave the row as 'pending' so the next
+          // sync cycle retries automatically — resetErrors() at sync start handles it.
+          if (e.response) {
+            await markStatusChangeError(change.id);
+          }
         }
       }
 

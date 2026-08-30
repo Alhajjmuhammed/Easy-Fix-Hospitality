@@ -50,5 +50,11 @@ export async function resetErrors() {
   await dbExec(
     "UPDATE offline_payments SET sync_status='pending', error_message=NULL WHERE sync_status='error'",
   );
+  await dbExec(
+    "UPDATE offline_bill_requests SET sync_status='pending', error_message=NULL WHERE sync_status='error'",
+  );
+  await dbExec(
+    "UPDATE offline_status_changes SET sync_status='pending' WHERE sync_status='error'",
+  );
 }
 
