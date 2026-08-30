@@ -361,7 +361,7 @@ class SecurityHeadersMiddleware:
         response['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
         response['Cross-Origin-Embedder-Policy'] = 'unsafe-none'
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(), payment=()'
+        response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(self), payment=()'
         response['X-DNS-Prefetch-Control'] = 'off'
         # Prevent search engines from indexing sensitive admin/system pages
         response['X-Robots-Tag'] = 'noindex, nofollow'
