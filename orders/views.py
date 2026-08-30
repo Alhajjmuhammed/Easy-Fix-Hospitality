@@ -1873,7 +1873,7 @@ def confirm_order(request, order_id):
 
         order.status = 'confirmed'
         order.confirmed_by = request.user
-        order.save()
+        order.save(update_fields=['status', 'confirmed_by'])
 
         # Mark table as occupied when order is confirmed (delivery/pickup have no table)
         if order.table_info:
@@ -2363,7 +2363,7 @@ def customer_cancel_order(request, order_id):
                 order.reason_if_cancelled = reason if reason else 'Cancelled by customer'
                 # Release the table when order is cancelled
                 order.release_table()
-                order.save()
+                order.save(update_fields=['status', 'reason_if_cancelled'])
 
                 messages.success(request, f'Order {order.order_number} cancelled successfully.')
                 return redirect('orders:my_orders' if request.user.is_customer() else 'orders:customer_care_dashboard')
@@ -3730,11 +3730,11 @@ def handle_add_to_existing_order(request, order_id, cart):
             # Update order total — total_amount is tax-inclusive, so gross the added subtotal
             tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
             order.total_amount += total_added * (1 + tax_rate)
-            order.save()
-            
+            order.save(update_fields=['total_amount'])
+
             # Log the action
             log_security_event(
-                event_type='items_added_to_order',
+                event_type='order_status_change',
                 user=request.user,
                 description=f"Added {len(cart)} items to Order {order.order_number}",
                 ip_address=get_client_ip(request),

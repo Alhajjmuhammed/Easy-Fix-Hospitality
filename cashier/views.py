@@ -475,7 +475,7 @@ def void_payment(request, payment_id):
         payment.voided_by = request.user
         payment.void_reason = void_reason
         payment.voided_at = timezone.now()
-        payment.save()
+        payment.save(update_fields=['is_voided', 'voided_by', 'voided_at', 'void_reason'])
         
         # Update order payment status — lock the order row to prevent concurrent payment/void races
         order = Order.objects.select_for_update(of=('self',)).get(pk=payment.order_id)
@@ -1007,7 +1007,8 @@ def cashier_reports(request):
     
     # Calculate statistics via DB aggregation (no Python iteration over orders)
     from django.db.models import Case, When, Value, DecimalField
-    agg = Order.objects.filter(id__in=order_ids).aggregate(
+    revenue_qs = Order.objects.filter(id__in=order_ids).exclude(status='cancelled')
+    agg = revenue_qs.aggregate(
         total_revenue=Sum('total_amount'),
         total_orders_count=Count('id'),
     )

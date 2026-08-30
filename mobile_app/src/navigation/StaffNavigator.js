@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -224,6 +225,16 @@ export default function StaffNavigator() {
           options={{ title: 'Printer', headerShown: false }}
         />
       </StationTab.Navigator>
+    );
+  }
+
+  if (!isCashier && !isManager && !isStation) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ fontSize: 16, textAlign: 'center', margin: 24 }}>
+          Your account role is not recognized. Please contact your administrator.
+        </Text>
+      </View>
     );
   }
 

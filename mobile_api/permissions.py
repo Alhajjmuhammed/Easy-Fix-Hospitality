@@ -51,7 +51,8 @@ class IsSubscriptionActive(BasePermission):
                 owner = direct
 
         if not owner:
-            return True
+            # Staff with no restaurant assignment should not be granted access
+            raise PermissionDenied({'error': 'No restaurant associated with this account. Contact your administrator.'})
 
         try:
             from accounts.models import RestaurantSubscription

@@ -797,13 +797,16 @@ export async function markStatusChangeError(id) {
 // ── Cached Delivery Assignments ───────────────────────────────────────────────
 
 export async function cacheAssignments(assignments) {
-  await dbExec('DELETE FROM cached_assignments');
-  for (const a of assignments) {
-    await dbExec(
-      "INSERT OR REPLACE INTO cached_assignments (id, order_id, status, order_data, updated_at) VALUES (?, ?, ?, ?, datetime('now'))",
-      [a.id, a.order?.id ?? null, a.status, JSON.stringify(a)],
-    );
-  }
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM cached_assignments');
+    for (const a of assignments) {
+      await db.runAsync(
+        "INSERT OR REPLACE INTO cached_assignments (id, order_id, status, order_data, updated_at) VALUES (?, ?, ?, ?, datetime('now'))",
+        [a.id, a.order?.id ?? null, a.status, JSON.stringify(a)],
+      );
+    }
+  });
 }
 
 export async function getCachedAssignments() {

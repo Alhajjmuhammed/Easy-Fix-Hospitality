@@ -118,12 +118,15 @@ def attendance_dashboard(request):
     staff_ids_present = AttendanceRecord.objects.filter(
         owner=owner, date=today, check_in__isnull=False
     ).values_list('staff_id', flat=True)
-    absent_staff_qs = User.objects.filter(
-        owner=owner, is_active=True, is_active_staff=True
-    ).exclude(id__in=staff_ids_present).exclude(id=owner.id)
-    # Restrict to the current restaurant's branch when a restaurant context is set
+    # Build the absent query from the correct owner context
     if restaurant and restaurant.branch_owner:
-        absent_staff_qs = absent_staff_qs.filter(owner=restaurant.branch_owner)
+        absent_owner = restaurant.branch_owner
+    else:
+        absent_owner = owner
+
+    absent_staff_qs = User.objects.filter(
+        owner=absent_owner, is_active=True, is_active_staff=True
+    ).exclude(id__in=staff_ids_present).exclude(id=absent_owner.id)
     # Exclude customer/admin roles; also exclude owner-level roles for non-owner viewers
     EXCLUDED_ROLES = {'customer', 'administrator', 'main_owner', 'branch_owner', 'owner'}
     absent_staff = [
@@ -577,12 +580,15 @@ def attendance_day_detail(request):
         staff_ids_present = AttendanceRecord.objects.filter(
             owner=owner, date=day, check_in__isnull=False
         ).values_list('staff_id', flat=True)
-        absent_qs = User.objects.filter(
-            owner=owner, is_active=True, is_active_staff=True
-        ).exclude(id__in=staff_ids_present).exclude(id=owner.id)
-        # Restrict to the current restaurant's branch when a restaurant context is set
+        # Build the absent query from the correct owner context
         if restaurant and restaurant.branch_owner:
-            absent_qs = absent_qs.filter(owner=restaurant.branch_owner)
+            absent_owner = restaurant.branch_owner
+        else:
+            absent_owner = owner
+
+        absent_qs = User.objects.filter(
+            owner=absent_owner, is_active=True, is_active_staff=True
+        ).exclude(id__in=staff_ids_present).exclude(id=absent_owner.id)
         EXCLUDED_ROLES = {'customer', 'administrator', 'main_owner', 'branch_owner', 'owner'}
         absent_staff = [u for u in absent_qs if not u.role or u.role.name not in EXCLUDED_ROLES]
 

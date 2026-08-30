@@ -20,8 +20,7 @@
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -34,7 +33,9 @@
       "bundleIdentifier": "com.easyfix.hospitality",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Used to connect to POS thermal printers.",
-        "NSCameraUsageDescription": "Used to scan QR codes for table selection."
+        "NSCameraUsageDescription": "Used to scan QR codes for table selection.",
+        "NSLocationWhenInUseUsageDescription": "Your location is shared with the restaurant to track your delivery route.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Your location is shared with the restaurant to track your delivery route."
       }
     },
     "plugins": [

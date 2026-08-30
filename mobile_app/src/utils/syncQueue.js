@@ -20,23 +20,26 @@ import { dbExec, dbQuery } from '../database/db';
  * Returns total count of items waiting to sync.
  */
 export async function getPendingCount() {
-  const [orders, payments, billRequests] = await Promise.all([
-    getPendingOrders().catch(() => []),
-    getPendingPayments().catch(() => []),
-    getPendingBillRequests().catch(() => []),
+  const [orders, payments, billReqs, statusChanges] = await Promise.all([
+    dbQuery("SELECT COUNT(*) as cnt FROM offline_orders WHERE sync_status='pending'"),
+    dbQuery("SELECT COUNT(*) as cnt FROM offline_payments WHERE sync_status='pending'"),
+    dbQuery("SELECT COUNT(*) as cnt FROM offline_bill_requests WHERE sync_status='pending'"),
+    dbQuery("SELECT COUNT(*) as cnt FROM offline_status_changes WHERE sync_status='pending'"),
   ]);
-  return orders.length + payments.length + billRequests.length;
+  return (orders[0]?.cnt || 0) + (payments[0]?.cnt || 0) + (billReqs[0]?.cnt || 0) + (statusChanges[0]?.cnt || 0);
 }
 
 /**
  * Returns true if any items have been in error state.
  */
 export async function hasErrors() {
-  const [errOrders, errPayments] = await Promise.all([
+  const [errOrders, errPayments, errBillReqs, errStatusChanges] = await Promise.all([
     dbQuery("SELECT 1 FROM offline_orders WHERE sync_status='error' LIMIT 1"),
     dbQuery("SELECT 1 FROM offline_payments WHERE sync_status='error' LIMIT 1"),
+    dbQuery("SELECT 1 FROM offline_bill_requests WHERE sync_status='error' LIMIT 1"),
+    dbQuery("SELECT 1 FROM offline_status_changes WHERE sync_status='error' LIMIT 1"),
   ]);
-  return errOrders.length > 0 || errPayments.length > 0;
+  return errOrders.length > 0 || errPayments.length > 0 || errBillReqs.length > 0 || errStatusChanges.length > 0;
 }
 
 /**

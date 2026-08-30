@@ -3291,6 +3291,10 @@ def get_table(request):
 @login_required
 def get_tables_json(request):
     """Return the owner's tables (and customers) as JSON for the Add Order modal."""
+    if not (request.user.is_owner() or request.user.is_main_owner() or
+            request.user.is_branch_owner() or request.user.is_manager() or
+            request.user.is_cashier() or request.user.is_administrator()):
+        return JsonResponse({'success': False, 'tables': [], 'customers': []}, status=403)
     try:
         owner_filter = get_owner_filter(request.user)
         session_restaurant_id = request.session.get('selected_restaurant_id')
@@ -3315,7 +3319,7 @@ def get_tables_json(request):
             tables = TableInfo.objects.none()
 
         table_list = [
-            {'id': t.id, 'tbl_no': t.tbl_no, 'is_available': t.is_available}
+            {'id': t.id, 'tbl_no': t.tbl_no, 'is_available': t.is_truly_available() if hasattr(t, 'is_truly_available') else t.is_available}
             for t in tables
         ]
 

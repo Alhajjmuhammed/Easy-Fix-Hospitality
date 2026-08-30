@@ -651,17 +651,18 @@ class RestaurantSubscription(models.Model):
     
     def extend_subscription(self, days=30, extend_by_admin=False):
         """Extend subscription by specified days"""
-        self.subscription_end_date += timedelta(days=days)
-        
-        if extend_by_admin:
-            self.subscription_status = 'active'
-            self.is_blocked_by_admin = False
-            
-        # Update next billing date
-        if self.next_billing_date:
-            self.next_billing_date += timedelta(days=days)
-        
-        self.save()
+        with transaction.atomic():
+            locked = self.__class__.objects.select_for_update(of=('self',)).get(pk=self.pk)
+            locked.subscription_end_date += timedelta(days=days)
+            if extend_by_admin:
+                locked.subscription_status = 'active'
+                locked.is_blocked_by_admin = False
+            if locked.next_billing_date:
+                locked.next_billing_date += timedelta(days=days)
+            fields = ['subscription_end_date', 'next_billing_date']
+            if extend_by_admin:
+                fields += ['subscription_status', 'is_blocked_by_admin']
+            locked.save(update_fields=fields)
     
     def block_restaurant(self, reason="Blocked by administrator", blocked_by=None):
         """Block restaurant access"""
@@ -721,11 +722,10 @@ class RestaurantSubscription(models.Model):
             # Always reactivate users when admin unblocks (admin override)
             # Unblock owner
             self.restaurant_owner.is_active = True
-            self.restaurant_owner.save()
+            self.restaurant_owner.save(update_fields=['is_active'])
 
             # Unblock all staff under this owner
-            staff_users = self.restaurant_owner.owned_users.all()
-            staff_users.update(is_active=True)
+            locked.restaurant_owner.owned_users.all().update(is_active=True)
 
             self.save(update_fields=['is_blocked_by_admin', 'block_reason', 'subscription_status'])
 

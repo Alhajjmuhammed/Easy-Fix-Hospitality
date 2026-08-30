@@ -162,43 +162,7 @@ print_success "Environment configuration created!"
 # Step 9: Update Django settings for production
 print_status "Step 9/12: Configuring Django for production..."
 
-# Create production settings file
-cat > $PROJECT_DIR/restaurant_system/production_settings.py << 'PYEOF'
-from .settings import *
-from decouple import config
-
-# Security Settings
-DEBUG = config('DEBUG', default=False, cast=bool)
-SECRET_KEY = config('SECRET_KEY')
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
-
-# Database
-DATABASES = {
-    'default': {
-        'ENGINE': config('DATABASE_ENGINE', default='django.db.backends.postgresql'),
-        'NAME': config('DATABASE_NAME'),
-        'USER': config('DATABASE_USER'),
-        'PASSWORD': config('DATABASE_PASSWORD'),
-        'HOST': config('DATABASE_HOST', default='localhost'),
-        'PORT': config('DATABASE_PORT', default='5432'),
-    }
-}
-
-# Static files
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-MEDIA_ROOT = BASE_DIR / 'media'
-
-# Security settings
-SECURE_BROWSER_XSS_FILTER = True
-X_FRAME_OPTIONS = 'DENY'
-SECURE_CONTENT_TYPE_NOSNIFF = True
-
-# CSRF settings
-CSRF_COOKIE_SECURE = False  # Set to True when using HTTPS
-SESSION_COOKIE_SECURE = False  # Set to True when using HTTPS
-PYEOF
-
-print_success "Production settings configured!"
+print_success "Production settings from git — no overwrite needed!"
 
 # Step 10: Run Django migrations and collect static files
 print_status "Step 10/12: Setting up database tables and collecting static files..."

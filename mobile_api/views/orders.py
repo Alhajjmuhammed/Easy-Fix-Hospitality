@@ -225,7 +225,11 @@ def _list_orders(request):
         qs = qs.filter(created_at__date__gte=week_start)
 
     VALID_PAYMENT_STATUSES = {'unpaid', 'partial', 'paid'}
-    VALID_ORDER_STATUSES = {'pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled', 'out_for_delivery', 'delivered'}
+    VALID_ORDER_STATUSES = {
+        'pending', 'confirmed', 'preparing', 'ready', 'served',
+        'cancelled', 'out_for_delivery', 'delivered',
+        'customer_refused', 'kitchen_error', 'quality_issue', 'wasted'
+    }
 
     # Payment status filter — supports comma-separated values (e.g. "unpaid,partial")
     payment_status = request.GET.get('payment_status', '')

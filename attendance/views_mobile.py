@@ -202,7 +202,7 @@ def attendance_confirm(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsSubscriptionActive])
 def attendance_my(request):
     """Return paginated attendance records for the authenticated staff member."""
     user = request.user
@@ -238,7 +238,7 @@ def attendance_my(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsSubscriptionActive])
 def attendance_status(request):
     """Return today's check-in status for the authenticated user."""
     today = timezone.localdate()

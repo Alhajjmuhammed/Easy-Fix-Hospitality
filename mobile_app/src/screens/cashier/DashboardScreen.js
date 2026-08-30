@@ -65,9 +65,14 @@ export default function CashierDashboardScreen({ navigation }) {
   const [voidReason,    setVoidReason]    = useState('');
   const [voiding,       setVoiding]       = useState(false);
 
+  // Payment picker (for orders with multiple payments — choose which to void)
+  const [paymentPickerOrder,   setPaymentPickerOrder]   = useState(null);
+  const [paymentPickerVisible, setPaymentPickerVisible] = useState(false);
+
   // Cancel dialog
   const [cancelDialog,  setCancelDialog]  = useState(null);
   const [cancelReason,  setCancelReason]  = useState('');
+  const [cancelError,   setCancelError]   = useState('');
   const [cancelling,    setCancelling]    = useState(false);
 
   // Transfer dialog
@@ -264,10 +269,15 @@ export default function CashierDashboardScreen({ navigation }) {
 
   // ── Void ───────────────────────────────────────────────────────────────────
   const openVoid = (order) => {
-    const payment = order.payments?.[0];
-    if (!payment) { setSnack('No payment found to void'); return; }
-    setVoidDialog({ order, paymentId: payment.id });
-    setVoidReason('');
+    if (order.payments?.length > 1) {
+      setPaymentPickerOrder(order);
+      setPaymentPickerVisible(true);
+    } else {
+      const payment = order.payments?.[0];
+      if (!payment) { setSnack('No payment found to void'); return; }
+      setVoidDialog({ order, paymentId: payment.id });
+      setVoidReason('');
+    }
   };
 
   const handleVoid = async () => {
@@ -293,10 +303,15 @@ export default function CashierDashboardScreen({ navigation }) {
   const openCancel = (order) => {
     setCancelDialog(order);
     setCancelReason('');
+    setCancelError('');
   };
 
   const handleCancel = async () => {
     if (!cancelDialog) return;
+    if (!cancelReason || cancelReason.trim() === '') {
+      setCancelError('Reason is required');
+      return;
+    }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
@@ -693,6 +708,27 @@ export default function CashierDashboardScreen({ navigation }) {
           </Dialog.Actions>
         </Dialog>
 
+        {/* ── Payment Picker Dialog (multi-payment void) ─────────────────── */}
+        <Dialog visible={paymentPickerVisible} onDismiss={() => setPaymentPickerVisible(false)}>
+          <Dialog.Title>Select Payment to Void</Dialog.Title>
+          <Dialog.Content>
+            {paymentPickerOrder?.payments?.map(p => (
+              <List.Item
+                key={p.id}
+                title={`${p.payment_method} — ${p.amount}`}
+                onPress={() => {
+                  setPaymentPickerVisible(false);
+                  setVoidReason('');
+                  setVoidDialog({ order: paymentPickerOrder, paymentId: p.id });
+                }}
+              />
+            ))}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setPaymentPickerVisible(false)}>Cancel</Button>
+          </Dialog.Actions>
+        </Dialog>
+
         {/* ── Void Dialog ────────────────────────────────────────────────── */}
         <Dialog visible={!!voidDialog} onDismiss={() => setVoidDialog(null)}>
           <Dialog.Title>Void Payment</Dialog.Title>
@@ -717,7 +753,10 @@ export default function CashierDashboardScreen({ navigation }) {
               Order #{cancelDialog?.order_number || cancelDialog?.id} · Table {cancelDialog?.table_number}
             </Text>
             <TextInput label="Reason" value={cancelReason}
-              onChangeText={setCancelReason} mode="outlined" multiline numberOfLines={2} autoFocus />
+              onChangeText={(text) => { setCancelReason(text); setCancelError(''); }} mode="outlined" multiline numberOfLines={2} autoFocus />
+            {!!cancelError && (
+              <Text variant="bodySmall" style={{ color: theme.colors.error, marginTop: 4 }}>{cancelError}</Text>
+            )}
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setCancelDialog(null)}>Back</Button>

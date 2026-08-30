@@ -55,8 +55,10 @@ def _list_bill_requests(request):
 
 def _create_bill_request(request):
     user = request.user
-    if not user.is_customer():
-        return Response({'error': 'Only customers can request bills.'}, status=403)
+    # Staff roles (cashier, owner, manager, customer_care) may also create bill requests
+    is_staff_user = _is_bill_staff(user)
+    if not user.is_customer() and not is_staff_user:
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:

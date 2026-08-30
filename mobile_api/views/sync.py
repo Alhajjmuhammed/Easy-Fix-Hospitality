@@ -414,8 +414,9 @@ def _sync_payment(user, owner, data):
             existing = Payment.objects.filter(notes__contains=f'[offline:{offline_id}]', processed_by=user).first()
             if existing:
                 return {'status': 'duplicate', 'payment_id': existing.id}
-        if order.status == 'cancelled':
-            return {'status': 'error', 'error': 'Cannot process payment for a cancelled order.'}
+        PAYMENT_BLOCKED_STATUSES = {'cancelled', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted'}
+        if order.status in PAYMENT_BLOCKED_STATUSES:
+            return {'status': 'error', 'error': f'Cannot process payment for a {order.status} order.'}
         already_paid = order.payments.filter(is_voided=False).aggregate(t=_Sum2('amount'))['t'] or Decimal('0.00')
         remaining = order.total_amount - already_paid
         if amount > remaining:
