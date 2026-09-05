@@ -496,7 +496,7 @@ PASSWORD_HASHERS = [
 ]
 
 # Session Security - Stricter for production
-SESSION_COOKIE_AGE = 900  # 15 minutes (900 seconds) - Auto logout after inactivity
+SESSION_COOKIE_AGE = 43200  # 12 hours (43200 seconds) - Keep cashiers logged in through a full shift
 SESSION_SAVE_EVERY_REQUEST = True  # Update expiry time on every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Honor timeout instead of browser close
 SESSION_COOKIE_NAME = 'restaurant_prod_session'

@@ -559,7 +559,7 @@ function printBill(orderId, orderNumber) {
     fetch(`/cashier/print-bill/${orderId}/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
+            'X-CSRFToken': getCookie('csrftoken'),
             'Content-Type': 'application/json'
         }
     })
