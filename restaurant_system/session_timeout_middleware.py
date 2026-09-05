@@ -73,10 +73,9 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
             # Calculate inactivity duration
             inactive_duration = current_time - last_activity
             
-            # Session timeout: 15 minutes (900 seconds)
-            # Note: This is in addition to SESSION_COOKIE_AGE
-            # This middleware provides more precise control
-            timeout_seconds = 900  # 15 minutes
+            # Session timeout: 12 hours (43200 seconds) - matches SESSION_COOKIE_AGE
+            # Cashiers can be idle between customers without being forced to re-login
+            timeout_seconds = 43200  # 12 hours
             
             if inactive_duration > timeout_seconds:
                 # Session timed out - logout user

@@ -90,7 +90,7 @@
 
     // Load products when waste modal is opened (override the base template function)
     function loadProductsForWaste() {
-        const productSelect = document.getElementById('product_id');
+        const productSelect = document.getElementById('product');
         productSelect.innerHTML = '<option value="">Select Product</option>';
 
         wasteProducts.forEach(product => {
@@ -563,8 +563,9 @@ function printBill(orderId, orderNumber) {
             'Content-Type': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(handleCashierResponse)
     .then(data => {
+        if (!data) return;
         if (data.success) {
             alert(data.message);
         } else if (data.error) {
@@ -574,6 +575,7 @@ function printBill(orderId, orderNumber) {
         }
     })
     .catch(error => {
+        if (error.message === 'session_expired' || error.message === 'access_denied') return;
         console.error('Error:', error);
         alert('An error occurred while printing the bill');
     });
@@ -759,16 +761,9 @@ function submitPayment() {
             selected_items: selectedItems
         })
     })
-    .then(response => {
-        if (response.status === 403) {
-            alert('Session expired or access denied. Please refresh the page and try again.');
-            location.reload();
-            return null;
-        }
-        return response.json();
-    })
+    .then(handleCashierResponse)
     .then(data => {
-        if (data === null) return;
+        if (!data) return;
         if (data.success) {
             alert('Payment processed successfully!');
             location.reload();
@@ -780,6 +775,7 @@ function submitPayment() {
         }
     })
     .catch(error => {
+        if (error.message === 'session_expired' || error.message === 'access_denied') return;
         console.error('Error:', error);
         alert('Connection error. Please refresh the page and try again.');
     });
@@ -789,8 +785,9 @@ function viewPaymentHistory(orderId) {
     const modal = new bootstrap.Modal(document.getElementById('historyModal'));
     
     fetch(`/cashier/payment-history/${orderId}/`)
-        .then(response => response.json())
+        .then(handleCashierResponse)
         .then(data => {
+            if (!data) return;
             if (data.error) {
                 alert('Error: ' + data.error);
                 return;
@@ -842,6 +839,7 @@ function viewPaymentHistory(orderId) {
             modal.show();
         })
         .catch(error => {
+            if (error.message === 'session_expired' || error.message === 'access_denied') return;
             console.error('Error:', error);
             alert('Error loading payment history');
         });
@@ -865,8 +863,9 @@ function voidPayment(paymentId) {
             refund_method: refundMethod
         })
     })
-    .then(response => response.json())
+    .then(handleCashierResponse)
     .then(data => {
+        if (!data) return;
         if (data.success) {
             alert(data.message);
             location.reload();
@@ -875,6 +874,7 @@ function voidPayment(paymentId) {
         }
     })
     .catch(error => {
+        if (error.message === 'session_expired' || error.message === 'access_denied') return;
         console.error('Error:', error);
         alert('Error voiding payment');
     });
@@ -898,8 +898,9 @@ function cancelOrder(orderId) {
                 reason: reason
             })
         })
-        .then(response => response.json())
+        .then(handleCashierResponse)
         .then(data => {
+            if (!data) return;
             if (data.success) {
                 alert(data.message);
                 location.reload();
@@ -908,6 +909,7 @@ function cancelOrder(orderId) {
             }
         })
         .catch(error => {
+            if (error.message === 'session_expired' || error.message === 'access_denied') return;
             console.error('Error:', error);
             alert('Error cancelling order');
         });
@@ -955,8 +957,9 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({ target_table_id: parseInt(targetTableId) })
         })
-        .then(response => response.json())
+        .then(handleCashierResponse)
         .then(data => {
+            if (!data) return;
             if (data.success) {
                 alert(data.message);
                 location.reload();
@@ -965,11 +968,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
+            if (error.message === 'session_expired' || error.message === 'access_denied') return;
             console.error('Error:', error);
             alert('Error transferring order');
         });
     });
 });
+
+function handleCashierResponse(response) {
+    if (response.status === 401) {
+        alert('Your session has expired. Please log in again.');
+        window.location.href = '/accounts/login/';
+        throw new Error('session_expired');
+    }
+    if (response.status === 403) {
+        alert('Access denied. Please refresh the page and try again.');
+        location.reload();
+        throw new Error('access_denied');
+    }
+    return response.json();
+}
 
 function getCookie(name) {
     let cookieValue = null;
