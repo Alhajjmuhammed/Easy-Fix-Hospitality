@@ -6,7 +6,7 @@ Provides rate limiting and security utilities for views
 from django_ratelimit.decorators import ratelimit
 from functools import wraps
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 
 def rate_limit_login(func):
@@ -35,13 +35,19 @@ def rate_limit_login(func):
 def rate_limit_payment(func):
     """
     Rate limiter for payment processing
-    - 3 attempts per minute per user
-    - 20 attempts per hour per user
+    - 10 attempts per minute per user (restaurant cashiers process many payments)
+    - 200 attempts per hour per user
+    Returns JSON 429 instead of HTML 403 so the frontend can show a proper message.
     """
     @wraps(func)
-    @ratelimit(key='user', rate='3/m', block=True, method='POST')
-    @ratelimit(key='user', rate='20/h', block=True, method='POST')
+    @ratelimit(key='user', rate='10/m', block=False, method='POST')
+    @ratelimit(key='user', rate='200/h', block=False, method='POST')
     def wrapper(request, *args, **kwargs):
+        if getattr(request, 'limited', False):
+            return JsonResponse({
+                'error': 'Too many payment attempts. Please wait a moment and try again.',
+                'rate_limited': True
+            }, status=429)
         return func(request, *args, **kwargs)
     return wrapper
 
