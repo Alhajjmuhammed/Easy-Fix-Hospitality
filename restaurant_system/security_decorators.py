@@ -35,13 +35,13 @@ def rate_limit_login(func):
 def rate_limit_payment(func):
     """
     Rate limiter for payment processing
-    - 10 attempts per minute per user (restaurant cashiers process many payments)
-    - 200 attempts per hour per user
+    - 20 attempts per minute per user (busy restaurants process many payments)
+    - 300 attempts per hour per user
     Returns JSON 429 instead of HTML 403 so the frontend can show a proper message.
     """
     @wraps(func)
-    @ratelimit(key='user', rate='10/m', block=False, method='POST')
-    @ratelimit(key='user', rate='200/h', block=False, method='POST')
+    @ratelimit(key='user', rate='20/m', block=False, method='POST')
+    @ratelimit(key='user', rate='300/h', block=False, method='POST')
     def wrapper(request, *args, **kwargs):
         if getattr(request, 'limited', False):
             return JsonResponse({
