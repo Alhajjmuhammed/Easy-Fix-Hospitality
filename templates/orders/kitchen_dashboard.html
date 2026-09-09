@@ -729,6 +729,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Tab hash routing + active class sync for KDS stage buttons
 document.addEventListener('DOMContentLoaded', function() {
+    // Activate tab from URL hash — scroll to top first so topbar stays visible
     if (window.location.hash) {
         var hash = window.location.hash.substring(1);
         var tabElement = document.getElementById(hash + '-tab');
@@ -736,15 +737,18 @@ document.addEventListener('DOMContentLoaded', function() {
             var tab = new bootstrap.Tab(tabElement);
             tab.show();
         }
+        window.scrollTo(0, 0);
     }
 
     var tabElements = document.querySelectorAll('[data-bs-toggle="tab"]');
     tabElements.forEach(function(tabElement) {
         tabElement.addEventListener('shown.bs.tab', function(e) {
-            // Update URL hash
+            // Update URL without triggering browser scroll (replaceState doesn't scroll)
             var targetId = e.target.getAttribute('data-bs-target').substring(1);
-            window.location.hash = targetId;
-            // Sync .active on stage buttons (Bootstrap manages this on nav-link; do it manually for kds-stage-btn)
+            if (history.replaceState) {
+                history.replaceState(null, null, '#' + targetId);
+            }
+            // Sync .active on stage buttons
             tabElements.forEach(function(btn) { btn.classList.remove('active'); btn.setAttribute('aria-selected', 'false'); });
             e.target.classList.add('active');
             e.target.setAttribute('aria-selected', 'true');
