@@ -6,72 +6,79 @@
 {% block extra_css %}
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
-   KDS — Kitchen Display System  |  Dark, high-contrast, readable at distance
+   KDS — Kitchen Display System  |  Light theme, clean & professional
    ═══════════════════════════════════════════════════════════════════════════ */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 :root {
     --c-pending:   #f59e0b;
-    --c-confirmed: #38bdf8;
-    --c-preparing: #fb923c;
-    --c-ready:     #4ade80;
-    --c-served:    #a78bfa;
+    --c-confirmed: #3b82f6;
+    --c-preparing: #f97316;
+    --c-ready:     #22c55e;
+    --c-served:    #8b5cf6;
 
-    --bg:          #07111f;
-    --surface:     #0e1e32;
-    --surface2:    #162740;
-    --border:      rgba(255,255,255,.07);
-    --text:        #f0f6ff;
-    --muted:       #7a93ad;
-    --r:           14px;
+    --bg:       #f0f4f8;
+    --surface:  #ffffff;
+    --surface2: #f8fafc;
+    --border:   #e2e8f0;
+    --text:     #1e293b;
+    --muted:    #64748b;
+    --r:        14px;
 }
 
 /* ── Reset & base ───────────────────────────────────────────────────────── */
 .kds * { box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
 .kds { background: var(--bg); min-height: 100vh; padding-bottom: 2.5rem; }
-@keyframes livepulse { 0%,100% { box-shadow:0 0 0 0 rgba(74,222,128,.5); } 60% { box-shadow:0 0 0 8px rgba(74,222,128,0); } }
-@keyframes spin       { to { transform:rotate(360deg); } }
-@keyframes fadein     { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+@keyframes livepulse { 0%,100% { box-shadow:0 0 0 0 rgba(34,197,94,.5); } 60% { box-shadow:0 0 0 8px rgba(34,197,94,0); } }
+@keyframes spin    { to { transform:rotate(360deg); } }
+@keyframes fadein  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 
 /* ── Top bar ────────────────────────────────────────────────────────────── */
 .kds-bar {
-    background: linear-gradient(135deg,#0a1929 0%,#0d2137 100%);
-    border-bottom: 1px solid var(--border);
-    padding: .9rem 1.5rem;
+    background: #ffffff;
+    border-bottom: 2px solid var(--border);
+    padding: .85rem 1.5rem;
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
 }
 .kds-bar-left  { display:flex; align-items:center; gap:.85rem; }
 .kds-bar-right { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; }
 
 .kds-live-dot {
     width:10px; height:10px; border-radius:50%;
-    background:#4ade80; flex-shrink:0;
+    background:#22c55e; flex-shrink:0;
     animation: livepulse 2s infinite;
 }
-.kds-name  { font-size:1.1rem; font-weight:800; color:#f0f6ff; letter-spacing:-.02em; }
-.kds-name span { color:var(--c-ready); }
+.kds-name  { font-size:1.1rem; font-weight:800; color:var(--text); letter-spacing:-.02em; }
 .kds-sub   { font-size:.75rem; color:var(--muted); margin-top:.1rem; }
 .kds-live-badge {
-    background: rgba(74,222,128,.12); border:1px solid rgba(74,222,128,.25);
-    color:#4ade80; border-radius:20px; padding:.25rem .75rem;
+    background:#dcfce7; border:1px solid #86efac;
+    color:#166534; border-radius:20px; padding:.25rem .75rem;
     font-size:.65rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
 }
-.kds-reconnect {
-    background:rgba(251,146,60,.12); border:1px solid rgba(251,146,60,.25);
-    color:#fb923c; border-radius:20px; padding:.28rem .8rem;
-    font-size:.72rem; font-weight:700; display:none; align-items:center; gap:.4rem;
+
+/* always-visible 15s refresh pill */
+.kds-refresh-pill {
+    background: #eff6ff; border:1px solid #bfdbfe;
+    color: #1d4ed8; border-radius:20px; padding:.28rem .9rem;
+    font-size:.75rem; font-weight:700; display:flex; align-items:center; gap:.45rem;
 }
+.kds-refresh-pill.reconnecting {
+    background:#fff7ed; border-color:#fed7aa; color:#c2410c;
+}
+.kds-refresh-num { font-variant-numeric:tabular-nums; font-weight:900; font-size:.85rem; }
+
 .kds-report-btn {
-    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
-    color:#c8daf0; border-radius:9px; padding:.38rem 1rem;
+    background:#f1f5f9; border:1px solid var(--border);
+    color:var(--text); border-radius:9px; padding:.4rem 1rem;
     font-size:.8rem; font-weight:600; text-decoration:none;
     display:flex; align-items:center; gap:.45rem;
-    transition: background .2s, color .2s;
+    transition: background .2s;
 }
-.kds-report-btn:hover { background:rgba(255,255,255,.13); color:#fff; }
+.kds-report-btn:hover { background:#e2e8f0; color:var(--text); }
 
 /* ── Stage selector ─────────────────────────────────────────────────────── */
-.kds-stages-wrap { padding: 1.25rem 1.25rem .5rem; }
+.kds-stages-wrap { padding: 1.1rem 1.25rem .5rem; }
 .kds-stages {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -79,25 +86,22 @@
 }
 .kds-stage {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: var(--r);
     padding: 1.1rem .5rem .9rem;
     cursor: pointer;
     display: flex; flex-direction: column; align-items: center; gap: .3rem;
     position: relative; overflow: hidden;
-    transition: transform .2s, box-shadow .2s, background .2s, border-color .2s;
+    transition: transform .2s, box-shadow .2s, border-color .2s, background .2s;
     text-align: center;
 }
-.kds-stage::before {
-    content:''; position:absolute; inset:0;
+.kds-stage:hover { transform:translateY(-2px); border-color:var(--sc); box-shadow:0 4px 16px rgba(0,0,0,.1); }
+.kds-stage.active {
+    border-color: var(--sc);
     background: var(--sc);
-    opacity: 0;
-    transition: opacity .25s;
+    box-shadow: 0 6px 24px rgba(0,0,0,.15);
+    transform: translateY(-3px);
 }
-.kds-stage:hover { transform:translateY(-2px); border-color: var(--sc); }
-.kds-stage:hover::before { opacity:.08; }
-.kds-stage.active { border-color: var(--sc); box-shadow: 0 0 0 1px var(--sc), 0 8px 28px rgba(0,0,0,.4); transform:translateY(-3px); }
-.kds-stage.active::before { opacity:.16; }
 
 .kds-stage.s-pending   { --sc: var(--c-pending);   }
 .kds-stage.s-confirmed { --sc: var(--c-confirmed);  }
@@ -107,27 +111,25 @@
 
 .kds-stage-icon {
     width:36px; height:36px; border-radius:50%;
-    background: rgba(255,255,255,.06);
+    background: rgba(0,0,0,.06);
     display:flex; align-items:center; justify-content:center;
     font-size:.95rem; color: var(--sc);
     position:relative; z-index:1;
-    transition: background .2s;
 }
-.kds-stage.active .kds-stage-icon { background: rgba(255,255,255,.14); }
+.kds-stage.active .kds-stage-icon { background:rgba(255,255,255,.25); color:#fff; }
 
 .kds-stage-num {
     font-size:2.2rem; font-weight:900; line-height:1;
     color: var(--sc); position:relative; z-index:1;
     transition: transform .2s;
 }
-.kds-stage.active .kds-stage-num { transform:scale(1.1); }
+.kds-stage.active .kds-stage-num { color:#fff; transform:scale(1.1); }
 
 .kds-stage-lbl {
     font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
     color: var(--muted); position:relative; z-index:1;
-    transition: color .2s;
 }
-.kds-stage.active .kds-stage-lbl { color: var(--sc); }
+.kds-stage.active .kds-stage-lbl { color:rgba(255,255,255,.85); }
 
 /* ── Content area ───────────────────────────────────────────────────────── */
 .kds-content { padding: .75rem 1.25rem 1rem; }
@@ -145,63 +147,56 @@
     background: var(--surface);
     border-radius: var(--r);
     border: 1px solid var(--border);
+    border-top: 4px solid var(--cc);
     overflow: hidden;
     display: flex; flex-direction: column;
     transition: box-shadow .2s, transform .2s;
-    position: relative;
 }
-.kds-card::before {
-    content:''; position:absolute; top:0; left:0; bottom:0;
-    width:4px; background: var(--cc);
-}
-.kds-card:hover { box-shadow:0 12px 40px rgba(0,0,0,.5); transform:translateY(-3px); }
+.kds-card:hover { box-shadow:0 8px 28px rgba(0,0,0,.12); transform:translateY(-2px); }
 
 /* card header */
 .kds-card-top {
-    background: linear-gradient(135deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.02) 100%);
-    border-bottom: 1px solid var(--border);
-    padding: .75rem 1rem .75rem 1.25rem;
+    padding: .8rem 1rem .75rem;
     display:flex; justify-content:space-between; align-items:center;
+    border-bottom: 1px solid var(--border);
 }
 .kds-order-no {
-    font-size:1.15rem; font-weight:900; color:var(--text);
-    letter-spacing:-.03em;
+    font-size:1.15rem; font-weight:900; color:var(--text); letter-spacing:-.03em;
 }
 .kds-order-no span { color: var(--cc); }
 .kds-tbl-badge {
-    background: var(--cc); color:#000;
+    background: var(--cc); color:#fff;
     border-radius:8px; padding:.25rem .7rem;
-    font-size:.78rem; font-weight:800; letter-spacing:-.01em;
+    font-size:.78rem; font-weight:800;
     display:flex; align-items:center; gap:.3rem;
 }
 
 /* card meta row */
 .kds-card-meta {
-    padding:.5rem 1rem .5rem 1.25rem;
+    padding:.5rem 1rem;
     display:flex; justify-content:space-between; align-items:center;
     border-bottom:1px solid var(--border);
     background: var(--surface2);
 }
-.kds-cust { font-size:.82rem; font-weight:600; color:var(--text); display:flex; align-items:center; gap:.4rem; }
+.kds-cust  { font-size:.82rem; font-weight:600; color:var(--text); display:flex; align-items:center; gap:.4rem; }
 .kds-cust i { color:var(--muted); font-size:.7rem; }
 .kds-placed { font-size:.75rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 
 /* items list */
-.kds-card-items { padding:.7rem 1rem .7rem 1.25rem; flex:1; }
+.kds-card-items { padding:.7rem 1rem; flex:1; }
 .kds-item {
     display:flex; align-items:center; justify-content:space-between;
-    padding:.32rem 0;
-    border-bottom:1px solid rgba(255,255,255,.04);
+    padding:.35rem 0; border-bottom:1px dashed #f1f5f9;
 }
 .kds-item:last-child { border-bottom:none; }
 .kds-item-name { font-size:.9rem; font-weight:500; color:var(--text); }
 .kds-qty {
-    background:var(--cc); color:#000;
+    background:var(--cc); color:#fff;
     border-radius:6px; padding:.1rem .5rem;
     font-size:.75rem; font-weight:800; flex-shrink:0;
 }
 .kds-note {
-    font-size:.73rem; color:var(--c-pending); font-style:italic;
+    font-size:.73rem; color:#dc2626; font-style:italic;
     padding:.2rem 0; display:flex; align-items:center; gap:.35rem;
 }
 
@@ -209,7 +204,7 @@
 .kds-card-foot {
     border-top:1px solid var(--border);
     background: var(--surface2);
-    padding:.6rem 1rem .6rem 1.25rem;
+    padding:.6rem 1rem;
     display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap;
 }
 .kds-timer {
@@ -225,30 +220,29 @@
     display:inline-flex; align-items:center; gap:.35rem;
     padding:.42rem .85rem; border-radius:8px;
     font-size:.78rem; font-weight:700; border:none; cursor:pointer;
-    text-decoration:none; transition:opacity .15s, transform .15s, box-shadow .15s;
+    text-decoration:none; transition:opacity .15s, transform .15s;
     letter-spacing:.01em;
 }
-.kds-btn:hover { opacity:.88; transform:translateY(-1px); }
+.kds-btn:hover { opacity:.87; transform:translateY(-1px); }
 
-.kds-btn-kot    { background:rgba(255,255,255,.08); color:#c8daf0; border:1px solid rgba(255,255,255,.1); }
-.kds-btn-kot:hover { background:rgba(255,255,255,.14); }
+.kds-btn-kot  { background:#f1f5f9; color:#475569; border:1px solid var(--border); }
+.kds-btn-kot:hover { background:#e2e8f0; }
 
-.kds-btn-confirm { background:#22c55e; color:#000; font-weight:800; }
-.kds-btn-start   { background:#38bdf8; color:#000; font-weight:800; }
-.kds-btn-ready   { background:#fb923c; color:#000; font-weight:800; }
-.kds-btn-serve   { background:#a78bfa; color:#000; font-weight:800; }
+.kds-btn-confirm { background:#22c55e; color:#fff; font-weight:800; }
+.kds-btn-start   { background:#3b82f6; color:#fff; font-weight:800; }
+.kds-btn-ready   { background:#f97316; color:#fff; font-weight:800; }
+.kds-btn-serve   { background:#8b5cf6; color:#fff; font-weight:800; }
 
 /* ── Empty state ────────────────────────────────────────────────────────── */
 .kds-empty {
-    grid-column:1/-1;
-    text-align:center; padding:5rem 1rem;
+    grid-column:1/-1; text-align:center; padding:5rem 1rem;
     color:var(--muted);
 }
 .kds-empty-icon {
     width:72px; height:72px; border-radius:50%;
-    background:var(--surface2); border:1px solid var(--border);
+    background:#f8fafc; border:2px solid var(--border);
     display:inline-flex; align-items:center; justify-content:center;
-    font-size:1.6rem; margin-bottom:1rem; color:var(--muted);
+    font-size:1.6rem; margin-bottom:1rem; color:#cbd5e1;
 }
 .kds-empty p { font-size:.95rem; font-weight:500; margin:0; }
 
@@ -260,19 +254,19 @@
 }
 .kds-log { width:100%; border-collapse:collapse; font-size:.87rem; }
 .kds-log thead th {
-    background:var(--surface2); color:var(--muted);
+    background:#f8fafc; color:var(--muted);
     padding:.7rem 1rem; font-size:.68rem; text-transform:uppercase;
     letter-spacing:.08em; font-weight:700; text-align:left;
-    border-bottom:1px solid var(--border);
+    border-bottom:2px solid var(--border);
 }
 .kds-log tbody td {
-    padding:.65rem 1rem; border-bottom:1px solid rgba(255,255,255,.04);
+    padding:.65rem 1rem; border-bottom:1px solid var(--border);
     color:var(--text);
 }
 .kds-log tbody tr:last-child td { border-bottom:none; }
 .kds-log tbody tr:hover td { background:var(--surface2); }
 .kds-served-badge {
-    background:rgba(74,222,128,.15); color:#4ade80;
+    background:#dcfce7; color:#166534;
     border-radius:6px; padding:.15rem .55rem;
     font-size:.75rem; font-weight:700; font-variant-numeric:tabular-nums;
 }
@@ -281,14 +275,14 @@
     display:flex; gap:.35rem; flex-wrap:wrap; align-items:center;
 }
 .kds-page-btn {
-    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);
+    background:var(--surface2); border:1px solid var(--border);
     color:var(--muted); border-radius:7px; padding:.3rem .65rem;
     font-size:.78rem; font-weight:600; text-decoration:none; cursor:pointer;
     transition:background .15s;
 }
-.kds-page-btn:hover { background:rgba(255,255,255,.12); color:var(--text); }
-.kds-page-btn.on { background:var(--c-served); color:#000; border-color:var(--c-served); }
-.kds-page-btn.off { opacity:.3; cursor:default; }
+.kds-page-btn:hover { background:var(--border); color:var(--text); }
+.kds-page-btn.on  { background:var(--c-served); color:#fff; border-color:var(--c-served); }
+.kds-page-btn.off { opacity:.35; cursor:default; }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width:700px) {
@@ -317,9 +311,9 @@
             <span class="kds-live-badge">Live</span>
         </div>
         <div class="kds-bar-right">
-            <div class="kds-reconnect" id="refreshTimer">
-                <i class="fas fa-sync-alt" style="animation:spin .85s linear infinite;"></i>
-                Reconnecting&hellip; <span id="countdown">30</span>s
+            <div class="kds-refresh-pill" id="refreshTimer">
+                <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                Refresh in <span class="kds-refresh-num" id="countdown">15</span>s
             </div>
             <a href="{% url 'orders:kitchen_reports' %}" class="kds-report-btn">
                 <i class="fas fa-chart-bar"></i> Reports
@@ -695,8 +689,23 @@
 
 {% block extra_js %}
 <script>
-// ── Real-time WebSocket connection ──────────────────────────────────────────
+// ── Always-on 15-second auto-refresh countdown ───────────────────────────────
 (function() {
+    var countdownEl = document.getElementById('countdown');
+    var timerEl     = document.getElementById('refreshTimer');
+    var iconEl      = document.getElementById('refreshIcon');
+    var INTERVAL    = 15;
+    var val         = INTERVAL;
+    var wsConnected = false;
+
+    function tick() {
+        val--;
+        if (countdownEl) countdownEl.textContent = val;
+        if (val <= 0) { location.reload(); }
+    }
+    setInterval(tick, 1000);
+
+    // ── WebSocket for instant new-order notifications ─────────────────────
     var ownerId = '{{ ws_owner_id }}';
     if (!ownerId || ownerId === 'None') return;
 
@@ -708,66 +717,34 @@
         ws = new WebSocket(wsUrl);
 
         ws.onopen = function() {
-            // Connected — show LIVE badge green, hide fallback countdown
-            var rt = document.getElementById('refreshTimer');
-            if (rt) rt.style.display = 'none';
+            wsConnected = true;
             reconnectDelay = 3000;
+            // Pill goes blue (normal) when connected
+            if (timerEl)  { timerEl.classList.remove('reconnecting'); }
+            if (iconEl)   { iconEl.style.animation = ''; }
         };
 
         ws.onmessage = function(e) {
             try {
                 var data = JSON.parse(e.data);
-                // Reload on new orders so kitchen sees them immediately
-                if (data.type === 'new_order') {
-                    location.reload();
-                }
+                if (data.type === 'new_order') { location.reload(); }
             } catch (_) {}
         };
 
         ws.onclose = function(e) {
-            // Reconnect with backoff (skip if server intentionally closed: 4001/4003)
+            wsConnected = false;
             if (e.code === 4001 || e.code === 4003) return;
+            // Pill goes orange while reconnecting
+            if (timerEl)  { timerEl.classList.add('reconnecting'); }
+            if (iconEl)   { iconEl.style.animation = 'spin .85s linear infinite'; }
             setTimeout(connect, reconnectDelay);
             reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-            // Fall back to 30s countdown while disconnected
-            startFallbackCountdown();
         };
 
         ws.onerror = function() { ws.close(); };
     }
 
     connect();
-
-    // ── Fallback polling countdown (used when WebSocket is unavailable) ────
-    var countdownEl = document.getElementById('countdown');
-    var timerEl = document.getElementById('refreshTimer');
-    var countdownVal = 30;
-    var countdownTimer = null;
-
-    function startFallbackCountdown() {
-        if (countdownTimer) return; // already running
-        if (timerEl) timerEl.style.display = 'flex';
-        countdownVal = 30;
-        countdownTimer = setInterval(function() {
-            countdownVal--;
-            if (countdownEl) countdownEl.textContent = countdownVal;
-            if (countdownVal <= 0) {
-                clearInterval(countdownTimer);
-                location.reload();
-            }
-        }, 1000);
-    }
-
-    // Start fallback countdown immediately if there are active orders
-    // (WebSocket onopen will hide it when connection succeeds)
-    var pendingCount = parseInt('{{ pending_count|default:0 }}');
-    var confirmedCount = parseInt('{{ confirmed_count|default:0 }}');
-    var preparingCount = parseInt('{{ preparing_count|default:0 }}');
-    if (pendingCount > 0 || confirmedCount > 0 || preparingCount > 0) {
-        startFallbackCountdown();
-    } else {
-        if (timerEl) timerEl.style.display = 'none';
-    }
 })();
 
 // Order preparation timers
