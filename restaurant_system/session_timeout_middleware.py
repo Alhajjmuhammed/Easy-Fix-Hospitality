@@ -38,6 +38,8 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
         '/api/health/',  # Health check endpoint
         '/orders/api/',  # Print client API (uses token auth)
         '/api/v1/',  # Mobile app REST API (uses token auth, not session)
+        '/orders/kitchen/',  # Kitchen display — passive screen, must never auto-logout
+        '/ws/',  # WebSocket connections
     ]
     
     def _is_ajax_request(self, request):
