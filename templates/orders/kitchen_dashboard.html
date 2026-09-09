@@ -293,7 +293,7 @@
 .kds-page-btn.on  { background:var(--c-served); color:#fff; border-color:var(--c-served); }
 .kds-page-btn.off { opacity:.35; cursor:default; }
 
-/* ── Responsive ─────────────────────────────────────────────────────────── */
+/* ── Responsive — mobile ────────────────────────────────────────────────── */
 @media (max-width:700px) {
     .kds-stage-num  { font-size:1.5rem; }
     .kds-stage-lbl  { display:none; }
@@ -302,6 +302,111 @@
     .kds-stage      { padding:.75rem .25rem .65rem; }
     .kds-grid       { grid-template-columns:1fr; }
     .kds-stages-wrap, .kds-content { padding-left:.75rem; padding-right:.75rem; }
+}
+
+/* ── Large screen (monitor ≥ 1200px) ────────────────────────────────────── */
+@media (min-width:1200px) {
+    /* Topbar */
+    .kds-bar { padding:1rem 2rem; }
+    .kds-name { font-size:1.35rem; }
+    .kds-sub  { font-size:.82rem; }
+    .kds-live-badge { font-size:.72rem; padding:.3rem .9rem; }
+    .kds-refresh-pill { font-size:.82rem; padding:.35rem 1.1rem; }
+    .kds-refresh-num  { font-size:.95rem; }
+    .kds-report-btn   { font-size:.88rem; padding:.5rem 1.25rem; }
+
+    /* Stage selector */
+    .kds-stages-wrap { padding:1rem 2rem; }
+    .kds-stages { gap:.85rem; }
+    .kds-stage  { padding:1.4rem .75rem 1.2rem; border-radius:18px; }
+    .kds-stage-icon { width:46px; height:46px; font-size:1.15rem; }
+    .kds-stage-num  { font-size:3rem; }
+    .kds-stage-lbl  { font-size:.7rem; letter-spacing:.12em; }
+
+    /* Grid — wider cards, more columns */
+    .kds-content { padding:1rem 2rem 1.5rem; }
+    .kds-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:1.25rem; }
+
+    /* Order card */
+    .kds-card { border-top-width:5px; border-radius:16px; }
+    .kds-card-top { padding:1rem 1.25rem; }
+    .kds-order-no { font-size:1.5rem; }
+    .kds-tbl-badge { font-size:.88rem; padding:.32rem .85rem; border-radius:10px; }
+
+    .kds-card-meta { padding:.65rem 1.25rem; }
+    .kds-cust   { font-size:.92rem; }
+    .kds-placed { font-size:.85rem; }
+
+    .kds-card-items { padding:.85rem 1.25rem; }
+    .kds-item { padding:.5rem 0; }
+    .kds-item-name { font-size:1.05rem; }
+    .kds-qty  { font-size:.88rem; padding:.18rem .65rem; border-radius:8px; }
+    .kds-note { font-size:.82rem; }
+
+    .kds-card-foot { padding:.75rem 1.25rem; }
+    .kds-timer { font-size:.92rem; }
+    .kds-btn { font-size:.88rem; padding:.55rem 1.1rem; border-radius:10px; }
+
+    /* Served log */
+    .kds-log { font-size:.95rem; }
+    .kds-log thead th { padding:.85rem 1.25rem; font-size:.75rem; }
+    .kds-log tbody td { padding:.8rem 1.25rem; }
+    .kds-served-badge { font-size:.85rem; padding:.2rem .7rem; }
+
+    /* Empty state */
+    .kds-empty { padding:7rem 1rem; }
+    .kds-empty-icon { width:90px; height:90px; font-size:2rem; }
+    .kds-empty p { font-size:1.1rem; }
+}
+
+/* ── TV / large 1080p+ (≥ 1600px) ──────────────────────────────────────── */
+@media (min-width:1600px) {
+    /* Topbar */
+    .kds-bar { padding:1.15rem 2.5rem; }
+    .kds-name { font-size:1.55rem; }
+    .kds-sub  { font-size:.9rem; }
+    .kds-live-dot { width:13px; height:13px; }
+
+    /* Stage selector */
+    .kds-stages-wrap { padding:1.15rem 2.5rem; }
+    .kds-stages { gap:1rem; }
+    .kds-stage  { padding:1.65rem 1rem 1.45rem; border-radius:20px; }
+    .kds-stage-icon { width:54px; height:54px; font-size:1.35rem; }
+    .kds-stage-num  { font-size:3.8rem; }
+    .kds-stage-lbl  { font-size:.78rem; letter-spacing:.14em; }
+
+    /* Grid */
+    .kds-content { padding:1.25rem 2.5rem 2rem; }
+    .kds-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap:1.5rem; }
+
+    /* Order card — dramatically larger for reading from a distance */
+    .kds-card { border-top-width:6px; border-radius:20px; }
+    .kds-card-top { padding:1.2rem 1.5rem; }
+    .kds-order-no { font-size:1.9rem; }
+    .kds-tbl-badge { font-size:1rem; padding:.38rem 1rem; border-radius:12px; }
+
+    .kds-card-meta { padding:.75rem 1.5rem; }
+    .kds-cust   { font-size:1rem; gap:.55rem; }
+    .kds-placed { font-size:.9rem; }
+
+    .kds-card-items { padding:1rem 1.5rem; }
+    .kds-item { padding:.6rem 0; }
+    .kds-item-name { font-size:1.2rem; font-weight:600; }
+    .kds-qty  { font-size:1rem; padding:.22rem .75rem; border-radius:9px; }
+    .kds-note { font-size:.9rem; }
+
+    .kds-card-foot { padding:.9rem 1.5rem; }
+    .kds-timer { font-size:1.05rem; }
+    .kds-btn {
+        font-size:1rem; padding:.7rem 1.35rem;
+        border-radius:12px; gap:.5rem;
+    }
+
+    /* Served log */
+    .kds-log { font-size:1.05rem; }
+    .kds-log thead th { padding:1rem 1.5rem; font-size:.82rem; }
+    .kds-log tbody td { padding:.9rem 1.5rem; }
+    .kds-served-badge { font-size:.92rem; padding:.25rem .8rem; }
 }
 </style>
 {% endblock %}
