@@ -78,7 +78,7 @@
 .kds-report-btn:hover { background:#e2e8f0; color:var(--text); }
 
 /* ── Stage selector ─────────────────────────────────────────────────────── */
-.kds-stages-wrap { padding: 1.1rem 1.25rem .5rem; }
+.kds-stages-wrap { padding: .9rem 1.25rem .9rem; }
 .kds-stages {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -130,6 +130,15 @@
     color: var(--muted); position:relative; z-index:1;
 }
 .kds-stage.active .kds-stage-lbl { color:rgba(255,255,255,.85); }
+
+/* ── Sticky header wrapper ──────────────────────────────────────────────── */
+.kds-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg);
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
 
 /* ── Content area ───────────────────────────────────────────────────────── */
 .kds-content { padding: .75rem 1.25rem 1rem; }
@@ -300,6 +309,9 @@
 {% block content %}
 <div class="kds" data-restaurant-view="true" data-owner-id="{{ request.user.owner.id|default:'default' }}">
 
+    <!-- ── Sticky header (topbar + stage nav always visible while scrolling) -->
+    <div class="kds-sticky">
+
     <!-- ── Top bar ──────────────────────────────────────────────────────── -->
     <div class="kds-bar">
         <div class="kds-bar-left">
@@ -362,6 +374,8 @@
 
         </div>
     </div>
+
+    </div><!-- /kds-sticky -->
 
     <!-- ── Tab panels ───────────────────────────────────────────────────── -->
     <div class="kds-content">
