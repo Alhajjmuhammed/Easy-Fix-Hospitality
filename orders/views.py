@@ -1197,6 +1197,9 @@ def kitchen_dashboard(request):
     served_paginator = Paginator(served_orders_qs, 20)
     served_page = served_paginator.get_page(request.GET.get('served_page', 1))
 
+    # Resolve owner_id for WebSocket connection (kitchen staff connect to their owner's channel)
+    _ws_owner_id = owner_filter.id if owner_filter else (request.user.id if request.user.is_owner() or request.user.is_main_owner() else None)
+
     context = {
         'pending_orders': pending_orders,
         'confirmed_orders': confirmed_orders,
@@ -1209,6 +1212,7 @@ def kitchen_dashboard(request):
         'ready_count': ready_orders.count(),
         'served_count': served_paginator.count,
         'status_choices': Order.STATUS_CHOICES,
+        'ws_owner_id': _ws_owner_id,
     }
 
     return render(request, 'orders/kitchen_dashboard.html', context)
@@ -1873,7 +1877,8 @@ def confirm_order(request, order_id):
 
         order.status = 'confirmed'
         order.confirmed_by = request.user
-        order.save(update_fields=['status', 'confirmed_by'])
+        order.confirmed_at = timezone.now()
+        order.save(update_fields=['status', 'confirmed_by', 'confirmed_at'])
 
         # Mark table as occupied when order is confirmed (delivery/pickup have no table)
         if order.table_info:
@@ -1882,6 +1887,45 @@ def confirm_order(request, order_id):
             table_msg = f' Table {order.table_info.tbl_no} is now occupied.'
         else:
             table_msg = ''
+
+        # Notify customer tracking WebSocket and restaurant staff
+        _owner_id = None
+        if order.ordered_by:
+            _owner_id = getattr(order.ordered_by, 'owner_id', None) or (order.ordered_by.id if order.ordered_by.is_owner() else None)
+        if not _owner_id and order.table_info:
+            _owner_id = getattr(order.table_info, 'owner_id', None)
+        try:
+            async_to_sync(channel_layer.group_send)(
+                f'order_{order.id}',
+                {
+                    'type': 'order_status_update',
+                    'order_id': order.id,
+                    'order_number': order.order_number,
+                    'status': order.status,
+                    'status_display': order.get_status_display(),
+                    'message': f'Order {order.order_number} confirmed',
+                    'updated_by': request.user.get_full_name() or request.user.username,
+                    'timestamp': timezone.now().isoformat(),
+                }
+            )
+        except Exception as _ws_err:
+            logger.warning(f"WS order notify failed in confirm_order: {_ws_err}")
+        if _owner_id:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f'restaurant_{_owner_id}',
+                    {
+                        'type': 'order_status_update',
+                        'order_id': order.id,
+                        'order_number': order.order_number,
+                        'status': order.status,
+                        'status_display': order.get_status_display(),
+                        'updated_by': request.user.get_full_name() or request.user.username,
+                        'timestamp': timezone.now().isoformat(),
+                    }
+                )
+            except Exception as _ws_err:
+                logger.warning(f"WS restaurant notify failed in confirm_order: {_ws_err}")
 
         return JsonResponse({
             'success': True,
@@ -1989,6 +2033,17 @@ def update_order_status(request, order_id):
         if new_status == 'confirmed' and not order.confirmed_by:
             order.confirmed_by = request.user
 
+        # Stamp the transition time so kitchen timers work correctly
+        _now = timezone.now()
+        if new_status == 'confirmed' and not order.confirmed_at:
+            order.confirmed_at = _now
+        elif new_status == 'preparing' and not order.preparing_at:
+            order.preparing_at = _now
+        elif new_status == 'ready' and not order.ready_at:
+            order.ready_at = _now
+        elif new_status == 'served' and not order.served_at:
+            order.served_at = _now
+
         # Release table and restore stock if order is cancelled through status change
         if new_status == 'cancelled':
             for item in order.order_items.select_related('product').select_for_update(of=('self',)):
@@ -1997,7 +2052,7 @@ def update_order_status(request, order_id):
                     item.product.save(update_fields=['available_in_stock'])
             order.release_table()
 
-        fields_to_update = ['status', 'reason_if_cancelled']
+        fields_to_update = ['status', 'reason_if_cancelled', 'confirmed_at', 'preparing_at', 'ready_at', 'served_at']
         if hasattr(order, 'confirmed_by') and order.confirmed_by:
             fields_to_update.append('confirmed_by')
         order.save(update_fields=fields_to_update)

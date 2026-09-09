@@ -96,7 +96,7 @@
             </div>
         </div>
         
-        {% if order.status not in 'served,cancelled' %}
+        {% if order.status not in "served,cancelled,delivered,out_for_delivery,customer_refused,kitchen_error,quality_issue,wasted" %}
             <div class="card mt-3">
                 <div class="card-header">
                     <h6 class="mb-0">Quick Actions</h6>
@@ -134,50 +134,56 @@
 
 {% block extra_js %}
 <script>
+function getCsrfToken() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+
 function confirmOrder(orderId) {
     if (!confirm('Confirm this order?')) return;
-    
+
     fetch(`/orders/confirm-order/${orderId}/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
+            'X-CSRFToken': getCsrfToken(),
             'Content-Type': 'application/json'
         }
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert(data.message);
-        }
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) { location.reload(); }
+        else { alert(data.message || 'Failed to confirm order.'); }
+    })
+    .catch(function(err) {
+        alert('Network error. Please try again.');
+        console.error(err);
     });
 }
 
 function updateStatus(orderId, newStatus) {
-    const statusMessages = {
+    var messages = {
         'preparing': 'Start preparing this order?',
         'ready': 'Mark this order as ready?',
         'served': 'Mark this order as served?'
     };
-    
-    if (!confirm(statusMessages[newStatus])) return;
-    
+    if (!confirm(messages[newStatus] || 'Update order status?')) return;
+
     fetch(`/orders/update-status/${orderId}/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
+            'X-CSRFToken': getCsrfToken(),
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: newStatus })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert(data.message);
-        }
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) { location.reload(); }
+        else { alert(data.message || 'Failed to update status.'); }
+    })
+    .catch(function(err) {
+        alert('Network error. Please try again.');
+        console.error(err);
     });
 }
 </script>
