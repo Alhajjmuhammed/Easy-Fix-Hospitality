@@ -5,312 +5,372 @@
 
 {% block extra_css %}
 <style>
-/* ── KDS Variables ─────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   KDS — Kitchen Display System  |  Dark, high-contrast, readable at distance
+   ═══════════════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 :root {
-    --kds-pending:   #f59e0b;
-    --kds-confirmed: #3b82f6;
-    --kds-preparing: #f97316;
-    --kds-ready:     #22c55e;
-    --kds-served:    #8b5cf6;
-    --kds-surface:   #ffffff;
-    --kds-bg:        #f1f5f9;
-    --kds-border:    #e2e8f0;
-    --kds-text:      #1e293b;
-    --kds-muted:     #64748b;
-    --kds-radius:    14px;
+    --c-pending:   #f59e0b;
+    --c-confirmed: #38bdf8;
+    --c-preparing: #fb923c;
+    --c-ready:     #4ade80;
+    --c-served:    #a78bfa;
+
+    --bg:          #07111f;
+    --surface:     #0e1e32;
+    --surface2:    #162740;
+    --border:      rgba(255,255,255,.07);
+    --text:        #f0f6ff;
+    --muted:       #7a93ad;
+    --r:           14px;
 }
 
-/* ── Page wrapper ──────────────────────────────────────────────────────── */
-.kds-wrap { background: var(--kds-bg); min-height: 100vh; padding-bottom: 2rem; }
+/* ── Reset & base ───────────────────────────────────────────────────────── */
+.kds * { box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+.kds { background: var(--bg); min-height: 100vh; padding-bottom: 2.5rem; }
+@keyframes livepulse { 0%,100% { box-shadow:0 0 0 0 rgba(74,222,128,.5); } 60% { box-shadow:0 0 0 8px rgba(74,222,128,0); } }
+@keyframes spin       { to { transform:rotate(360deg); } }
+@keyframes fadein     { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 
-/* ── Top bar ───────────────────────────────────────────────────────────── */
-.kds-topbar {
-    background: #0f172a;
-    color: #e2e8f0;
-    padding: 0.75rem 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    border-radius: 0 0 var(--kds-radius) var(--kds-radius);
-    margin-bottom: 1.25rem;
-    box-shadow: 0 4px 24px rgba(0,0,0,.18);
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+.kds-bar {
+    background: linear-gradient(135deg,#0a1929 0%,#0d2137 100%);
+    border-bottom: 1px solid var(--border);
+    padding: .9rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
 }
-.kds-topbar-left { display: flex; align-items: center; gap: 0.75rem; }
-.kds-restaurant { font-size: 1.15rem; font-weight: 700; color: #f8fafc; letter-spacing: -.01em; }
-.kds-staff { font-size: 0.8rem; color: #94a3b8; }
+.kds-bar-left  { display:flex; align-items:center; gap:.85rem; }
+.kds-bar-right { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; }
+
 .kds-live-dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: #22c55e;
-    box-shadow: 0 0 0 0 rgba(34,197,94,.5);
-    animation: livepulse 1.8s infinite;
-    flex-shrink: 0;
+    width:10px; height:10px; border-radius:50%;
+    background:#4ade80; flex-shrink:0;
+    animation: livepulse 2s infinite;
 }
-@keyframes livepulse {
-    0%   { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
-    70%  { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
-    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+.kds-name  { font-size:1.1rem; font-weight:800; color:#f0f6ff; letter-spacing:-.02em; }
+.kds-name span { color:var(--c-ready); }
+.kds-sub   { font-size:.75rem; color:var(--muted); margin-top:.1rem; }
+.kds-live-badge {
+    background: rgba(74,222,128,.12); border:1px solid rgba(74,222,128,.25);
+    color:#4ade80; border-radius:20px; padding:.25rem .75rem;
+    font-size:.65rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
 }
-.kds-live-label { font-size: 0.7rem; font-weight: 700; color: #22c55e; letter-spacing: .06em; text-transform: uppercase; }
-.kds-topbar-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.kds-reports-btn {
-    display: flex; align-items: center; gap: 0.4rem;
-    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
-    color: #e2e8f0; border-radius: 8px; padding: 0.4rem 0.85rem;
-    font-size: 0.82rem; font-weight: 600; text-decoration: none;
-    transition: background .2s;
+.kds-reconnect {
+    background:rgba(251,146,60,.12); border:1px solid rgba(251,146,60,.25);
+    color:#fb923c; border-radius:20px; padding:.28rem .8rem;
+    font-size:.72rem; font-weight:700; display:none; align-items:center; gap:.4rem;
 }
-.kds-reports-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
-.kds-refresh-pill {
-    background: rgba(245,158,11,.15); border: 1px solid rgba(245,158,11,.3);
-    color: #fbbf24; border-radius: 20px; padding: 0.3rem 0.8rem;
-    font-size: 0.75rem; font-weight: 600; display: none;
+.kds-report-btn {
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+    color:#c8daf0; border-radius:9px; padding:.38rem 1rem;
+    font-size:.8rem; font-weight:600; text-decoration:none;
+    display:flex; align-items:center; gap:.45rem;
+    transition: background .2s, color .2s;
 }
+.kds-report-btn:hover { background:rgba(255,255,255,.13); color:#fff; }
 
-/* ── Stage navigation ──────────────────────────────────────────────────── */
+/* ── Stage selector ─────────────────────────────────────────────────────── */
+.kds-stages-wrap { padding: 1.25rem 1.25rem .5rem; }
 .kds-stages {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 0;
-    background: var(--kds-surface);
-    border-radius: var(--kds-radius);
-    box-shadow: 0 2px 12px rgba(0,0,0,.07);
-    overflow: hidden;
-    margin: 0 0 1.25rem;
-    border: 1px solid var(--kds-border);
+    gap: .65rem;
 }
-.kds-stage-btn {
-    display: flex; flex-direction: column; align-items: center;
-    padding: 1rem 0.5rem;
-    border: none; background: transparent; cursor: pointer;
-    position: relative; transition: background .2s;
-    border-right: 1px solid var(--kds-border);
+.kds-stage {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 1.1rem .5rem .9rem;
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: .3rem;
+    position: relative; overflow: hidden;
+    transition: transform .2s, box-shadow .2s, background .2s, border-color .2s;
+    text-align: center;
 }
-.kds-stage-btn:last-child { border-right: none; }
-.kds-stage-btn:hover { background: #f8fafc; }
-.kds-stage-btn::after {
-    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
-    height: 3px; background: transparent; transition: background .2s;
+.kds-stage::before {
+    content:''; position:absolute; inset:0;
+    background: var(--sc);
+    opacity: 0;
+    transition: opacity .25s;
 }
-.kds-stage-btn.active { background: #f8fafc; }
-.kds-stage-btn.active::after { background: var(--stage-color); }
-.kds-stage-btn.s-pending  { --stage-color: var(--kds-pending);   }
-.kds-stage-btn.s-confirmed{ --stage-color: var(--kds-confirmed); }
-.kds-stage-btn.s-preparing{ --stage-color: var(--kds-preparing); }
-.kds-stage-btn.s-ready    { --stage-color: var(--kds-ready);     }
-.kds-stage-btn.s-served   { --stage-color: var(--kds-served);    }
+.kds-stage:hover { transform:translateY(-2px); border-color: var(--sc); }
+.kds-stage:hover::before { opacity:.08; }
+.kds-stage.active { border-color: var(--sc); box-shadow: 0 0 0 1px var(--sc), 0 8px 28px rgba(0,0,0,.4); transform:translateY(-3px); }
+.kds-stage.active::before { opacity:.16; }
 
-.kds-stage-count {
-    font-size: 2rem; font-weight: 800; line-height: 1;
-    color: var(--stage-color);
+.kds-stage.s-pending   { --sc: var(--c-pending);   }
+.kds-stage.s-confirmed { --sc: var(--c-confirmed);  }
+.kds-stage.s-preparing { --sc: var(--c-preparing);  }
+.kds-stage.s-ready     { --sc: var(--c-ready);      }
+.kds-stage.s-served    { --sc: var(--c-served);     }
+
+.kds-stage-icon {
+    width:36px; height:36px; border-radius:50%;
+    background: rgba(255,255,255,.06);
+    display:flex; align-items:center; justify-content:center;
+    font-size:.95rem; color: var(--sc);
+    position:relative; z-index:1;
+    transition: background .2s;
+}
+.kds-stage.active .kds-stage-icon { background: rgba(255,255,255,.14); }
+
+.kds-stage-num {
+    font-size:2.2rem; font-weight:900; line-height:1;
+    color: var(--sc); position:relative; z-index:1;
     transition: transform .2s;
 }
-.kds-stage-btn.active .kds-stage-count { transform: scale(1.1); }
-.kds-stage-icon { font-size: 1rem; color: var(--stage-color); margin-bottom: 0.2rem; opacity: .75; }
-.kds-stage-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--kds-muted); margin-top: 0.2rem; }
-.kds-stage-btn.active .kds-stage-label { color: var(--stage-color); }
+.kds-stage.active .kds-stage-num { transform:scale(1.1); }
 
-/* ── Order card grid ───────────────────────────────────────────────────── */
+.kds-stage-lbl {
+    font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+    color: var(--muted); position:relative; z-index:1;
+    transition: color .2s;
+}
+.kds-stage.active .kds-stage-lbl { color: var(--sc); }
+
+/* ── Content area ───────────────────────────────────────────────────────── */
+.kds-content { padding: .75rem 1.25rem 1rem; }
+
+/* ── Card grid ──────────────────────────────────────────────────────────── */
 .kds-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(295px, 1fr));
     gap: 1rem;
-    padding: 0.25rem 0;
+    animation: fadein .3s ease;
 }
 
-/* ── Order card ────────────────────────────────────────────────────────── */
+/* ── Order card ─────────────────────────────────────────────────────────── */
 .kds-card {
-    background: var(--kds-surface);
-    border-radius: var(--kds-radius);
-    box-shadow: 0 2px 10px rgba(0,0,0,.06);
-    border: 1px solid var(--kds-border);
+    background: var(--surface);
+    border-radius: var(--r);
+    border: 1px solid var(--border);
     overflow: hidden;
     display: flex; flex-direction: column;
     transition: box-shadow .2s, transform .2s;
+    position: relative;
 }
-.kds-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,.12); transform: translateY(-2px); }
+.kds-card::before {
+    content:''; position:absolute; top:0; left:0; bottom:0;
+    width:4px; background: var(--cc);
+}
+.kds-card:hover { box-shadow:0 12px 40px rgba(0,0,0,.5); transform:translateY(-3px); }
 
-.kds-card-header {
-    background: var(--card-color, #3b82f6);
-    padding: 0.7rem 1rem;
-    display: flex; justify-content: space-between; align-items: center;
+/* card header */
+.kds-card-top {
+    background: linear-gradient(135deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.02) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: .75rem 1rem .75rem 1.25rem;
+    display:flex; justify-content:space-between; align-items:center;
 }
-.kds-order-num { font-size: 1rem; font-weight: 800; color: #fff; letter-spacing: -.01em; }
-.kds-table-badge {
-    background: rgba(255,255,255,.22); color: #fff;
-    border-radius: 6px; padding: 0.2rem 0.6rem;
-    font-size: 0.78rem; font-weight: 700;
+.kds-order-no {
+    font-size:1.15rem; font-weight:900; color:var(--text);
+    letter-spacing:-.03em;
+}
+.kds-order-no span { color: var(--cc); }
+.kds-tbl-badge {
+    background: var(--cc); color:#000;
+    border-radius:8px; padding:.25rem .7rem;
+    font-size:.78rem; font-weight:800; letter-spacing:-.01em;
+    display:flex; align-items:center; gap:.3rem;
 }
 
+/* card meta row */
 .kds-card-meta {
-    padding: 0.55rem 1rem;
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid var(--kds-border);
-    background: #fafbfc;
+    padding:.5rem 1rem .5rem 1.25rem;
+    display:flex; justify-content:space-between; align-items:center;
+    border-bottom:1px solid var(--border);
+    background: var(--surface2);
 }
-.kds-customer { font-size: 0.82rem; font-weight: 600; color: var(--kds-text); }
-.kds-time { font-size: 0.78rem; color: var(--kds-muted); }
+.kds-cust { font-size:.82rem; font-weight:600; color:var(--text); display:flex; align-items:center; gap:.4rem; }
+.kds-cust i { color:var(--muted); font-size:.7rem; }
+.kds-placed { font-size:.75rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 
-.kds-card-items { padding: 0.75rem 1rem; flex: 1; }
-.kds-item-row {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding: 0.3rem 0;
-    border-bottom: 1px dashed #f0f0f0;
-    font-size: 0.88rem; color: var(--kds-text);
+/* items list */
+.kds-card-items { padding:.7rem 1rem .7rem 1.25rem; flex:1; }
+.kds-item {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.32rem 0;
+    border-bottom:1px solid rgba(255,255,255,.04);
 }
-.kds-item-row:last-child { border-bottom: none; }
-.kds-item-name { font-weight: 500; }
-.kds-item-qty {
-    background: var(--card-color, #3b82f6); color: #fff;
-    border-radius: 5px; padding: 0.1rem 0.45rem;
-    font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+.kds-item:last-child { border-bottom:none; }
+.kds-item-name { font-size:.9rem; font-weight:500; color:var(--text); }
+.kds-qty {
+    background:var(--cc); color:#000;
+    border-radius:6px; padding:.1rem .5rem;
+    font-size:.75rem; font-weight:800; flex-shrink:0;
 }
-.kds-special {
-    font-size: 0.75rem; color: #ef4444; font-style: italic;
-    padding: 0.25rem 0; display: flex; align-items: center; gap: 0.3rem;
+.kds-note {
+    font-size:.73rem; color:var(--c-pending); font-style:italic;
+    padding:.2rem 0; display:flex; align-items:center; gap:.35rem;
 }
 
-.kds-card-footer {
-    padding: 0.65rem 1rem;
-    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-    background: #fafbfc;
-    border-top: 1px solid var(--kds-border);
-    flex-wrap: wrap;
+/* card footer */
+.kds-card-foot {
+    border-top:1px solid var(--border);
+    background: var(--surface2);
+    padding:.6rem 1rem .6rem 1.25rem;
+    display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap;
 }
 .kds-timer {
-    font-size: 0.8rem; font-weight: 700; color: var(--kds-muted);
-    display: flex; align-items: center; gap: 0.3rem;
+    display:flex; align-items:center; gap:.4rem;
+    font-size:.82rem; font-weight:700; color:var(--muted);
 }
-.kds-timer-val { font-variant-numeric: tabular-nums; }
-.kds-btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.kds-timer i { font-size:.75rem; }
+.kds-timer-val { font-variant-numeric:tabular-nums; }
+.kds-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
 
+/* buttons */
 .kds-btn {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-    padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.78rem;
-    font-weight: 700; border: none; cursor: pointer; text-decoration: none;
-    transition: opacity .15s, transform .15s;
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.42rem .85rem; border-radius:8px;
+    font-size:.78rem; font-weight:700; border:none; cursor:pointer;
+    text-decoration:none; transition:opacity .15s, transform .15s, box-shadow .15s;
+    letter-spacing:.01em;
 }
-.kds-btn:hover { opacity: .85; transform: translateY(-1px); }
-.kds-btn-print { background: #e0f2fe; color: #0369a1; }
-.kds-btn-confirm  { background: #22c55e; color: #fff; }
-.kds-btn-prepare  { background: #3b82f6; color: #fff; }
-.kds-btn-ready    { background: #f97316; color: #fff; }
-.kds-btn-serve    { background: #8b5cf6; color: #fff; }
+.kds-btn:hover { opacity:.88; transform:translateY(-1px); }
 
-/* ── Served log (compact table) ────────────────────────────────────────── */
-.kds-served-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-.kds-served-table th {
-    background: #0f172a; color: #cbd5e1;
-    padding: 0.65rem 0.85rem; font-size: 0.72rem;
-    text-transform: uppercase; letter-spacing: .05em; font-weight: 700;
-    text-align: left;
-}
-.kds-served-table td { padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--kds-border); color: var(--kds-text); }
-.kds-served-table tr:last-child td { border-bottom: none; }
-.kds-served-table tr:hover td { background: #f8fafc; }
+.kds-btn-kot    { background:rgba(255,255,255,.08); color:#c8daf0; border:1px solid rgba(255,255,255,.1); }
+.kds-btn-kot:hover { background:rgba(255,255,255,.14); }
 
-/* ── Empty state ───────────────────────────────────────────────────────── */
+.kds-btn-confirm { background:#22c55e; color:#000; font-weight:800; }
+.kds-btn-start   { background:#38bdf8; color:#000; font-weight:800; }
+.kds-btn-ready   { background:#fb923c; color:#000; font-weight:800; }
+.kds-btn-serve   { background:#a78bfa; color:#000; font-weight:800; }
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
 .kds-empty {
-    grid-column: 1 / -1;
-    text-align: center; padding: 3.5rem 1rem;
-    color: var(--kds-muted);
+    grid-column:1/-1;
+    text-align:center; padding:5rem 1rem;
+    color:var(--muted);
 }
-.kds-empty i { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: .4; display: block; }
-.kds-empty p { font-size: 0.95rem; font-weight: 500; }
-
-/* ── Served at badge ───────────────────────────────────────────────────── */
-.kds-time-badge {
-    background: #dcfce7; color: #166534;
-    border-radius: 6px; padding: 0.15rem 0.5rem;
-    font-size: 0.78rem; font-weight: 700;
+.kds-empty-icon {
+    width:72px; height:72px; border-radius:50%;
+    background:var(--surface2); border:1px solid var(--border);
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:1.6rem; margin-bottom:1rem; color:var(--muted);
 }
+.kds-empty p { font-size:.95rem; font-weight:500; margin:0; }
 
-/* ── Spin animation for reconnecting icon ──────────────────────────────── */
-@keyframes spin { to { transform: rotate(360deg); } }
+/* ── Served log table ───────────────────────────────────────────────────── */
+.kds-log-wrap {
+    background:var(--surface); border-radius:var(--r);
+    border:1px solid var(--border); overflow:hidden;
+    animation:fadein .3s ease;
+}
+.kds-log { width:100%; border-collapse:collapse; font-size:.87rem; }
+.kds-log thead th {
+    background:var(--surface2); color:var(--muted);
+    padding:.7rem 1rem; font-size:.68rem; text-transform:uppercase;
+    letter-spacing:.08em; font-weight:700; text-align:left;
+    border-bottom:1px solid var(--border);
+}
+.kds-log tbody td {
+    padding:.65rem 1rem; border-bottom:1px solid rgba(255,255,255,.04);
+    color:var(--text);
+}
+.kds-log tbody tr:last-child td { border-bottom:none; }
+.kds-log tbody tr:hover td { background:var(--surface2); }
+.kds-served-badge {
+    background:rgba(74,222,128,.15); color:#4ade80;
+    border-radius:6px; padding:.15rem .55rem;
+    font-size:.75rem; font-weight:700; font-variant-numeric:tabular-nums;
+}
+.kds-log-pager {
+    padding:.65rem 1rem; border-top:1px solid var(--border);
+    display:flex; gap:.35rem; flex-wrap:wrap; align-items:center;
+}
+.kds-page-btn {
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);
+    color:var(--muted); border-radius:7px; padding:.3rem .65rem;
+    font-size:.78rem; font-weight:600; text-decoration:none; cursor:pointer;
+    transition:background .15s;
+}
+.kds-page-btn:hover { background:rgba(255,255,255,.12); color:var(--text); }
+.kds-page-btn.on { background:var(--c-served); color:#000; border-color:var(--c-served); }
+.kds-page-btn.off { opacity:.3; cursor:default; }
 
-/* ── Strip any Bootstrap .nav / .tab residue on stage buttons ──────────── */
-.kds-stages .kds-stage-btn:focus { outline: none; box-shadow: none; }
-.kds-stages { border-bottom: none; }
-
-/* ── Responsive ────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-    .kds-stages { grid-template-columns: repeat(5, 1fr); }
-    .kds-stage-count { font-size: 1.4rem; }
-    .kds-stage-label { display: none; }
-    .kds-stage-icon { font-size: 0.85rem; }
-    .kds-grid { grid-template-columns: 1fr; }
-    .kds-topbar { border-radius: 0; }
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width:700px) {
+    .kds-stage-num  { font-size:1.5rem; }
+    .kds-stage-lbl  { display:none; }
+    .kds-stage-icon { width:28px; height:28px; font-size:.78rem; }
+    .kds-stages     { gap:.4rem; }
+    .kds-stage      { padding:.75rem .25rem .65rem; }
+    .kds-grid       { grid-template-columns:1fr; }
+    .kds-stages-wrap, .kds-content { padding-left:.75rem; padding-right:.75rem; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="kds-wrap" data-restaurant-view="true" data-owner-id="{{ request.user.owner.id|default:'default' }}">
+<div class="kds" data-restaurant-view="true" data-owner-id="{{ request.user.owner.id|default:'default' }}">
 
     <!-- ── Top bar ──────────────────────────────────────────────────────── -->
-    <div class="kds-topbar">
-        <div class="kds-topbar-left">
+    <div class="kds-bar">
+        <div class="kds-bar-left">
             <span class="kds-live-dot"></span>
             <div>
-                <div class="kds-restaurant"><i class="fas fa-utensils" style="margin-right:.45rem;opacity:.65;"></i>{% get_restaurant_name %}</div>
-                <div class="kds-staff">{{ user.get_full_name }} &nbsp;·&nbsp; Kitchen</div>
+                <div class="kds-name"><i class="fas fa-utensils" style="color:var(--c-preparing);margin-right:.5rem;font-size:.9rem;"></i>{% get_restaurant_name %}</div>
+                <div class="kds-sub">{{ user.get_full_name }} &nbsp;·&nbsp; Kitchen Station</div>
             </div>
-            <span class="kds-live-label">Live</span>
+            <span class="kds-live-badge">Live</span>
         </div>
-        <div class="kds-topbar-right">
-            <div class="kds-refresh-pill" id="refreshTimer">
-                <i class="fas fa-sync-alt" style="animation:spin .9s linear infinite;"></i>
-                Reconnecting… <span id="countdown">30</span>s
+        <div class="kds-bar-right">
+            <div class="kds-reconnect" id="refreshTimer">
+                <i class="fas fa-sync-alt" style="animation:spin .85s linear infinite;"></i>
+                Reconnecting&hellip; <span id="countdown">30</span>s
             </div>
-            <a href="{% url 'orders:kitchen_reports' %}" class="kds-reports-btn">
+            <a href="{% url 'orders:kitchen_reports' %}" class="kds-report-btn">
                 <i class="fas fa-chart-bar"></i> Reports
             </a>
         </div>
     </div>
 
-    <div class="container-fluid px-3">
-
-        <!-- ── Stage navigation ─────────────────────────────────────────── -->
+    <!-- ── Stage selector ───────────────────────────────────────────────── -->
+    <div class="kds-stages-wrap">
         <div class="kds-stages" id="orderTabs" role="tablist">
-            <button class="kds-stage-btn s-pending active" id="pending-tab"
-                    data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab"
-                    aria-selected="true">
-                <span class="kds-stage-icon"><i class="fas fa-clock"></i></span>
-                <span class="kds-stage-count">{{ pending_count }}</span>
-                <span class="kds-stage-label">Pending</span>
-            </button>
-            <button class="kds-stage-btn s-confirmed" id="confirmed-tab"
-                    data-bs-toggle="tab" data-bs-target="#confirmed" type="button" role="tab"
-                    aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-check-circle"></i></span>
-                <span class="kds-stage-count">{{ confirmed_count }}</span>
-                <span class="kds-stage-label">Confirmed</span>
-            </button>
-            <button class="kds-stage-btn s-preparing" id="preparing-tab"
-                    data-bs-toggle="tab" data-bs-target="#preparing" type="button" role="tab"
-                    aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-fire"></i></span>
-                <span class="kds-stage-count">{{ preparing_count }}</span>
-                <span class="kds-stage-label">Preparing</span>
-            </button>
-            <button class="kds-stage-btn s-ready" id="ready-tab"
-                    data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab"
-                    aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-bell"></i></span>
-                <span class="kds-stage-count">{{ ready_count }}</span>
-                <span class="kds-stage-label">Ready</span>
-            </button>
-            <button class="kds-stage-btn s-served" id="served-tab"
-                    data-bs-toggle="tab" data-bs-target="#served" type="button" role="tab"
-                    aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-check-double"></i></span>
-                <span class="kds-stage-count">{{ served_count }}</span>
-                <span class="kds-stage-label">Served</span>
-            </button>
-        </div>
 
-        <!-- ── Tab content ──────────────────────────────────────────────── -->
+            <button class="kds-stage s-pending active" id="pending-tab"
+                    data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab" aria-selected="true">
+                <span class="kds-stage-icon"><i class="fas fa-clock"></i></span>
+                <span class="kds-stage-num">{{ pending_count }}</span>
+                <span class="kds-stage-lbl">Pending</span>
+            </button>
+
+            <button class="kds-stage s-confirmed" id="confirmed-tab"
+                    data-bs-toggle="tab" data-bs-target="#confirmed" type="button" role="tab" aria-selected="false">
+                <span class="kds-stage-icon"><i class="fas fa-check-circle"></i></span>
+                <span class="kds-stage-num">{{ confirmed_count }}</span>
+                <span class="kds-stage-lbl">Confirmed</span>
+            </button>
+
+            <button class="kds-stage s-preparing" id="preparing-tab"
+                    data-bs-toggle="tab" data-bs-target="#preparing" type="button" role="tab" aria-selected="false">
+                <span class="kds-stage-icon"><i class="fas fa-fire"></i></span>
+                <span class="kds-stage-num">{{ preparing_count }}</span>
+                <span class="kds-stage-lbl">Preparing</span>
+            </button>
+
+            <button class="kds-stage s-ready" id="ready-tab"
+                    data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab" aria-selected="false">
+                <span class="kds-stage-icon"><i class="fas fa-bell"></i></span>
+                <span class="kds-stage-num">{{ ready_count }}</span>
+                <span class="kds-stage-lbl">Ready</span>
+            </button>
+
+            <button class="kds-stage s-served" id="served-tab"
+                    data-bs-toggle="tab" data-bs-target="#served" type="button" role="tab" aria-selected="false">
+                <span class="kds-stage-icon"><i class="fas fa-check-double"></i></span>
+                <span class="kds-stage-num">{{ served_count }}</span>
+                <span class="kds-stage-lbl">Served</span>
+            </button>
+
+        </div>
+    </div>
+
+    <!-- ── Tab panels ───────────────────────────────────────────────────── -->
+    <div class="kds-content">
         <div class="tab-content" id="orderTabsContent">
 
             <!-- PENDING ──────────────────────────────────────────────────── -->
@@ -318,34 +378,38 @@
                 {% if pending_orders %}
                 <div class="kds-grid">
                     {% for order in pending_orders %}
-                    <div class="kds-card" style="--card-color:#f59e0b;">
-                        <div class="kds-card-header">
-                            <span class="kds-order-num">#{{ order.order_number }}</span>
-                            <span class="kds-table-badge">
-                                <i class="fas fa-chair" style="font-size:.65rem;margin-right:.25rem;"></i>{{ order.table_info.tbl_no|default:order.get_order_type_display }}
+                    <div class="kds-card" style="--cc:var(--c-pending);">
+                        <div class="kds-card-top">
+                            <span class="kds-order-no"><span>#</span>{{ order.order_number }}</span>
+                            <span class="kds-tbl-badge">
+                                <i class="fas fa-utensils" style="font-size:.6rem;"></i>
+                                {{ order.table_info.tbl_no|default:order.get_order_type_display }}
                             </span>
                         </div>
                         <div class="kds-card-meta">
-                            <span class="kds-customer"><i class="fas fa-user" style="font-size:.65rem;opacity:.5;margin-right:.3rem;"></i>{{ order.ordered_by }}</span>
-                            <span class="kds-time">{{ order.created_at|date:"H:i" }}</span>
+                            <span class="kds-cust"><i class="fas fa-user"></i>{{ order.ordered_by }}</span>
+                            <span class="kds-placed">{{ order.created_at|date:"H:i" }}</span>
                         </div>
                         <div class="kds-card-items">
                             {% for item in order.order_items.all %}
                                 {% if item.product.station == 'kitchen' %}
-                                <div class="kds-item-row">
+                                <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-item-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>
                                 </div>
                                 {% if item.special_notes %}
-                                <div class="kds-special"><i class="fas fa-info-circle"></i> {{ item.special_notes }}</div>
+                                <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>
                                 {% endif %}
                                 {% endif %}
                             {% endfor %}
                         </div>
-                        <div class="kds-card-footer">
-                            <span class="kds-timer"><i class="fas fa-hourglass-start" style="font-size:.7rem;"></i>&nbsp;<span class="kds-timer-val">{{ order.created_at|date:"H:i" }}</span></span>
-                            <div class="kds-btn-row">
-                                <a href="{% url 'orders:print_kot' order.id %}" target="_blank" class="kds-btn kds-btn-print">
+                        <div class="kds-card-foot">
+                            <span class="kds-timer">
+                                <i class="fas fa-hourglass-start"></i>
+                                <span class="kds-timer-val">{{ order.created_at|date:"H:i" }}</span>
+                            </span>
+                            <div class="kds-actions">
+                                <a href="{% url 'orders:print_kot' order.id %}" target="_blank" class="kds-btn kds-btn-kot">
                                     <i class="fas fa-print"></i> KOT
                                 </a>
                                 <form method="post" action="{% url 'orders:update_order_status' order.id %}" style="margin:0;">
@@ -363,8 +427,8 @@
                 {% else %}
                 <div class="kds-grid">
                     <div class="kds-empty">
-                        <i class="fas fa-clock"></i>
-                        <p>No pending orders</p>
+                        <div class="kds-empty-icon"><i class="fas fa-clock"></i></div>
+                        <p>No pending orders right now</p>
                     </div>
                 </div>
                 {% endif %}
@@ -375,41 +439,45 @@
                 {% if confirmed_orders %}
                 <div class="kds-grid">
                     {% for order in confirmed_orders %}
-                    <div class="kds-card" style="--card-color:#3b82f6;">
-                        <div class="kds-card-header">
-                            <span class="kds-order-num">#{{ order.order_number }}</span>
-                            <span class="kds-table-badge">
-                                <i class="fas fa-chair" style="font-size:.65rem;margin-right:.25rem;"></i>{{ order.table_info.tbl_no|default:order.get_order_type_display }}
+                    <div class="kds-card" style="--cc:var(--c-confirmed);">
+                        <div class="kds-card-top">
+                            <span class="kds-order-no"><span>#</span>{{ order.order_number }}</span>
+                            <span class="kds-tbl-badge">
+                                <i class="fas fa-utensils" style="font-size:.6rem;"></i>
+                                {{ order.table_info.tbl_no|default:order.get_order_type_display }}
                             </span>
                         </div>
                         <div class="kds-card-meta">
-                            <span class="kds-customer"><i class="fas fa-user" style="font-size:.65rem;opacity:.5;margin-right:.3rem;"></i>{{ order.ordered_by }}</span>
-                            <span class="kds-time">{{ order.created_at|date:"H:i" }}</span>
+                            <span class="kds-cust"><i class="fas fa-user"></i>{{ order.ordered_by }}</span>
+                            <span class="kds-placed">{{ order.created_at|date:"H:i" }}</span>
                         </div>
                         <div class="kds-card-items">
                             {% for item in order.order_items.all %}
                                 {% if item.product.station == 'kitchen' %}
-                                <div class="kds-item-row">
+                                <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-item-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>
                                 </div>
                                 {% if item.special_notes %}
-                                <div class="kds-special"><i class="fas fa-info-circle"></i> {{ item.special_notes }}</div>
+                                <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>
                                 {% endif %}
                                 {% endif %}
                             {% endfor %}
                         </div>
-                        <div class="kds-card-footer">
-                            <span class="kds-timer"><i class="fas fa-stopwatch" style="font-size:.7rem;"></i>&nbsp;<span class="kds-timer-val" id="timer-{{ order.id }}"
-                                  data-start-time="{{ order.confirmed_at|date:'c'|default:order.created_at|date:'c' }}">…</span></span>
-                            <div class="kds-btn-row">
-                                <a href="{% url 'orders:print_kot' order.id %}" target="_blank" class="kds-btn kds-btn-print">
+                        <div class="kds-card-foot">
+                            <span class="kds-timer">
+                                <i class="fas fa-stopwatch"></i>
+                                <span class="kds-timer-val" id="timer-{{ order.id }}"
+                                      data-start-time="{{ order.confirmed_at|date:'c'|default:order.created_at|date:'c' }}">…</span>
+                            </span>
+                            <div class="kds-actions">
+                                <a href="{% url 'orders:print_kot' order.id %}" target="_blank" class="kds-btn kds-btn-kot">
                                     <i class="fas fa-print"></i> KOT
                                 </a>
                                 <form method="post" action="{% url 'orders:update_order_status' order.id %}" style="margin:0;">
                                     {% csrf_token %}
                                     <input type="hidden" name="status" value="preparing">
-                                    <button type="submit" class="kds-btn kds-btn-prepare">
+                                    <button type="submit" class="kds-btn kds-btn-start">
                                         <i class="fas fa-play"></i> Start
                                     </button>
                                 </form>
@@ -421,7 +489,7 @@
                 {% else %}
                 <div class="kds-grid">
                     <div class="kds-empty">
-                        <i class="fas fa-check-circle"></i>
+                        <div class="kds-empty-icon"><i class="fas fa-check-circle"></i></div>
                         <p>No confirmed orders</p>
                     </div>
                 </div>
@@ -433,35 +501,39 @@
                 {% if preparing_orders %}
                 <div class="kds-grid">
                     {% for order in preparing_orders %}
-                    <div class="kds-card" style="--card-color:#f97316;">
-                        <div class="kds-card-header">
-                            <span class="kds-order-num">#{{ order.order_number }}</span>
-                            <span class="kds-table-badge">
-                                <i class="fas fa-chair" style="font-size:.65rem;margin-right:.25rem;"></i>{{ order.table_info.tbl_no|default:order.get_order_type_display }}
+                    <div class="kds-card" style="--cc:var(--c-preparing);">
+                        <div class="kds-card-top">
+                            <span class="kds-order-no"><span>#</span>{{ order.order_number }}</span>
+                            <span class="kds-tbl-badge">
+                                <i class="fas fa-utensils" style="font-size:.6rem;"></i>
+                                {{ order.table_info.tbl_no|default:order.get_order_type_display }}
                             </span>
                         </div>
                         <div class="kds-card-meta">
-                            <span class="kds-customer"><i class="fas fa-user" style="font-size:.65rem;opacity:.5;margin-right:.3rem;"></i>{{ order.ordered_by }}</span>
-                            <span class="kds-time">{{ order.created_at|date:"H:i" }}</span>
+                            <span class="kds-cust"><i class="fas fa-user"></i>{{ order.ordered_by }}</span>
+                            <span class="kds-placed">{{ order.created_at|date:"H:i" }}</span>
                         </div>
                         <div class="kds-card-items">
                             {% for item in order.order_items.all %}
                                 {% if item.product.station == 'kitchen' %}
-                                <div class="kds-item-row">
+                                <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-item-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>
                                 </div>
                                 {% if item.special_notes %}
-                                <div class="kds-special"><i class="fas fa-info-circle"></i> {{ item.special_notes }}</div>
+                                <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>
                                 {% endif %}
                                 {% endif %}
                             {% endfor %}
                         </div>
-                        <div class="kds-card-footer">
-                            <span class="kds-timer"><i class="fas fa-stopwatch" style="font-size:.7rem;"></i>&nbsp;<span class="kds-timer-val" id="timer-{{ order.id }}"
-                                  data-start-time="{{ order.preparing_at|date:'c'|default:order.created_at|date:'c' }}">…</span></span>
-                            <div class="kds-btn-row">
-                                <a href="{% url 'orders:reprint_kot' order.id %}" target="_blank" class="kds-btn kds-btn-print">
+                        <div class="kds-card-foot">
+                            <span class="kds-timer">
+                                <i class="fas fa-fire"></i>
+                                <span class="kds-timer-val" id="timer-{{ order.id }}"
+                                      data-start-time="{{ order.preparing_at|date:'c'|default:order.created_at|date:'c' }}">…</span>
+                            </span>
+                            <div class="kds-actions">
+                                <a href="{% url 'orders:reprint_kot' order.id %}" target="_blank" class="kds-btn kds-btn-kot">
                                     <i class="fas fa-print"></i> KOT
                                 </a>
                                 <form method="post" action="{% url 'orders:update_order_status' order.id %}" style="margin:0;">
@@ -479,7 +551,7 @@
                 {% else %}
                 <div class="kds-grid">
                     <div class="kds-empty">
-                        <i class="fas fa-fire"></i>
+                        <div class="kds-empty-icon"><i class="fas fa-fire"></i></div>
                         <p>No orders being prepared</p>
                     </div>
                 </div>
@@ -491,35 +563,39 @@
                 {% if ready_orders %}
                 <div class="kds-grid">
                     {% for order in ready_orders %}
-                    <div class="kds-card" style="--card-color:#22c55e;">
-                        <div class="kds-card-header">
-                            <span class="kds-order-num">#{{ order.order_number }}</span>
-                            <span class="kds-table-badge">
-                                <i class="fas fa-chair" style="font-size:.65rem;margin-right:.25rem;"></i>{{ order.table_info.tbl_no|default:order.get_order_type_display }}
+                    <div class="kds-card" style="--cc:var(--c-ready);">
+                        <div class="kds-card-top">
+                            <span class="kds-order-no"><span>#</span>{{ order.order_number }}</span>
+                            <span class="kds-tbl-badge">
+                                <i class="fas fa-utensils" style="font-size:.6rem;"></i>
+                                {{ order.table_info.tbl_no|default:order.get_order_type_display }}
                             </span>
                         </div>
                         <div class="kds-card-meta">
-                            <span class="kds-customer"><i class="fas fa-user" style="font-size:.65rem;opacity:.5;margin-right:.3rem;"></i>{{ order.ordered_by }}</span>
-                            <span class="kds-time">{{ order.created_at|date:"H:i" }}</span>
+                            <span class="kds-cust"><i class="fas fa-user"></i>{{ order.ordered_by }}</span>
+                            <span class="kds-placed">{{ order.created_at|date:"H:i" }}</span>
                         </div>
                         <div class="kds-card-items">
                             {% for item in order.order_items.all %}
                                 {% if item.product.station == 'kitchen' %}
-                                <div class="kds-item-row">
+                                <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-item-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>
                                 </div>
                                 {% if item.special_notes %}
-                                <div class="kds-special"><i class="fas fa-info-circle"></i> {{ item.special_notes }}</div>
+                                <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>
                                 {% endif %}
                                 {% endif %}
                             {% endfor %}
                         </div>
-                        <div class="kds-card-footer">
-                            <span class="kds-timer"><i class="fas fa-stopwatch" style="font-size:.7rem;"></i>&nbsp;<span class="kds-timer-val" id="timer-{{ order.id }}"
-                                  data-start-time="{{ order.ready_at|date:'c'|default:order.created_at|date:'c' }}">…</span></span>
-                            <div class="kds-btn-row">
-                                <a href="{% url 'orders:reprint_kot' order.id %}" target="_blank" class="kds-btn kds-btn-print">
+                        <div class="kds-card-foot">
+                            <span class="kds-timer">
+                                <i class="fas fa-stopwatch"></i>
+                                <span class="kds-timer-val" id="timer-{{ order.id }}"
+                                      data-start-time="{{ order.ready_at|date:'c'|default:order.created_at|date:'c' }}">…</span>
+                            </span>
+                            <div class="kds-actions">
+                                <a href="{% url 'orders:reprint_kot' order.id %}" target="_blank" class="kds-btn kds-btn-kot">
                                     <i class="fas fa-print"></i> KOT
                                 </a>
                                 <form method="post" action="{% url 'orders:update_order_status' order.id %}" style="margin:0;">
@@ -537,7 +613,7 @@
                 {% else %}
                 <div class="kds-grid">
                     <div class="kds-empty">
-                        <i class="fas fa-bell"></i>
+                        <div class="kds-empty-icon"><i class="fas fa-bell"></i></div>
                         <p>No orders ready for service</p>
                     </div>
                 </div>
@@ -547,31 +623,31 @@
             <!-- SERVED ───────────────────────────────────────────────────── -->
             <div class="tab-pane fade" id="served" role="tabpanel">
                 {% if served_orders %}
-                <div style="background:var(--kds-surface);border-radius:var(--kds-radius);border:1px solid var(--kds-border);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);">
+                <div class="kds-log-wrap">
                     <div style="overflow-x:auto;">
-                    <table class="kds-served-table">
+                    <table class="kds-log">
                         <thead>
                             <tr>
                                 <th>Order</th>
                                 <th>Table</th>
                                 <th>Customer</th>
                                 <th>Ordered</th>
-                                <th>Served</th>
+                                <th>Served at</th>
                                 <th>Items</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for order in served_orders %}
                             <tr>
-                                <td><strong>#{{ order.order_number }}</strong></td>
-                                <td>{{ order.table_info.tbl_no|default:order.get_order_type_display }}</td>
-                                <td>{{ order.ordered_by }}</td>
-                                <td>{{ order.created_at|date:"H:i" }}</td>
-                                <td><span class="kds-time-badge">{{ order.served_at|date:"H:i"|default:order.updated_at|date:"H:i" }}</span></td>
+                                <td><strong style="color:var(--c-served);">#{{ order.order_number }}</strong></td>
+                                <td style="color:var(--text);">{{ order.table_info.tbl_no|default:order.get_order_type_display }}</td>
+                                <td style="color:var(--text);">{{ order.ordered_by }}</td>
+                                <td style="color:var(--muted);">{{ order.created_at|date:"H:i" }}</td>
+                                <td><span class="kds-served-badge">{{ order.served_at|date:"H:i"|default:order.updated_at|date:"H:i" }}</span></td>
                                 <td>
                                     {% for item in order.order_items.all %}
                                         {% if item.product.station == 'kitchen' %}
-                                        <span style="margin-right:.5rem;font-size:.82rem;">{{ item.product.name }} <strong>×{{ item.quantity }}</strong></span>
+                                        <span style="margin-right:.6rem;font-size:.83rem;color:var(--text);">{{ item.product.name }} <strong style="color:var(--c-served);">×{{ item.quantity }}</strong></span>
                                         {% endif %}
                                     {% endfor %}
                                 </td>
@@ -581,23 +657,23 @@
                     </table>
                     </div>
                     {% if served_orders.has_other_pages %}
-                    <div style="padding:.75rem 1rem;border-top:1px solid var(--kds-border);display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
+                    <div class="kds-log-pager">
                         {% if served_orders.has_previous %}
-                            <a href="?served_page={{ served_orders.previous_page_number }}#served" class="kds-btn kds-btn-print">&laquo;</a>
+                            <a href="?served_page={{ served_orders.previous_page_number }}#served" class="kds-page-btn">&laquo;</a>
                         {% else %}
-                            <span class="kds-btn" style="opacity:.35;cursor:default;">&laquo;</span>
+                            <span class="kds-page-btn off">&laquo;</span>
                         {% endif %}
                         {% for num in served_orders.paginator.page_range %}
                             {% if served_orders.number == num %}
-                                <span class="kds-btn kds-btn-serve">{{ num }}</span>
+                                <span class="kds-page-btn on">{{ num }}</span>
                             {% else %}
-                                <a href="?served_page={{ num }}#served" class="kds-btn kds-btn-print">{{ num }}</a>
+                                <a href="?served_page={{ num }}#served" class="kds-page-btn">{{ num }}</a>
                             {% endif %}
                         {% endfor %}
                         {% if served_orders.has_next %}
-                            <a href="?served_page={{ served_orders.next_page_number }}#served" class="kds-btn kds-btn-print">&raquo;</a>
+                            <a href="?served_page={{ served_orders.next_page_number }}#served" class="kds-page-btn">&raquo;</a>
                         {% else %}
-                            <span class="kds-btn" style="opacity:.35;cursor:default;">&raquo;</span>
+                            <span class="kds-page-btn off">&raquo;</span>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -605,16 +681,16 @@
                 {% else %}
                 <div class="kds-grid">
                     <div class="kds-empty">
-                        <i class="fas fa-check-double"></i>
+                        <div class="kds-empty-icon"><i class="fas fa-check-double"></i></div>
                         <p>No served orders yet today</p>
                     </div>
                 </div>
                 {% endif %}
             </div>
 
-        </div><!-- /tab-content -->
-    </div><!-- /container-fluid -->
-</div><!-- /kds-wrap -->
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -670,7 +746,7 @@
 
     function startFallbackCountdown() {
         if (countdownTimer) return; // already running
-        if (timerEl) timerEl.style.display = '';
+        if (timerEl) timerEl.style.display = 'flex';
         countdownVal = 30;
         countdownTimer = setInterval(function() {
             countdownVal--;
@@ -713,11 +789,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 timerElement.textContent = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
 
                 if (minutes >= 15) {
-                    timerElement.style.color = '#dc3545';
+                    timerElement.style.color = '#f87171';
                 } else if (minutes >= 10) {
-                    timerElement.style.color = '#fd7e14';
+                    timerElement.style.color = '#fb923c';
                 } else {
-                    timerElement.style.color = '#6c757d';
+                    timerElement.style.color = '';
                 }
             }
 
