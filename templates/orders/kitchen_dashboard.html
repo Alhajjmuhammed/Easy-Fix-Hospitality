@@ -26,20 +26,24 @@
     --r:        14px;
 }
 
+/* ── Hide base navbar on kitchen display ───────────────────────────────── */
+nav.navbar, .navbar { display:none !important; }
+body { padding-top:0 !important; margin-top:0 !important; }
+
 /* ── Reset & base ───────────────────────────────────────────────────────── */
 .kds * { box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
-.kds { background: var(--bg); min-height: 100vh; padding-bottom: 2.5rem; }
+/* padding-bottom reserves space for the fixed bottom bar (~195px) */
+.kds { background: var(--bg); min-height: 100vh; padding-bottom: 200px; }
 @keyframes livepulse { 0%,100% { box-shadow:0 0 0 0 rgba(34,197,94,.5); } 60% { box-shadow:0 0 0 8px rgba(34,197,94,0); } }
 @keyframes spin    { to { transform:rotate(360deg); } }
 @keyframes fadein  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 
-/* ── Top bar ────────────────────────────────────────────────────────────── */
+/* ── Info bar (now at very bottom of the fixed panel) ───────────────────── */
 .kds-bar {
     background: #ffffff;
-    border-bottom: 2px solid var(--border);
-    padding: .85rem 1.5rem;
+    border-top: 1px solid var(--border);
+    padding: .6rem 1.5rem;
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-    box-shadow: 0 2px 8px rgba(0,0,0,.06);
 }
 .kds-bar-left  { display:flex; align-items:center; gap:.85rem; }
 .kds-bar-right { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; }
@@ -131,14 +135,16 @@
 }
 .kds-stage.active .kds-stage-lbl { color:rgba(255,255,255,.85); }
 
-/* ── Sticky header wrapper ──────────────────────────────────────────────── */
+/* ── Bottom bar — fixed to bottom of screen ─────────────────────────────── */
 .kds-sticky {
-    position: sticky;
-    top: 0;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
     z-index: 100;
     background: var(--bg);
-    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    box-shadow: 0 -4px 16px rgba(0,0,0,.1);
 }
+/* Stage tabs sit at the top of the bottom bar, separated from the info strip */
+.kds-stages-wrap { border-bottom: 1px solid var(--border); }
 
 /* ── Content area ───────────────────────────────────────────────────────── */
 .kds-content { padding: .75rem 1.25rem 1rem; }
@@ -306,8 +312,9 @@
 
 /* ── Large screen (monitor ≥ 1200px) ────────────────────────────────────── */
 @media (min-width:1200px) {
+    .kds { padding-bottom: 230px; }
     /* Topbar */
-    .kds-bar { padding:1rem 2rem; }
+    .kds-bar { padding:.75rem 2rem; }
     .kds-name { font-size:1.35rem; }
     .kds-sub  { font-size:.82rem; }
     .kds-live-badge { font-size:.72rem; padding:.3rem .9rem; }
@@ -361,8 +368,9 @@
 
 /* ── TV / large 1080p+ (≥ 1600px) ──────────────────────────────────────── */
 @media (min-width:1600px) {
+    .kds { padding-bottom: 270px; }
     /* Topbar */
-    .kds-bar { padding:1.15rem 2.5rem; }
+    .kds-bar { padding:.85rem 2.5rem; }
     .kds-name { font-size:1.55rem; }
     .kds-sub  { font-size:.9rem; }
     .kds-live-dot { width:13px; height:13px; }
@@ -414,75 +422,7 @@
 {% block content %}
 <div class="kds" data-restaurant-view="true" data-owner-id="{{ request.user.owner.id|default:'default' }}">
 
-    <!-- ── Sticky header (topbar + stage nav always visible while scrolling) -->
-    <div class="kds-sticky">
-
-    <!-- ── Top bar ──────────────────────────────────────────────────────── -->
-    <div class="kds-bar">
-        <div class="kds-bar-left">
-            <span class="kds-live-dot"></span>
-            <div>
-                <div class="kds-name"><i class="fas fa-utensils" style="color:var(--c-preparing);margin-right:.5rem;font-size:.9rem;"></i>{% get_restaurant_name %}</div>
-                <div class="kds-sub">{{ user.get_full_name }} &nbsp;·&nbsp; Kitchen Station</div>
-            </div>
-            <span class="kds-live-badge">Live</span>
-        </div>
-        <div class="kds-bar-right">
-            <div class="kds-refresh-pill" id="refreshTimer">
-                <i class="fas fa-sync-alt" id="refreshIcon"></i>
-                Refresh in <span class="kds-refresh-num" id="countdown">15</span>s
-            </div>
-            <a href="{% url 'orders:kitchen_reports' %}" class="kds-report-btn">
-                <i class="fas fa-chart-bar"></i> Reports
-            </a>
-        </div>
-    </div>
-
-    <!-- ── Stage selector ───────────────────────────────────────────────── -->
-    <div class="kds-stages-wrap">
-        <div class="kds-stages" id="orderTabs" role="tablist">
-
-            <button class="kds-stage s-pending active" id="pending-tab"
-                    data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab" aria-selected="true">
-                <span class="kds-stage-icon"><i class="fas fa-clock"></i></span>
-                <span class="kds-stage-num">{{ pending_count }}</span>
-                <span class="kds-stage-lbl">Pending</span>
-            </button>
-
-            <button class="kds-stage s-confirmed" id="confirmed-tab"
-                    data-bs-toggle="tab" data-bs-target="#confirmed" type="button" role="tab" aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-check-circle"></i></span>
-                <span class="kds-stage-num">{{ confirmed_count }}</span>
-                <span class="kds-stage-lbl">Confirmed</span>
-            </button>
-
-            <button class="kds-stage s-preparing" id="preparing-tab"
-                    data-bs-toggle="tab" data-bs-target="#preparing" type="button" role="tab" aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-fire"></i></span>
-                <span class="kds-stage-num">{{ preparing_count }}</span>
-                <span class="kds-stage-lbl">Preparing</span>
-            </button>
-
-            <button class="kds-stage s-ready" id="ready-tab"
-                    data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab" aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-bell"></i></span>
-                <span class="kds-stage-num">{{ ready_count }}</span>
-                <span class="kds-stage-lbl">Ready</span>
-            </button>
-
-            <button class="kds-stage s-served" id="served-tab"
-                    data-bs-toggle="tab" data-bs-target="#served" type="button" role="tab" aria-selected="false">
-                <span class="kds-stage-icon"><i class="fas fa-check-double"></i></span>
-                <span class="kds-stage-num">{{ served_count }}</span>
-                <span class="kds-stage-lbl">Served</span>
-            </button>
-
-        </div>
-    </div>
-
-    </div><!-- /kds-sticky -->
-
-    <!-- ── Tab panels ───────────────────────────────────────────────────── -->
+    <!-- ── Tab panels (orders fill the top of the screen) ──────────────── -->
     <div class="kds-content">
         <div class="tab-content" id="orderTabsContent">
 
@@ -803,6 +743,75 @@
 
         </div>
     </div>
+
+    <!-- ── Bottom bar — fixed to bottom of screen ───────────────────────── -->
+    <div class="kds-sticky">
+
+        <!-- Stage selector (top of bottom bar) -->
+        <div class="kds-stages-wrap">
+            <div class="kds-stages" id="orderTabs" role="tablist">
+
+                <button class="kds-stage s-pending active" id="pending-tab"
+                        data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab" aria-selected="true">
+                    <span class="kds-stage-icon"><i class="fas fa-clock"></i></span>
+                    <span class="kds-stage-num">{{ pending_count }}</span>
+                    <span class="kds-stage-lbl">Pending</span>
+                </button>
+
+                <button class="kds-stage s-confirmed" id="confirmed-tab"
+                        data-bs-toggle="tab" data-bs-target="#confirmed" type="button" role="tab" aria-selected="false">
+                    <span class="kds-stage-icon"><i class="fas fa-check-circle"></i></span>
+                    <span class="kds-stage-num">{{ confirmed_count }}</span>
+                    <span class="kds-stage-lbl">Confirmed</span>
+                </button>
+
+                <button class="kds-stage s-preparing" id="preparing-tab"
+                        data-bs-toggle="tab" data-bs-target="#preparing" type="button" role="tab" aria-selected="false">
+                    <span class="kds-stage-icon"><i class="fas fa-fire"></i></span>
+                    <span class="kds-stage-num">{{ preparing_count }}</span>
+                    <span class="kds-stage-lbl">Preparing</span>
+                </button>
+
+                <button class="kds-stage s-ready" id="ready-tab"
+                        data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab" aria-selected="false">
+                    <span class="kds-stage-icon"><i class="fas fa-bell"></i></span>
+                    <span class="kds-stage-num">{{ ready_count }}</span>
+                    <span class="kds-stage-lbl">Ready</span>
+                </button>
+
+                <button class="kds-stage s-served" id="served-tab"
+                        data-bs-toggle="tab" data-bs-target="#served" type="button" role="tab" aria-selected="false">
+                    <span class="kds-stage-icon"><i class="fas fa-check-double"></i></span>
+                    <span class="kds-stage-num">{{ served_count }}</span>
+                    <span class="kds-stage-lbl">Served</span>
+                </button>
+
+            </div>
+        </div>
+
+        <!-- Info strip (very bottom) -->
+        <div class="kds-bar">
+            <div class="kds-bar-left">
+                <span class="kds-live-dot"></span>
+                <div>
+                    <div class="kds-name"><i class="fas fa-utensils" style="color:var(--c-preparing);margin-right:.5rem;font-size:.9rem;"></i>{% get_restaurant_name %}</div>
+                    <div class="kds-sub">{{ user.get_full_name }} &nbsp;·&nbsp; Kitchen Station</div>
+                </div>
+                <span class="kds-live-badge">Live</span>
+            </div>
+            <div class="kds-bar-right">
+                <div class="kds-refresh-pill" id="refreshTimer">
+                    <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                    Refresh in <span class="kds-refresh-num" id="countdown">15</span>s
+                </div>
+                <a href="{% url 'orders:kitchen_reports' %}" class="kds-report-btn">
+                    <i class="fas fa-chart-bar"></i> Reports
+                </a>
+            </div>
+        </div>
+
+    </div><!-- /kds-sticky bottom bar -->
+
 </div>
 {% endblock %}
 
