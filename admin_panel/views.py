@@ -1924,48 +1924,54 @@ def bulk_delete_main_categories(request):
     try:
         data = json.loads(request.body)
         category_ids = data.get('category_ids', [])
-        
+
         if not category_ids:
             return JsonResponse({'success': False, 'message': 'No categories selected'})
-        
+
         owner_filter = get_owner_filter(request.user)
-        
-        # Get categories with owner filtering
+
+        # Evaluate to a concrete list of IDs immediately — avoids lazy queryset
+        # being re-evaluated as a subquery multiple times (causes issues on PostgreSQL)
         if owner_filter:
             _mcq_bd = (
                 Q(owner=owner_filter) |
                 Q(restaurant__main_owner=owner_filter) |
                 Q(restaurant__branch_owner=owner_filter)
             )
-            categories = MainCategory.objects.filter(_mcq_bd, id__in=category_ids).distinct()
+            cat_id_list = list(
+                MainCategory.objects.filter(_mcq_bd, id__in=category_ids)
+                .distinct().values_list('id', flat=True)
+            )
         else:
-            categories = MainCategory.objects.filter(id__in=category_ids)
-        
-        if not categories.exists():
+            cat_id_list = list(
+                MainCategory.objects.filter(id__in=category_ids).values_list('id', flat=True)
+            )
+
+        if not cat_id_list:
             return JsonResponse({'success': False, 'message': 'No valid categories found'})
-        
+
         # Count related items before deletion
-        category_names = list(categories.values_list('name', flat=True))
-        total_subcategories = SubCategory.objects.filter(main_category__in=categories).count()
-        total_products = Product.objects.filter(main_category__in=categories).count()
+        category_names = list(MainCategory.objects.filter(id__in=cat_id_list).values_list('name', flat=True))
+        total_subcategories = SubCategory.objects.filter(main_category_id__in=cat_id_list).count()
+        total_products = Product.objects.filter(main_category_id__in=cat_id_list).count()
 
         # Nullify all PROTECT FK refs to these categories' products before deletion
-        product_ids = list(Product.objects.filter(main_category__in=categories).values_list('id', flat=True))
+        product_ids = list(Product.objects.filter(main_category_id__in=cat_id_list).values_list('id', flat=True))
         if product_ids:
             _cleanup_product_dependencies(product_ids)
 
-        # Now delete in correct order: products → subcategories → categories
-        deleted_count = categories.count()
+        # Delete in correct order using plain ID lists (no lazy querysets)
+        deleted_count = len(cat_id_list)
         Product.objects.filter(id__in=product_ids).delete()
-        SubCategory.objects.filter(main_category__in=categories).delete()
-        categories.delete()
-        
+        SubCategory.objects.filter(main_category_id__in=cat_id_list).delete()
+        MainCategory.objects.filter(id__in=cat_id_list).delete()
+
         # Build success message
         if deleted_count == 1:
             message = f'Main category "{category_names[0]}" deleted successfully'
         else:
             message = f'{deleted_count} main categories deleted successfully'
-        
+
         if total_subcategories > 0:
             message += f' (including {total_subcategories} subcategories'
             if total_products > 0:
@@ -1982,8 +1988,9 @@ def bulk_delete_main_categories(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Invalid JSON data'})
     except Exception as e:
-        logger.error(f'Error bulk deleting main categories: {str(e)}')
-        return JsonResponse({'success': False, 'message': 'Failed to delete categories. Please try again.'})
+        import traceback
+        logger.error(f'Error bulk deleting main categories: {traceback.format_exc()}')
+        return JsonResponse({'success': False, 'message': f'Failed to delete categories: {str(e)}'})
 
 
 @login_required
@@ -1998,40 +2005,42 @@ def bulk_delete_subcategories(request):
     try:
         data = json.loads(request.body)
         subcategory_ids = data.get('subcategory_ids', [])
-        
+
         if not subcategory_ids:
             return JsonResponse({'success': False, 'message': 'No subcategories selected'})
-        
+
         owner_filter = get_owner_filter(request.user)
-        
-        # Get subcategories with owner filtering
+
+        # Evaluate to a concrete ID list immediately
         if owner_filter:
-            subcategories = SubCategory.objects.filter(
-                id__in=subcategory_ids
-            ).filter(
-                Q(main_category__owner=owner_filter) |
-                Q(main_category__restaurant__main_owner=owner_filter) |
-                Q(main_category__restaurant__branch_owner=owner_filter)
-            ).distinct()
+            sub_id_list = list(
+                SubCategory.objects.filter(
+                    id__in=subcategory_ids
+                ).filter(
+                    Q(main_category__owner=owner_filter) |
+                    Q(main_category__restaurant__main_owner=owner_filter) |
+                    Q(main_category__restaurant__branch_owner=owner_filter)
+                ).distinct().values_list('id', flat=True)
+            )
         else:
-            subcategories = SubCategory.objects.filter(id__in=subcategory_ids)
-        
-        if not subcategories.exists():
+            sub_id_list = list(
+                SubCategory.objects.filter(id__in=subcategory_ids).values_list('id', flat=True)
+            )
+
+        if not sub_id_list:
             return JsonResponse({'success': False, 'message': 'No valid subcategories found'})
-        
-        # Count related products before deletion — 1 aggregate query instead of N
-        subcategory_names = list(subcategories.values_list('name', flat=True))
-        total_products = Product.objects.filter(sub_category__in=subcategories).count()
-        
+
+        subcategory_names = list(SubCategory.objects.filter(id__in=sub_id_list).values_list('name', flat=True))
+        total_products = Product.objects.filter(sub_category_id__in=sub_id_list).count()
+
         # Nullify product deps so SET_NULL cascade on sub_category works cleanly
-        product_ids = list(Product.objects.filter(sub_category__in=subcategories).values_list('id', flat=True))
+        product_ids = list(Product.objects.filter(sub_category_id__in=sub_id_list).values_list('id', flat=True))
         if product_ids:
             _cleanup_product_dependencies(product_ids)
 
-        deleted_count = subcategories.count()
-        subcategories.delete()
+        deleted_count = len(sub_id_list)
+        SubCategory.objects.filter(id__in=sub_id_list).delete()
 
-        # Build success message
         if deleted_count == 1:
             message = f'Subcategory "{subcategory_names[0]}" deleted successfully'
         else:
@@ -2048,8 +2057,9 @@ def bulk_delete_subcategories(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'message': 'Invalid JSON data'})
     except Exception as e:
-        logger.error(f'Error bulk deleting subcategories: {str(e)}')
-        return JsonResponse({'success': False, 'message': 'Failed to delete subcategories. Please try again.'})
+        import traceback
+        logger.error(f'Error bulk deleting subcategories: {traceback.format_exc()}')
+        return JsonResponse({'success': False, 'message': f'Failed to delete subcategories: {str(e)}'})
 
 
 @login_required
