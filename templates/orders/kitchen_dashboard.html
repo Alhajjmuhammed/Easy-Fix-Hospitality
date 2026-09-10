@@ -29,13 +29,25 @@
 /* ── Strip ALL base-template chrome on kitchen page ─────────────────────── */
 nav.navbar, nav.navbar-expand-lg { display:none !important; }
 footer.footer { display:none !important; }
-main.container { max-width:100% !important; padding:0 !important; margin:0 !important; width:100% !important; }
+/* Override Bootstrap container — must be wider than any .container breakpoint */
+body > *,
+main, main.container, .container, .container-fluid,
+main.container.my-4 {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
 body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
 
 /* ── Reset & base ───────────────────────────────────────────────────────── */
 .kds * { box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
-/* padding-bottom reserves space for the fixed bottom bar (~155px) */
-.kds { background: var(--bg); min-height: 100vh; padding-bottom: 160px; }
+/* padding-bottom reserves space for the fixed bottom bar (~130px without icons) */
+.kds { background: var(--bg); min-height: 100vh; padding-bottom: 140px; width:100%; }
 @keyframes livepulse { 0%,100% { box-shadow:0 0 0 0 rgba(34,197,94,.5); } 60% { box-shadow:0 0 0 8px rgba(34,197,94,0); } }
 @keyframes spin    { to { transform:rotate(360deg); } }
 @keyframes fadein  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
@@ -148,10 +160,10 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
 /* Stage tabs sit at the top of the bottom bar, separated from the info strip */
 .kds-stages-wrap { border-bottom: 1px solid var(--border); padding:.5rem 1.25rem; }
 
-/* Compact stages inside the bottom bar */
-.kds-sticky .kds-stage      { padding:.55rem .4rem .45rem; border-radius:10px; }
+/* Compact stages inside the bottom bar — no icon, just number + label */
+.kds-sticky .kds-stage      { padding:.45rem .4rem .4rem; border-radius:10px; }
 .kds-sticky .kds-stage-num  { font-size:1.65rem; }
-.kds-sticky .kds-stage-icon { width:26px; height:26px; font-size:.75rem; }
+.kds-sticky .kds-stage-icon { display:none; }
 .kds-sticky .kds-stage-lbl  { font-size:.58rem; }
 
 /* ── Content area ───────────────────────────────────────────────────────── */
@@ -320,7 +332,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
 
 /* ── Large screen (monitor ≥ 1200px) ────────────────────────────────────── */
 @media (min-width:1200px) {
-    .kds { padding-bottom: 175px; }
+    .kds { padding-bottom: 150px; }
     /* Topbar */
     .kds-bar { padding:.75rem 2rem; }
     .kds-name { font-size:1.35rem; }
@@ -338,9 +350,9 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
     .kds-stage-num  { font-size:3rem; }
     .kds-stage-lbl  { font-size:.7rem; letter-spacing:.12em; }
 
-    /* Grid — force 3 columns minimum on large screens */
+    /* Grid — force 3 columns on large screens */
     .kds-content { padding:1rem 2rem 1.5rem; }
-    .kds-grid { grid-template-columns: repeat(3, 1fr); gap:1.25rem; }
+    .kds-grid { grid-template-columns: repeat(3, 1fr) !important; gap:1.25rem; width:100% !important; }
 
     /* Order card */
     .kds-card { border-top-width:5px; border-radius:16px; }
@@ -376,7 +388,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
 
 /* ── TV / large 1080p+ (≥ 1600px) ──────────────────────────────────────── */
 @media (min-width:1600px) {
-    .kds { padding-bottom: 195px; }
+    .kds { padding-bottom: 165px; }
     /* Topbar */
     .kds-bar { padding:.85rem 2.5rem; }
     .kds-name { font-size:1.55rem; }
@@ -393,7 +405,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
 
     /* Grid — force 4 columns on TV */
     .kds-content { padding:1.25rem 2.5rem 2rem; }
-    .kds-grid { grid-template-columns: repeat(4, 1fr); gap:1.5rem; }
+    .kds-grid { grid-template-columns: repeat(4, 1fr) !important; gap:1.5rem; width:100% !important; }
 
     /* Order card — dramatically larger for reading from a distance */
     .kds-card { border-top-width:6px; border-radius:20px; }
