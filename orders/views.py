@@ -1129,8 +1129,8 @@ def create_order(request):
 @login_required
 def kitchen_dashboard(request):
     """Kitchen staff dashboard to manage orders"""
-    if not request.user.is_kitchen_staff():
-        messages.error(request, 'Access denied. Kitchen staff privileges required.')
+    if not request.user.has_feature('kitchen_dashboard'):
+        messages.error(request, 'Access denied. Kitchen dashboard access required.')
         return redirect('restaurant:home')
     
     # Get filter parameters
@@ -1198,8 +1198,8 @@ def kitchen_dashboard(request):
 @login_required
 def bar_dashboard(request):
     """Bar staff dashboard to manage bar orders"""
-    if not request.user.is_bar_staff():
-        messages.error(request, 'Access denied. Bar staff privileges required.')
+    if not request.user.has_feature('bar_dashboard'):
+        messages.error(request, 'Access denied. Bar dashboard access required.')
         return redirect('restaurant:home')
 
     # Get filter parameters
@@ -1257,8 +1257,8 @@ def bar_dashboard(request):
 @login_required
 def buffet_dashboard(request):
     """Buffet staff dashboard to manage buffet orders"""
-    if not request.user.is_buffet_staff():
-        messages.error(request, 'Access denied. Buffet staff privileges required.')
+    if not request.user.has_feature('buffet_dashboard'):
+        messages.error(request, 'Access denied. Buffet dashboard access required.')
         return redirect('restaurant:home')
 
     # Get filter parameters
@@ -1318,8 +1318,8 @@ def buffet_dashboard(request):
 @login_required
 def service_dashboard(request):
     """Service staff dashboard to manage service orders"""
-    if not request.user.is_service_staff():
-        messages.error(request, 'Access denied. Service staff privileges required.')
+    if not request.user.has_feature('service_dashboard'):
+        messages.error(request, 'Access denied. Service dashboard access required.')
         return redirect('restaurant:home')
 
     # Get filter parameters
@@ -1379,8 +1379,8 @@ def service_dashboard(request):
 @login_required
 def kitchen_reports(request):
     """Kitchen staff daily and weekly reports"""
-    if not request.user.is_kitchen_staff():
-        messages.error(request, 'Access denied. Kitchen staff privileges required.')
+    if not request.user.has_feature('kitchen_dashboard'):
+        messages.error(request, 'Access denied. Kitchen dashboard access required.')
         return redirect('restaurant:home')
     
     try:
@@ -1494,8 +1494,8 @@ def kitchen_reports(request):
 @login_required
 def bar_reports(request):
     """Bar staff daily and weekly reports"""
-    if not request.user.is_bar_staff():
-        messages.error(request, 'Access denied. Bar staff privileges required.')
+    if not request.user.has_feature('bar_dashboard'):
+        messages.error(request, 'Access denied. Bar dashboard access required.')
         return redirect('restaurant:home')
     
     try:
@@ -1609,8 +1609,8 @@ def bar_reports(request):
 @login_required
 def buffet_reports(request):
     """Buffet staff daily and weekly reports"""
-    if not request.user.is_buffet_staff():
-        messages.error(request, 'Access denied. Buffet staff privileges required.')
+    if not request.user.has_feature('buffet_dashboard'):
+        messages.error(request, 'Access denied. Buffet dashboard access required.')
         return redirect('restaurant:home')
 
     try:
@@ -1720,8 +1720,8 @@ def buffet_reports(request):
 @login_required
 def service_reports(request):
     """Service staff daily and weekly reports"""
-    if not request.user.is_service_staff():
-        messages.error(request, 'Access denied. Service staff privileges required.')
+    if not request.user.has_feature('service_dashboard'):
+        messages.error(request, 'Access denied. Service dashboard access required.')
         return redirect('restaurant:home')
 
     try:
@@ -1833,7 +1833,7 @@ def service_reports(request):
 @transaction.atomic
 def confirm_order(request, order_id):
     """Kitchen staff confirms a pending order"""
-    if not request.user.is_kitchen_staff():
+    if not request.user.has_feature('kitchen_dashboard'):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     try:
@@ -1920,7 +1920,7 @@ def confirm_order(request, order_id):
 @transaction.atomic
 def update_order_status(request, order_id):
     """Update order status"""
-    if not (request.user.is_kitchen_staff() or request.user.is_bar_staff() or request.user.is_buffet_staff() or request.user.is_service_staff()):
+    if not (request.user.has_feature('kitchen_dashboard') or request.user.has_feature('bar_dashboard') or request.user.has_feature('buffet_dashboard') or request.user.has_feature('service_dashboard')):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
     
     try:
@@ -2140,10 +2140,10 @@ def update_order_status(request, order_id):
 @login_required
 def cancel_order(request, order_id):
     """Cancel an order with reason"""
-    if not request.user.is_kitchen_staff():
+    if not request.user.has_feature('kitchen_dashboard'):
         if request.headers.get('Content-Type') == 'application/json':
-            return JsonResponse({'success': False, 'message': 'Access denied. Kitchen staff privileges required.'})
-        messages.error(request, 'Access denied. Kitchen staff privileges required.')
+            return JsonResponse({'success': False, 'message': 'Access denied. Kitchen dashboard access required.'})
+        messages.error(request, 'Access denied. Kitchen dashboard access required.')
         return redirect('orders:kitchen_dashboard')
     
     try:
@@ -2418,8 +2418,8 @@ def customer_cancel_order(request, order_id):
 @login_required
 def kitchen_order_detail(request, order_id):
     """Detailed view of order for kitchen staff"""
-    if not request.user.is_kitchen_staff():
-        messages.error(request, 'Access denied. Kitchen staff privileges required.')
+    if not request.user.has_feature('kitchen_dashboard'):
+        messages.error(request, 'Access denied. Kitchen dashboard access required.')
         return redirect('restaurant:home')
     
     try:
