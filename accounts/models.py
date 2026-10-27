@@ -214,8 +214,11 @@ class User(AbstractUser):
         try:
             from accounts.permissions_defaults import DEFAULT_ROLE_FEATURES
             role_name = self.role.name if self.role else ''
-            if self.owner:
-                rps = RolePermissionSet.objects.filter(owner=self.owner, role=self.role).first()
+            # Custom role overrides everything else (mirrors has_feature priority)
+            if self.custom_role_id:
+                slugs = set(self.custom_role.features.values_list('slug', flat=True))
+            elif self.owner:
+                rps = RolePermissionSet.objects.filter(owner=self.owner, role_name=role_name).first()
                 if rps:
                     slugs = set(rps.features.values_list('slug', flat=True))
                 else:
