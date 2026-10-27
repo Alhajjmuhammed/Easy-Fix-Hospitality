@@ -54,11 +54,13 @@
                                                             <li>
                                                                 {{ item.quantity }}x {{ item.product.name }} 
                                                                 <span class="text-muted">({% currency_symbol %}{{ item.get_subtotal }})</span>
-                                                                {% if request.user.is_cashier and order.status != 'cancelled' and order.payment_status != 'paid' and order.order_items.all|length > 1 %}
+                                                                {% with feats=request.user.visible_features %}
+                                                                {% if request.user.is_cashier and 'cancel_orders' in feats and order.status != 'cancelled' and order.payment_status != 'paid' and order.order_items.all|length > 1 %}
                                                                     <button class="btn btn-xs btn-danger btn-sm ms-2" onclick="cancelItem({{ item.id }}, '{{ item.product.name }}', {{ item.quantity }})">
                                                                         <i class="fas fa-times"></i> Cancel
                                                                     </button>
                                                                 {% endif %}
+                                                                {% endwith %}
                                                             </li>
                                                         {% endfor %}
                                                     </ul>

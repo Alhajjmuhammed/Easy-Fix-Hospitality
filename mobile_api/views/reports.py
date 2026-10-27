@@ -28,6 +28,8 @@ def cc_reports(request):
     """My Reports for Customer Care – mirrors the web customer_care_reports view."""
     if not _is_report_staff(request.user):
         return Response({'error': 'Access denied.'}, status=403)
+    if not request.user.has_feature('view_reports'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:
@@ -341,6 +343,8 @@ def cashier_reports(request):
     user = request.user
     if not user.is_cashier():
         return Response({'error': 'Access denied. Cashier role required.'}, status=403)
+    if not user.has_feature('view_reports'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:

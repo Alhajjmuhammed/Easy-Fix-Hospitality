@@ -4180,10 +4180,12 @@ def cancel_order_item(request, item_id):
         return JsonResponse({'error': 'Invalid request method'}, status=405)
     
     # Check permissions - customer care, cashier, or owners can cancel items
-    if not (request.user.is_customer_care() or request.user.is_cashier() or 
-            request.user.is_owner() or request.user.is_main_owner() or 
-            request.user.is_branch_owner() or request.user.is_kitchen_staff() or 
+    if not (request.user.is_customer_care() or request.user.is_cashier() or
+            request.user.is_owner() or request.user.is_main_owner() or
+            request.user.is_branch_owner() or request.user.is_kitchen_staff() or
             request.user.is_manager()):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('cancel_orders'):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     try:

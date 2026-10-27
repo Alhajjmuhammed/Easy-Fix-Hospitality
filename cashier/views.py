@@ -682,6 +682,8 @@ def payment_history(request, order_id):
     """Get payment history for an order"""
     if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('view_receipts'):
+        return JsonResponse({'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
     _oq_ph = (
@@ -729,6 +731,9 @@ def generate_receipt(request, payment_id):
     if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Cashier, Customer Care, or Owner role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('view_receipts'):
+        messages.error(request, "You don't have permission to view receipts.")
+        return redirect('cashier:cashier_dashboard')
     
     owner = get_owner_filter(request.user)
     _pq_gr = (
@@ -764,12 +769,15 @@ def generate_receipt(request, payment_id):
     return render(request, 'cashier/receipt.html', context)
 
 
-@login_required  
+@login_required
 def reprint_receipt(request, payment_id):
     """Reprint an existing receipt"""
     if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Cashier, Customer Care, or Owner role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('view_receipts'):
+        messages.error(request, "You don't have permission to view receipts.")
+        return redirect('cashier:cashier_dashboard')
     
     owner = get_owner_filter(request.user)
     _pq_rr = (
@@ -882,7 +890,9 @@ def print_bill(request, order_id):
     """Print bill for an order (before payment) - shows what customer owes"""
     if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
-    
+    if not request.user.has_feature('view_receipts'):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+
     owner = get_owner_filter(request.user)
     _oq_pb = (
         Q(table_info__owner=owner) |

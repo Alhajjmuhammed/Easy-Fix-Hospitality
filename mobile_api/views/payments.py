@@ -281,6 +281,8 @@ def payment_receipt(request, payment_id):
     """Get full receipt data for a payment."""
     if not _is_payment_staff(request.user):
         return Response({'error': 'Access denied.'}, status=403)
+    if not request.user.has_feature('view_receipts'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:
@@ -330,6 +332,8 @@ def payment_receipt(request, payment_id):
 def reprint_receipt(request, payment_id):
     """Reprint the receipt for a payment."""
     if not _is_payment_staff(request.user):
+        return Response({'error': 'Access denied.'}, status=403)
+    if not request.user.has_feature('view_receipts'):
         return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
