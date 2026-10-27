@@ -1954,6 +1954,9 @@ def cashier_waste_form(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. This page is for cashiers only.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_waste'):
+        messages.error(request, "You don't have permission to manage waste.")
+        return redirect('restaurant:home')
     
     owner_filter = get_owner_filter(request.user)
     
@@ -1978,6 +1981,9 @@ def cashier_waste_interface(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. This page is for cashiers only.")
         return redirect('accounts:login')
+    if not request.user.has_feature('manage_waste'):
+        messages.error(request, "You don't have permission to manage waste.")
+        return redirect('restaurant:home')
     
     owner_filter = get_owner_filter(request.user)
     
