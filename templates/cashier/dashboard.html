@@ -436,9 +436,11 @@ $(document).ready(function() {
                                                         {% endif %}
                                                     {% endif %}
                                                     {% if order.status != 'cancelled' and order.payment_status != 'paid' and order.table_info %}
+                                                        {% if 'manage_orders' in feats %}
                                                         <button type="button" class="btn btn-warning btn-sm" onclick="openTransferModal({{ order.id }}, '{{ order.order_number|escapejs }}', '{{ order.table_info.tbl_no|escapejs }}')">
                                                             🔄 Transfer
                                                         </button>
+                                                        {% endif %}
                                                     {% endif %}
                                                 </div>
                                                 {% endwith %}
