@@ -167,25 +167,16 @@
                                             </small>
                                         </div>
                                         
-                                        {% if product.available_in_stock > 0 %}
-                                            <div class="add-to-cart-row">
-                                                <div class="input-group input-group-sm" style="width: 95px; flex-shrink: 0;">
-                                                    <button class="btn btn-outline-secondary qty-decrease" type="button" data-product-id="{{ product.id }}">-</button>
-                                                    <input type="number" class="form-control text-center" id="qty-{{ product.id }}" value="1" min="1" max="{{ product.available_in_stock }}" style="padding: 0;">
-                                                    <button class="btn btn-outline-secondary qty-increase" type="button" data-product-id="{{ product.id }}" data-max="{{ product.available_in_stock }}">+</button>
-                                                </div>
-                                                <button class="btn btn-primary btn-sm flex-grow-1 add-to-cart-btn" data-product-id="{{ product.id }}">
-                                                    <i class="bi bi-cart-plus"></i> Add
-                                                </button>
+                                        <div class="add-to-cart-row">
+                                            <div class="input-group input-group-sm" style="width: 95px; flex-shrink: 0;">
+                                                <button class="btn btn-outline-secondary qty-decrease" type="button" data-product-id="{{ product.id }}">-</button>
+                                                <input type="number" class="form-control text-center" id="qty-{{ product.id }}" value="1" min="1" max="100" style="padding: 0;">
+                                                <button class="btn btn-outline-secondary qty-increase" type="button" data-product-id="{{ product.id }}" data-max="100">+</button>
                                             </div>
-                                            <small class="text-success mt-1 d-block">
-                                                <i class="bi bi-check-circle-fill"></i> {{ product.available_in_stock }} in stock
-                                            </small>
-                                        {% else %}
-                                            <button class="btn btn-secondary btn-sm" disabled>
-                                                <i class="bi bi-x-circle"></i> Out of Stock
+                                            <button class="btn btn-primary btn-sm flex-grow-1 add-to-cart-btn" data-product-id="{{ product.id }}">
+                                                <i class="bi bi-cart-plus"></i> Add
                                             </button>
-                                        {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

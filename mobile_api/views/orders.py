@@ -354,12 +354,6 @@ def _place_order(request):
             unavailable.append({'product_id': product_id, 'name': product.name})
             continue
 
-        if product.available_in_stock is not None and product.available_in_stock < quantity:
-            return Response(
-                {'error': f'Only {product.available_in_stock} of "{product.name}" left in stock.'},
-                status=status.HTTP_409_CONFLICT,
-            )
-
         fn = getattr(product, 'get_current_price', None)
         server_price = float(fn()) if fn else float(product.price)
 
@@ -448,9 +442,6 @@ def _place_order(request):
                 id=pv['product_id'],
             ).first()
             if product is None or not product.is_available:
-                continue
-            # Re-check stock under lock
-            if product.available_in_stock is not None and product.available_in_stock < pv['quantity']:
                 continue
             validated_items.append({'product': product, 'quantity': pv['quantity'], 'unit_price': pv['unit_price']})
 
@@ -1118,12 +1109,6 @@ def add_items_to_order(request, order_id):
             return Response({'error': f'Product {product_id} not found.'}, status=400)
         if not product.is_available:
             return Response({'error': f'Product {product.name} is not available.'}, status=400)
-        # Mirror the web's handle_add_to_existing_order stock check
-        if product.available_in_stock is not None and product.available_in_stock < quantity:
-            return Response(
-                {'error': f'Only {product.available_in_stock} of "{product.name}" left in stock.'},
-                status=status.HTTP_409_CONFLICT,
-            )
         fn = getattr(product, 'get_current_price', None)
         server_price = float(fn()) if fn else float(product.price)
         validated.append({'product': product, 'quantity': quantity, 'unit_price': server_price})
@@ -1157,8 +1142,6 @@ def add_items_to_order(request, order_id):
             p = Product.objects.select_for_update(of=('self',)).get(id=item['product'].id)
             if not p.is_available:
                 raise _StockConflict(f'"{p.name}" is no longer available.')
-            if p.available_in_stock is not None and p.available_in_stock < item['quantity']:
-                raise _StockConflict(f'Only {p.available_in_stock} of "{p.name}" left in stock.')
             oi = OrderItem.objects.create(
                 order=order,
                 product=p,

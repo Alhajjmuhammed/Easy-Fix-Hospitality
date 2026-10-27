@@ -75,16 +75,18 @@ def _create_bill_request(request):
     )
     table = get_object_or_404(TableInfo.objects.filter(_tq_br).distinct(), id=table_id)
 
-    # Mirror web's request_bill: customer must have an active unpaid order at this table.
-    has_active_order = Order.objects.filter(
+    # Customers must have their own active order; staff only need any active order at the table.
+    _order_filter = Order.objects.filter(
         table_info=table,
-        ordered_by=user,
         status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
         payment_status__in=['unpaid', 'partial'],
-    ).exists()
+    )
+    if user.is_customer():
+        _order_filter = _order_filter.filter(ordered_by=user)
+    has_active_order = _order_filter.exists()
     if not has_active_order:
         return Response(
-            {'error': 'You do not have an active order at this table.'},
+            {'error': 'No active order at this table.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -109,6 +111,29 @@ def _create_bill_request(request):
             status='pending',
         )
     logger.info('Bill request created: table %s by %s', table.tbl_no, user.username)
+
+    # Notify restaurant staff via WebSocket so they see the bill request in real-time.
+    def _notify_bill():
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            from django.utils.timezone import now as _now
+            ch = get_channel_layer()
+            if ch and table.owner_id:
+                async_to_sync(ch.group_send)(
+                    f'restaurant_{table.owner_id}',
+                    {
+                        'type': 'bill_request',
+                        'table_number': str(table.tbl_no),
+                        'bill_request_id': br.id,
+                        'message': f'Bill requested at Table {table.tbl_no}',
+                        'timestamp': _now().isoformat(),
+                    },
+                )
+        except Exception as _e:
+            logger.warning('WS notify failed for bill_request: %s', _e)
+    from django.db import transaction as _tx2
+    _tx2.on_commit(_notify_bill)
 
     return Response(
         {'bill_request': BillRequestSerializer(br).data, 'message': 'Bill request submitted.'},

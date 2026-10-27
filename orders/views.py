@@ -13,7 +13,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
 from django.db import transaction
-from django.db.models import Count, Q, F
+from django.db.models import Count, Q, F, Sum
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
@@ -277,13 +277,6 @@ def add_to_cart(request):
         if not product:
             return JsonResponse({'success': False, 'message': 'Product not found or not available.'})
         
-        # Check stock
-        if product.available_in_stock < quantity:
-            return JsonResponse({
-                'success': False, 
-                'message': f'Only {product.available_in_stock} items available in stock.'
-            })
-        
         # Get and validate cart
         cart = validate_cart_data(request.session.get('cart', {}))
         
@@ -296,11 +289,6 @@ def add_to_cart(request):
         if str(product_id) in cart:
             # Update existing item with current promotional pricing
             new_quantity = cart[str(product_id)]['quantity'] + quantity
-            if new_quantity > product.available_in_stock:
-                return JsonResponse({
-                    'success': False,
-                    'message': f'Cannot add more. Only {product.available_in_stock} items available.'
-                })
             if new_quantity > 100:
                 return JsonResponse({'success': False, 'message': 'Maximum quantity exceeded.'})
 
@@ -427,13 +415,7 @@ def update_cart_quantity(request):
         
         if not product:
             return JsonResponse({'success': False, 'message': 'Product not found.'})
-        
-        if quantity > product.available_in_stock:
-            return JsonResponse({
-                'success': False,
-                'message': f'Only {product.available_in_stock} items available.'
-            })
-        
+
         # Get and validate cart
         cart = validate_cart_data(request.session.get('cart', {}))
         
@@ -504,7 +486,7 @@ def view_cart(request):
     
     # Get restaurant owner's tax rate from validated session
     restaurant = validate_session_restaurant_id(request.session)
-    tax_rate = float(restaurant.tax_rate) if restaurant else float(Decimal('0.0800'))
+    tax_rate = float(restaurant.tax_rate) if restaurant else float(getattr(request.user, 'tax_rate', None) or Decimal('0.0800'))
     
     # Calculate tax and final total
     tax_amount = cart_total * tax_rate
@@ -616,7 +598,7 @@ def place_order(request):
                             Q(branch_owner=current_restaurant)
                         )
                         rest_obj = RestaurantModel.objects.filter(_rq).first()
-                        remote_tax_rate = Decimal(str(rest_obj.tax_rate)) if rest_obj else Decimal('0.08')
+                        remote_tax_rate = Decimal(str(rest_obj.tax_rate)) if rest_obj else Decimal(str(getattr(current_restaurant, 'tax_rate', None) or Decimal('0.08')))
 
                         order = Order.objects.create(
                             order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
@@ -671,10 +653,6 @@ def place_order(request):
 
                         if not product:
                             raise Exception(f'Product not available')
-
-                        # Check stock again
-                        if product.available_in_stock < item['quantity']:
-                            raise Exception(f'Insufficient stock for {product.name}')
 
                         # SECURITY: always re-fetch the authoritative price from the database.
                         unit_price_paid = product.get_current_price()
@@ -2471,9 +2449,12 @@ def kitchen_order_detail(request, order_id):
 @login_required
 def customer_care_dashboard(request):
     """Customer care dashboard with orders placed by this customer care user from their restaurant only"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or 
+    if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Customer care or management privileges required.')
+        return redirect('restaurant:home')
+    if not request.user.has_feature('manage_orders'):
+        messages.error(request, "You don't have permission to access order management.")
         return redirect('restaurant:home')
     
     # Set restaurant context for customer care users
@@ -2560,10 +2541,13 @@ def customer_care_dashboard(request):
 @login_required
 def customer_care_payments(request):
     """Customer Care payment processing interface - separate from cashier dashboard"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or 
+    if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('process_payments'):
+        messages.error(request, "You don't have permission to process payments.")
+        return redirect('restaurant:home')
     
     owner = get_owner_filter(request.user)
     
@@ -2665,10 +2649,13 @@ def customer_care_payments(request):
 @login_required
 def customer_care_receipt(request, payment_id):
     """Generate receipt for Customer Care - separate from cashier"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or 
+    if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('view_receipts'):
+        messages.error(request, "You don't have permission to view receipts.")
+        return redirect('orders:customer_care_dashboard')
     
     from cashier.models import Payment
     from decimal import Decimal
@@ -2689,8 +2676,9 @@ def customer_care_receipt(request, payment_id):
     # Calculate change and remaining balance (compute total once)
     order_total = order.get_total()
     change_amount = payment.amount - order_total if payment.payment_method == 'cash' and payment.amount > order_total else Decimal('0.00')
-    remaining_balance = order_total - payment.amount if payment.amount < order_total else Decimal('0.00')
-    
+    total_paid_cc = order.payments.filter(is_voided=False).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    remaining_balance = max(order_total - total_paid_cc, Decimal('0.00'))
+
     context = {
         'payment': payment,
         'order': order,
@@ -2706,10 +2694,13 @@ def customer_care_receipt(request, payment_id):
 @login_required
 def customer_care_reprint_receipt(request, payment_id):
     """Reprint receipt for Customer Care"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or 
+    if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('view_receipts'):
+        messages.error(request, "You don't have permission to view receipts.")
+        return redirect('orders:customer_care_dashboard')
     
     from cashier.models import Payment
     from decimal import Decimal
@@ -2733,8 +2724,9 @@ def customer_care_reprint_receipt(request, payment_id):
     # Calculate change and remaining balance (compute total once)
     order_total = order.get_total()
     change_amount = payment.amount - order_total if payment.payment_method == 'cash' and payment.amount > order_total else Decimal('0.00')
-    remaining_balance = order_total - payment.amount if payment.amount < order_total else Decimal('0.00')
-    
+    total_paid_ccrr = order.payments.filter(is_voided=False).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    remaining_balance = max(order_total - total_paid_ccrr, Decimal('0.00'))
+
     context = {
         'payment': payment,
         'order': order,
@@ -2751,10 +2743,13 @@ def customer_care_reprint_receipt(request, payment_id):
 @login_required
 def customer_care_receipt_management(request):
     """Manage receipts for Customer Care - search and reprint by order number or date"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or 
+    if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Customer Care or Owner role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('view_receipts'):
+        messages.error(request, "You don't have permission to view receipts.")
+        return redirect('orders:customer_care_dashboard')
     
     from cashier.models import Payment
     from restaurant.models import Product
@@ -2903,10 +2898,13 @@ def print_kot(request, order_id):
     order = get_object_or_404(Order.objects.prefetch_related('order_items__product'), id=order_id)
     
     # Permission check - only staff can print KOT
-    if not (request.user.is_kitchen_staff() or 
-            request.user.is_customer_care() or 
+    if not (request.user.is_kitchen_staff() or
+            request.user.is_customer_care() or
             request.user.is_cashier() or
-            request.user.is_owner() or 
+            request.user.is_owner() or
+            request.user.is_main_owner() or
+            request.user.is_branch_owner() or
+            request.user.is_manager() or
             request.user.is_administrator()):
         messages.error(request, 'Access denied. Staff privileges required to print KOT.')
         return redirect('orders:my_orders')
@@ -3758,10 +3756,6 @@ def handle_add_to_existing_order(request, order_id, cart):
                 if not product:
                     raise Exception(f'Product not available')
                 
-                # Check stock
-                if product.available_in_stock < item['quantity']:
-                    raise Exception(f'Insufficient stock for {product.name}')
-                
                 # SECURITY: always re-fetch the authoritative price from the database.
                 # Never trust the client-supplied session cart price — it can be tampered.
                 unit_price_paid = product.get_current_price()
@@ -3868,10 +3862,13 @@ def handle_add_to_existing_order(request, order_id, cart):
 @login_required
 def customer_care_reports(request):
     """Customer Care Reports - showing only their own orders and sales"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or 
+    if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Customer Care or management role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('view_reports'):
+        messages.error(request, "You don't have permission to view reports.")
+        return redirect('orders:customer_care_dashboard')
     
     from django.utils import timezone
     from django.db.models import Sum, Count, Q

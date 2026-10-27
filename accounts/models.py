@@ -156,6 +156,14 @@ class User(AbstractUser):
     is_active_staff = models.BooleanField(default=True)
     # Mobile push notification token (Expo push token for customer notifications)
     expo_push_token = models.CharField(max_length=200, blank=True, null=True)
+    # Custom role assigned to this staff member (overrides built-in role permissions)
+    custom_role = models.ForeignKey(
+        'CustomRole',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_users',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -166,6 +174,57 @@ class User(AbstractUser):
     
     def is_administrator(self):
         return self.role and self.role.name == 'administrator'
+
+    def is_admin_staff(self):
+        return self.role and self.role.name == 'admin_staff'
+
+    def has_admin_perm(self, section, action='view'):
+        if self.is_administrator():
+            return True
+        if not self.is_admin_staff():
+            return False
+        try:
+            perm = self.admin_section_permissions.get(section=section)
+            return bool(getattr(perm, f'can_{action}', False))
+        except Exception:
+            return False
+
+    @property
+    def admin_visible_sections(self):
+        """Returns the set of section keys this user can view — used in templates."""
+        _all = {'dashboard', 'restaurants', 'users', 'statistics', 'orders',
+                'categories', 'products', 'tables', 'riders'}
+        if self.is_administrator():
+            return _all
+        if self.is_admin_staff():
+            return set(p.section for p in self.admin_section_permissions.filter(can_view=True))
+        return set()
+
+    @property
+    def visible_features(self):
+        """Returns the set of feature slugs this user can access — for sidebar/template use."""
+        if (self.is_administrator() or self.is_owner() or
+                self.is_main_owner() or self.is_branch_owner()):
+            try:
+                from accounts.models import Feature
+                return set(Feature.objects.values_list('slug', flat=True))
+            except Exception:
+                return set()
+        slugs = set()
+        try:
+            from accounts.permissions_defaults import DEFAULT_ROLE_FEATURES
+            role_name = self.role.name if self.role else ''
+            if self.owner:
+                rps = RolePermissionSet.objects.filter(owner=self.owner, role=self.role).first()
+                if rps:
+                    slugs = set(rps.features.values_list('slug', flat=True))
+                else:
+                    slugs = set(DEFAULT_ROLE_FEATURES.get(role_name, []))
+            else:
+                slugs = set(DEFAULT_ROLE_FEATURES.get(role_name, []))
+        except Exception:
+            pass
+        return slugs
 
     def is_admin(self):
         """Alias for is_administrator() for template compatibility"""
@@ -415,6 +474,45 @@ class User(AbstractUser):
         except (TypeError, ValueError):
             return f"{symbol}0.00"
     
+    def has_feature(self, slug):
+        """Check if this user has access to a specific feature.
+
+        Priority order:
+        1. Owners and administrators always have full access.
+        2. Custom role features (if the user has one assigned).
+        3. Restaurant-level RolePermissionSet (if configured by owner/admin).
+        4. Default built-in role features from permissions_defaults.py.
+        """
+        if self.is_administrator() or self.is_owner():
+            return True
+
+        owner = self.get_owner()
+        if not owner:
+            return self._default_has_feature(slug)
+
+        # Custom role overrides everything else for this user
+        if self.custom_role_id:
+            return self.custom_role.features.filter(slug=slug).exists()
+
+        # Check restaurant-level permission set for this role
+        role_name = self.role.name if self.role else None
+        if role_name:
+            try:
+                rps = RolePermissionSet.objects.get(owner=owner, role_name=role_name)
+                return rps.features.filter(slug=slug).exists()
+            except RolePermissionSet.DoesNotExist:
+                pass
+
+        return self._default_has_feature(slug)
+
+    def _default_has_feature(self, slug):
+        """Fallback: use the hardcoded default feature list for this role."""
+        from accounts.permissions_defaults import DEFAULT_ROLE_FEATURES
+        role_name = self.role.name if self.role else None
+        if not role_name:
+            return False
+        return slug in DEFAULT_ROLE_FEATURES.get(role_name, [])
+
     def generate_qr_code(self):
         """Generate unique QR code for restaurant"""
         import uuid
@@ -819,6 +917,99 @@ class RestaurantSubscription(models.Model):
         return info
 
 
+class Feature(models.Model):
+    """A named capability that can be granted or revoked per restaurant/role."""
+
+    CATEGORY_CHOICES = [
+        ('orders', 'Orders'),
+        ('payments', 'Payments'),
+        ('station', 'Station Dashboards'),
+        ('menu', 'Menu Management'),
+        ('staff', 'Staff'),
+        ('reports', 'Reports'),
+        ('operations', 'Operations'),
+    ]
+
+    slug = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=255, blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='operations')
+
+    class Meta:
+        ordering = ['category', 'name']
+        verbose_name = 'Feature'
+        verbose_name_plural = 'Features'
+
+    def __str__(self):
+        return self.name
+
+
+class RolePermissionSet(models.Model):
+    """Per-restaurant, per-role feature set. Overrides the built-in defaults for one role."""
+
+    BUILT_IN_ROLES = [
+        ('manager', 'Manager'),
+        ('customer_care', 'Customer Care'),
+        ('kitchen', 'Kitchen'),
+        ('bar', 'Bar'),
+        ('buffet', 'Buffet'),
+        ('service', 'Service'),
+        ('cashier', 'Cashier'),
+        ('delivery_rider', 'Delivery Rider'),
+    ]
+
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='role_permission_sets',
+        limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']},
+    )
+    role_name = models.CharField(max_length=20, choices=BUILT_IN_ROLES)
+    features = models.ManyToManyField(Feature, blank=True, related_name='role_sets')
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='permission_set_updates',
+    )
+
+    class Meta:
+        unique_together = [('owner', 'role_name')]
+        verbose_name = 'Role Permission Set'
+        verbose_name_plural = 'Role Permission Sets'
+        ordering = ['owner', 'role_name']
+
+    def __str__(self):
+        return f'{self.owner.restaurant_name or self.owner.username} — {self.get_role_name_display()}'
+
+
+class CustomRole(models.Model):
+    """A fully custom role created by a restaurant owner with any combination of features."""
+
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='custom_roles',
+        limit_choices_to={'role__name__in': ['owner', 'main_owner', 'branch_owner']},
+    )
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=255, blank=True)
+    features = models.ManyToManyField(Feature, blank=True, related_name='custom_roles')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('owner', 'name')]
+        verbose_name = 'Custom Role'
+        verbose_name_plural = 'Custom Roles'
+        ordering = ['owner', 'name']
+
+    def __str__(self):
+        return f'{self.owner.restaurant_name or self.owner.username} — {self.name}'
+
+
 class AuditLog(models.Model):
     """
     General audit log for security events and data changes.
@@ -973,3 +1164,36 @@ class SubscriptionLog(models.Model):
     
     def __str__(self):
         return f"{self.subscription} - {self.get_action_display()}"
+
+
+class AdminSectionPermission(models.Model):
+    SECTIONS = [
+        ('dashboard',   'Dashboard'),
+        ('restaurants', 'Restaurants'),
+        ('users',       'User Management'),
+        ('statistics',  'Statistics'),
+        ('orders',      'Orders'),
+        ('categories',  'Categories'),
+        ('products',    'Products'),
+        ('tables',      'Tables'),
+        ('riders',      'Delivery Riders'),
+    ]
+
+    staff = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        related_name='admin_section_permissions',
+        limit_choices_to={'role__name': 'admin_staff'},
+    )
+    section    = models.CharField(max_length=30, choices=SECTIONS)
+    can_view   = models.BooleanField(default=False)
+    can_create = models.BooleanField(default=False)
+    can_edit   = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = [('staff', 'section')]
+        verbose_name = 'Admin Section Permission'
+
+    def __str__(self):
+        return f'{self.staff.username} — {self.section}'

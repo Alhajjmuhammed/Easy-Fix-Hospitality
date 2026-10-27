@@ -36,13 +36,10 @@ def _get_currency_symbol(owner, user):
 
 def _require_inventory_access(user):
     """Return True if the user is allowed to access inventory pages."""
-    return (
-        user.is_owner()
-        or user.is_main_owner()
-        or user.is_branch_owner()
-        or user.is_manager()
-        or user.is_administrator()
-    )
+    if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner()
+            or user.is_manager() or user.is_administrator()):
+        return False
+    return user.has_feature('manage_inventory')
 
 
 # ---------------------------------------------------------------------------
@@ -71,8 +68,8 @@ def dashboard(request):
     out_of_stock_count = 0
     for item in items_qs:
         stock = item.stock_total
-        is_low = item.is_low_stock
-        is_out = item.is_out_of_stock
+        is_low = 0 < stock <= item.low_stock_threshold
+        is_out = stock <= 0
         if is_low:
             low_stock_count += 1
         if is_out:

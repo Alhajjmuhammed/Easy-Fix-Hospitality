@@ -597,6 +597,7 @@
                 </a>
             </div>
             
+            {% with feats=request.user.visible_features %}
             <div class="sidebar-nav">
                 <!-- Overview Section -->
                 <div class="nav-section">
@@ -610,37 +611,58 @@
                 <!-- Management Section -->
                 <div class="nav-section">
                     <div class="nav-section-title">Management</div>
-                    
-                    <!-- All owners and managers get staff management -->
+
+                    <!-- Staff management -->
                     {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
+                    {% if 'manage_staff' in feats %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}" href="{% url 'admin_panel:manage_users' %}" data-tooltip="{% if user.is_owner and not user.is_administrator %}Staff Management{% else %}Users & Roles{% endif %}">
                         <i class="fas fa-users"></i>
                         <span>{% if user.is_owner and not user.is_administrator %}Staff Management{% else %}Users & Roles{% endif %}</span>
                     </a>
                     {% endif %}
-                    
-                    <!-- All owners and managers get full restaurant management -->
+                    {% endif %}
+
+                    <!-- Categories -->
                     {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
+                    {% if 'manage_categories' in feats %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_categories' %}active{% endif %}" href="{% url 'admin_panel:manage_categories' %}" data-tooltip="Categories">
                         <i class="fas fa-tags"></i>
                         <span>Categories</span>
                     </a>
+                    {% endif %}
+
+                    <!-- Products -->
+                    {% if 'manage_menu' in feats %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_products' %}active{% endif %}" href="{% url 'admin_panel:manage_products' %}" data-tooltip="Products">
                         <i class="fas fa-utensils"></i>
                         <span>Products</span>
                     </a>
+                    {% endif %}
+
+                    <!-- Tables -->
+                    {% if 'manage_tables' in feats %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_tables' %}active{% endif %}" href="{% url 'admin_panel:manage_tables' %}" data-tooltip="Tables">
                         <i class="fas fa-table"></i>
                         <span>Tables</span>
                     </a>
                     {% endif %}
-                    
-                    <!-- Happy Hour for restaurant owners and managers -->
-                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
+                    {% endif %}
+
+                    <!-- Roles & Permissions — owners only, not managers -->
+                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner %}
+                    <a class="nav-link {% if request.resolver_match.url_name == 'roles_permissions' %}active{% endif %}" href="{% url 'admin_panel:roles_permissions' %}" data-tooltip="Roles &amp; Permissions">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Roles &amp; Permissions</span>
+                    </a>
+                    {% endif %}
+
+                    {% if 'manage_promotions' in feats %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'restaurant' and 'promotion' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'restaurant:manage_promotions' %}" data-tooltip="Happy Hour">
                         <i class="fas fa-clock text-warning"></i>
                         <span>Happy Hour</span>
                     </a>
+                    {% endif %}
+                    {% if 'manage_events' in feats %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'restaurant' and 'event' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'restaurant:manage_events' %}" data-tooltip="Events">
                         <i class="fas fa-calendar-alt text-info"></i>
                         <span>Event Menu</span>
@@ -674,13 +696,18 @@
                 <!-- Operations Section -->
                 <div class="nav-section">
                     <div class="nav-section-title">Operations</div>
-                    
-                    <!-- All owners and managers get normal operations -->
+
+                    <!-- Orders -->
                     {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
+                    {% if 'manage_orders' in feats %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'manage_orders' %}active{% endif %}" href="{% url 'admin_panel:manage_orders' %}" data-tooltip="Orders">
                         <i class="fas fa-shopping-cart"></i>
                         <span>Orders</span>
                     </a>
+                    {% endif %}
+
+                    <!-- Reports -->
+                    {% if 'view_reports' in feats %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'reports' and request.resolver_match.url_name != 'money_flow' %}active{% endif %}" href="{% url 'reports:dashboard' %}" data-tooltip="Sales Reports">
                         <i class="fas fa-chart-bar"></i>
                         <span>Sales Reports</span>
@@ -690,15 +717,24 @@
                         <span>Money Flow</span>
                     </a>
                     {% endif %}
+                    {% endif %}
+
+                    <!-- Waste Management -->
                     {% if user.is_owner or user.is_administrator or user.is_branch_owner or user.is_main_owner or user.is_manager %}
+                    {% if 'manage_waste' in feats %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'waste_management' %}active{% endif %}" href="{% url 'waste_management:dashboard' %}" data-tooltip="{% if user.is_administrator %}System Waste Reports{% else %}Waste Management{% endif %}">
                         <i class="fas fa-trash-alt"></i>
                         <span>{% if user.is_administrator %}System Waste Reports{% else %}Waste Management{% endif %}</span>
                     </a>
+                    {% endif %}
+
+                    <!-- Inventory -->
+                    {% if 'manage_inventory' in feats %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'inventory' %}active{% endif %}" href="{% url 'inventory:dashboard' %}" data-tooltip="Inventory">
                         <i class="fas fa-boxes"></i>
                         <span>Inventory</span>
                     </a>
+                    {% endif %}
                     {% elif user.is_cashier %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'waste_management' %}active{% endif %}" href="{% url 'waste_management:cashier_record' %}" data-tooltip="Record Waste">
                         <i class="fas fa-trash-alt"></i>
@@ -710,7 +746,7 @@
                 <!-- Attendance Section -->
                 <div class="nav-section">
                     <div class="nav-section-title">Attendance</div>
-                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner or user.is_manager %}
+                    {% if user.is_owner or user.is_branch_owner or user.is_main_owner or 'view_attendance' in feats %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name != 'my' %}active{% endif %}" href="{% url 'attendance:dashboard' %}" data-tooltip="Attendance">
                         <i class="fas fa-clipboard-list"></i>
                         <span>Attendance</span>
@@ -736,15 +772,16 @@
                         <i class="fas fa-user-circle"></i>
                         <span>My Profile</span>
                     </a>
-                    <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
+                    <a class="nav-link" href="#" data-tooltip="Logout" id="logoutLink" onclick="document.getElementById('logoutForm').submit(); return false;">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                    <form id="logoutForm" method="post" action="{% url 'accounts:logout' %}" style="display:none;">
                         {% csrf_token %}
-                        <button type="submit" class="nav-link" style="background: none; border: none; cursor: pointer;" data-tooltip="Logout">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span>Logout</span>
-                        </button>
                     </form>
                 </div>
             </div>
+            {% endwith %}
         </nav>
 
         <!-- Main Content -->

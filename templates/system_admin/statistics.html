@@ -4,297 +4,343 @@
 {% block page_title %}Statistics{% endblock %}
 {% block page_subtitle %}Comprehensive System Analytics{% endblock %}
 
+{% block extra_css %}
+<style>
+  .kpi-card {
+    background:#fff; border:1px solid #e8ecef; border-radius:10px;
+    padding:18px 14px; display:flex; align-items:center; gap:12px;
+    height:100%; transition:box-shadow .15s;
+  }
+  .kpi-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); }
+  .kpi-icon {
+    width:50px; height:50px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; color:#fff; flex-shrink:0;
+  }
+  .kpi-body h3 { font-size:1.5rem; font-weight:700; margin:0; line-height:1.1; }
+  .kpi-body p  { font-size:.75rem; color:#6c757d; margin:2px 0 0; }
+
+  .chart-card { background:#fff; border:1px solid #e8ecef; border-radius:10px; overflow:hidden; }
+  .ch-header {
+    padding:13px 18px; border-bottom:1px solid #f0f2f5;
+    font-weight:600; font-size:.85rem; color:#2c3e50;
+    display:flex; align-items:center; gap:7px;
+  }
+  .ch-header i { color:#3498db; }
+  .ch-body { padding:16px; }
+
+  .status-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:6px 0; border-bottom:1px solid #f5f5f5; font-size:.82rem;
+  }
+  .status-row:last-child { border-bottom:none; }
+
+  .prog-bar { background:#f0f2f5; border-radius:4px; height:7px; overflow:hidden; flex:1; margin:0 10px; }
+  .prog-fill { height:7px; border-radius:4px; background:#2c3e50; }
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- Overview Cards -->
-<div class="row mb-4">
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-        <div class="stat-card">
-            <div class="icon" style="background: linear-gradient(45deg, #3498db, #2980b9);">
-                <i class="fas fa-store"></i>
-            </div>
-            <h4>{{ stats.total_restaurants }}</h4>
-            <p>Restaurants</p>
-        </div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:linear-gradient(135deg,#3498db,#2980b9)"><i class="fas fa-store"></i></div>
+      <div class="kpi-body"><h3>{{ stats.total_restaurants }}</h3><p>Restaurants</p></div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-        <div class="stat-card">
-            <div class="icon" style="background: linear-gradient(45deg, #27ae60, #229954);">
-                <i class="fas fa-users"></i>
-            </div>
-            <h4>{{ stats.total_users }}</h4>
-            <p>Total Users</p>
-        </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:linear-gradient(135deg,#27ae60,#229954)"><i class="fas fa-users"></i></div>
+      <div class="kpi-body"><h3>{{ stats.total_users }}</h3><p>Total Users</p></div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-        <div class="stat-card">
-            <div class="icon" style="background: linear-gradient(45deg, #f39c12, #e67e22);">
-                <i class="fas fa-clipboard-list"></i>
-            </div>
-            <h4>{{ stats.total_orders }}</h4>
-            <p>Total Orders</p>
-        </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:linear-gradient(135deg,#f39c12,#e67e22)"><i class="fas fa-clipboard-list"></i></div>
+      <div class="kpi-body"><h3>{{ stats.total_orders }}</h3><p>Total Orders</p></div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-        <div class="stat-card">
-            <div class="icon" style="background: linear-gradient(45deg, #9b59b6, #8e44ad);">
-                <i class="fas fa-box"></i>
-            </div>
-            <h4>{{ stats.total_products }}</h4>
-            <p>Products</p>
-        </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:linear-gradient(135deg,#9b59b6,#8e44ad)"><i class="fas fa-box"></i></div>
+      <div class="kpi-body"><h3>{{ stats.total_products }}</h3><p>Products</p></div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-        <div class="stat-card">
-            <div class="icon" style="background: linear-gradient(45deg, #e74c3c, #c0392b);">
-                <i class="fas fa-tags"></i>
-            </div>
-            <h4>{{ stats.total_categories }}</h4>
-            <p>Categories</p>
-        </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:linear-gradient(135deg,#e74c3c,#c0392b)"><i class="fas fa-tags"></i></div>
+      <div class="kpi-body"><h3>{{ stats.total_categories }}</h3><p>Categories</p></div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-        <div class="stat-card">
-            <div class="icon" style="background: linear-gradient(45deg, #34495e, #2c3e50);">
-                <i class="fas fa-chair"></i>
-            </div>
-            <h4>{{ stats.total_tables }}</h4>
-            <p>Tables</p>
-        </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:linear-gradient(135deg,#34495e,#2c3e50)"><i class="fas fa-chair"></i></div>
+      <div class="kpi-body"><h3>{{ stats.total_tables }}</h3><p>Tables</p></div>
     </div>
+  </div>
 </div>
 
-<!-- Time-based Statistics -->
-<div class="row mb-4">
-    <div class="col-lg-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-line me-2"></i>
-                    Order Statistics
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <div class="border-end">
-                            <h3 class="text-success">{{ stats.orders_today }}</h3>
-                            <small class="text-muted">Today</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="border-end">
-                            <h3 class="text-info">{{ stats.orders_this_week }}</h3>
-                            <small class="text-muted">This Week</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <h3 class="text-primary">{{ stats.orders_this_month }}</h3>
-                        <small class="text-muted">This Month</small>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- Line graphs: Orders & Users over 30 days -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="chart-card">
+      <div class="ch-header"><i class="fas fa-chart-line"></i> Orders — Last 30 Days</div>
+      <div class="ch-body"><canvas id="ordersLineChart" height="130"></canvas></div>
     </div>
-    
-    <div class="col-lg-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-user-plus me-2"></i>
-                    New User Registrations
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <div class="border-end">
-                            <h3 class="text-success">{{ stats.new_users_today }}</h3>
-                            <small class="text-muted">Today</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="border-end">
-                            <h3 class="text-info">{{ stats.new_users_this_week }}</h3>
-                            <small class="text-muted">This Week</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <h3 class="text-primary">{{ stats.new_users_this_month }}</h3>
-                        <small class="text-muted">This Month</small>
-                    </div>
-                </div>
-            </div>
-        </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="chart-card">
+      <div class="ch-header"><i class="fas fa-user-plus"></i> New Users — Last 30 Days</div>
+      <div class="ch-body"><canvas id="usersLineChart" height="130"></canvas></div>
     </div>
+  </div>
 </div>
 
-<!-- Breakdown Charts -->
-<div class="row mb-4">
-    <div class="col-lg-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-pie me-2"></i>
-                    Order Status Breakdown
-                </h5>
-            </div>
-            <div class="card-body">
-                {% for status, count in order_status_counts.items %}
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <div class="d-flex align-items-center">
-                        {% if status == 'pending' %}
-                            <span class="badge bg-warning me-2">{{ status|title }}</span>
-                        {% elif status == 'confirmed' %}
-                            <span class="badge bg-info me-2">{{ status|title }}</span>
-                        {% elif status == 'preparing' %}
-                            <span class="badge bg-primary me-2">{{ status|title }}</span>
-                        {% elif status == 'ready' %}
-                            <span class="badge bg-success me-2">{{ status|title }}</span>
-                        {% elif status == 'delivered' %}
-                            <span class="badge bg-secondary me-2">{{ status|title }}</span>
-                        {% else %}
-                            <span class="badge bg-danger me-2">{{ status|title }}</span>
-                        {% endif %}
-                        <span>{{ status|title }} Orders</span>
-                    </div>
-                    <strong>{{ count }}</strong>
-                </div>
-                {% endfor %}
-            </div>
+<!-- Order Status + User Roles -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-5">
+    <div class="chart-card" style="height:100%;">
+      <div class="ch-header"><i class="fas fa-chart-pie"></i> Order Status Breakdown</div>
+      <div class="ch-body" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+        <div style="flex:0 0 180px;"><canvas id="orderDoughnut"></canvas></div>
+        <div style="flex:1;min-width:140px;">
+          {% for status, count in order_status_counts.items %}
+          <div class="status-row">
+            {% if status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
+            {% elif status == 'confirmed' %}<span class="badge bg-info">Confirmed</span>
+            {% elif status == 'preparing' %}<span class="badge bg-primary">Preparing</span>
+            {% elif status == 'ready' %}<span class="badge bg-success">Ready</span>
+            {% elif status == 'delivered' %}<span class="badge bg-secondary">Delivered</span>
+            {% else %}<span class="badge bg-danger">Cancelled</span>{% endif %}
+            <strong>{{ count }}</strong>
+          </div>
+          {% endfor %}
         </div>
+      </div>
     </div>
-    
-    <div class="col-lg-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-users-cog me-2"></i>
-                    User Role Distribution
-                </h5>
-            </div>
-            <div class="card-body">
-                {% for role, count in user_role_counts.items %}
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <div class="d-flex align-items-center">
-                        {% if role == 'owner' %}
-                            <span class="badge bg-primary me-2">{{ role|title }}</span>
-                        {% elif role == 'kitchen' %}
-                            <span class="badge bg-warning me-2">{{ role|title }}</span>
-                        {% elif role == 'customer_care' %}
-                            <span class="badge bg-info me-2">Customer Care</span>
-                        {% elif role == 'admin' %}
-                            <span class="badge bg-danger me-2">{{ role|title }}</span>
-                        {% else %}
-                            <span class="badge bg-secondary me-2">{{ role|title }}</span>
-                        {% endif %}
-                        <span>{{ role|title }} Users</span>
-                    </div>
-                    <strong>{{ count }}</strong>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="chart-card" style="height:100%;">
+      <div class="ch-header"><i class="fas fa-users-cog"></i> User Role Distribution</div>
+      <div class="ch-body"><canvas id="roleBarChart" height="180"></canvas></div>
     </div>
+  </div>
 </div>
 
-<!-- Top Restaurants -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-trophy me-2"></i>
-                    Top Restaurants by Order Volume
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if top_restaurants %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Rank</th>
-                                    <th>Restaurant</th>
-                                    <th>Owner</th>
-                                    <th>Total Orders</th>
-                                    <th>Registration Date</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for restaurant in top_restaurants %}
-                                <tr>
-                                    <td>
-                                        {% if forloop.counter == 1 %}
-                                            <i class="fas fa-trophy text-warning"></i>
-                                        {% elif forloop.counter == 2 %}
-                                            <i class="fas fa-medal text-muted"></i>
-                                        {% elif forloop.counter == 3 %}
-                                            <i class="fas fa-award text-warning"></i>
-                                        {% else %}
-                                            {{ forloop.counter }}
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <strong>{{ restaurant.restaurant_name }}</strong>
-                                    </td>
-                                    <td>{{ restaurant.get_full_name|default:restaurant.username }}</td>
-                                    <td>
-                                        <span class="badge bg-primary">{{ restaurant.order_count }}</span>
-                                    </td>
-                                    <td>{{ restaurant.date_joined|date:"M d, Y" }}</td>
-                                    <td>
-                                        <span class="badge bg-success">Active</span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="text-muted text-center py-3">No restaurant data available</p>
-                {% endif %}
-            </div>
-        </div>
+<!-- Top Restaurants horizontal bar -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="chart-card">
+      <div class="ch-header"><i class="fas fa-trophy"></i> Top Restaurants by Order Volume</div>
+      <div class="ch-body"><canvas id="topRestChart" height="110"></canvas></div>
     </div>
+  </div>
 </div>
 
-<!-- Export Actions -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-download me-2"></i>
-                    Export & Reports
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-outline-primary" onclick="showMessage('Export functionality coming soon')">
-                        <i class="fas fa-file-csv me-1"></i> Export to CSV
-                    </button>
-                    <button class="btn btn-outline-success" onclick="showMessage('Export functionality coming soon')">
-                        <i class="fas fa-file-excel me-1"></i> Export to Excel
-                    </button>
-                    <button class="btn btn-outline-danger" onclick="showMessage('Export functionality coming soon')">
-                        <i class="fas fa-file-pdf me-1"></i> Generate PDF Report
-                    </button>
-                    <button class="btn btn-outline-info" onclick="showMessage('Backup functionality coming soon')">
-                        <i class="fas fa-database me-1"></i> Backup Database
-                    </button>
-                </div>
-            </div>
+<!-- Leaderboard Table -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="chart-card">
+      <div class="ch-header"><i class="fas fa-list-ol"></i> Restaurant Leaderboard</div>
+      <div class="ch-body p-0">
+        {% if top_restaurants %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" style="font-size:.83rem;">
+            <thead style="background:#f8f9fa;">
+              <tr>
+                <th class="ps-3" style="width:50px">Rank</th>
+                <th>Restaurant</th>
+                <th>Owner</th>
+                <th>Total Orders</th>
+                <th>Share</th>
+                <th>Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in top_restaurants %}
+              <tr>
+                <td class="ps-3 text-center">
+                  {% if forloop.counter == 1 %}<i class="fas fa-trophy text-warning"></i>
+                  {% elif forloop.counter == 2 %}<i class="fas fa-medal text-muted"></i>
+                  {% elif forloop.counter == 3 %}<i class="fas fa-award" style="color:#cd7f32;"></i>
+                  {% else %}<span class="text-muted fw-bold">{{ forloop.counter }}</span>{% endif %}
+                </td>
+                <td><strong>{{ r.restaurant_name }}</strong></td>
+                <td class="text-muted">{{ r.get_full_name|default:r.username }}</td>
+                <td><span class="badge bg-primary rounded-pill">{{ r.order_count }}</span></td>
+                <td style="min-width:100px;">
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="prog-bar">
+                      {% if top_restaurants.0.order_count > 0 %}
+                      <div class="prog-fill" style="width:{% widthratio r.order_count top_restaurants.0.order_count 100 %}%"></div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+                <td class="text-muted">{{ r.date_joined|date:"M Y" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
+        {% else %}
+          <p class="text-muted text-center py-4">No restaurant data available</p>
+        {% endif %}
+      </div>
     </div>
+  </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
-    // Auto-refresh statistics every 5 minutes
-    setTimeout(function() {
-        location.reload();
-    }, 300000);
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+  const dailyOrders = {{ json_daily_orders|safe }};
+  const dailyUsers  = {{ json_daily_users|safe }};
+  const statusData  = {{ json_order_status|safe }};
+  const roleData    = {{ json_role_counts|safe }};
+  const topRest     = {{ json_top_restaurants|safe }};
+
+  Chart.defaults.font.family = "'Segoe UI', Arial, sans-serif";
+  Chart.defaults.color = '#6c757d';
+
+  // ── Orders line graph ──
+  new Chart(document.getElementById('ordersLineChart'), {
+    type: 'line',
+    data: {
+      labels: dailyOrders.labels,
+      datasets: [{
+        label: 'Orders',
+        data: dailyOrders.data,
+        borderColor: '#3498db',
+        backgroundColor: 'rgba(52,152,219,0.08)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f2f5' } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }
+      }
+    }
+  });
+
+  // ── New users line graph ──
+  new Chart(document.getElementById('usersLineChart'), {
+    type: 'line',
+    data: {
+      labels: dailyUsers.labels,
+      datasets: [{
+        label: 'New Users',
+        data: dailyUsers.data,
+        borderColor: '#27ae60',
+        backgroundColor: 'rgba(39,174,96,0.08)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f2f5' } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }
+      }
+    }
+  });
+
+  // ── Order status doughnut ──
+  new Chart(document.getElementById('orderDoughnut'), {
+    type: 'doughnut',
+    data: {
+      labels: statusData.labels,
+      datasets: [{
+        data: statusData.data,
+        backgroundColor: statusData.colors,
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed.toLocaleString() } }
+      }
+    }
+  });
+
+  // ── User role bar ──
+  new Chart(document.getElementById('roleBarChart'), {
+    type: 'bar',
+    data: {
+      labels: roleData.labels,
+      datasets: [{
+        label: 'Users',
+        data: roleData.data,
+        backgroundColor: '#2c3e50',
+        borderRadius: 5,
+        hoverBackgroundColor: '#3498db',
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f2f5' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // ── Top restaurants horizontal bar ──
+  new Chart(document.getElementById('topRestChart'), {
+    type: 'bar',
+    data: {
+      labels: topRest.labels,
+      datasets: [{
+        label: 'Orders',
+        data: topRest.data,
+        backgroundColor: '#3498db',
+        borderRadius: 4,
+        hoverBackgroundColor: '#2c3e50',
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.x.toLocaleString() + ' orders' } }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#f0f2f5' } },
+        y: { grid: { display: false }, ticks: { font: { size: 12 } } }
+      }
+    }
+  });
+  } catch(e) {
+    console.error('Statistics chart error:', e);
+  }
+});
+
+setTimeout(() => location.reload(), 300000);
 </script>
 {% endblock %}

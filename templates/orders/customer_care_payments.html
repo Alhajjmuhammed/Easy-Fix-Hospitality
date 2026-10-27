@@ -201,27 +201,34 @@
                                             <small class="badge bg-secondary">{{ order.get_status_display }}</small>
                                         </td>
                                         <td>
+                                            {% with feats=request.user.visible_features %}
                                             <div class="btn-group-vertical btn-group-sm">
                                                 {% if order.payment_status != 'paid' %}
-                                                <button class="btn btn-success btn-sm mb-1" 
+                                                {% if 'process_payments' in feats %}
+                                                <button class="btn btn-success btn-sm mb-1"
                                                         onclick="processPayment('{{ order.id }}', '{{ order.order_number }}', {{ order.balance|default:order.total_amount }})">
                                                     <i class="bi bi-cash"></i> Pay
                                                 </button>
-                                                <button class="btn btn-secondary btn-sm mb-1" 
+                                                {% endif %}
+                                                {% if 'view_receipts' in feats %}
+                                                <button class="btn btn-secondary btn-sm mb-1"
                                                         onclick="printBill('{{ order.id }}', '{{ order.order_number }}')">
                                                     <i class="bi bi-receipt"></i> Print Bill
                                                 </button>
                                                 {% endif %}
-                                                <a href="{% url 'orders:order_detail' order.id %}" 
+                                                {% endif %}
+                                                <a href="{% url 'orders:order_detail' order.id %}"
                                                    class="btn btn-info btn-sm mb-1">
                                                     <i class="bi bi-eye"></i> View
                                                 </a>
                                                 {% if order.payments.exists %}
                                                     {% if order.latest_payment %}
-                                                    <button class="btn btn-outline-secondary btn-sm" 
-                                                            onclick="generateReceipt('{{ order.latest_payment.id }}')"> 
+                                                    {% if 'view_receipts' in feats %}
+                                                    <button class="btn btn-outline-secondary btn-sm"
+                                                            onclick="generateReceipt('{{ order.latest_payment.id }}')">
                                                         <i class="bi bi-printer"></i> Receipt
                                                     </button>
+                                                    {% endif %}
                                                     {% endif %}
                                                 {% endif %}                                                {% if order.status != 'cancelled' and order.payment_status != 'paid' and order.table_info %}
                                                 <button class="btn btn-warning btn-sm mt-1"
@@ -229,6 +236,7 @@
                                                     <i class="bi bi-arrow-left-right"></i> Transfer
                                                 </button>
                                                 {% endif %}                                            </div>
+                                            {% endwith %}
                                         </td>
                                     </tr>
                                     {% endfor %}

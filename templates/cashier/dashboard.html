@@ -76,6 +76,10 @@
 <script>
     // Currency symbol for JavaScript
     const CURRENCY_SYMBOL = '{% currency_symbol %}';
+    {% with feats=request.user.visible_features %}
+    const CAN_VOID = {% if 'void_payments' in feats %}true{% else %}false{% endif %};
+    const CAN_PRINT_RECEIPT = {% if 'view_receipts' in feats %}true{% else %}false{% endif %};
+    {% endwith %}
 
     // Pass products data from Django template to JavaScript
     const wasteProducts = [
@@ -403,26 +407,33 @@ $(document).ready(function() {
                                                 {% endif %}
                                             </td>
                                             <td>
+                                                {% with feats=request.user.visible_features %}
                                                 <div class="btn-group-vertical btn-group-sm" role="group">
                                                     {% if order.status != 'cancelled' and order.balance_due > 0 %}
+                                                        {% if 'process_payments' in feats %}
                                                         <button type="button" class="btn btn-success btn-sm" onclick="processPayment({{ order.id }})">
                                                             💳 Pay
                                                         </button>
+                                                        {% endif %}
+                                                        {% if 'view_receipts' in feats %}
                                                         <button type="button" class="btn btn-secondary btn-sm" onclick="printBill({{ order.id }}, '{{ order.order_number }}')">
                                                             🧾 Print Bill
                                                         </button>
+                                                        {% endif %}
                                                     {% endif %}
-                                                    
+
                                                     {% if order.total_paid > 0 %}
                                                         <button type="button" class="btn btn-info btn-sm" onclick="viewPaymentHistory({{ order.id }})">
                                                             📊 History
                                                         </button>
                                                     {% endif %}
-                                                    
+
                                                     {% if order.status != 'cancelled' and order.total_paid == 0 %}
+                                                        {% if 'manage_orders' in feats %}
                                                         <button type="button" class="btn btn-danger btn-sm" onclick="cancelOrder({{ order.id }})">
                                                             ❌ Cancel
                                                         </button>
+                                                        {% endif %}
                                                     {% endif %}
                                                     {% if order.status != 'cancelled' and order.payment_status != 'paid' and order.table_info %}
                                                         <button type="button" class="btn btn-warning btn-sm" onclick="openTransferModal({{ order.id }}, '{{ order.order_number|escapejs }}', '{{ order.table_info.tbl_no|escapejs }}')">
@@ -430,6 +441,7 @@ $(document).ready(function() {
                                                         </button>
                                                     {% endif %}
                                                 </div>
+                                                {% endwith %}
                                             </td>
                                         </tr>
                                     {% endfor %}
@@ -821,12 +833,12 @@ function viewPaymentHistory(orderId) {
                                         }
                                     </td>
                                     <td>
-                                        ${!payment.is_voided ? 
+                                        ${!payment.is_voided ?
                                             `<div class="btn-group btn-group-sm">
-                                                <button class="btn btn-danger" onclick="voidPayment(${payment.id})">Void</button>
-                                                <button class="btn btn-info" onclick="generateReceipt(${payment.id})">Receipt</button>
-                                            </div>` : 
-                                            `<button class="btn btn-sm btn-secondary" onclick="generateReceipt(${payment.id})">View Receipt</button>`
+                                                ${CAN_VOID ? `<button class="btn btn-danger" onclick="voidPayment(${payment.id})">Void</button>` : ''}
+                                                ${CAN_PRINT_RECEIPT ? `<button class="btn btn-info" onclick="generateReceipt(${payment.id})">Receipt</button>` : ''}
+                                            </div>` :
+                                            `${CAN_PRINT_RECEIPT ? `<button class="btn btn-sm btn-secondary" onclick="generateReceipt(${payment.id})">View Receipt</button>` : ''}`
                                         }
                                     </td>
                                 </tr>

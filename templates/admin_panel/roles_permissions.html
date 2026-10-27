@@ -1,0 +1,657 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Roles & Permissions{% endblock %}
+{% block page_title %}Roles & Permissions{% endblock %}
+{% block page_description %}Control what each staff role can access in your restaurant{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --rp-blue: #1d4ed8;
+    --rp-blue-light: #eff6ff;
+    --rp-blue-mid: #dbeafe;
+    --rp-border: #e2e8f0;
+    --rp-text: #0f172a;
+    --rp-muted: #64748b;
+    --rp-sidebar: #f8fafc;
+    --rp-success: #16a34a;
+    --rp-danger: #dc2626;
+}
+
+/* Tabs */
+.rp-tabs-bar { display:flex; gap:0; border-bottom:2px solid var(--rp-border); margin-bottom:24px; }
+.rp-tab-btn {
+    display:inline-flex; align-items:center; gap:7px;
+    padding:10px 20px; font-size:.875rem; font-weight:500; cursor:pointer;
+    background:none; border:none; color:var(--rp-muted);
+    border-bottom:2px solid transparent; margin-bottom:-2px; transition:color .15s,border-color .15s;
+}
+.rp-tab-btn.active { color:var(--rp-blue); border-bottom-color:var(--rp-blue); }
+.rp-tab-btn:hover:not(.active) { color:var(--rp-text); }
+.rp-tab-badge {
+    font-size:.7rem; font-weight:600; padding:1px 7px; border-radius:12px;
+    background:var(--rp-blue-mid); color:var(--rp-blue);
+}
+.rp-tab-pane { display:none; }
+.rp-tab-pane.active { display:block; }
+
+/* Two-column layout */
+.rp-layout { display:grid; grid-template-columns:230px 1fr; gap:18px; align-items:start; }
+@media(max-width:768px){ .rp-layout { grid-template-columns:1fr; } }
+
+/* Sidebar */
+.rp-sidebar { background:var(--rp-sidebar); border:1px solid var(--rp-border); border-radius:0 !important; overflow:hidden; position:sticky; top:72px; }
+.rp-sidebar-title { padding:13px 15px 11px; font-size:.7rem; font-weight:700; letter-spacing:.7px; text-transform:uppercase; color:var(--rp-muted); border-bottom:1px solid var(--rp-border); background:#fff; }
+.rp-role-btn {
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:11px 13px; background:none; border:none; border-bottom:1px solid var(--rp-border);
+    cursor:pointer; text-align:left; transition:background .12s; position:relative;
+}
+.rp-role-btn:last-child { border-bottom:none; }
+.rp-role-btn:hover { background:#f1f5f9; }
+.rp-role-btn.active { background:var(--rp-blue-light); }
+.rp-role-btn.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--rp-blue); border-radius:0 2px 2px 0; }
+.rp-role-icon { width:33px; height:33px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:.88rem; flex-shrink:0; }
+.rp-role-btn.active .rp-role-icon { background:var(--rp-blue) !important; color:#fff !important; }
+.rp-role-name { font-size:.83rem; font-weight:600; color:var(--rp-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rp-role-btn.active .rp-role-name { color:var(--rp-blue); }
+.rp-role-count { font-size:.71rem; color:var(--rp-muted); margin-top:1px; }
+.rp-unsaved-dot { width:7px; height:7px; background:#f59e0b; border-radius:50%; flex-shrink:0; display:none; margin-left:auto; }
+
+.ri-manager       { background:#eff6ff; color:#1d4ed8; }
+.ri-customer_care { background:#f0fdf4; color:#16a34a; }
+.ri-kitchen       { background:#fff7ed; color:#ea580c; }
+.ri-bar           { background:#faf5ff; color:#7c3aed; }
+.ri-buffet        { background:#fef2f2; color:#dc2626; }
+.ri-service       { background:#f0f9ff; color:#0284c7; }
+.ri-cashier       { background:#fefce8; color:#ca8a04; }
+.ri-delivery_rider{ background:#f0fdf4; color:#059669; }
+
+/* Panel */
+.rp-panel { background:#fff; border:1px solid var(--rp-border); border-radius:0 !important; overflow:hidden; }
+.rp-panel-header {
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    padding:17px 20px; border-bottom:1px solid var(--rp-border);
+    background:#2c3e50; border-radius:0 !important;
+}
+.rp-panel-title { display:flex; align-items:center; gap:10px; color:#fff; }
+.rp-panel-title span { font-size:1rem; font-weight:600; }
+.rp-panel-title small { font-size:.76rem; color:rgba(255,255,255,.6); margin-left:6px; }
+.rp-panel-actions { display:flex; align-items:center; gap:10px; }
+.rp-unsaved-badge {
+    font-size:.74rem; font-weight:600; padding:3px 10px; border-radius:12px;
+    background:rgba(251,191,36,.2); border:1px solid rgba(251,191,36,.4); color:#fbbf24; display:none;
+}
+.rp-save-btn {
+    display:inline-flex; align-items:center; gap:6px; padding:7px 17px; border-radius:8px;
+    font-size:.83rem; font-weight:600; cursor:pointer; border:none; background:#fff; color:var(--rp-blue); transition:all .15s;
+}
+.rp-save-btn:hover { background:var(--rp-blue-light); }
+.rp-save-btn:disabled { opacity:.6; cursor:not-allowed; }
+.rp-panel-body { padding:20px; }
+.rp-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; color:var(--rp-muted); text-align:center; padding:40px; }
+.rp-empty i { font-size:2.2rem; opacity:.2; margin-bottom:12px; }
+
+/* Features */
+.rp-category { margin-bottom:22px; }
+.rp-cat-header {
+    display:flex; align-items:center; gap:7px; font-size:.71rem; font-weight:700; letter-spacing:.7px;
+    text-transform:uppercase; padding-bottom:9px; margin-bottom:11px; border-bottom:1.5px solid var(--rp-border);
+}
+.rp-cat-icon { width:21px; height:21px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:.63rem; }
+.rp-feat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:7px; }
+.rp-feat-item { border:1.5px solid var(--rp-border); border-radius:8px; transition:border-color .12s,background .12s; overflow:hidden; }
+.rp-feat-item:has(.rp-feat-cb:checked) { border-color:#93c5fd; background:var(--rp-blue-light); }
+.rp-feat-label { display:flex; align-items:flex-start; gap:9px; padding:11px 12px; cursor:pointer; width:100%; }
+.rp-feat-cb { width:15px; height:15px; border-radius:4px; flex-shrink:0; margin-top:2px; accent-color:var(--rp-blue); cursor:pointer; }
+.rp-feat-name { font-size:.83rem; font-weight:600; color:var(--rp-text); }
+.rp-feat-desc { font-size:.73rem; color:var(--rp-muted); margin-top:2px; line-height:1.4; }
+
+.cat-orders   { background:#fef3c7; color:#b45309; }
+.cat-payments { background:#d1fae5; color:#065f46; }
+.cat-station  { background:#ede9fe; color:#5b21b6; }
+.cat-menu     { background:#fee2e2; color:#991b1b; }
+.cat-staff    { background:#dbeafe; color:#1e40af; }
+.cat-reports  { background:#cffafe; color:#164e63; }
+.cat-ops      { background:#f1f5f9; color:#475569; }
+
+/* Custom roles */
+.cr-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.cr-toolbar h2 { font-size:.97rem; font-weight:700; color:var(--rp-text); margin:0; }
+.rp-btn-primary {
+    display:inline-flex; align-items:center; gap:7px; padding:9px 17px; border-radius:8px;
+    border:none; background:var(--rp-blue); color:#fff; font-size:.84rem; font-weight:600; cursor:pointer; transition:background .15s;
+}
+.rp-btn-primary:hover { background:#1e40af; }
+.cr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:13px; }
+.cr-card { background:#fff; border:1.5px solid var(--rp-border); border-radius:0; padding:17px 17px 13px; transition:box-shadow .15s,border-color .15s; }
+.cr-card:hover { box-shadow:0 4px 14px rgba(0,0,0,.09); border-color:#c7d2fe; }
+.cr-card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:11px; }
+.cr-name { font-size:.94rem; font-weight:700; color:var(--rp-text); }
+.cr-desc { font-size:.77rem; color:var(--rp-muted); margin-top:3px; }
+.cr-actions { display:flex; gap:6px; flex-shrink:0; }
+.btn-icon {
+    width:29px; height:29px; border-radius:4px; border:1.5px solid var(--rp-border);
+    background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:.78rem; transition:all .12s;
+}
+.btn-icon.edit:hover { background:var(--rp-blue-light); border-color:#93c5fd; color:var(--rp-blue); }
+.btn-icon.del:hover  { background:#fef2f2; border-color:#fca5a5; color:var(--rp-danger); }
+.cr-chips { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:11px; min-height:24px; }
+.cr-chip { font-size:.71rem; font-weight:500; padding:2px 8px; border-radius:12px; background:var(--rp-blue-light); color:var(--rp-blue); border:1px solid var(--rp-blue-mid); }
+.cr-chip-more { font-size:.71rem; color:var(--rp-muted); padding:2px 4px; }
+.cr-footer { display:flex; align-items:center; gap:6px; padding-top:9px; border-top:1px solid var(--rp-border); font-size:.75rem; color:var(--rp-muted); }
+.cr-empty { grid-column:1/-1; padding:50px 20px; text-align:center; color:var(--rp-muted); }
+.cr-empty i { font-size:2.2rem; opacity:.2; display:block; margin-bottom:12px; }
+
+/* Assign section */
+.assign-card { background:#fff; border:1px solid var(--rp-border); border-radius:0; overflow:hidden; margin-top:24px; }
+.assign-card-head { padding:14px 20px; border-bottom:1px solid var(--rp-border); background:var(--rp-sidebar); }
+.assign-card-head h3 { font-size:.93rem; font-weight:700; color:var(--rp-text); margin:0; }
+.assign-card-body { padding:20px; }
+.assign-table { width:100%; border-collapse:collapse; }
+.assign-table thead th { padding:11px 16px; font-size:.73rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--rp-muted); background:var(--rp-sidebar); border-bottom:1px solid var(--rp-border); text-align:left; }
+.assign-table tbody tr { border-bottom:1px solid var(--rp-border); transition:background .1s; }
+.assign-table tbody tr:last-child { border-bottom:none; }
+.assign-table tbody tr:hover { background:#fafafa; }
+.assign-table td { padding:12px 16px; vertical-align:middle; }
+.staff-name { font-size:.87rem; font-weight:600; color:var(--rp-text); }
+.staff-uname { font-size:.74rem; color:var(--rp-muted); }
+.built-chip { display:inline-block; font-size:.74rem; font-weight:500; padding:2px 9px; border-radius:12px; background:#f1f5f9; color:var(--rp-muted); border:1px solid var(--rp-border); }
+.custom-chip { display:inline-block; font-size:.74rem; font-weight:600; padding:2px 9px; border-radius:12px; background:var(--rp-blue-light); color:var(--rp-blue); border:1px solid var(--rp-blue-mid); }
+.assign-sel { padding:6px 10px; border-radius:7px; border:1.5px solid var(--rp-border); font-size:.81rem; color:var(--rp-text); background:#fff; cursor:pointer; min-width:160px; transition:border-color .15s; outline:none; }
+.assign-sel:focus { border-color:var(--rp-blue); }
+.no-staff { padding:40px 20px; text-align:center; color:var(--rp-muted); font-size:.87rem; }
+
+/* Modal */
+.rp-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1060; align-items:center; justify-content:center; padding:20px; }
+.rp-modal-overlay.open { display:flex; }
+.rp-modal { background:#fff; border-radius:4px; width:100%; max-width:740px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+.rp-modal-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--rp-border); flex-shrink:0; }
+.rp-modal-title { font-size:1rem; font-weight:700; color:var(--rp-text); }
+.btn-mclose { width:31px; height:31px; border-radius:7px; border:1.5px solid var(--rp-border); background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:.88rem; color:var(--rp-muted); transition:all .12s; }
+.btn-mclose:hover { background:#fef2f2; border-color:#fca5a5; color:var(--rp-danger); }
+.rp-modal-body { padding:20px 22px; overflow-y:auto; flex:1; }
+.rp-modal-foot { padding:14px 22px; border-top:1px solid var(--rp-border); display:flex; justify-content:flex-end; gap:10px; flex-shrink:0; }
+.btn-mcancel { padding:8px 16px; border-radius:8px; border:1.5px solid var(--rp-border); background:#fff; color:var(--rp-muted); font-size:.83rem; font-weight:500; cursor:pointer; transition:all .12s; }
+.btn-mcancel:hover { background:#f8fafc; color:var(--rp-text); }
+.btn-msave { padding:8px 18px; border-radius:8px; border:none; background:var(--rp-blue); color:#fff; font-size:.83rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background .15s; }
+.btn-msave:hover { background:#1e40af; }
+.btn-msave:disabled { opacity:.6; cursor:not-allowed; }
+.rp-form-label { display:block; font-size:.81rem; font-weight:600; color:var(--rp-text); margin-bottom:5px; }
+.rp-form-input { width:100%; padding:8px 11px; border-radius:8px; border:1.5px solid var(--rp-border); font-size:.87rem; color:var(--rp-text); outline:none; transition:border-color .15s; }
+.rp-form-input:focus { border-color:var(--rp-blue); }
+.modal-sect { font-size:.71rem; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--rp-muted); margin:18px 0 12px; padding-top:14px; border-top:1px solid var(--rp-border); }
+.modal-feat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:6px; margin-bottom:13px; }
+.modal-feat-item { display:flex; align-items:flex-start; gap:8px; padding:9px 10px; border:1.5px solid var(--rp-border); border-radius:8px; cursor:pointer; transition:all .12s; }
+.modal-feat-item:has(.cr-feat-cb:checked) { border-color:#93c5fd; background:var(--rp-blue-light); }
+.modal-feat-item input { margin-top:2px; flex-shrink:0; accent-color:var(--rp-blue); }
+.modal-feat-name { font-size:.79rem; font-weight:600; color:var(--rp-text); }
+.modal-feat-desc { font-size:.71rem; color:var(--rp-muted); margin-top:1px; }
+.rp-modal-error { padding:9px 13px; border-radius:8px; background:#fef2f2; border:1px solid #fca5a5; color:var(--rp-danger); font-size:.83rem; margin-top:12px; display:none; }
+
+/* Toast */
+.rp-toast { position:fixed; bottom:22px; right:22px; z-index:9999; padding:11px 16px; border-radius:10px; font-size:.86rem; font-weight:500; display:flex; align-items:center; gap:8px; box-shadow:0 4px 16px rgba(0,0,0,.14); animation:rpUp .2s ease; max-width:310px; }
+.rp-toast.success { background:#f0fdf4; border:1.5px solid #bbf7d0; color:#15803d; }
+.rp-toast.danger  { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; }
+@keyframes rpUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Tabs -->
+<div class="rp-tabs-bar">
+    <button class="rp-tab-btn active" data-tab="rpBuiltin">
+        <i class="fas fa-users-cog"></i> Built-in Roles
+    </button>
+    <button class="rp-tab-btn" data-tab="rpCustom">
+        <i class="fas fa-user-tag"></i> Custom Roles
+        <span class="rp-tab-badge">{{ custom_roles|length }}</span>
+    </button>
+</div>
+
+<!-- TAB 1: Built-in Roles -->
+<div class="rp-tab-pane active" id="rpBuiltin">
+    <div class="rp-layout">
+
+        <!-- Sidebar -->
+        <div class="rp-sidebar">
+            <div class="rp-sidebar-title">Select a role to edit</div>
+            {% for role_name, role_display in built_in_roles %}
+            <button class="rp-role-btn" data-role="{{ role_name }}" onclick="rpSelectRole('{{ role_name }}','{{ role_display }}')">
+                <span class="rp-role-icon ri-{{ role_name }}">
+                    {% if role_name == 'manager' %}<i class="fas fa-user-tie"></i>
+                    {% elif role_name == 'customer_care' %}<i class="fas fa-headset"></i>
+                    {% elif role_name == 'kitchen' %}<i class="fas fa-fire"></i>
+                    {% elif role_name == 'bar' %}<i class="fas fa-wine-glass-alt"></i>
+                    {% elif role_name == 'buffet' %}<i class="fas fa-drumstick-bite"></i>
+                    {% elif role_name == 'service' %}<i class="fas fa-concierge-bell"></i>
+                    {% elif role_name == 'cashier' %}<i class="fas fa-cash-register"></i>
+                    {% elif role_name == 'delivery_rider' %}<i class="fas fa-motorcycle"></i>
+                    {% endif %}
+                </span>
+                <div style="flex:1;min-width:0;">
+                    <div class="rp-role-name">{{ role_display }}</div>
+                    <div class="rp-role-count" id="rpcnt-{{ role_name }}">Loading…</div>
+                </div>
+                <span class="rp-unsaved-dot" id="rpdot-{{ role_name }}"></span>
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- Panel -->
+        <div class="rp-panel">
+            <div class="rp-panel-header">
+                <div class="rp-panel-title">
+                    <i class="fas fa-shield-alt"></i>
+                    <div>
+                        <span id="rpPanelTitle">Select a role</span>
+                        <small id="rpPanelCount"></small>
+                    </div>
+                </div>
+                <div class="rp-panel-actions">
+                    <span class="rp-unsaved-badge" id="rpUnsaved">Unsaved changes</span>
+                    <button class="rp-save-btn" id="rpSaveBtn" disabled>
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+            <div class="rp-panel-body" id="rpPanelBody">
+                <div class="rp-empty">
+                    <i class="fas fa-hand-pointer"></i>
+                    <p style="font-size:.87rem;">Select a role from the left to<br>view and edit its permissions.</p>
+                </div>
+            </div>
+
+            <!-- Hidden feature panels -->
+            <div id="rpFeaturePanels" style="display:none;">
+                {% for category_name, cat_features in features_by_category.items %}
+                <div class="rp-category">
+                    <div class="rp-cat-header">
+                        <span class="rp-cat-icon
+                            {% if 'order' in category_name|lower %}cat-orders
+                            {% elif 'payment' in category_name|lower %}cat-payments
+                            {% elif 'station' in category_name|lower %}cat-station
+                            {% elif 'menu' in category_name|lower %}cat-menu
+                            {% elif 'staff' in category_name|lower %}cat-staff
+                            {% elif 'report' in category_name|lower %}cat-reports
+                            {% else %}cat-ops{% endif %}">
+                            {% if 'order' in category_name|lower %}<i class="fas fa-shopping-cart"></i>
+                            {% elif 'payment' in category_name|lower %}<i class="fas fa-credit-card"></i>
+                            {% elif 'station' in category_name|lower %}<i class="fas fa-tv"></i>
+                            {% elif 'menu' in category_name|lower %}<i class="fas fa-utensils"></i>
+                            {% elif 'staff' in category_name|lower %}<i class="fas fa-users"></i>
+                            {% elif 'report' in category_name|lower %}<i class="fas fa-chart-bar"></i>
+                            {% else %}<i class="fas fa-cogs"></i>{% endif %}
+                        </span>
+                        <span style="color:
+                            {% if 'order' in category_name|lower %}#b45309
+                            {% elif 'payment' in category_name|lower %}#065f46
+                            {% elif 'station' in category_name|lower %}#5b21b6
+                            {% elif 'menu' in category_name|lower %}#991b1b
+                            {% elif 'staff' in category_name|lower %}#1e40af
+                            {% elif 'report' in category_name|lower %}#164e63
+                            {% else %}#475569{% endif %};">{{ category_name }}</span>
+                    </div>
+                    <div class="rp-feat-grid">
+                        {% for feature in cat_features %}
+                        <div class="rp-feat-item">
+                            <label class="rp-feat-label">
+                                <input type="checkbox" class="rp-feat-cb feature-toggle"
+                                       data-slug="{{ feature.slug }}" onchange="rpOnChange()">
+                                <div>
+                                    <div class="rp-feat-name">{{ feature.name }}</div>
+                                    <div class="rp-feat-desc">{{ feature.description }}</div>
+                                </div>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TAB 2: Custom Roles -->
+<div class="rp-tab-pane" id="rpCustom">
+    <div class="cr-toolbar">
+        <h2><i class="fas fa-user-tag me-2" style="color:var(--rp-blue);"></i>Custom Roles</h2>
+        <button class="rp-btn-primary" id="rpOpenCreate">
+            <i class="fas fa-plus"></i> Create Custom Role
+        </button>
+    </div>
+
+    <div class="cr-grid" id="crList">
+        {% if custom_roles %}
+        {% for cr in custom_roles %}
+        <div class="cr-card" id="cr-row-{{ cr.pk }}">
+            <div class="cr-card-top">
+                <div>
+                    <div class="cr-name">{{ cr.name }}</div>
+                    {% if cr.description %}<div class="cr-desc">{{ cr.description }}</div>{% endif %}
+                </div>
+                <div class="cr-actions">
+                    <button class="btn-icon edit edit-custom-role" title="Edit"
+                            data-id="{{ cr.pk }}" data-name="{{ cr.name }}" data-description="{{ cr.description|default:'' }}">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="btn-icon del delete-custom-role" title="Delete"
+                            data-id="{{ cr.pk }}" data-name="{{ cr.name }}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="cr-chips">
+                {% for f in cr.features.all|slice:":5" %}
+                <span class="cr-chip">{{ f.name }}</span>
+                {% endfor %}
+                {% if cr.features.count > 5 %}
+                <span class="cr-chip-more">+{{ cr.features.count|add:"-5" }} more</span>
+                {% endif %}
+                {% if cr.features.count == 0 %}
+                <span class="cr-chip-more" style="font-style:italic;">No features</span>
+                {% endif %}
+            </div>
+            <div class="cr-footer">
+                <i class="fas fa-users" style="font-size:.73rem;"></i>
+                {{ cr.assigned_users.count }} staff &bull; {{ cr.features.count }} features
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="cr-empty" id="noCRMsg">
+            <i class="fas fa-user-tag"></i>
+            <div style="font-weight:600;margin-bottom:6px;">No custom roles yet</div>
+            <div style="font-size:.83rem;">Create a custom role to give specific staff a unique set of permissions.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Assign Section -->
+    {% if staff %}
+    <div class="assign-card">
+        <div class="assign-card-head">
+            <h3><i class="fas fa-user-check me-2" style="color:var(--rp-blue);"></i>Assign Custom Roles to Staff</h3>
+        </div>
+        <div class="assign-card-body" style="padding:0;">
+            <table class="assign-table">
+                <thead>
+                    <tr>
+                        <th>Staff Member</th>
+                        <th>Built-in Role</th>
+                        <th>Active Custom Role</th>
+                        <th>Assign</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in staff %}
+                    <tr id="asr-{{ s.pk }}">
+                        <td>
+                            <div class="staff-name">{{ s.get_full_name|default:s.username }}</div>
+                            <div class="staff-uname">@{{ s.username }}</div>
+                        </td>
+                        <td><span class="built-chip">{{ s.role.get_name_display|default:"No role" }}</span></td>
+                        <td id="asr-label-{{ s.pk }}">
+                            {% if s.custom_role %}
+                            <span class="custom-chip">{{ s.custom_role.name }}</span>
+                            {% else %}
+                            <span style="color:var(--rp-muted);font-size:.81rem;">Using built-in</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <select class="assign-sel" onchange="rpAssign({{ s.pk }}, this.value, this)">
+                                <option value="">— Built-in —</option>
+                                {% for cr in custom_roles %}
+                                <option value="{{ cr.pk }}"{% if s.custom_role_id == cr.pk %} selected{% endif %}>{{ cr.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Custom Role Modal -->
+<div class="rp-modal-overlay" id="rpModalOverlay">
+    <div class="rp-modal">
+        <div class="rp-modal-head">
+            <div class="rp-modal-title" id="rpModalTitle"><i class="fas fa-user-tag me-2" style="color:var(--rp-blue);"></i>Create Custom Role</div>
+            <button class="btn-mclose" id="rpModalClose"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="rp-modal-body">
+            <input type="hidden" id="rpEditId">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:4px;">
+                <div>
+                    <label class="rp-form-label">Role Name <span style="color:var(--rp-danger);">*</span></label>
+                    <input type="text" class="rp-form-input" id="rpCrName" maxlength="100" placeholder="e.g. Senior Cashier">
+                </div>
+                <div>
+                    <label class="rp-form-label">Description <span style="color:var(--rp-muted);font-weight:400;">(optional)</span></label>
+                    <input type="text" class="rp-form-input" id="rpCrDesc" maxlength="255" placeholder="Brief description">
+                </div>
+            </div>
+            <div class="modal-sect">Select Permissions</div>
+            {% for category_name, cat_features in features_by_category.items %}
+            <div style="margin-bottom:16px;">
+                <div style="font-size:.71rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--rp-muted);margin-bottom:9px;display:flex;align-items:center;gap:5px;">
+                    {% if 'order' in category_name|lower %}<i class="fas fa-shopping-cart" style="color:#b45309;"></i>
+                    {% elif 'payment' in category_name|lower %}<i class="fas fa-credit-card" style="color:#065f46;"></i>
+                    {% elif 'station' in category_name|lower %}<i class="fas fa-tv" style="color:#5b21b6;"></i>
+                    {% elif 'menu' in category_name|lower %}<i class="fas fa-utensils" style="color:#991b1b;"></i>
+                    {% elif 'staff' in category_name|lower %}<i class="fas fa-users" style="color:#1e40af;"></i>
+                    {% elif 'report' in category_name|lower %}<i class="fas fa-chart-bar" style="color:#164e63;"></i>
+                    {% else %}<i class="fas fa-cogs" style="color:#475569;"></i>{% endif %}
+                    {{ category_name }}
+                </div>
+                <div class="modal-feat-grid">
+                    {% for feature in cat_features %}
+                    <label class="modal-feat-item">
+                        <input type="checkbox" class="cr-feat-cb" data-slug="{{ feature.slug }}">
+                        <div>
+                            <div class="modal-feat-name">{{ feature.name }}</div>
+                            <div class="modal-feat-desc">{{ feature.description }}</div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            <div class="rp-modal-error" id="rpCrError"></div>
+        </div>
+        <div class="rp-modal-foot">
+            <button class="btn-mcancel" id="rpModalCancel">Cancel</button>
+            <button class="btn-msave" id="rpSaveCr"><i class="fas fa-save"></i> Save Role</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+    const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+    function postJSON(url, data){
+        return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},body:JSON.stringify(data)}).then(r=>r.json());
+    }
+    function toast(msg, type){
+        var el=document.createElement('div');
+        el.className='rp-toast '+type;
+        el.innerHTML='<i class="fas '+(type==='success'?'fa-check-circle':'fa-exclamation-circle')+'"></i> '+msg;
+        document.body.appendChild(el);
+        setTimeout(function(){el.remove();},3500);
+    }
+
+    const roleSets = {{ role_sets_json|safe }};
+    const customRolesData = {{ custom_roles_json|safe }};
+    const customRolesMap = {};
+    customRolesData.forEach(function(cr){customRolesMap[cr.id]=cr;});
+
+    // Init sidebar counts
+    Object.keys(roleSets).forEach(function(role){
+        var el=document.getElementById('rpcnt-'+role);
+        if(el){var n=(roleSets[role]||[]).length;el.textContent=n+' feature'+(n!==1?'s':'')+' enabled';}
+    });
+
+    // Tab switching
+    document.querySelectorAll('.rp-tab-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+            document.querySelectorAll('.rp-tab-btn').forEach(function(b){b.classList.remove('active');});
+            document.querySelectorAll('.rp-tab-pane').forEach(function(p){p.classList.remove('active');});
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab).classList.add('active');
+        });
+    });
+
+    // Role panel
+    var panelsHTML = document.getElementById('rpFeaturePanels').innerHTML;
+    var localChanges = {};
+    var currentRole = null;
+
+    window.rpSelectRole = function(roleName, roleDisplay){
+        currentRole = roleName;
+        document.querySelectorAll('.rp-role-btn').forEach(function(b){b.classList.remove('active');});
+        var btn=document.querySelector('.rp-role-btn[data-role="'+roleName+'"]');
+        if(btn) btn.classList.add('active');
+        document.getElementById('rpPanelTitle').textContent = roleDisplay;
+        document.getElementById('rpSaveBtn').disabled = false;
+
+        var body = document.getElementById('rpPanelBody');
+        body.innerHTML = panelsHTML;
+
+        var slugs = localChanges[roleName] ? localChanges[roleName] : new Set(roleSets[roleName]||[]);
+        body.querySelectorAll('.feature-toggle').forEach(function(cb){cb.checked=slugs.has(cb.dataset.slug);});
+        updateCount(); updateUnsaved();
+    };
+
+    window.rpOnChange = function(){
+        if(!currentRole) return;
+        var slugs=new Set();
+        document.querySelectorAll('#rpPanelBody .feature-toggle:checked').forEach(function(cb){slugs.add(cb.dataset.slug);});
+        localChanges[currentRole]=slugs;
+        updateCount(); updateUnsaved();
+        var dot=document.getElementById('rpdot-'+currentRole);
+        if(dot) dot.style.display='block';
+    };
+
+    function updateCount(){
+        var n=document.querySelectorAll('#rpPanelBody .feature-toggle:checked').length;
+        document.getElementById('rpPanelCount').textContent=n+' feature'+(n!==1?'s':'')+' enabled';
+        var cnt=document.getElementById('rpcnt-'+currentRole);
+        if(cnt) cnt.textContent=n+' feature'+(n!==1?'s':'')+' enabled';
+    }
+    function updateUnsaved(){
+        var badge=document.getElementById('rpUnsaved');
+        if(badge) badge.style.display=localChanges[currentRole]?'inline-block':'none';
+    }
+
+    document.getElementById('rpSaveBtn').addEventListener('click',function(){
+        if(!currentRole) return;
+        var btn=this;
+        var slugs=Array.from(document.querySelectorAll('#rpPanelBody .feature-toggle:checked')).map(function(cb){return cb.dataset.slug;});
+        btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Saving…';
+        postJSON('{% url "admin_panel:save_role_permissions" %}',{role_name:currentRole,feature_slugs:slugs})
+            .then(function(res){
+                btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Save Changes';
+                if(res.success){
+                    roleSets[currentRole]=slugs; delete localChanges[currentRole];
+                    var dot=document.getElementById('rpdot-'+currentRole);
+                    if(dot) dot.style.display='none';
+                    updateUnsaved(); toast('Permissions saved.','success');
+                } else { toast(res.error||'Error saving.','danger'); }
+            }).catch(function(){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Save Changes';toast('Network error.','danger');});
+    });
+
+    // Auto-select first role
+    var first=document.querySelector('.rp-role-btn');
+    if(first) rpSelectRole(first.dataset.role, first.querySelector('.rp-role-name').textContent);
+
+    // Modal
+    var overlay=document.getElementById('rpModalOverlay');
+    function openModal(){overlay.classList.add('open');}
+    function closeModal(){overlay.classList.remove('open');}
+    document.getElementById('rpModalClose').addEventListener('click',closeModal);
+    document.getElementById('rpModalCancel').addEventListener('click',closeModal);
+    overlay.addEventListener('click',function(e){if(e.target===overlay)closeModal();});
+
+    function clearModal(){
+        document.getElementById('rpEditId').value='';
+        document.getElementById('rpCrName').value='';
+        document.getElementById('rpCrDesc').value='';
+        document.getElementById('rpCrError').style.display='none';
+        document.querySelectorAll('.cr-feat-cb').forEach(function(cb){cb.checked=false;});
+    }
+
+    document.getElementById('rpOpenCreate').addEventListener('click',function(){
+        clearModal();
+        document.getElementById('rpModalTitle').innerHTML='<i class="fas fa-plus me-2" style="color:var(--rp-blue);"></i>Create Custom Role';
+        openModal();
+    });
+
+    document.querySelectorAll('.edit-custom-role').forEach(function(btn){
+        btn.addEventListener('click',function(){
+            clearModal();
+            var id=parseInt(this.dataset.id);
+            document.getElementById('rpEditId').value=id;
+            document.getElementById('rpCrName').value=this.dataset.name||'';
+            document.getElementById('rpCrDesc').value=this.dataset.description||'';
+            document.getElementById('rpModalTitle').innerHTML='<i class="fas fa-pen me-2" style="color:var(--rp-blue);"></i>Edit Custom Role';
+            var cr=customRolesMap[id];
+            if(cr&&cr.feature_slugs) cr.feature_slugs.forEach(function(s){
+                var cb=document.querySelector('.cr-feat-cb[data-slug="'+s+'"]');
+                if(cb) cb.checked=true;
+            });
+            openModal();
+        });
+    });
+
+    document.getElementById('rpSaveCr').addEventListener('click',function(){
+        var errEl=document.getElementById('rpCrError');
+        errEl.style.display='none';
+        var name=document.getElementById('rpCrName').value.trim();
+        if(!name){errEl.textContent='Role name is required.';errEl.style.display='block';return;}
+        var desc=document.getElementById('rpCrDesc').value.trim();
+        var roleId=document.getElementById('rpEditId').value;
+        var slugs=Array.from(document.querySelectorAll('.cr-feat-cb:checked')).map(function(cb){return cb.dataset.slug;});
+        var btn=this; btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Saving…';
+        postJSON('{% url "admin_panel:create_custom_role" %}',{name:name,description:desc,feature_slugs:slugs,role_id:roleId?parseInt(roleId):null})
+            .then(function(res){
+                btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Save Role';
+                if(res.success){closeModal();toast('Custom role saved.','success');setTimeout(function(){location.reload();},700);}
+                else{errEl.textContent=res.error||'Error.';errEl.style.display='block';}
+            }).catch(function(){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Save Role';toast('Network error.','danger');});
+    });
+
+    document.querySelectorAll('.delete-custom-role').forEach(function(btn){
+        btn.addEventListener('click',function(){
+            var name=this.dataset.name, id=parseInt(this.dataset.id);
+            if(!confirm('Delete custom role "'+name+'"? Staff assigned to it will revert to built-in role defaults.')) return;
+            postJSON('{% url "admin_panel:delete_custom_role" %}',{role_id:id}).then(function(res){
+                if(res.success){var el=document.getElementById('cr-row-'+id);if(el)el.remove();toast('Role deleted.','success');}
+                else toast(res.error||'Error.','danger');
+            });
+        });
+    });
+
+    window.rpAssign=function(userId,roleId,sel){
+        postJSON('{% url "admin_panel:assign_custom_role" %}',{user_id:userId,custom_role_id:roleId?parseInt(roleId):null})
+            .then(function(res){
+                if(res.success){
+                    var label=document.getElementById('asr-label-'+userId);
+                    if(label){
+                        if(roleId){var cr=customRolesMap[parseInt(roleId)];label.innerHTML='<span class="custom-chip">'+(cr?cr.name:'Custom Role')+'</span>';}
+                        else label.innerHTML='<span style="color:var(--rp-muted);font-size:.81rem;">Using built-in</span>';
+                    }
+                    toast('Assignment updated.','success');
+                } else toast(res.error||'Error.','danger');
+            });
+    };
+})();
+</script>
+{% endblock %}

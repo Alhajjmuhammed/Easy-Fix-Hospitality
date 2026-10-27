@@ -261,7 +261,7 @@ class Product(models.Model):
     main_category = models.ForeignKey(MainCategory, on_delete=models.PROTECT, related_name='products')
     sub_category = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, related_name='products', null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
-    available_in_stock = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    available_in_stock = models.IntegerField(default=0)
     is_available = models.BooleanField(default=True)
     preparation_time = models.IntegerField(help_text="Time in minutes", default=15)
     station = models.CharField(max_length=20, choices=[('kitchen', 'Kitchen'), ('bar', 'Bar'), ('buffet', 'Buffet'), ('service', 'Service')], default='kitchen', help_text="Assign to kitchen, bar, buffet, or service station")
@@ -287,7 +287,7 @@ class Product(models.Model):
             return self.name
     
     def is_in_stock(self):
-        return self.available_in_stock > 0 and self.is_available
+        return self.is_available
     
     def get_image(self):
         """Get the category image for this product"""

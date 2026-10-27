@@ -407,11 +407,16 @@
                                                     data-restaurant-id="{{ restaurant.id }}" title="View Details">
                                                 <i class="fas fa-eye me-1"></i>View
                                             </button>
-                                            <button class="btn btn-sm btn-outline-warning edit-restaurant" 
+                                            <button class="btn btn-sm btn-outline-warning edit-restaurant"
                                                     data-restaurant-id="{{ restaurant.id }}" title="Edit Restaurant">
                                                 <i class="fas fa-edit me-1"></i>Edit
                                             </button>
-                                            
+                                            <a class="btn btn-sm btn-outline-info"
+                                               href="{% url 'system_admin:restaurant_permissions' restaurant.main_owner.id %}"
+                                               title="Manage Permissions">
+                                                <i class="fas fa-shield-alt me-1"></i>Permissions
+                                            </a>
+
                                             {% if not restaurant.parent_restaurant %}
                                                 <!-- Subscription Management Buttons - Only for Main Restaurants -->
                                                 {% if restaurant.subscription %}

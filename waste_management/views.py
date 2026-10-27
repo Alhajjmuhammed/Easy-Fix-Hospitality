@@ -111,6 +111,9 @@ def waste_dashboard(request):
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Only owners and administrators can access waste management dashboard.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_waste'):
+        messages.error(request, "You don't have permission to access waste management.")
+        return redirect('restaurant:home')
     
     # Run automatic waste detection
     auto_detected = detect_automatic_waste()
@@ -129,7 +132,7 @@ def waste_dashboard(request):
     search_query = request.GET.get('search', '').strip()
     
     # Get restaurant context
-    session_restaurant_id = request.session.get('selected_restaurant')
+    session_restaurant_id = request.session.get('selected_restaurant_id')
     restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
     
     # Determine which restaurant to filter by
@@ -346,15 +349,21 @@ def waste_dashboard(request):
     if category_id != 'all':
         subcategories = subcategories.filter(main_category_id=category_id)
     
-    # Waste reason choices
+    # Waste reason choices — must match FoodWasteLog.WASTE_REASON_CHOICES exactly
     waste_reason_choices = [
-        ('overcooked', 'Overcooked'),
-        ('expired', 'Expired'),
-        ('customer_left', 'Customer Left'),
-        ('preparation_error', 'Preparation Error'),
-        ('contaminated', 'Contaminated'),
-        ('spoiled', 'Spoiled'),
-        ('other', 'Other'),
+        ('customer_refused', 'Customer Refused'),
+        ('customer_left', 'Customer Left Before Pickup'),
+        ('wrong_order', 'Wrong Order Made'),
+        ('quality_issue', 'Quality Issue'),
+        ('kitchen_error', 'Kitchen Error'),
+        ('overcooking', 'Overcooking'),
+        ('undercooking', 'Undercooking'),
+        ('contamination', 'Food Contamination'),
+        ('equipment_failure', 'Equipment Failure'),
+        ('ingredient_expired', 'Expired Ingredients'),
+        ('staff_error', 'Staff Error'),
+        ('customer_complaint', 'Customer Complaint'),
+        ('other', 'Other Reason'),
     ]
     
     context = {
@@ -393,6 +402,9 @@ def export_waste_csv(request):
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('export_reports'):
+        messages.error(request, "You don't have permission to export reports.")
+        return redirect('restaurant:home')
     
     # Get same filters as dashboard
     period = request.GET.get('period', 'today')
@@ -404,7 +416,7 @@ def export_waste_csv(request):
     restaurant_filter = request.GET.get('restaurant_filter', '').strip()
     
     # Get restaurant context
-    session_restaurant_id = request.session.get('selected_restaurant')
+    session_restaurant_id = request.session.get('selected_restaurant_id')
     restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
     
     # Determine target restaurant
@@ -624,6 +636,9 @@ def export_waste_pdf(request):
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('export_reports'):
+        messages.error(request, "You don't have permission to export reports.")
+        return redirect('restaurant:home')
     
     # Get same filters as dashboard
     period = request.GET.get('period', 'today')
@@ -635,7 +650,7 @@ def export_waste_pdf(request):
     restaurant_filter = request.GET.get('restaurant_filter', '').strip()
     
     # Get restaurant context
-    session_restaurant_id = request.session.get('selected_restaurant')
+    session_restaurant_id = request.session.get('selected_restaurant_id')
     restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
     
     # Determine target restaurant
@@ -928,6 +943,8 @@ def record_food_waste(request):
     """Record a food waste incident"""
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager() or request.user.is_cashier()):
         return JsonResponse({'error': 'Access denied. Only owners, administrators, and cashiers can record waste.'}, status=403)
+    if not request.user.has_feature('manage_waste'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         data = json.loads(request.body)
@@ -998,6 +1015,8 @@ def edit_waste_log(request, log_id):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('manage_waste'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     owner_filter = get_owner_filter(request.user)
     if owner_filter:
@@ -1071,6 +1090,8 @@ def delete_waste_log(request, log_id):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('manage_waste'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     owner_filter = get_owner_filter(request.user)
     if owner_filter:
@@ -1105,6 +1126,9 @@ def waste_reports(request):
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('view_reports'):
+        messages.error(request, "You don't have permission to view reports.")
+        return redirect('waste_management:dashboard')
     
     # Get filters
     period_type = request.GET.get('period', 'daily')
@@ -1115,7 +1139,7 @@ def waste_reports(request):
     restaurant_filter = request.GET.get('restaurant_filter', '').strip()
     
     # Get restaurant context
-    session_restaurant_id = request.session.get('selected_restaurant')
+    session_restaurant_id = request.session.get('selected_restaurant_id')
     restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
     
     # Determine target restaurant
@@ -1390,6 +1414,8 @@ def export_waste_report(request):
     """Export waste report in various formats"""
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('export_reports'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     export_format = request.GET.get('format', 'csv')
     period_type = request.GET.get('period', 'daily')
@@ -1412,7 +1438,7 @@ def export_waste_report(request):
             date_to = None
     
     # Get restaurant context
-    session_restaurant_id = request.session.get('selected_restaurant')
+    session_restaurant_id = request.session.get('selected_restaurant_id')
     restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
     
     # Determine target restaurant
@@ -1772,6 +1798,9 @@ def cost_settings(request):
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_waste'):
+        messages.error(request, "You don't have permission to manage waste settings.")
+        return redirect('waste_management:dashboard')
     
     owner_filter = get_owner_filter(request.user)
     
@@ -1823,6 +1852,8 @@ def update_cost_settings(request):
     """Update product cost settings"""
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('manage_waste'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         data = json.loads(request.body)
@@ -1866,7 +1897,10 @@ def cashier_record_waste(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. This page is for cashiers only.")
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_waste'):
+        messages.error(request, "You don't have permission to record waste.")
+        return redirect('restaurant:home')
+
     owner_filter = get_owner_filter(request.user)
     
     # Get products for the dropdown - filter by main_category owner

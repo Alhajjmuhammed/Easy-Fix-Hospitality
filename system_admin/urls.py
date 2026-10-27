@@ -1,12 +1,14 @@
 from django.urls import path
 from . import views
+from . import views_permissions
+from . import views_staff
 
 app_name = 'system_admin'
 
 urlpatterns = [
     # Overview
     path('', views.system_dashboard, name='dashboard'),
-    path('statistics/', views.system_statistics, name='statistics'),
+    path('statistics/', views.statistics, name='statistics'),
     
     # Management
     path('users/', views.manage_all_users, name='manage_users'),
@@ -76,6 +78,21 @@ urlpatterns = [
 
     # Mobile App Release
     path('app/upload/', views.upload_app_release, name='upload_app_release'),
+
+    # Restaurant Permissions Management (System Admin)
+    path('restaurant-permissions/<int:restaurant_id>/', views_permissions.restaurant_permissions, name='restaurant_permissions'),
+    path('restaurant-permissions/<int:restaurant_id>/save-role/', views_permissions.admin_save_role_permissions, name='admin_save_role_permissions'),
+    path('restaurant-permissions/<int:restaurant_id>/create-custom-role/', views_permissions.admin_create_custom_role, name='admin_create_custom_role'),
+    path('restaurant-permissions/<int:restaurant_id>/delete-custom-role/', views_permissions.admin_delete_custom_role, name='admin_delete_custom_role'),
+    path('restaurant-permissions/<int:restaurant_id>/assign-custom-role/', views_permissions.admin_assign_custom_role, name='admin_assign_custom_role'),
+    path('restaurant-permissions/<int:restaurant_id>/reset-defaults/', views_permissions.admin_reset_to_defaults, name='admin_reset_to_defaults'),
+
+    # Admin Staff Management
+    path('admin-staff/', views_staff.admin_staff_list, name='admin_staff_list'),
+    path('admin-staff/create/', views_staff.create_admin_staff, name='create_admin_staff'),
+    path('admin-staff/<int:staff_id>/edit/', views_staff.edit_admin_staff, name='edit_admin_staff'),
+    path('admin-staff/<int:staff_id>/delete/', views_staff.delete_admin_staff, name='delete_admin_staff'),
+    path('admin-staff/<int:staff_id>/permissions/', views_staff.save_staff_permissions, name='save_staff_permissions'),
 
     # Orders Management
     path('order-details/<int:order_id>/', views.order_details, name='order_details'),

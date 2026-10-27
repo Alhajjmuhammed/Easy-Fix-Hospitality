@@ -31,13 +31,15 @@ from io import BytesIO
 @login_required
 def dashboard(request):
     """Advanced sales reports dashboard with kitchen/bar filtering"""
-    
-    if not (request.user.is_administrator() or request.user.is_owner() or 
-            request.user.is_main_owner() or request.user.is_branch_owner() or 
-            request.user.is_customer_care()):
-        from django.shortcuts import redirect
-        from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.contrib import messages
+    if not (request.user.is_administrator() or request.user.is_owner() or
+            request.user.is_main_owner() or request.user.is_branch_owner() or
+            request.user.is_manager() or request.user.is_customer_care()):
         messages.error(request, "Access denied. Owner or Customer Care role required.")
+        return redirect('restaurant:home')
+    if not request.user.has_feature('view_reports'):
+        messages.error(request, "You don't have permission to view reports.")
         return redirect('restaurant:home')
     
     # Import restaurant context utilities
@@ -606,8 +608,11 @@ def export_csv(request):
     from django.contrib import messages as _messages
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or
-            request.user.is_customer_care()):
+            request.user.is_manager() or request.user.is_customer_care()):
         _messages.error(request, "Access denied. Owner or Customer Care role required.")
+        return redirect('restaurant:home')
+    if not request.user.has_feature('export_reports'):
+        _messages.error(request, "You don't have permission to export reports.")
         return redirect('restaurant:home')
     
     # Import restaurant context utilities
@@ -1187,8 +1192,11 @@ def export_pdf(request):
     from django.contrib import messages as _messages
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or
-            request.user.is_customer_care()):
+            request.user.is_manager() or request.user.is_customer_care()):
         _messages.error(request, "Access denied. Owner or Customer Care role required.")
+        return redirect('restaurant:home')
+    if not request.user.has_feature('export_reports'):
+        _messages.error(request, "You don't have permission to export reports.")
         return redirect('restaurant:home')
     
     # Import restaurant context utilities
@@ -1868,6 +1876,9 @@ def money_flow(request):
             request.user.is_main_owner() or request.user.is_branch_owner() or
             request.user.is_manager() or request.user.is_customer_care()):
         _messages.error(request, "Access denied. Owner or Manager role required.")
+        return redirect('restaurant:home')
+    if not request.user.has_feature('view_reports'):
+        _messages.error(request, "You don't have permission to view reports.")
         return redirect('restaurant:home')
     from inventory.models import InventoryRecord
     from restaurant.models import Event

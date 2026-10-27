@@ -552,6 +552,7 @@
             <h4>EasyFix</h4>
         </div>
         
+        {% with sv=request.user.admin_visible_sections %}
         <ul class="sidebar-menu">
             <!-- Overview Section -->
             <li class="menu-section">Overview</li>
@@ -561,56 +562,75 @@
                     <span>Dashboard</span>
                 </a>
             </li>
-            
+
             <!-- Management Section -->
+            {% if request.user.is_administrator or 'users' in sv or 'categories' in sv or 'products' in sv or 'tables' in sv %}
             <li class="menu-section">Management</li>
+            {% endif %}
+            {% if request.user.is_administrator or 'users' in sv %}
             <li>
                 <a href="{% url 'system_admin:manage_users' %}" class="{% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">
                     <i class="fas fa-users"></i>
                     <span>User Management</span>
                 </a>
             </li>
+            {% endif %}
+            {% if request.user.is_administrator or 'categories' in sv %}
             <li>
                 <a href="{% url 'system_admin:manage_categories' %}" class="{% if request.resolver_match.url_name == 'manage_categories' %}active{% endif %}">
                     <i class="fas fa-tags"></i>
                     <span>Categories</span>
                 </a>
             </li>
+            {% endif %}
+            {% if request.user.is_administrator or 'products' in sv %}
             <li>
                 <a href="{% url 'system_admin:manage_products' %}" class="{% if request.resolver_match.url_name == 'manage_products' %}active{% endif %}">
                     <i class="fas fa-box"></i>
                     <span>Products</span>
                 </a>
             </li>
+            {% endif %}
+            {% if request.user.is_administrator or 'tables' in sv %}
             <li>
                 <a href="{% url 'system_admin:manage_tables' %}" class="{% if request.resolver_match.url_name == 'manage_tables' %}active{% endif %}">
                     <i class="fas fa-chair"></i>
                     <span>Tables</span>
                 </a>
             </li>
-            
+            {% endif %}
+
             <!-- Operations Section -->
+            {% if request.user.is_administrator or 'orders' in sv or 'restaurants' in sv or 'riders' in sv %}
             <li class="menu-section">Operations</li>
+            {% endif %}
+            {% if request.user.is_administrator or 'orders' in sv %}
             <li>
                 <a href="{% url 'system_admin:manage_orders' %}" class="{% if request.resolver_match.url_name == 'manage_orders' %}active{% endif %}">
                     <i class="fas fa-clipboard-list"></i>
                     <span>Orders</span>
                 </a>
             </li>
+            {% endif %}
+            {% if request.user.is_administrator or 'restaurants' in sv %}
             <li>
                 <a href="{% url 'system_admin:manage_restaurants' %}" class="{% if request.resolver_match.url_name == 'manage_restaurants' %}active{% endif %}">
                     <i class="fas fa-store"></i>
                     <span>Restaurants</span>
                 </a>
             </li>
+            {% endif %}
+            {% if request.user.is_administrator or 'riders' in sv %}
             <li>
                 <a href="{% url 'system_admin:manage_riders' %}" class="{% if request.resolver_match.url_name == 'manage_riders' %}active{% endif %}">
                     <i class="fas fa-motorcycle"></i>
                     <span>Delivery Riders</span>
                 </a>
             </li>
+            {% endif %}
 
             <!-- System Section -->
+            {% if request.user.is_administrator or 'statistics' in sv %}
             <li class="menu-section">System</li>
             <li>
                 <a href="{% url 'system_admin:statistics' %}" class="{% if request.resolver_match.url_name == 'statistics' %}active{% endif %}">
@@ -618,9 +638,19 @@
                     <span>Statistics</span>
                 </a>
             </li>
-            
+            {% endif %}
+            {% if request.user.is_administrator %}
+            <li>
+                <a href="{% url 'system_admin:admin_staff_list' %}" class="{% if 'admin_staff' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Admin Staff</span>
+                </a>
+            </li>
+            {% endif %}
+
             <!-- User Section -->
             <li class="menu-section">Account</li>
+            {% endwith %}
             <li>
                 <a href="#" onclick="showMessage('Profile management coming soon')">
                     <i class="fas fa-user"></i>

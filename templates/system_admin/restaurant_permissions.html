@@ -1,0 +1,944 @@
+{% extends 'system_admin/base.html' %}
+{% block title %}Permissions — {{ owner.restaurant_name|default:owner.username }}{% endblock %}
+
+{% block content %}
+<style>
+:root {
+    --perm-blue: #1d4ed8;
+    --perm-blue-light: #eff6ff;
+    --perm-blue-mid: #dbeafe;
+    --perm-sidebar-bg: #f8fafc;
+    --perm-border: #e2e8f0;
+    --perm-text: #0f172a;
+    --perm-muted: #64748b;
+    --perm-success: #16a34a;
+    --perm-danger: #dc2626;
+    --perm-card-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --perm-card-shadow-hover: 0 4px 12px rgba(0,0,0,.1);
+}
+
+.perm-page { max-width: 1400px; margin: 0 auto; padding: 0 4px; }
+
+/* Header */
+.perm-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px; margin-bottom: 28px; padding-top: 8px;
+}
+.perm-restaurant-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: .75rem; font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--perm-blue); background: var(--perm-blue-light);
+    border: 1px solid var(--perm-blue-mid);
+    padding: 3px 10px; border-radius: 20px; margin-bottom: 8px;
+}
+.perm-header h1 { font-size: 1.45rem; font-weight: 700; color: var(--perm-text); margin: 0 0 4px; }
+.perm-header p { color: var(--perm-muted); font-size: .875rem; margin: 0; }
+.perm-header-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn-perm-reset {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 8px; font-size: .84rem; font-weight: 500; cursor: pointer;
+    border: 1.5px solid #f97316; color: #ea580c; background: #fff7ed;
+    transition: all .15s;
+}
+.btn-perm-reset:hover { background: #ffedd5; }
+.btn-perm-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 8px; font-size: .84rem; font-weight: 500;
+    border: 1.5px solid var(--perm-border); color: var(--perm-muted); background: #fff;
+    text-decoration: none; transition: all .15s;
+}
+.btn-perm-back:hover { background: #f8fafc; color: var(--perm-text); }
+
+/* Tabs */
+.perm-tabs-bar {
+    display: flex; gap: 0; border-bottom: 2px solid var(--perm-border); margin-bottom: 24px;
+}
+.perm-tab-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 20px; font-size: .875rem; font-weight: 500; cursor: pointer;
+    background: none; border: none; color: var(--perm-muted);
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: color .15s, border-color .15s;
+}
+.perm-tab-btn.active { color: var(--perm-blue); border-bottom-color: var(--perm-blue); }
+.perm-tab-btn:hover:not(.active) { color: var(--perm-text); }
+.perm-tab-btn .tab-badge {
+    font-size: .7rem; font-weight: 600; padding: 1px 7px; border-radius: 12px;
+    background: var(--perm-blue-mid); color: var(--perm-blue);
+}
+.perm-tab-pane { display: none; }
+.perm-tab-pane.active { display: block; }
+
+/* Role layout */
+.perm-roles-layout {
+    display: grid; grid-template-columns: 240px 1fr; gap: 20px; align-items: start;
+}
+@media (max-width: 768px) { .perm-roles-layout { grid-template-columns: 1fr; } }
+
+/* Sidebar */
+.roles-sidebar {
+    background: var(--perm-sidebar-bg); border: 1px solid var(--perm-border);
+    border-radius: 0 !important; overflow: hidden; position: sticky; top: 72px;
+}
+.roles-sidebar-title {
+    padding: 14px 16px 12px; font-size: .7rem; font-weight: 700;
+    letter-spacing: .7px; text-transform: uppercase; color: var(--perm-muted);
+    border-bottom: 1px solid var(--perm-border); background: #fff;
+}
+.role-item {
+    display: flex; align-items: center; gap: 11px; width: 100%;
+    padding: 11px 14px; background: none; border: none;
+    border-bottom: 1px solid var(--perm-border); cursor: pointer;
+    text-align: left; transition: background .12s; position: relative;
+}
+.role-item:last-child { border-bottom: none; }
+.role-item:hover { background: #f1f5f9; }
+.role-item.active { background: var(--perm-blue-light); }
+.role-item.active::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--perm-blue); border-radius: 0 2px 2px 0;
+}
+.role-icon {
+    width: 34px; height: 34px; border-radius: 9px; display: flex;
+    align-items: center; justify-content: center; font-size: .9rem; flex-shrink: 0;
+}
+.role-item.active .role-icon { background: var(--perm-blue) !important; color: #fff !important; }
+.role-item-info { flex: 1; min-width: 0; }
+.role-item-name { font-size: .84rem; font-weight: 600; color: var(--perm-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.role-item.active .role-item-name { color: var(--perm-blue); }
+.role-item-count { font-size: .72rem; color: var(--perm-muted); margin-top: 1px; }
+.role-unsaved-dot {
+    width: 7px; height: 7px; background: #f59e0b; border-radius: 50%; flex-shrink: 0; display: none;
+}
+
+/* Role icons per role */
+.ri-manager     { background: #eff6ff; color: #1d4ed8; }
+.ri-customer_care { background: #f0fdf4; color: #16a34a; }
+.ri-kitchen     { background: #fff7ed; color: #ea580c; }
+.ri-bar         { background: #faf5ff; color: #7c3aed; }
+.ri-buffet      { background: #fef2f2; color: #dc2626; }
+.ri-service     { background: #f0f9ff; color: #0284c7; }
+.ri-cashier     { background: #fefce8; color: #ca8a04; }
+.ri-delivery_rider { background: #f0fdf4; color: #059669; }
+
+/* Right panel */
+.roles-content-panel {
+    background: #fff; border: 1px solid var(--perm-border);
+    border-radius: 0 !important; overflow: hidden;
+}
+.roles-content-header {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    padding: 18px 22px; border-bottom: 1px solid var(--perm-border);
+    background: #2c3e50; border-radius: 0 !important;
+}
+.roles-content-title {
+    display: flex; align-items: center; gap: 10px; color: #fff;
+}
+.roles-content-title i { font-size: 1.1rem; opacity: .8; }
+.roles-content-title span { font-size: 1.05rem; font-weight: 600; }
+.roles-content-title small { font-size: .78rem; color: rgba(255,255,255,.65); margin-left: 6px; }
+.roles-content-actions { display: flex; align-items: center; gap: 10px; }
+.unsaved-badge {
+    font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 12px;
+    background: rgba(251,191,36,.2); border: 1px solid rgba(251,191,36,.4);
+    color: #fbbf24; display: none;
+}
+.btn-save-role {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 18px; border-radius: 8px; font-size: .84rem; font-weight: 600; cursor: pointer;
+    border: none; background: #fff; color: var(--perm-blue);
+    transition: all .15s;
+}
+.btn-save-role:hover { background: var(--perm-blue-light); }
+.btn-save-role:disabled { opacity: .6; cursor: not-allowed; }
+.roles-content-body { padding: 22px; }
+
+/* Empty state */
+.roles-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 300px; color: var(--perm-muted); text-align: center; padding: 40px;
+}
+.roles-empty i { font-size: 2.5rem; opacity: .25; margin-bottom: 14px; }
+.roles-empty p { font-size: .9rem; }
+
+/* Feature categories */
+.feat-category { margin-bottom: 24px; }
+.feat-category-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: .72rem; font-weight: 700; letter-spacing: .7px; text-transform: uppercase;
+    padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1.5px solid var(--perm-border);
+}
+.feat-cat-icon {
+    width: 22px; height: 22px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center; font-size: .65rem;
+}
+.feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.feat-item {
+    border: 1.5px solid var(--perm-border); border-radius: 8px;
+    transition: border-color .12s, background .12s; overflow: hidden;
+}
+.feat-item:has(.feature-toggle:checked) {
+    border-color: #93c5fd; background: var(--perm-blue-light);
+}
+.feat-label {
+    display: flex; align-items: flex-start; gap: 10px; padding: 12px 13px; cursor: pointer; width: 100%;
+}
+.feat-checkbox {
+    width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; margin-top: 2px;
+    accent-color: var(--perm-blue); cursor: pointer;
+}
+.feat-text-wrap { flex: 1; min-width: 0; }
+.feat-name { font-size: .84rem; font-weight: 600; color: var(--perm-text); }
+.feat-desc { font-size: .74rem; color: var(--perm-muted); margin-top: 2px; line-height: 1.4; }
+
+/* Category colors */
+.cat-orders     { background: #fef3c7; color: #b45309; }
+.cat-payments   { background: #d1fae5; color: #065f46; }
+.cat-station    { background: #ede9fe; color: #5b21b6; }
+.cat-menu       { background: #fee2e2; color: #991b1b; }
+.cat-staff      { background: #dbeafe; color: #1e40af; }
+.cat-reports    { background: #cffafe; color: #164e63; }
+.cat-operations { background: #f1f5f9; color: #475569; }
+
+/* Custom roles */
+.custom-roles-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.custom-roles-header h2 { font-size: 1rem; font-weight: 700; color: var(--perm-text); margin: 0; }
+.btn-create-role {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: 8px; font-size: .84rem; font-weight: 600; cursor: pointer;
+    border: none; background: var(--perm-blue); color: #fff; transition: background .15s;
+}
+.btn-create-role:hover { background: #1e40af; }
+.cr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.cr-card {
+    background: #fff; border: 1.5px solid var(--perm-border); border-radius: 0;
+    padding: 18px 18px 14px; box-shadow: var(--perm-card-shadow);
+    transition: box-shadow .15s, border-color .15s;
+}
+.cr-card:hover { box-shadow: var(--perm-card-shadow-hover); border-color: #c7d2fe; }
+.cr-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.cr-name { font-size: .95rem; font-weight: 700; color: var(--perm-text); }
+.cr-desc { font-size: .78rem; color: var(--perm-muted); margin-top: 3px; }
+.cr-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-cr-edit, .btn-cr-delete {
+    width: 30px; height: 30px; border-radius: 7px; border: 1.5px solid var(--perm-border);
+    background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: .8rem; transition: all .12s;
+}
+.btn-cr-edit:hover { background: var(--perm-blue-light); border-color: #93c5fd; color: var(--perm-blue); }
+.btn-cr-delete:hover { background: #fef2f2; border-color: #fca5a5; color: var(--perm-danger); }
+.cr-features { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; min-height: 28px; }
+.cr-feat-chip {
+    font-size: .72rem; font-weight: 500; padding: 3px 9px; border-radius: 12px;
+    background: var(--perm-blue-light); color: var(--perm-blue); border: 1px solid var(--perm-blue-mid);
+}
+.cr-feat-more { font-size: .72rem; color: var(--perm-muted); padding: 3px 6px; }
+.cr-card-footer {
+    display: flex; align-items: center; gap: 6px; padding-top: 10px;
+    border-top: 1px solid var(--perm-border); font-size: .76rem; color: var(--perm-muted);
+}
+.cr-no-roles {
+    grid-column: 1/-1; padding: 60px 20px; text-align: center; color: var(--perm-muted);
+}
+.cr-no-roles i { font-size: 2.5rem; opacity: .2; display: block; margin-bottom: 14px; }
+
+/* Assign tab */
+.assign-table-wrap { background: #fff; border: 1px solid var(--perm-border); border-radius: 0; overflow: hidden; }
+.assign-table { width: 100%; border-collapse: collapse; }
+.assign-table thead th {
+    padding: 13px 18px; font-size: .75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--perm-muted); background: var(--perm-sidebar-bg);
+    border-bottom: 1px solid var(--perm-border); text-align: left;
+}
+.assign-table tbody tr { border-bottom: 1px solid var(--perm-border); transition: background .1s; }
+.assign-table tbody tr:last-child { border-bottom: none; }
+.assign-table tbody tr:hover { background: #fafafa; }
+.assign-table td { padding: 13px 18px; vertical-align: middle; }
+.staff-name { font-size: .88rem; font-weight: 600; color: var(--perm-text); }
+.staff-username { font-size: .76rem; color: var(--perm-muted); }
+.role-chip {
+    display: inline-block; font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 12px;
+    background: #f1f5f9; color: var(--perm-muted); border: 1px solid var(--perm-border);
+}
+.custom-role-chip {
+    display: inline-block; font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 12px;
+    background: var(--perm-blue-light); color: var(--perm-blue); border: 1px solid var(--perm-blue-mid);
+}
+.assign-select {
+    padding: 6px 10px; border-radius: 7px; border: 1.5px solid var(--perm-border);
+    font-size: .82rem; color: var(--perm-text); background: #fff; cursor: pointer;
+    min-width: 170px; transition: border-color .15s; outline: none;
+}
+.assign-select:focus { border-color: var(--perm-blue); }
+
+/* Modal */
+.perm-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    z-index: 1060; align-items: center; justify-content: center; padding: 20px;
+}
+.perm-modal-overlay.open { display: flex; }
+.perm-modal {
+    background: #fff; border-radius: 4px; width: 100%; max-width: 760px;
+    max-height: 90vh; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.perm-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; border-bottom: 1px solid var(--perm-border); flex-shrink: 0;
+}
+.perm-modal-title { font-size: 1.05rem; font-weight: 700; color: var(--perm-text); }
+.btn-modal-close {
+    width: 32px; height: 32px; border-radius: 7px; border: 1.5px solid var(--perm-border);
+    background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: .9rem; color: var(--perm-muted); transition: all .12s;
+}
+.btn-modal-close:hover { background: #fef2f2; border-color: #fca5a5; color: var(--perm-danger); }
+.perm-modal-body { padding: 22px 24px; overflow-y: auto; flex: 1; }
+.perm-modal-footer {
+    padding: 16px 24px; border-top: 1px solid var(--perm-border);
+    display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;
+}
+.btn-modal-cancel {
+    padding: 9px 18px; border-radius: 8px; border: 1.5px solid var(--perm-border);
+    background: #fff; color: var(--perm-muted); font-size: .84rem; font-weight: 500; cursor: pointer;
+    transition: all .12s;
+}
+.btn-modal-cancel:hover { background: #f8fafc; color: var(--perm-text); }
+.btn-modal-save {
+    padding: 9px 20px; border-radius: 8px; border: none;
+    background: var(--perm-blue); color: #fff; font-size: .84rem; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; transition: background .15s;
+}
+.btn-modal-save:hover { background: #1e40af; }
+.btn-modal-save:disabled { opacity: .6; cursor: not-allowed; }
+.modal-form-group { margin-bottom: 16px; }
+.modal-form-label { display: block; font-size: .82rem; font-weight: 600; color: var(--perm-text); margin-bottom: 6px; }
+.modal-form-input {
+    width: 100%; padding: 9px 12px; border-radius: 8px;
+    border: 1.5px solid var(--perm-border); font-size: .88rem; color: var(--perm-text);
+    outline: none; transition: border-color .15s;
+}
+.modal-form-input:focus { border-color: var(--perm-blue); }
+.modal-section-title {
+    font-size: .72rem; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--perm-muted); margin: 20px 0 14px; padding-top: 16px; border-top: 1px solid var(--perm-border);
+}
+.modal-feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 7px; margin-bottom: 14px; }
+.modal-feat-item {
+    display: flex; align-items: flex-start; gap: 8px; padding: 10px 11px;
+    border: 1.5px solid var(--perm-border); border-radius: 8px; cursor: pointer; transition: all .12s;
+}
+.modal-feat-item:has(.cr-feat-cb:checked) { border-color: #93c5fd; background: var(--perm-blue-light); }
+.modal-feat-item input { margin-top: 2px; flex-shrink: 0; accent-color: var(--perm-blue); }
+.modal-feat-name { font-size: .8rem; font-weight: 600; color: var(--perm-text); }
+.modal-feat-desc { font-size: .72rem; color: var(--perm-muted); margin-top: 1px; }
+.modal-error {
+    padding: 10px 14px; border-radius: 8px; background: #fef2f2;
+    border: 1px solid #fca5a5; color: var(--perm-danger); font-size: .84rem;
+    margin-top: 14px; display: none;
+}
+
+/* Toast */
+.perm-toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    padding: 12px 18px; border-radius: 10px; font-size: .87rem; font-weight: 500;
+    display: flex; align-items: center; gap: 8px; max-width: 320px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15); animation: slideUp .2s ease;
+}
+.perm-toast.success { background: #f0fdf4; border: 1.5px solid #bbf7d0; color: #15803d; }
+.perm-toast.danger  { background: #fef2f2; border: 1.5px solid #fecaca; color: #b91c1c; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+.no-staff-msg { padding: 60px 20px; text-align: center; color: var(--perm-muted); background: #fff; border: 1px solid var(--perm-border); border-radius: 14px; }
+.no-staff-msg i { font-size: 2.5rem; opacity: .2; display: block; margin-bottom: 14px; }
+</style>
+
+<div class="perm-page">
+
+    <!-- Header -->
+    <div class="perm-header">
+        <div>
+            <div class="perm-restaurant-label">
+                <i class="fas fa-shield-alt" style="font-size:.7rem;"></i>
+                Permissions Management
+            </div>
+            <h1>{{ owner.restaurant_name|default:owner.username }}</h1>
+            <p>Control what each staff role can access. Changes take effect immediately.</p>
+        </div>
+        <div class="perm-header-actions">
+            <button class="btn-perm-reset" id="resetDefaultsBtn">
+                <i class="fas fa-undo" style="font-size:.8rem;"></i> Reset to Defaults
+            </button>
+            <a href="{% url 'system_admin:manage_restaurants' %}" class="btn-perm-back">
+                <i class="fas fa-arrow-left" style="font-size:.8rem;"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="perm-tabs-bar">
+        <button class="perm-tab-btn active" data-tab="tabRoles">
+            <i class="fas fa-users-cog"></i> Built-in Roles
+        </button>
+        <button class="perm-tab-btn" data-tab="tabCustom">
+            <i class="fas fa-user-tag"></i> Custom Roles
+            <span class="tab-badge">{{ custom_roles|length }}</span>
+        </button>
+        <button class="perm-tab-btn" data-tab="tabAssign">
+            <i class="fas fa-user-check"></i> Assign Roles
+            <span class="tab-badge">{{ staff|length }}</span>
+        </button>
+    </div>
+
+    <!-- TAB 1: Built-in Roles -->
+    <div class="perm-tab-pane active" id="tabRoles">
+        <div class="perm-roles-layout">
+
+            <!-- Sidebar -->
+            <div class="roles-sidebar">
+                <div class="roles-sidebar-title">Select a role to edit</div>
+                {% for role_name, role_display in built_in_roles %}
+                <button class="role-item" data-role="{{ role_name }}" onclick="selectRole('{{ role_name }}', '{{ role_display }}')">
+                    <span class="role-icon ri-{{ role_name }}">
+                        {% if role_name == 'manager' %}<i class="fas fa-user-tie"></i>
+                        {% elif role_name == 'customer_care' %}<i class="fas fa-headset"></i>
+                        {% elif role_name == 'kitchen' %}<i class="fas fa-fire"></i>
+                        {% elif role_name == 'bar' %}<i class="fas fa-wine-glass-alt"></i>
+                        {% elif role_name == 'buffet' %}<i class="fas fa-drumstick-bite"></i>
+                        {% elif role_name == 'service' %}<i class="fas fa-concierge-bell"></i>
+                        {% elif role_name == 'cashier' %}<i class="fas fa-cash-register"></i>
+                        {% elif role_name == 'delivery_rider' %}<i class="fas fa-motorcycle"></i>
+                        {% endif %}
+                    </span>
+                    <div class="role-item-info">
+                        <div class="role-item-name">{{ role_display }}</div>
+                        <div class="role-item-count" id="cnt-{{ role_name }}">Loading...</div>
+                    </div>
+                    <span class="role-unsaved-dot" id="dot-{{ role_name }}"></span>
+                </button>
+                {% endfor %}
+            </div>
+
+            <!-- Right Panel -->
+            <div class="roles-content-panel">
+                <div class="roles-content-header">
+                    <div class="roles-content-title">
+                        <i class="fas fa-shield-alt" id="panelIcon"></i>
+                        <div>
+                            <span id="activeRoleTitle">Select a role from the left</span>
+                            <small id="activeRoleCount"></small>
+                        </div>
+                    </div>
+                    <div class="roles-content-actions">
+                        <span class="unsaved-badge" id="unsavedBadge">Unsaved changes</span>
+                        <button class="btn-save-role" id="saveRoleBtn" disabled>
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </div>
+                </div>
+                <div class="roles-content-body" id="roleContentBody">
+                    <div class="roles-empty">
+                        <i class="fas fa-mouse-pointer"></i>
+                        <p>Select a role from the left panel to<br>view and edit its permissions.</p>
+                    </div>
+                </div>
+
+                <!-- Hidden feature panels, one per category -->
+                <div id="featurePanels" style="display:none;">
+                    {% for category_name, cat_features in features_by_category.items %}
+                    {% with cat_key=category_name|lower|cut:" " %}
+                    <div class="feat-category" data-category="{{ category_name }}">
+                        <div class="feat-category-header">
+                            <span class="feat-cat-icon
+                                {% if 'order' in category_name|lower %}cat-orders
+                                {% elif 'payment' in category_name|lower %}cat-payments
+                                {% elif 'station' in category_name|lower %}cat-station
+                                {% elif 'menu' in category_name|lower %}cat-menu
+                                {% elif 'staff' in category_name|lower %}cat-staff
+                                {% elif 'report' in category_name|lower %}cat-reports
+                                {% else %}cat-operations{% endif %}">
+                                {% if 'order' in category_name|lower %}<i class="fas fa-shopping-cart"></i>
+                                {% elif 'payment' in category_name|lower %}<i class="fas fa-credit-card"></i>
+                                {% elif 'station' in category_name|lower %}<i class="fas fa-tv"></i>
+                                {% elif 'menu' in category_name|lower %}<i class="fas fa-utensils"></i>
+                                {% elif 'staff' in category_name|lower %}<i class="fas fa-users"></i>
+                                {% elif 'report' in category_name|lower %}<i class="fas fa-chart-bar"></i>
+                                {% else %}<i class="fas fa-cogs"></i>{% endif %}
+                            </span>
+                            <span style="color:
+                                {% if 'order' in category_name|lower %}#b45309
+                                {% elif 'payment' in category_name|lower %}#065f46
+                                {% elif 'station' in category_name|lower %}#5b21b6
+                                {% elif 'menu' in category_name|lower %}#991b1b
+                                {% elif 'staff' in category_name|lower %}#1e40af
+                                {% elif 'report' in category_name|lower %}#164e63
+                                {% else %}#475569{% endif %};">{{ category_name }}</span>
+                        </div>
+                        <div class="feat-grid">
+                            {% for feature in cat_features %}
+                            <div class="feat-item">
+                                <label class="feat-label">
+                                    <input type="checkbox" class="feat-checkbox feature-toggle"
+                                           data-slug="{{ feature.slug }}" onchange="onFeatureChange()">
+                                    <div class="feat-text-wrap">
+                                        <div class="feat-name">{{ feature.name }}</div>
+                                        <div class="feat-desc">{{ feature.description }}</div>
+                                    </div>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: Custom Roles -->
+    <div class="perm-tab-pane" id="tabCustom">
+        <div class="custom-roles-header">
+            <h2><i class="fas fa-user-tag me-2 text-primary"></i>Custom Roles</h2>
+            <button class="btn-create-role" id="openCreateRoleBtn">
+                <i class="fas fa-plus"></i> Create Custom Role
+            </button>
+        </div>
+        <div class="cr-grid" id="customRolesList">
+            {% if custom_roles %}
+            {% for cr in custom_roles %}
+            <div class="cr-card" id="cr-{{ cr.pk }}">
+                <div class="cr-card-top">
+                    <div>
+                        <div class="cr-name">{{ cr.name }}</div>
+                        {% if cr.description %}<div class="cr-desc">{{ cr.description }}</div>{% endif %}
+                    </div>
+                    <div class="cr-card-actions">
+                        <button class="btn-cr-edit edit-cr-btn" title="Edit"
+                                data-id="{{ cr.pk }}" data-name="{{ cr.name }}" data-desc="{{ cr.description|default:'' }}">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="btn-cr-delete delete-cr-btn" title="Delete"
+                                data-id="{{ cr.pk }}" data-name="{{ cr.name }}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="cr-features">
+                    {% for f in cr.features.all|slice:":5" %}
+                    <span class="cr-feat-chip">{{ f.name }}</span>
+                    {% endfor %}
+                    {% if cr.features.count > 5 %}
+                    <span class="cr-feat-more">+{{ cr.features.count|add:"-5" }} more</span>
+                    {% endif %}
+                    {% if cr.features.count == 0 %}
+                    <span class="cr-feat-more" style="font-style:italic;">No features assigned</span>
+                    {% endif %}
+                </div>
+                <div class="cr-card-footer">
+                    <i class="fas fa-users" style="font-size:.75rem;"></i>
+                    {{ cr.assigned_users.count }} staff assigned
+                    &bull; {{ cr.features.count }} features
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="cr-no-roles">
+                <i class="fas fa-user-tag"></i>
+                <div style="font-weight:600;margin-bottom:6px;" id="noCRMsg">No custom roles yet</div>
+                <div style="font-size:.84rem;">Create a custom role to give staff a specific set of permissions different from their built-in role.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TAB 3: Assign Custom Roles -->
+    <div class="perm-tab-pane" id="tabAssign">
+        {% if staff %}
+        <div class="assign-table-wrap">
+            <table class="assign-table">
+                <thead>
+                    <tr>
+                        <th>Staff Member</th>
+                        <th>Built-in Role</th>
+                        <th>Active Custom Role</th>
+                        <th>Assign Custom Role</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in staff %}
+                    <tr id="sr-{{ member.pk }}">
+                        <td>
+                            <div class="staff-name">{{ member.get_full_name|default:member.username }}</div>
+                            <div class="staff-username">@{{ member.username }}</div>
+                        </td>
+                        <td>
+                            <span class="role-chip">{{ member.role.get_name_display|default:"No role" }}</span>
+                        </td>
+                        <td id="cr-label-{{ member.pk }}">
+                            {% if member.custom_role %}
+                            <span class="custom-role-chip">{{ member.custom_role.name }}</span>
+                            {% else %}
+                            <span style="color:var(--perm-muted);font-size:.82rem;">Using built-in</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <select class="assign-select" onchange="assignCR({{ member.pk }}, this.value)">
+                                <option value="">— Built-in role —</option>
+                                {% for cr in custom_roles %}
+                                <option value="{{ cr.pk }}"{% if member.custom_role_id == cr.pk %} selected{% endif %}>
+                                    {{ cr.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="no-staff-msg">
+            <i class="fas fa-users"></i>
+            <div style="font-weight:600;margin-bottom:6px;">No staff members found</div>
+            <div style="font-size:.84rem;">This restaurant has no staff accounts yet.</div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Custom Role Modal -->
+<div class="perm-modal-overlay" id="crModalOverlay">
+    <div class="perm-modal">
+        <div class="perm-modal-header">
+            <div class="perm-modal-title" id="crModalTitle">
+                <i class="fas fa-user-tag me-2 text-primary"></i> Create Custom Role
+            </div>
+            <button class="btn-modal-close" id="closeModalBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="perm-modal-body">
+            <input type="hidden" id="crEditId">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="modal-form-row">
+                <div class="modal-form-group">
+                    <label class="modal-form-label">Role Name <span style="color:var(--perm-danger);">*</span></label>
+                    <input type="text" class="modal-form-input" id="crNameInput" maxlength="100" placeholder="e.g. Head Waiter">
+                </div>
+                <div class="modal-form-group">
+                    <label class="modal-form-label">Description <span style="color:var(--perm-muted);font-weight:400;">(optional)</span></label>
+                    <input type="text" class="modal-form-input" id="crDescInput" maxlength="255" placeholder="Brief description">
+                </div>
+            </div>
+            <div class="modal-section-title">Select Permissions</div>
+            {% for category_name, cat_features in features_by_category.items %}
+            <div style="margin-bottom:18px;">
+                <div style="font-size:.72rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+                            color:var(--perm-muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+                    {% if 'order' in category_name|lower %}<i class="fas fa-shopping-cart" style="color:#b45309;"></i>
+                    {% elif 'payment' in category_name|lower %}<i class="fas fa-credit-card" style="color:#065f46;"></i>
+                    {% elif 'station' in category_name|lower %}<i class="fas fa-tv" style="color:#5b21b6;"></i>
+                    {% elif 'menu' in category_name|lower %}<i class="fas fa-utensils" style="color:#991b1b;"></i>
+                    {% elif 'staff' in category_name|lower %}<i class="fas fa-users" style="color:#1e40af;"></i>
+                    {% elif 'report' in category_name|lower %}<i class="fas fa-chart-bar" style="color:#164e63;"></i>
+                    {% else %}<i class="fas fa-cogs" style="color:#475569;"></i>{% endif %}
+                    {{ category_name }}
+                </div>
+                <div class="modal-feat-grid">
+                    {% for feature in cat_features %}
+                    <label class="modal-feat-item">
+                        <input type="checkbox" class="cr-feat-cb" data-slug="{{ feature.slug }}">
+                        <div>
+                            <div class="modal-feat-name">{{ feature.name }}</div>
+                            <div class="modal-feat-desc">{{ feature.description }}</div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            <div class="modal-error" id="crError"></div>
+        </div>
+        <div class="perm-modal-footer">
+            <button class="btn-modal-cancel" id="cancelModalBtn">Cancel</button>
+            <button class="btn-modal-save" id="saveCrBtn">
+                <i class="fas fa-save"></i> Save Role
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const RID  = {{ restaurant_id }};
+    const BASE = '/system-admin/restaurant-permissions/' + RID;
+    const CSRF = '{{ csrf_token }}';
+
+    const roleSets      = {{ role_sets_json|safe }};
+    const customRolesArr = {{ custom_roles_json|safe }};
+    const customRolesMap = {};
+    customRolesArr.forEach(function(cr) { customRolesMap[cr.id] = cr; });
+
+    // Track local changes per role
+    const localChanges = {};  // {roleName: Set<slug>}
+    let currentRole = null;
+
+    // --- Sidebar counts ---
+    Object.keys(roleSets).forEach(function(role) {
+        var el = document.getElementById('cnt-' + role);
+        if (el) {
+            var n = (roleSets[role] || []).length;
+            el.textContent = n + ' feature' + (n !== 1 ? 's' : '') + ' enabled';
+        }
+    });
+
+    // --- Tab switching ---
+    document.querySelectorAll('.perm-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.perm-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('.perm-tab-pane').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab).classList.add('active');
+        });
+    });
+
+    // --- Role selection ---
+    var featurePanelsHTML = document.getElementById('featurePanels').innerHTML;
+
+    window.selectRole = function(roleName, roleDisplay) {
+        currentRole = roleName;
+
+        document.querySelectorAll('.role-item').forEach(function(b) { b.classList.remove('active'); });
+        var btn = document.querySelector('.role-item[data-role="' + roleName + '"]');
+        if (btn) btn.classList.add('active');
+
+        document.getElementById('activeRoleTitle').textContent = roleDisplay;
+        document.getElementById('saveRoleBtn').disabled = false;
+
+        // Load feature panel
+        var body = document.getElementById('roleContentBody');
+        body.innerHTML = featurePanelsHTML;
+
+        // Set checkboxes from localChanges or roleSets
+        var slugs = localChanges[roleName]
+            ? localChanges[roleName]
+            : new Set(roleSets[roleName] || []);
+
+        document.querySelectorAll('#roleContentBody .feature-toggle').forEach(function(cb) {
+            cb.checked = slugs.has(cb.dataset.slug);
+        });
+
+        updateActiveCount();
+        updateUnsavedBadge();
+    };
+
+    window.onFeatureChange = function() {
+        if (!currentRole) return;
+        // Persist current state to localChanges
+        var slugs = new Set();
+        document.querySelectorAll('#roleContentBody .feature-toggle:checked').forEach(function(cb) {
+            slugs.add(cb.dataset.slug);
+        });
+        localChanges[currentRole] = slugs;
+        updateActiveCount();
+        updateUnsavedBadge();
+        // Show unsaved dot on sidebar
+        var dot = document.getElementById('dot-' + currentRole);
+        if (dot) dot.style.display = 'block';
+    };
+
+    function updateActiveCount() {
+        var n = document.querySelectorAll('#roleContentBody .feature-toggle:checked').length;
+        document.getElementById('activeRoleCount').textContent = n + ' feature' + (n !== 1 ? 's' : '') + ' enabled';
+        var cntEl = document.getElementById('cnt-' + currentRole);
+        if (cntEl) cntEl.textContent = n + ' feature' + (n !== 1 ? 's' : '') + ' enabled';
+    }
+
+    function updateUnsavedBadge() {
+        var badge = document.getElementById('unsavedBadge');
+        if (!badge || !currentRole) return;
+        var changed = localChanges[currentRole] !== undefined;
+        badge.style.display = changed ? 'inline-block' : 'none';
+    }
+
+    function post(path, body) {
+        return fetch(BASE + path, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+            body: JSON.stringify(body),
+        }).then(function(r) { return r.json(); });
+    }
+
+    function toast(msg, type) {
+        var el = document.createElement('div');
+        el.className = 'perm-toast ' + type;
+        el.innerHTML = '<i class="fas ' + (type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle') + '"></i> ' + msg;
+        document.body.appendChild(el);
+        setTimeout(function() { el.remove(); }, 3500);
+    }
+
+    // --- Save role ---
+    document.getElementById('saveRoleBtn').addEventListener('click', function() {
+        if (!currentRole) return;
+        var btn = this;
+        var slugs = Array.from(document.querySelectorAll('#roleContentBody .feature-toggle:checked'))
+                         .map(function(cb) { return cb.dataset.slug; });
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        post('/save-role/', {role_name: currentRole, feature_slugs: slugs})
+            .then(function(res) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+                if (res.success) {
+                    roleSets[currentRole] = slugs;
+                    delete localChanges[currentRole];
+                    var dot = document.getElementById('dot-' + currentRole);
+                    if (dot) dot.style.display = 'none';
+                    updateUnsavedBadge();
+                    toast('Permissions saved for this role.', 'success');
+                } else {
+                    toast(res.error || 'Error saving.', 'danger');
+                }
+            }).catch(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+                toast('Network error. Please try again.', 'danger');
+            });
+    });
+
+    // --- Reset to defaults ---
+    document.getElementById('resetDefaultsBtn').addEventListener('click', function() {
+        if (!confirm('Reset ALL role permissions for this restaurant to system defaults? This cannot be undone.')) return;
+        post('/reset-defaults/', {}).then(function(res) {
+            if (res.success) {
+                toast('All permissions reset to defaults.', 'success');
+                setTimeout(function() { location.reload(); }, 1000);
+            } else {
+                toast(res.error || 'Error.', 'danger');
+            }
+        });
+    });
+
+    // --- Modal ---
+    var overlay = document.getElementById('crModalOverlay');
+
+    function openModal() { overlay.classList.add('open'); }
+    function closeModal() { overlay.classList.remove('open'); }
+
+    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+    document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) closeModal(); });
+
+    function clearCrForm() {
+        document.getElementById('crEditId').value = '';
+        document.getElementById('crNameInput').value = '';
+        document.getElementById('crDescInput').value = '';
+        document.getElementById('crError').style.display = 'none';
+        document.querySelectorAll('.cr-feat-cb').forEach(function(cb) { cb.checked = false; });
+    }
+
+    document.getElementById('openCreateRoleBtn').addEventListener('click', function() {
+        clearCrForm();
+        document.getElementById('crModalTitle').innerHTML = '<i class="fas fa-plus me-2 text-primary"></i> Create Custom Role';
+        openModal();
+    });
+
+    document.querySelectorAll('.edit-cr-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            clearCrForm();
+            var id = parseInt(this.dataset.id);
+            document.getElementById('crEditId').value = id;
+            document.getElementById('crNameInput').value = this.dataset.name || '';
+            document.getElementById('crDescInput').value = this.dataset.desc || '';
+            document.getElementById('crModalTitle').innerHTML = '<i class="fas fa-pen me-2 text-primary"></i> Edit Custom Role';
+            var cr = customRolesMap[id];
+            if (cr && cr.feature_slugs) {
+                cr.feature_slugs.forEach(function(s) {
+                    var cb = document.querySelector('.cr-feat-cb[data-slug="' + s + '"]');
+                    if (cb) cb.checked = true;
+                });
+            }
+            openModal();
+        });
+    });
+
+    document.getElementById('saveCrBtn').addEventListener('click', function() {
+        var errEl = document.getElementById('crError');
+        errEl.style.display = 'none';
+        var name = document.getElementById('crNameInput').value.trim();
+        if (!name) { errEl.textContent = 'Role name is required.'; errEl.style.display = 'block'; return; }
+        var desc   = document.getElementById('crDescInput').value.trim();
+        var roleId = document.getElementById('crEditId').value;
+        var slugs  = Array.from(document.querySelectorAll('.cr-feat-cb:checked')).map(function(cb) { return cb.dataset.slug; });
+        var btn    = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        post('/create-custom-role/', {name: name, description: desc, feature_slugs: slugs, role_id: roleId ? parseInt(roleId) : null})
+            .then(function(res) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Save Role';
+                if (res.success) {
+                    closeModal();
+                    toast('Custom role saved.', 'success');
+                    setTimeout(function() { location.reload(); }, 700);
+                } else {
+                    errEl.textContent = res.error || 'Error.';
+                    errEl.style.display = 'block';
+                }
+            }).catch(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Save Role';
+                toast('Network error.', 'danger');
+            });
+    });
+
+    document.querySelectorAll('.delete-cr-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var name = this.dataset.name;
+            var id   = parseInt(this.dataset.id);
+            if (!confirm('Delete custom role "' + name + '"? Staff assigned to it will revert to their built-in role defaults.')) return;
+            post('/delete-custom-role/', {role_id: id}).then(function(res) {
+                if (res.success) {
+                    var card = document.getElementById('cr-' + id);
+                    if (card) card.remove();
+                    toast('Role "' + name + '" deleted.', 'success');
+                } else {
+                    toast(res.error || 'Error.', 'danger');
+                }
+            });
+        });
+    });
+
+    // --- Assign custom role ---
+    function assignCR(userId, customRoleId) {
+        post('/assign-custom-role/', {user_id: userId, custom_role_id: customRoleId ? parseInt(customRoleId) : null})
+            .then(function(res) {
+                if (res.success) {
+                    var label = document.getElementById('cr-label-' + userId);
+                    if (label) {
+                        if (customRoleId) {
+                            var cr = customRolesMap[parseInt(customRoleId)];
+                            label.innerHTML = '<span class="custom-role-chip">' + (cr ? cr.name : 'Custom Role') + '</span>';
+                        } else {
+                            label.innerHTML = '<span style="color:var(--perm-muted);font-size:.82rem;">Using built-in</span>';
+                        }
+                    }
+                    toast('Role assignment updated.', 'success');
+                } else {
+                    toast(res.error || 'Error.', 'danger');
+                }
+            });
+    }
+    window.assignCR = assignCR;
+
+    // Auto-select first role on load
+    var firstRoleBtn = document.querySelector('.role-item');
+    if (firstRoleBtn) {
+        var roleName    = firstRoleBtn.dataset.role;
+        var roleDisplay = firstRoleBtn.querySelector('.role-item-name').textContent;
+        selectRole(roleName, roleDisplay);
+    }
+})();
+</script>
+{% endblock %}

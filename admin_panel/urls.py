@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import views_branches
 from . import views_main_owner
+from . import views_permissions
 
 app_name = 'admin_panel'
 
@@ -108,6 +109,13 @@ urlpatterns = [
     path('qr-code/image/', views.generate_qr_image, name='generate_qr_image'),
     path('qr-code/debug/', views.debug_qr_code, name='debug_qr_code'),
     
+    # Roles & Permissions
+    path('roles-permissions/', views_permissions.roles_permissions_view, name='roles_permissions'),
+    path('roles-permissions/save-role/', views_permissions.save_role_permissions, name='save_role_permissions'),
+    path('roles-permissions/custom-role/create/', views_permissions.create_custom_role, name='create_custom_role'),
+    path('roles-permissions/custom-role/delete/', views_permissions.delete_custom_role, name='delete_custom_role'),
+    path('roles-permissions/custom-role/assign/', views_permissions.assign_custom_role, name='assign_custom_role'),
+
     # Printer Configuration
     path('printer-settings/', views.printer_settings, name='printer_settings'),
     path('printer-settings/save/', views.save_printer_settings, name='save_printer_settings'),

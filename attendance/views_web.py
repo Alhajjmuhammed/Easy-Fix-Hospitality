@@ -96,6 +96,9 @@ def attendance_dashboard(request):
     if not _require_can_manage(request):
         messages.error(request, 'Access denied.')
         return redirect('admin_panel:admin_dashboard')
+    if not request.user.has_feature('view_attendance'):
+        messages.error(request, "You don't have permission to access attendance.")
+        return redirect('restaurant:owner_dashboard')
 
     owner, restaurant = _get_owner_and_restaurant(request)
     today = timezone.localdate()
@@ -159,6 +162,9 @@ def attendance_shifts(request):
     if not _require_owner_or_manager(request):
         messages.error(request, 'Access denied.')
         return redirect('admin_panel:admin_dashboard')
+    if not request.user.has_feature('manage_attendance'):
+        messages.error(request, "You don't have permission to manage attendance.")
+        return redirect('restaurant:owner_dashboard')
 
     owner, restaurant = _get_owner_and_restaurant(request)
 
@@ -226,6 +232,9 @@ def attendance_calendar(request):
     if not _require_can_manage(request):
         messages.error(request, 'Access denied.')
         return redirect('admin_panel:admin_dashboard')
+    if not request.user.has_feature('view_attendance'):
+        messages.error(request, "You don't have permission to access attendance.")
+        return redirect('restaurant:owner_dashboard')
 
     owner, restaurant = _get_owner_and_restaurant(request)
 
@@ -298,6 +307,8 @@ def attendance_day_records(request):
     """AJAX: return all attendance records for a given date as JSON."""
     if not _require_can_manage(request):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('view_attendance'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     owner, restaurant = _get_owner_and_restaurant(request)
     day_str = request.GET.get('date')
@@ -321,6 +332,9 @@ def attendance_qr(request):
     if not _require_owner_or_manager(request):
         messages.error(request, 'Access denied.')
         return redirect('admin_panel:admin_dashboard')
+    if not request.user.has_feature('manage_attendance'):
+        messages.error(request, "You don't have permission to manage attendance.")
+        return redirect('restaurant:owner_dashboard')
 
     owner, restaurant = _get_owner_and_restaurant(request)
     qr_obj = _get_or_create_qr(owner, restaurant)
@@ -348,6 +362,8 @@ def attendance_qr_regenerate(request):
     """Regenerate the attendance QR token."""
     if not _require_owner_or_manager(request):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('manage_attendance'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     owner, restaurant = _get_owner_and_restaurant(request)
     qr_obj = _get_or_create_qr(owner, restaurant)
@@ -550,6 +566,9 @@ def attendance_day_detail(request):
     if not _require_can_manage(request):
         messages.error(request, 'Access denied.')
         return redirect('admin_panel:admin_dashboard')
+    if not request.user.has_feature('view_attendance'):
+        messages.error(request, "You don't have permission to access attendance.")
+        return redirect('restaurant:owner_dashboard')
 
     owner, restaurant = _get_owner_and_restaurant(request)
     today = timezone.localdate()
@@ -620,6 +639,9 @@ def attendance_reports(request):
     if not _require_can_manage(request):
         messages.error(request, 'Access denied.')
         return redirect('admin_panel:admin_dashboard')
+    if not request.user.has_feature('view_attendance'):
+        messages.error(request, "You don't have permission to access attendance.")
+        return redirect('restaurant:owner_dashboard')
 
     owner, restaurant = _get_owner_and_restaurant(request)
     today = timezone.localdate()

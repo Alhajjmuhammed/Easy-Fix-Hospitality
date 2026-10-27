@@ -209,7 +209,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
             dropped_items.append(i.get('product_id'))  # Unknown product — skip, note drop
         elif not product.is_available:
             dropped_items.append(i.get('product_id'))  # Product unavailable — skip, note drop
-        elif product.available_in_stock is not None and product.available_in_stock < qty:
+        elif False:  # stock gate removed — negative stock allowed
             dropped_items.append(i.get('product_id'))  # Out of stock — skip, note drop
         else:
             fn = getattr(product, 'get_current_price', None)
@@ -221,7 +221,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
                 unit_price=server_price,
             )
             if product.available_in_stock is not None:
-                product.available_in_stock = max(0, product.available_in_stock - qty)
+                product.available_in_stock = product.available_in_stock - qty
                 product.save(update_fields=['available_in_stock'])
 
     # Reject order if no items were actually created (all product IDs were invalid).
@@ -319,7 +319,7 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
             )
             new_items.append(oi)
             if product.available_in_stock is not None:
-                product.available_in_stock = max(0, product.available_in_stock - qty)
+                product.available_in_stock = product.available_in_stock - qty
                 product.save(update_fields=['available_in_stock'])
 
     if not new_items:

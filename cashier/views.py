@@ -40,7 +40,10 @@ def cashier_dashboard(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. Cashier role required.")
         return redirect('accounts:profile')
-    
+    if not request.user.has_feature('manage_orders'):
+        messages.error(request, "You don't have permission to access the cashier dashboard.")
+        return redirect('accounts:profile')
+
     owner = get_owner_filter(request.user)
     
     # Get filters from request
@@ -167,7 +170,10 @@ def my_orders(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. Cashier role required.")
         return redirect('accounts:profile')
-    
+    if not request.user.has_feature('manage_orders'):
+        messages.error(request, "You don't have permission to view orders.")
+        return redirect('accounts:profile')
+
     owner = get_owner_filter(request.user)
     
     # Get orders created by or entered by this cashier
@@ -216,7 +222,9 @@ def process_payment(request, order_id):
     """Process payment for an order - full or partial"""
     if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
-    
+    if not request.user.has_feature('process_payments'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     owner = get_owner_filter(request.user)
     _oq_pp = (
         Q(table_info__owner=owner) |
@@ -441,7 +449,9 @@ def void_payment(request, payment_id):
     """Void a payment transaction"""
     if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
-    
+    if not request.user.has_feature('void_payments'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     owner = get_owner_filter(request.user)
     _pq_vp = (
         Q(order__table_info__owner=owner) |
@@ -802,7 +812,10 @@ def receipt_management(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. Cashier role required.")
         return redirect('accounts:profile')
-    
+    if not request.user.has_feature('view_receipts'):
+        messages.error(request, "You don't have permission to manage receipts.")
+        return redirect('cashier:cashier_dashboard')
+
     owner = get_owner_filter(request.user)
     
     # Get search parameters
@@ -918,6 +931,9 @@ def cashier_reports(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. Cashier role required.")
         return redirect('accounts:profile')
+    if not request.user.has_feature('view_reports'):
+        messages.error(request, "You don't have permission to view reports.")
+        return redirect('cashier:cashier_dashboard')
     
     from django.utils import timezone
     from django.db.models import Sum, Count, Q

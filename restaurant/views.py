@@ -1,5 +1,8 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_csv(value):
@@ -485,7 +488,10 @@ def manage_staff(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_staff'):
+        messages.error(request, "You don't have permission to manage staff.")
+        return redirect('restaurant:owner_dashboard')
+
     # Get staff members belonging to this owner only
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
@@ -504,7 +510,12 @@ def add_staff(request):
             return JsonResponse({'success': False, 'message': 'Access denied. Owner privileges required.'})
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_staff'):
+        if request.headers.get('Content-Type') == 'application/json':
+            return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+        messages.error(request, "You don't have permission to manage staff.")
+        return redirect('restaurant:owner_dashboard')
+
     if request.method == 'POST':
         # Handle AJAX request from owner dashboard
         if request.headers.get('Content-Type') == 'application/json':
@@ -592,7 +603,10 @@ def manage_promotions(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_promotions'):
+        messages.error(request, "You don't have permission to manage promotions.")
+        return redirect('restaurant:owner_dashboard')
+
     # Import restaurant context utilities
     from admin_panel.restaurant_utils import get_restaurant_context
     
@@ -700,7 +714,10 @@ def add_promotion(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_promotions'):
+        messages.error(request, "You don't have permission to manage promotions.")
+        return redirect('restaurant:manage_promotions')
+
     # Import restaurant context utilities
     from admin_panel.restaurant_utils import get_restaurant_context
     
@@ -781,7 +798,10 @@ def edit_promotion(request, promotion_id):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_promotions'):
+        messages.error(request, "You don't have permission to manage promotions.")
+        return redirect('restaurant:manage_promotions')
+
     # Import restaurant context utilities
     from admin_panel.restaurant_utils import get_restaurant_context
     
@@ -904,7 +924,10 @@ def delete_promotion(request, promotion_id):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_promotions'):
+        messages.error(request, "You don't have permission to manage promotions.")
+        return redirect('restaurant:manage_promotions')
+
     # Import restaurant context utilities
     from admin_panel.restaurant_utils import get_restaurant_context
     
@@ -1007,7 +1030,9 @@ def toggle_promotion(request, promotion_id):
     """Toggle promotion active/inactive status via AJAX"""
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
-    
+    if not request.user.has_feature('manage_promotions'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     # Import restaurant context utilities
     from admin_panel.restaurant_utils import get_restaurant_context
     
@@ -1064,7 +1089,7 @@ def promotion_preview(request, promotion_id):
     ).distinct().select_related('main_category', 'sub_category')
     
     from admin_panel.restaurant_utils import get_restaurant_context as _grc
-    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+    _rc = _grc(request.user, request.session.get('selected_restaurant_id'), request)
 
     context = {
         'promotion': promotion,
@@ -1092,6 +1117,9 @@ def manage_events(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_events'):
+        messages.error(request, "You don't have permission to manage events.")
+        return redirect('restaurant:owner_dashboard')
     
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
@@ -1100,7 +1128,7 @@ def manage_events(request):
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
     restaurant = Restaurant.objects.filter(
-        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
@@ -1186,7 +1214,7 @@ def manage_events(request):
     events_page = paginator.get_page(page_number)
     
     from admin_panel.restaurant_utils import get_restaurant_context as _grc
-    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+    _rc = _grc(request.user, request.session.get('selected_restaurant_id'), request)
 
     context = {
         'events': events_page,
@@ -1211,7 +1239,10 @@ def add_event(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_events'):
+        messages.error(request, "You don't have permission to manage events.")
+        return redirect('restaurant:manage_events')
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
     
@@ -1219,7 +1250,7 @@ def add_event(request):
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
     restaurant = Restaurant.objects.filter(
-        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
@@ -1236,7 +1267,7 @@ def add_event(request):
         form = EventForm()
     
     from admin_panel.restaurant_utils import get_restaurant_context as _grc
-    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+    _rc = _grc(request.user, request.session.get('selected_restaurant_id'), request)
 
     context = {
         'form': form,
@@ -1255,7 +1286,10 @@ def edit_event(request, event_id):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_events'):
+        messages.error(request, "You don't have permission to manage events.")
+        return redirect('restaurant:manage_events')
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
     
@@ -1265,7 +1299,7 @@ def edit_event(request, event_id):
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
     restaurant = Restaurant.objects.filter(
-        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
@@ -1279,7 +1313,7 @@ def edit_event(request, event_id):
         form = EventForm(instance=event)
     
     from admin_panel.restaurant_utils import get_restaurant_context as _grc
-    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+    _rc = _grc(request.user, request.session.get('selected_restaurant_id'), request)
 
     context = {
         'form': form,
@@ -1308,12 +1342,12 @@ def view_event(request, event_id):
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
     restaurant = Restaurant.objects.filter(
-        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
     from admin_panel.restaurant_utils import get_restaurant_context as _grc
-    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+    _rc = _grc(request.user, request.session.get('selected_restaurant_id'), request)
 
     context = {
         'event': event,
@@ -1329,7 +1363,9 @@ def delete_event(request, event_id):
     """Delete an event"""
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
-    
+    if not request.user.has_feature('manage_events'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
     
@@ -1403,7 +1439,7 @@ def event_reports(request):
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
     restaurant = Restaurant.objects.filter(
-        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
@@ -1486,7 +1522,7 @@ def event_reports(request):
     embed = request.GET.get('embed', '0') == '1'
     
     from admin_panel.restaurant_utils import get_restaurant_context as _grc
-    _rc = _grc(request.user, request.session.get('current_restaurant_id'), request)
+    _rc = _grc(request.user, request.session.get('selected_restaurant_id'), request)
 
     context = {
         'stats': stats,
@@ -1636,7 +1672,7 @@ def export_events_csv(request):
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
     restaurant = Restaurant.objects.filter(
-        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     
@@ -1754,7 +1790,7 @@ def export_events_pdf(request):
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
     restaurant = Restaurant.objects.filter(
-        DBQ(main_owner=owner_filter) | DBQ(branch_owner=request.user)
+        DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
     restaurant_name = restaurant.name if restaurant else 'Restaurant'

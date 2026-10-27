@@ -772,35 +772,35 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
             <div class="kds-stages" id="orderTabs" role="tablist">
 
                 <button class="kds-stage s-pending active" id="pending-tab"
-                        data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab" aria-selected="true">
+                        data-kds-target="#pending" type="button" role="tab" aria-selected="true">
                     <span class="kds-stage-icon"><i class="fas fa-clock"></i></span>
                     <span class="kds-stage-num">{{ pending_count }}</span>
                     <span class="kds-stage-lbl">Pending</span>
                 </button>
 
                 <button class="kds-stage s-confirmed" id="confirmed-tab"
-                        data-bs-toggle="tab" data-bs-target="#confirmed" type="button" role="tab" aria-selected="false">
+                        data-kds-target="#confirmed" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-check-circle"></i></span>
                     <span class="kds-stage-num">{{ confirmed_count }}</span>
                     <span class="kds-stage-lbl">Confirmed</span>
                 </button>
 
                 <button class="kds-stage s-preparing" id="preparing-tab"
-                        data-bs-toggle="tab" data-bs-target="#preparing" type="button" role="tab" aria-selected="false">
+                        data-kds-target="#preparing" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-fire"></i></span>
                     <span class="kds-stage-num">{{ preparing_count }}</span>
                     <span class="kds-stage-lbl">Preparing</span>
                 </button>
 
                 <button class="kds-stage s-ready" id="ready-tab"
-                        data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab" aria-selected="false">
+                        data-kds-target="#ready" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-bell"></i></span>
                     <span class="kds-stage-num">{{ ready_count }}</span>
                     <span class="kds-stage-lbl">Ready</span>
                 </button>
 
                 <button class="kds-stage s-served" id="served-tab"
-                        data-bs-toggle="tab" data-bs-target="#served" type="button" role="tab" aria-selected="false">
+                        data-kds-target="#served" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-check-double"></i></span>
                     <span class="kds-stage-num">{{ served_count }}</span>
                     <span class="kds-stage-lbl">Served</span>
@@ -928,34 +928,43 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Tab hash routing + active class sync for KDS stage buttons
-document.addEventListener('DOMContentLoaded', function() {
-    // Activate tab from URL hash — scroll to top first so topbar stays visible
-    if (window.location.hash) {
-        var hash = window.location.hash.substring(1);
-        var tabElement = document.getElementById(hash + '-tab');
-        if (tabElement) {
-            var tab = new bootstrap.Tab(tabElement);
-            tab.show();
+// Custom KDS tab switcher — direct style manipulation, no Bootstrap Tab dependency.
+function kdsShowTab(targetId) {
+    // Show/hide panes with inline styles (bypasses any CSS specificity issues)
+    document.querySelectorAll('.tab-pane').forEach(function(p) {
+        if (p.id === targetId) {
+            p.style.display = 'block';
+            p.style.opacity = '1';
+        } else {
+            p.style.display = 'none';
         }
-        window.scrollTo(0, 0);
-    }
+    });
+    // Sync button active state
+    document.querySelectorAll('.kds-stage[data-kds-target]').forEach(function(btn) {
+        var isTarget = btn.getAttribute('data-kds-target') === '#' + targetId;
+        btn.classList.toggle('active', isTarget);
+        btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+    });
+    // Update hash without scroll jump
+    try { history.replaceState(null, null, '#' + targetId); } catch(e) {}
+    window.scrollTo(0, 0);
+}
 
-    var tabElements = document.querySelectorAll('[data-bs-toggle="tab"]');
-    tabElements.forEach(function(tabElement) {
-        tabElement.addEventListener('shown.bs.tab', function(e) {
-            // Update URL without triggering browser scroll (replaceState doesn't scroll)
-            var targetId = e.target.getAttribute('data-bs-target').substring(1);
-            if (history.replaceState) {
-                history.replaceState(null, null, '#' + targetId);
-            }
-            // Sync .active on stage buttons
-            tabElements.forEach(function(btn) { btn.classList.remove('active'); btn.setAttribute('aria-selected', 'false'); });
-            e.target.classList.add('active');
-            e.target.setAttribute('aria-selected', 'true');
-        });
+// Wire click handlers immediately (DOM is ready — script is at bottom of body)
+document.querySelectorAll('.kds-stage[data-kds-target]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        kdsShowTab(btn.getAttribute('data-kds-target').substring(1));
     });
 });
+
+// Restore tab from URL hash on page load
+(function() {
+    var hash = window.location.hash ? window.location.hash.substring(1) : '';
+    var validTabs = ['pending', 'confirmed', 'preparing', 'ready', 'served'];
+    if (hash && validTabs.indexOf(hash) !== -1) {
+        kdsShowTab(hash);
+    }
+}());
 
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {

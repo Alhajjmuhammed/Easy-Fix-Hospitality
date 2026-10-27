@@ -462,10 +462,13 @@ def admin_dashboard(request):
 @login_required
 def manage_users(request):
     """User management view"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_staff'):
+        messages.error(request, "You don't have permission to access Staff Management.")
+        return redirect('admin_panel:admin_dashboard')
 
     try:
         # Get restaurant context
@@ -656,10 +659,13 @@ def manage_users(request):
 @login_required
 def manage_products(request):
     """Product management view - accessible by administrators and owners"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_menu'):
+        messages.error(request, "You don't have permission to access Products.")
+        return redirect('admin_panel:admin_dashboard')
 
     # Initialize variables
     main_categories = MainCategory.objects.none()
@@ -804,10 +810,13 @@ def manage_products(request):
 @login_required
 def manage_orders(request):
     """Order management view with status-based tabs - accessible by administrators and owners"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_orders'):
+        messages.error(request, "You don't have permission to access Orders.")
+        return redirect('admin_panel:admin_dashboard')
 
     try:
         # Get restaurant context
@@ -1006,10 +1015,13 @@ def manage_orders(request):
 @login_required
 def manage_tables(request):
     """Table management view"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_tables'):
+        messages.error(request, "You don't have permission to access Tables.")
+        return redirect('admin_panel:admin_dashboard')
 
     try:
         # Get restaurant context
@@ -1117,10 +1129,13 @@ def manage_tables(request):
 @login_required
 def manage_categories(request):
     """Category management view"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
+    if not request.user.has_feature('manage_categories'):
+        messages.error(request, "You don't have permission to access Categories.")
+        return redirect('admin_panel:admin_dashboard')
 
     # Initialize variables
     main_categories = MainCategory.objects.none()
@@ -1253,9 +1268,11 @@ def manage_categories(request):
 @transaction.atomic
 def add_main_category(request):
     """Add a new main category"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         # Get restaurant context to determine where to save the category
@@ -1347,9 +1364,11 @@ def add_main_category(request):
 @transaction.atomic
 def edit_main_category(request, category_id):
     """Edit an existing main category"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         # Import restaurant context utilities
@@ -1462,9 +1481,11 @@ def edit_main_category(request, category_id):
 @transaction.atomic
 def delete_main_category(request, category_id):
     """Delete a main category"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         # Import restaurant context utilities
@@ -1530,9 +1551,11 @@ def delete_main_category(request, category_id):
 @require_POST
 def toggle_main_category(request, category_id):
     """Toggle main category active status"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         # Import restaurant context utilities
@@ -1582,9 +1605,11 @@ def toggle_main_category(request, category_id):
 @transaction.atomic
 def add_subcategory(request):
     """Add a new subcategory"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         # Get restaurant context instead of owner filter
@@ -1669,13 +1694,15 @@ def add_subcategory(request):
 @transaction.atomic
 def edit_subcategory(request, subcategory_id):
     """Edit an existing subcategory"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         owner_filter = get_owner_filter(request.user)
-        
+
         # Get subcategory with owner filtering
         if owner_filter:
             _scq = (
@@ -1735,9 +1762,11 @@ def edit_subcategory(request, subcategory_id):
 @transaction.atomic
 def delete_subcategory(request, subcategory_id):
     """Delete a subcategory"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         # Import restaurant context utilities
@@ -1796,9 +1825,11 @@ def delete_subcategory(request, subcategory_id):
 @require_POST
 def toggle_subcategory(request, subcategory_id):
     """Toggle subcategory active status"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         # Import restaurant context utilities
@@ -1847,10 +1878,12 @@ def toggle_subcategory(request, subcategory_id):
 @login_required
 def get_subcategories(request, main_category_id):
     """Get subcategories for a main category"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Get restaurant context for proper filtering
         session_restaurant_id = request.session.get('selected_restaurant_id')
@@ -1917,9 +1950,11 @@ def get_subcategories(request, main_category_id):
 @transaction.atomic
 def bulk_delete_main_categories(request):
     """Bulk delete main categories"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         data = json.loads(request.body)
@@ -1998,9 +2033,11 @@ def bulk_delete_main_categories(request):
 @transaction.atomic
 def bulk_delete_subcategories(request):
     """Bulk delete subcategories"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_categories'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
         data = json.loads(request.body)
@@ -2067,10 +2104,12 @@ def bulk_delete_subcategories(request):
 @transaction.atomic
 def add_product(request):
     """Add new product"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_menu'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Get restaurant context for proper filtering
         from restaurant.models_restaurant import Restaurant
@@ -2217,9 +2256,11 @@ def view_product(request, product_id):
 @login_required
 def edit_product(request, product_id):
     """Get product details for editing"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_menu'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         owner_filter = get_owner_filter(request.user)
@@ -2266,14 +2307,16 @@ def edit_product(request, product_id):
 @require_http_methods(["POST"])
 def update_product(request, product_id):
     """Update product"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': False, 'message': 'Access denied'})
         else:
             messages.error(request, "Access denied. Administrator privileges required.")
             return redirect('admin_panel:manage_products')
-    
+    if not request.user.has_feature('manage_menu'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Get owner filter for permission check
         owner_filter = get_owner_filter(request.user)
@@ -2362,10 +2405,12 @@ def update_product(request, product_id):
 @require_http_methods(["POST"])
 def toggle_product_availability(request, product_id):
     """Toggle product availability"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_menu'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Get owner filter for permission check
         owner_filter = get_owner_filter(request.user)
@@ -2405,14 +2450,16 @@ def toggle_product_availability(request, product_id):
 @transaction.atomic
 def delete_product(request, product_id):
     """Delete product"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_menu'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Get owner filter for permission check
         owner_filter = get_owner_filter(request.user)
-        
+
         # Get product with proper filtering for both restaurant and owner-based categories
         if owner_filter:
             # Build comprehensive query for accessible categories
@@ -2473,10 +2520,12 @@ def _can_manage_target_user(requesting_user, target_user):
 @require_POST
 def add_user(request):
     """Add a new user"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_staff'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Get form data
         first_name = request.POST.get('first_name', '').strip()
@@ -2642,10 +2691,12 @@ def add_user(request):
 @require_http_methods(["GET"])
 def get_user_data(request, user_id):
     """Get user data for editing"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_staff'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         user = get_object_or_404(User, id=user_id)
         
@@ -2679,10 +2730,12 @@ def get_user_data(request, user_id):
 @require_POST
 def update_user(request, user_id):
     """Update an existing user"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_staff'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         user = get_object_or_404(User, id=user_id)
         
@@ -2857,10 +2910,12 @@ def update_user(request, user_id):
 @require_POST
 def toggle_user_status(request, user_id):
     """Toggle user active/inactive status"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_staff'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         user = get_object_or_404(User, id=user_id)
         
@@ -2910,9 +2965,11 @@ def toggle_user_status(request, user_id):
 @transaction.atomic
 def delete_user(request, user_id):
     """Delete a user"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not request.user.has_feature('manage_staff'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         user = get_object_or_404(User, id=user_id)
@@ -3117,11 +3174,14 @@ def delete_role(request, role_id):
 @login_required
 def edit_user(request, user_id):
     """Edit user view (GET request)"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('admin_panel:manage_users')
-    
+    if not request.user.has_feature('manage_staff'):
+        messages.error(request, "You don't have permission to manage staff.")
+        return redirect('admin_panel:admin_dashboard')
+
     user = get_object_or_404(User, id=user_id)
     
     # Check if requesting user has permission to edit this user
@@ -3186,10 +3246,12 @@ def edit_role(request, role_id):
 @require_http_methods(["POST"])
 def add_table(request):
     """Add new table"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_tables'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Get restaurant context to determine where to save the table
         session_restaurant_id = request.session.get('selected_restaurant_id')
@@ -3262,10 +3324,12 @@ def add_table(request):
 @login_required
 def get_table(request):
     """Get table data for editing"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_tables'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     table_id = request.GET.get('table_id')
     try:
         table = get_object_or_404(TableInfo, id=table_id)
@@ -3356,10 +3420,12 @@ def get_tables_json(request):
 @require_http_methods(["POST"])
 def update_table(request):
     """Update table"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_tables'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Import restaurant context utilities
         from admin_panel.restaurant_utils import get_restaurant_context
@@ -3474,10 +3540,12 @@ def update_table(request):
 @require_http_methods(["POST"])
 def toggle_table_status(request):
     """Toggle table availability status"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_tables'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Import restaurant context utilities
         from admin_panel.restaurant_utils import get_restaurant_context
@@ -3534,10 +3602,12 @@ def toggle_table_status(request):
 @transaction.atomic
 def delete_table(request):
     """Delete table"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_tables'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Import restaurant context utilities
         from admin_panel.restaurant_utils import get_restaurant_context
@@ -3586,10 +3656,12 @@ def delete_table(request):
 @login_required
 def view_order(request, order_id):
     """View order details"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_orders'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         owner_filter = get_owner_filter(request.user)
         order_qs = Order.objects.select_related('ordered_by', 'entered_by', 'confirmed_by', 'table_info').prefetch_related('order_items__product')
@@ -3623,10 +3695,12 @@ def view_order(request, order_id):
 @require_http_methods(["POST"])
 def update_order_status(request):
     """Update order status"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_orders'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         order_id = request.POST.get('order_id')
         new_status = request.POST.get('status')
@@ -3674,11 +3748,14 @@ def update_order_status(request):
 @login_required
 def add_order(request):
     """Add new order"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator privileges required.")
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_orders'):
+        messages.error(request, "You don't have permission to manage orders.")
+        return redirect('admin_panel:admin_dashboard')
+
     if request.method == 'POST':
         try:
             owner_filter = get_owner_filter(request.user)
@@ -3748,11 +3825,14 @@ def add_order(request):
 @login_required
 def edit_order(request, order_id):
     """Edit order"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator privileges required.")
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_orders'):
+        messages.error(request, "You don't have permission to manage orders.")
+        return redirect('admin_panel:admin_dashboard')
+
     # Get owner filter for multi-tenant support
     owner_filter = get_owner_filter(request.user)
     
@@ -3845,10 +3925,12 @@ def edit_order(request, order_id):
 @transaction.atomic
 def delete_order(request, order_id):
     """Delete order"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    
+    if not request.user.has_feature('manage_orders'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Enforce restaurant tenancy — administrators may delete any order,
         # owners/managers may only delete orders belonging to their restaurant.
@@ -3916,10 +3998,12 @@ def delete_order(request, order_id):
 @transaction.atomic
 def bulk_delete_orders(request):
     """Bulk delete multiple orders"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'error': 'Access denied. Administrator or Owner privileges required.'})
-    
+    if not request.user.has_feature('manage_orders'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Parse JSON data
         data = json.loads(request.body)
@@ -4518,11 +4602,14 @@ def debug_qr_code(request):
 @login_required
 def import_products_csv(request):
     """Import products from CSV file"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
-    
+    if not request.user.has_feature('manage_menu'):
+        messages.error(request, "You don't have permission to manage products.")
+        return redirect('admin_panel:admin_dashboard')
+
     if request.method != 'POST':
         return redirect('admin_panel:manage_products')
     
@@ -4733,11 +4820,14 @@ def import_products_csv(request):
 @login_required
 def import_products_excel(request):
     """Import products from Excel file"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
-    
+    if not request.user.has_feature('manage_menu'):
+        messages.error(request, "You don't have permission to manage products.")
+        return redirect('admin_panel:admin_dashboard')
+
     if request.method != 'POST':
         return redirect('admin_panel:manage_products')
     
@@ -5122,10 +5212,12 @@ def download_template_excel(request):
 @transaction.atomic
 def bulk_delete_products(request):
     """Bulk delete multiple products"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'error': 'Access denied. Administrator or Owner privileges required.'})
-    
+    if not request.user.has_feature('manage_menu'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+
     try:
         # Parse JSON data
         data = json.loads(request.body)
@@ -5209,11 +5301,14 @@ def bulk_delete_products(request):
 @login_required
 def export_products_csv(request):
     """Export all products to CSV"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
-    
+    if not request.user.has_feature('export_reports'):
+        messages.error(request, "You don't have permission to export reports.")
+        return redirect('admin_panel:admin_dashboard')
+
     # Get restaurant context for proper filtering
     session_restaurant_id = request.session.get('selected_restaurant_id')
     restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
@@ -5264,11 +5359,14 @@ def export_products_csv(request):
 @login_required  
 def export_products_excel(request):
     """Export all products to Excel"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
-    
+    if not request.user.has_feature('export_reports'):
+        messages.error(request, "You don't have permission to export reports.")
+        return redirect('admin_panel:admin_dashboard')
+
     try:
         import openpyxl
     except ImportError:
@@ -5337,11 +5435,14 @@ def export_products_excel(request):
 @login_required
 def export_products_pdf(request):
     """Export all products to PDF"""
-    if not (request.user.is_administrator() or request.user.is_owner() or 
+    if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
-    
+    if not request.user.has_feature('export_reports'):
+        messages.error(request, "You don't have permission to export reports.")
+        return redirect('admin_panel:admin_dashboard')
+
     try:
         from reportlab.lib.pagesizes import letter, A4
         from reportlab.lib import colors

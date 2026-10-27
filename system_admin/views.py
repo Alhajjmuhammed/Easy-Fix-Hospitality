@@ -21,6 +21,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def _can_access(user, section=None, action='view'):
+    """Returns True if user is admin or admin_staff with the given section permission."""
+    if user.is_administrator():
+        return True
+    if section and user.is_admin_staff():
+        return user.has_admin_perm(section, action)
+    return False
+
+
 def get_all_restaurants_for_admin():
     """
     Helper function to get all restaurants for admin filtering.
@@ -84,8 +94,8 @@ def get_restaurant_owner_by_id(restaurant_id):
 
 @login_required
 def system_dashboard(request):
-    """System-wide dashboard for administrators"""
-    if not request.user.is_administrator():
+    """System-wide dashboard for administrators and admin staff"""
+    if not (request.user.is_administrator() or request.user.is_admin_staff()):
         messages.error(request, 'Access denied. Administrator privileges required.')
         return redirect('accounts:login')
     
@@ -182,9 +192,9 @@ def upload_app_release(request):
 @login_required
 def statistics(request):
     """System-wide statistics for administrators"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'statistics', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     from datetime import datetime, timedelta
     from django.utils import timezone
@@ -194,12 +204,9 @@ def statistics(request):
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
     
-    # Basic counts - Updated for new role system
+    # Basic counts
     stats = {
-        'total_restaurants': User.objects.filter(
-            role__name__in=['owner', 'main_owner', 'branch_owner'],
-            restaurant_name__isnull=False
-        ).exclude(restaurant_name='').count(),
+        'total_restaurants': Restaurant.objects.filter(is_main_restaurant=True).count(),
         'total_users': User.objects.count(),
         'total_orders': Order.objects.count(),
         'total_products': Product.objects.count(),
@@ -244,29 +251,74 @@ def statistics(request):
         Role.objects.annotate(count=Count('user')).values_list('name', 'count')
     )
     
-    # Top restaurants by order count - Updated for new role system
-    top_restaurants = User.objects.filter(
+    # Top restaurants by order count
+    top_restaurants = list(User.objects.filter(
         role__name__in=['owner', 'main_owner', 'branch_owner'],
         restaurant_name__isnull=False
     ).exclude(restaurant_name='').annotate(
-        order_count=Count('tableinfo__order')
-    ).order_by('-order_count')[:10]
-    
+        order_count=Count('tables__orders', distinct=True)
+    ).order_by('-order_count')[:10])
+
+    # Daily orders for last 30 days (line graph)
+    from django.db.models.functions import TruncDate
+    _daily_orders = {
+        str(row['day']): row['count']
+        for row in Order.objects
+            .filter(created_at__date__gte=month_ago)
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(count=Count('id'))
+    }
+    _daily_users = {
+        str(row['day']): row['count']
+        for row in User.objects
+            .filter(date_joined__date__gte=month_ago)
+            .annotate(day=TruncDate('date_joined'))
+            .values('day')
+            .annotate(count=Count('id'))
+    }
+    _day_labels, _order_series, _user_series = [], [], []
+    for i in range(29, -1, -1):
+        d = today - timedelta(days=i)
+        _day_labels.append(d.strftime('%d %b'))
+        _order_series.append(_daily_orders.get(str(d), 0))
+        _user_series.append(_daily_users.get(str(d), 0))
+
+    STATUS_COLORS = {
+        'pending': '#f39c12', 'confirmed': '#3498db', 'preparing': '#9b59b6',
+        'ready': '#27ae60', 'delivered': '#95a5a6', 'cancelled': '#e74c3c',
+    }
+
     context = {
         'stats': stats,
         'order_status_counts': order_status_counts,
         'user_role_counts': user_role_counts,
         'top_restaurants': top_restaurants,
+        'json_order_status': json.dumps({
+            'labels': [s.title() for s in order_status_counts.keys()],
+            'data': list(order_status_counts.values()),
+            'colors': [STATUS_COLORS.get(s, '#bdc3c7') for s in order_status_counts.keys()],
+        }),
+        'json_role_counts': json.dumps({
+            'labels': [r.replace('_', ' ').title() for r in user_role_counts.keys()],
+            'data': list(user_role_counts.values()),
+        }),
+        'json_top_restaurants': json.dumps({
+            'labels': [r.restaurant_name for r in top_restaurants],
+            'data': [r.order_count for r in top_restaurants],
+        }),
+        'json_daily_orders': json.dumps({'labels': _day_labels, 'data': _order_series}),
+        'json_daily_users': json.dumps({'labels': _day_labels, 'data': _user_series}),
     }
-    
+
     return render(request, 'system_admin/statistics.html', context)
 
 @login_required
 def manage_all_restaurants(request):
     """Manage all restaurants system-wide with subscription plan information"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'restaurants', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Get search and filter parameters
     search_query = request.GET.get('search', '').strip()
@@ -363,6 +415,7 @@ def manage_all_restaurants(request):
         # Add subscription status and days remaining
         try:
             subscription = main_owner.subscription
+            restaurant.subscription = subscription
             restaurant.subscription_status = subscription.subscription_status
             restaurant.days_remaining = subscription.days_until_expiration
             restaurant.subscription_end_date = subscription.subscription_end_date
@@ -428,9 +481,9 @@ def manage_all_restaurants(request):
 @login_required
 def manage_all_users(request):
     """Manage all users system-wide"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'users', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Get all restaurants for filtering - Updated to include all owner types and PRO plans
     restaurants = get_all_restaurants_for_admin()
@@ -516,9 +569,9 @@ def manage_all_users(request):
 @login_required
 def view_all_orders(request):
     """View all orders system-wide"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'orders', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Filter options
     status_filter = request.GET.get('status', 'all')
@@ -624,9 +677,9 @@ def system_statistics(request):
 @transaction.atomic
 def create_restaurant_owner(request):
     """Create a new restaurant owner"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'restaurants', 'create'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     if request.method == 'POST':
         try:
@@ -656,6 +709,9 @@ def create_restaurant_owner(request):
             subscription_plan = 'PRO' if request.POST.get('subscription_plan') == 'PRO' else 'SINGLE'
             allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
             
+            # Enhanced validation
+            errors = []
+
             # Handle subscription dates based on quick_period or custom dates
             if quick_period and quick_period != 'custom':
                 # Use preset period - calculate dates automatically
@@ -679,9 +735,6 @@ def create_restaurant_owner(request):
                 # Default fallback (30 days)
                 start_date_obj = date.today()
                 end_date_obj = start_date_obj + timedelta(days=30)
-            
-            # Enhanced validation
-            errors = []
             
             # Required field validation
             if not username:
@@ -824,7 +877,7 @@ def create_restaurant_owner(request):
 @login_required
 def get_restaurant_details(request, restaurant_id):
     """Get detailed restaurant information via AJAX - NEW Restaurant model version"""
-    if not request.user.is_administrator():
+    if not _can_access(request.user, 'restaurants', 'view'):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
     try:
@@ -918,9 +971,9 @@ def get_restaurant_details(request, restaurant_id):
 @login_required
 def edit_restaurant(request, restaurant_id):
     """Edit restaurant information - NEW Restaurant model version"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'restaurants', 'edit'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Fetch Restaurant model (not User model!)
     restaurant_model = get_object_or_404(Restaurant, id=restaurant_id)
@@ -1114,70 +1167,101 @@ def edit_restaurant(request, restaurant_id):
     
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
+def _cascade_delete_restaurant(restaurant):
+    """Delete all PROTECT-referenced data for a restaurant in the correct dependency order."""
+    # 1. Cashier payment chain (PROTECT → Payment → Order)
+    try:
+        from cashier.models import VoidTransaction
+        VoidTransaction.objects.filter(original_payment__order__table_info__restaurant=restaurant).delete()
+    except Exception:
+        pass
+    try:
+        from cashier.models import OrderItemPayment
+        OrderItemPayment.objects.filter(payment__order__table_info__restaurant=restaurant).delete()
+    except Exception:
+        pass
+    try:
+        from cashier.models import Payment
+        Payment.objects.filter(order__table_info__restaurant=restaurant).delete()
+    except Exception:
+        pass
+    # 2. Waste logs and cost breakdowns (PROTECT → Order)
+    try:
+        from waste_management.models import FoodWasteLog
+        FoodWasteLog.objects.filter(order__table_info__restaurant=restaurant).delete()
+    except Exception:
+        pass
+    try:
+        from orders.models import OrderCostBreakdown
+        OrderCostBreakdown.objects.filter(order__table_info__restaurant=restaurant).delete()
+    except Exception:
+        pass
+    # 3. Orders cascade-delete OrderItems; TableInfo is PROTECT → Restaurant
+    Order.objects.filter(table_info__restaurant=restaurant).delete()
+    TableInfo.objects.filter(restaurant=restaurant).delete()
+    # 4. Waste logs that reference products directly (PROTECT → Product)
+    categories = list(MainCategory.objects.filter(restaurant=restaurant))
+    products = Product.objects.filter(main_category__in=categories)
+    try:
+        from waste_management.models import FoodWasteLog
+        FoodWasteLog.objects.filter(product__in=products).delete()
+    except Exception:
+        pass
+    # 5. Products then SubCategories must go before MainCategories (both PROTECT → MainCategory)
+    products.delete()
+    SubCategory.objects.filter(main_category__in=categories).delete()
+    MainCategory.objects.filter(restaurant=restaurant).delete()
+
+
 @login_required
 def delete_restaurant(request, restaurant_id):
     """Delete a restaurant (branch or main) - NEW Restaurant model version"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
-    
-    # Fetch Restaurant model (not User model!)
+    if not _can_access(request.user, 'restaurants', 'delete'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
+
     restaurant = get_object_or_404(Restaurant, id=restaurant_id)
-    
+
     if request.method == 'POST':
         restaurant_name = restaurant.name
         is_main = restaurant.is_main_restaurant
-        
+
         try:
-            # If main restaurant, delete all branches first
             if is_main:
                 branches = list(restaurant.branches.all())
                 branch_count = len(branches)
-                
                 for branch in branches:
-                    # Only clear branch_owner (don't clear parent_restaurant - violates CHECK constraint)
-                    if branch.branch_owner:
-                        branch.branch_owner = None
-                        branch.save(update_fields=['branch_owner'])
-                    # Delete branch directly
+                    _cascade_delete_restaurant(branch)
                     branch.delete()
-                
                 success_msg = f'Main restaurant "{restaurant_name}" and {branch_count} branch(es) deleted successfully.'
             else:
-                # Branch deletion - simpler
                 success_msg = f'Branch "{restaurant_name}" deleted successfully.'
-            
-            # Clear branch_owner if exists (don't clear parent_restaurant for branches)
-            if restaurant.branch_owner:
-                restaurant.branch_owner = None
-                restaurant.save(update_fields=['branch_owner'])
-            
-            # Delete the restaurant
+
+            _cascade_delete_restaurant(restaurant)
             restaurant.delete()
-            
+
             messages.success(request, success_msg)
             logger.info(f"[SYSTEM ADMIN] Restaurant deleted: {restaurant_name} (is_main={is_main}) by {request.user.username}")
-            
+
         except Exception as e:
             logger.error(f'Error deleting restaurant: {str(e)}')
             messages.error(request, 'Error deleting restaurant. Please try again.')
-        
+
         return redirect('system_admin:manage_restaurants')
-    
-    # For GET requests, just redirect back to manage restaurants
+
     return redirect('system_admin:manage_restaurants')
 
 
 @login_required
 def block_restaurant(request, restaurant_id):
     """Block a restaurant's subscription access"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'restaurants', 'edit'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
+    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
     restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
-    
+
     if request.method == 'POST':
         try:
             # Get or create subscription
@@ -1217,13 +1301,13 @@ def block_restaurant(request, restaurant_id):
 @login_required
 def unblock_restaurant(request, restaurant_id):
     """Unblock a restaurant's subscription access"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'restaurants', 'edit'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
+    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
     restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
-    
+
     if request.method == 'POST':
         try:
             if hasattr(restaurant_owner, 'subscription'):
@@ -1264,11 +1348,11 @@ def unblock_restaurant(request, restaurant_id):
 @login_required
 def extend_subscription(request, restaurant_id):
     """Extend a restaurant's subscription"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'restaurants', 'edit'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
-    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner'])
+    restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
     restaurant_name = restaurant_owner.restaurant_name or f"Restaurant {restaurant_owner.username}"
     
     if request.method == 'POST':
@@ -1342,9 +1426,9 @@ def extend_subscription(request, restaurant_id):
 @login_required
 def manage_categories(request):
     """Manage all categories across all restaurants"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'categories', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Get all restaurants for filtering - Updated to include all owner types and PRO plans
     restaurants = get_all_restaurants_for_admin()
@@ -1415,8 +1499,8 @@ def manage_categories(request):
 @login_required
 def create_category(request):
     """Create a new main category"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'create'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -1461,8 +1545,8 @@ def create_category(request):
 @login_required
 def create_subcategory(request):
     """Create a new sub category"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'create'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -1502,8 +1586,8 @@ def create_subcategory(request):
 @login_required
 def edit_category(request, category_id):
     """Edit an existing main category"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     category = get_object_or_404(MainCategory, id=category_id)
     
@@ -1552,8 +1636,8 @@ def edit_category(request, category_id):
 @login_required
 def delete_category(request, category_id):
     """Delete a main category"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'delete'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -1586,8 +1670,8 @@ def delete_category(request, category_id):
 @login_required
 def category_details(request, category_id):
     """Get category details including subcategories and products"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     category = get_object_or_404(MainCategory, id=category_id)
     subcategories = category.subcategories.all()
@@ -1603,8 +1687,8 @@ def category_details(request, category_id):
 @login_required
 def edit_subcategory(request, subcategory_id):
     """Edit an existing sub category"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     subcategory = get_object_or_404(SubCategory, id=subcategory_id)
     
@@ -1651,8 +1735,8 @@ def edit_subcategory(request, subcategory_id):
 @login_required
 def delete_subcategory(request, subcategory_id):
     """Delete a sub category"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'delete'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -1688,9 +1772,9 @@ def delete_subcategory(request, subcategory_id):
 @login_required
 def manage_products(request):
     """Manage all products across all restaurants"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'products', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Get all restaurants for filtering - Updated to include all owner types and PRO plans
     restaurants = get_all_restaurants_for_admin()
@@ -1780,8 +1864,8 @@ def manage_products(request):
 @login_required
 def create_product(request):
     """Create a new product"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'products', 'create'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -1846,8 +1930,8 @@ def create_product(request):
 @login_required
 def edit_product(request, product_id):
     """Edit an existing product"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'products', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     product = get_object_or_404(Product, id=product_id)
     
@@ -1920,8 +2004,8 @@ def edit_product(request, product_id):
 @login_required
 def delete_product(request, product_id):
     """Delete a product"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'products', 'delete'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -1955,8 +2039,8 @@ def delete_product(request, product_id):
 @login_required
 def product_details(request, product_id):
     """Get product details"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'products', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     product = get_object_or_404(Product, id=product_id)
     
@@ -1980,8 +2064,8 @@ def product_details(request, product_id):
 @login_required
 def get_subcategories(request, category_id):
     """Get subcategories for a main category (AJAX endpoint)"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         category = get_object_or_404(MainCategory, id=category_id)
@@ -1994,8 +2078,8 @@ def get_subcategories(request, category_id):
 @login_required
 def get_categories(request, restaurant_id):
     """Get main categories for a restaurant (AJAX endpoint)"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'categories', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         restaurant_owner = get_object_or_404(User, id=restaurant_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
@@ -2016,9 +2100,9 @@ def get_categories(request, restaurant_id):
 @login_required
 def manage_tables(request):
     """Manage all tables across all restaurants"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'tables', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Get all restaurants for filtering - Updated to include all owner types and PRO plans
     restaurants = get_all_restaurants_for_admin()
@@ -2103,8 +2187,8 @@ def manage_tables(request):
 @login_required
 def create_table(request):
     """Create a new table"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'tables', 'create'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2159,8 +2243,8 @@ def create_table(request):
 @login_required
 def edit_table(request, table_id):
     """Edit an existing table"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'tables', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     table = get_object_or_404(TableInfo, id=table_id)
     
@@ -2219,8 +2303,8 @@ def edit_table(request, table_id):
 @login_required
 def delete_table(request, table_id):
     """Delete a table"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'tables', 'delete'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2253,8 +2337,8 @@ def delete_table(request, table_id):
 @login_required
 def table_details(request, table_id):
     """Get table details including recent orders"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'tables', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     table = get_object_or_404(TableInfo, id=table_id)
     
@@ -2266,7 +2350,8 @@ def table_details(request, table_id):
     recent_orders = orders.select_related('ordered_by').order_by('-created_at')[:10]
     
     # Revenue statistics
-    total_revenue = sum(order.total_amount for order in orders)
+    from django.db.models import Sum as _Sum
+    total_revenue = orders.aggregate(total=_Sum('total_amount'))['total'] or 0
     
     context = {
         'table': table,
@@ -2282,9 +2367,9 @@ def table_details(request, table_id):
 @login_required
 def manage_orders(request):
     """Manage all orders across all restaurants"""
-    if not request.user.is_administrator():
-        messages.error(request, 'Access denied. Administrator privileges required.')
-        return redirect('accounts:login')
+    if not _can_access(request.user, 'orders', 'view'):
+        messages.error(request, 'Access denied.')
+        return redirect('system_admin:dashboard')
     
     # Get all restaurants for filtering - Updated to include all owner types and PRO plans
     restaurants = get_all_restaurants_for_admin()
@@ -2324,7 +2409,10 @@ def manage_orders(request):
     
     # Apply filters
     if restaurant_filter:
-        orders = orders.filter(table_info__owner__id=restaurant_filter)
+        orders = orders.filter(
+            Q(table_info__owner__id=restaurant_filter) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__id=restaurant_filter)
+        )
         selected_restaurant = get_restaurant_owner_by_id(restaurant_filter)
     else:
         selected_restaurant = None
@@ -2376,8 +2464,8 @@ def manage_orders(request):
 @login_required
 def order_details(request, order_id):
     """Get detailed order information"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'orders', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     order = get_object_or_404(Order, id=order_id)
     order_items = order.order_items.select_related('product', 'product__main_category').all()
@@ -2391,8 +2479,8 @@ def order_details(request, order_id):
 @login_required
 def update_order_status(request, order_id):
     """Update order status"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'orders', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2438,8 +2526,8 @@ def update_order_status(request, order_id):
 @login_required
 def update_payment_status(request, order_id):
     """Update payment status"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'orders', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2485,8 +2573,8 @@ def update_payment_status(request, order_id):
 @login_required
 def cancel_order(request, order_id):
     """Cancel an order with reason"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'orders', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2521,8 +2609,8 @@ def cancel_order(request, order_id):
 @login_required
 def create_staff(request):
     """Create a new staff member"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'users', 'create'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2594,8 +2682,8 @@ def create_staff(request):
 @login_required
 def edit_staff(request, staff_id):
     """Edit an existing staff member"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'users', 'edit'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     staff_member = get_object_or_404(User, id=staff_id)
     
@@ -2671,8 +2759,8 @@ def edit_staff(request, staff_id):
 @login_required
 def delete_staff(request, staff_id):
     """Delete a staff member"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'users', 'delete'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2686,7 +2774,7 @@ def delete_staff(request, staff_id):
             role_name = staff_member.role.name
             
             # Special handling for owners - check if they have staff
-            if role_name == 'owner':
+            if role_name in ('owner', 'main_owner', 'branch_owner'):
                 staff_count = User.objects.filter(owner=staff_member).count()
                 if staff_count > 0:
                     return JsonResponse({
@@ -2729,8 +2817,8 @@ def delete_staff(request, staff_id):
 @login_required
 def create_user(request):
     """Create a new user"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied'})
+    if not _can_access(request.user, 'users', 'create'):
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2800,8 +2888,8 @@ def create_user(request):
 @login_required
 def user_details(request, user_id):
     """Get user details"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied'})
+    if not _can_access(request.user, 'users', 'view'):
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
     
     try:
         user = get_object_or_404(User, id=user_id)
@@ -2827,8 +2915,8 @@ def user_details(request, user_id):
 @login_required
 def edit_user(request, user_id):
     """Edit existing user"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied'})
+    if not _can_access(request.user, 'users', 'edit'):
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2903,8 +2991,8 @@ def edit_user(request, user_id):
 @login_required
 def delete_user(request, user_id):
     """Delete user"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied'})
+    if not _can_access(request.user, 'users', 'delete'):
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -2930,8 +3018,8 @@ def delete_user(request, user_id):
 @login_required
 def get_order_status(request, order_id):
     """Get current order status for editing"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'orders', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         order = get_object_or_404(Order, id=order_id)
@@ -2947,8 +3035,8 @@ def get_order_status(request, order_id):
 @login_required  
 def get_payment_status(request, order_id):
     """Get current payment status for editing"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'message': 'Access denied'})
+    if not _can_access(request.user, 'orders', 'view'):
+        return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
     
     try:
         order = get_object_or_404(Order, id=order_id)
@@ -2966,8 +3054,8 @@ def get_payment_status(request, order_id):
 @login_required
 def toggle_restaurant_subscription_plan(request):
     """Admin function to change restaurant subscription plan"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    if not _can_access(request.user, 'restaurants', 'edit'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -3115,8 +3203,8 @@ def toggle_restaurant_subscription_plan(request):
 @login_required  
 def toggle_restaurant_status(request):
     """Admin function to activate/deactivate restaurants"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    if not _can_access(request.user, 'restaurants', 'edit'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -3145,8 +3233,8 @@ def toggle_restaurant_status(request):
 @login_required
 def toggle_remote_orders(request):
     """Admin function to allow/disallow delivery & pickup (remote orders) for a restaurant"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    if not _can_access(request.user, 'restaurants', 'edit'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
 
     if request.method == 'POST':
         try:
@@ -3172,8 +3260,8 @@ def toggle_remote_orders(request):
 @login_required
 def delete_restaurant_admin(request):
     """Admin function to delete restaurants"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    if not _can_access(request.user, 'restaurants', 'delete'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
     
     if request.method == 'POST':
         try:
@@ -3181,26 +3269,13 @@ def delete_restaurant_admin(request):
             restaurant = get_object_or_404(Restaurant, id=restaurant_id)
             
             restaurant_name = restaurant.name
-            main_owner = restaurant.main_owner
-            
-            # Delete all branches first if this is a main restaurant
+
             if restaurant.is_main_restaurant:
-                branches = list(restaurant.branches.all())
-                for branch in branches:
-                    # Only clear branch_owner (don't clear parent_restaurant - violates CHECK constraint)
-                    if branch.branch_owner:
-                        branch.branch_owner = None
-                        branch.save(update_fields=['branch_owner'])
-                    # Delete branch directly
+                for branch in list(restaurant.branches.all()):
+                    _cascade_delete_restaurant(branch)
                     branch.delete()
-            
-            # For branch deletion - don't clear parent_restaurant (violates CHECK constraint)
-            # Just clear branch_owner if exists
-            if restaurant.branch_owner:
-                restaurant.branch_owner = None
-                restaurant.save(update_fields=['branch_owner'])
-            
-            # Delete the restaurant directly (parent_restaurant stays until deletion)
+
+            _cascade_delete_restaurant(restaurant)
             restaurant.delete()
             
             return JsonResponse({
@@ -3218,8 +3293,8 @@ def delete_restaurant_admin(request):
 @login_required
 def restaurant_details_admin(request, restaurant_id):
     """Admin function to get detailed restaurant information"""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied. Administrator privileges required.'})
+    if not _can_access(request.user, 'restaurants', 'view'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
     
     try:
         restaurant = get_object_or_404(Restaurant, id=restaurant_id)
@@ -3271,7 +3346,7 @@ def restaurant_details_admin(request, restaurant_id):
 @login_required
 def manage_riders(request):
     """List all delivery riders across all restaurants (admin) or per restaurant."""
-    if not request.user.is_administrator():
+    if not _can_access(request.user, 'riders', 'view'):
         messages.error(request, 'Access denied.')
         return redirect('system_admin:dashboard')
 
@@ -3315,9 +3390,9 @@ def manage_riders(request):
 @login_required
 def create_rider_form(request):
     """Handle traditional HTML form POST to create a delivery rider."""
-    if not request.user.is_administrator():
+    if not _can_access(request.user, 'riders', 'create'):
         messages.error(request, 'Access denied.')
-        return redirect('system_admin:manage_riders')
+        return redirect('system_admin:dashboard')
 
     if request.method != 'POST':
         return redirect('system_admin:manage_riders')
@@ -3408,23 +3483,14 @@ def create_rider_form(request):
 @login_required
 def create_rider(request):
     """Create a new delivery rider account for a restaurant."""
-    print(f"\n[CREATE_RIDER] ===== REQUEST RECEIVED =====")
-    print(f"[CREATE_RIDER] Method: {request.method}")
-    print(f"[CREATE_RIDER] User: {request.user} | Is admin: {request.user.is_administrator()}")
-
-    if not request.user.is_administrator():
-        print("[CREATE_RIDER] DENIED: not admin")
-        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    if not _can_access(request.user, 'riders', 'create'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
 
     if request.method != 'POST':
-        print("[CREATE_RIDER] DENIED: not POST")
         return JsonResponse({'success': False, 'error': 'POST required.'})
 
     try:
-        raw_body = request.body
-        print(f"[CREATE_RIDER] Raw body: {raw_body[:500]}")
-        data = json.loads(raw_body)
-        print(f"[CREATE_RIDER] Parsed data: {data}")
+        data = json.loads(request.body)
 
         owner_id     = data.get('owner_id') or None
         first_name   = data.get('first_name', '').strip()
@@ -3434,23 +3500,17 @@ def create_rider(request):
         phone        = data.get('phone', '').strip()
         vehicle_type = data.get('vehicle_type', 'motorcycle')
 
-        print(f"[CREATE_RIDER] username={username!r} owner_id={owner_id!r} vehicle={vehicle_type!r}")
-
         if not username or not password:
-            print("[CREATE_RIDER] FAIL: missing username or password")
             return JsonResponse({'success': False, 'error': 'Username and password are required.'})
 
         owner = None
         if owner_id:
             owner = get_object_or_404(User, id=owner_id, role__name__in=['owner', 'main_owner', 'branch_owner'])
-            print(f"[CREATE_RIDER] owner resolved: {owner}")
 
         if User.objects.filter(username=username).exists():
-            print(f"[CREATE_RIDER] FAIL: username {username!r} already taken")
             return JsonResponse({'success': False, 'error': f'Username "{username}" is already taken.'})
 
         rider_role = Role.objects.get(name='delivery_rider')
-        print(f"[CREATE_RIDER] rider_role: {rider_role}")
 
         with transaction.atomic():
             user = User.objects.create_user(
@@ -3463,7 +3523,6 @@ def create_rider(request):
                 owner=owner,
                 is_active_staff=True,
             )
-            print(f"[CREATE_RIDER] User created: {user.id}")
             rider = DeliveryRider.objects.create(
                 user=user,
                 owner=owner,
@@ -3471,24 +3530,17 @@ def create_rider(request):
                 is_available=True,
                 is_active=True,
             )
-            print(f"[CREATE_RIDER] Rider created: {rider.id}")
 
         scope_label = owner.restaurant_name if owner else 'Global'
-        result = {
+        return JsonResponse({
             'success': True,
             'message': f'Rider "{user.get_full_name() or username}" created for {scope_label}.',
             'rider_id': rider.id,
-        }
-        print(f"[CREATE_RIDER] SUCCESS: {result}")
-        return JsonResponse(result)
+        })
 
     except Role.DoesNotExist:
-        print("[CREATE_RIDER] FAIL: delivery_rider role not found")
         return JsonResponse({'success': False, 'error': 'delivery_rider role not found. Run migrations first.'})
     except Exception as e:
-        import traceback
-        print(f"[CREATE_RIDER] EXCEPTION: {type(e).__name__}: {e}")
-        traceback.print_exc()
         logger.error(f'create_rider error: {e}', exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)})
 
@@ -3496,8 +3548,8 @@ def create_rider(request):
 @login_required
 def toggle_rider_status(request):
     """Toggle a rider's is_active flag."""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    if not _can_access(request.user, 'riders', 'edit'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
 
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required.'})
@@ -3528,8 +3580,8 @@ def toggle_rider_status(request):
 @login_required
 def delete_rider(request, rider_id):
     """Permanently delete a delivery rider."""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    if not _can_access(request.user, 'riders', 'delete'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
 
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required.'})
@@ -3547,8 +3599,8 @@ def delete_rider(request, rider_id):
 @login_required
 def rider_details(request, rider_id):
     """Return rider details as JSON for the admin modal."""
-    if not request.user.is_administrator():
-        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    if not _can_access(request.user, 'riders', 'view'):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
 
     rider = get_object_or_404(
         DeliveryRider.objects.select_related('user', 'owner'), id=rider_id

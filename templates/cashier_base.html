@@ -227,7 +227,7 @@
             
             <!-- Desktop Navigation -->
             <div class="desktop-nav d-flex align-items-center flex-grow-1">
-
+                {% with feats=request.user.visible_features %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'orders:select_table' %}" title="Select Table & View Menu">
                     <i class="fas fa-utensils me-1"></i>Menu
                 </a>
@@ -239,32 +239,41 @@
                 <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_dashboard' %}" title="Customer Care Dashboard">
                     <i class="fas fa-headset me-1"></i>CC Dashboard
                 </a>
+                {% if 'process_payments' in feats %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_payments' %}" title="Process Payments">
                     <i class="fas fa-cash-register me-1"></i>Payments
                 </a>
                 {% endif %}
-                {% if user.is_cashier %}
+                {% endif %}
+                {% if user.is_cashier and 'view_receipts' in feats %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'cashier:receipt_management' %}" title="Manage Receipts">
                     <i class="fas fa-receipt me-1"></i>Manage Receipts
                 </a>
                 {% endif %}
                 {% if user.is_cashier %}
+                {% if 'view_reports' in feats %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'cashier:cashier_reports' %}" title="My Sales Reports">
                     <i class="fas fa-chart-bar me-1"></i>My Reports
                 </a>
+                {% endif %}
+                {% if 'manage_orders' in feats %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'cashier:my_orders' %}" title="My Orders">
                     <i class="fas fa-list-ul me-1"></i>My Orders
                 </a>
+                {% endif %}
                 {% elif user.is_customer_care %}
+                {% if 'view_reports' in feats %}
                 <a class="text-decoration-none text-dark me-3" href="{% url 'orders:customer_care_reports' %}" title="My Sales Reports">
                     <i class="fas fa-chart-bar me-1"></i>My Reports
                 </a>
                 {% endif %}
-                {% if user.is_cashier %}
+                {% endif %}
+                {% if user.is_cashier and 'manage_waste' in feats %}
                 <a class="text-decoration-none text-dark me-3" href="#" data-bs-toggle="modal" data-bs-target="#recordWasteModal" title="Record Waste">
                     <i class="fas fa-trash-alt me-1"></i>Record Waste
                 </a>
                 {% endif %}
+                {% endwith %}
                 
                 <div class="ms-auto d-flex align-items-center">
                     <div class="dropdown">
@@ -295,11 +304,11 @@
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <form method="post" action="{% url 'accounts:logout' %}" style="display: inline; width: 100%;">
+                                <a class="dropdown-item" href="#" onclick="document.getElementById('logoutFormDropdown').submit(); return false;" style="cursor:pointer;">
+                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                </a>
+                                <form id="logoutFormDropdown" method="post" action="{% url 'accounts:logout' %}" style="display:none;">
                                     {% csrf_token %}
-                                    <button type="submit" class="dropdown-item" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
-                                        <i class="fas fa-sign-out-alt"></i> Logout
-                                    </button>
                                 </form>
                             </li>
                         </ul>
@@ -326,7 +335,7 @@
             <div class="container">
                 <div class="collapse" id="mobileNavContent">
                     <div class="mobile-nav-content">
-
+                        {% with feats=request.user.visible_features %}
                         <a class="mobile-nav-link" href="{% url 'orders:select_table' %}">
                             <i class="fas fa-utensils me-2"></i>Menu
                         </a>
@@ -338,32 +347,41 @@
                         <a class="mobile-nav-link active" href="{% url 'orders:customer_care_dashboard' %}">
                             <i class="fas fa-headset me-2"></i>Customer Care Dashboard
                         </a>
+                        {% if 'process_payments' in feats %}
                         <a class="mobile-nav-link" href="{% url 'orders:customer_care_payments' %}">
                             <i class="fas fa-cash-register me-2"></i>Process Payments
                         </a>
                         {% endif %}
-                        {% if user.is_cashier %}
+                        {% endif %}
+                        {% if user.is_cashier and 'view_receipts' in feats %}
                         <a class="mobile-nav-link" href="{% url 'cashier:receipt_management' %}">
                             <i class="fas fa-receipt me-2"></i>Manage Receipts
                         </a>
                         {% endif %}
                         {% if user.is_cashier %}
+                        {% if 'view_reports' in feats %}
                         <a class="mobile-nav-link" href="{% url 'cashier:cashier_reports' %}">
                             <i class="fas fa-chart-bar me-2"></i>My Reports
                         </a>
+                        {% endif %}
+                        {% if 'manage_orders' in feats %}
                         <a class="mobile-nav-link" href="{% url 'cashier:my_orders' %}">
                             <i class="fas fa-list-ul me-2"></i>My Orders
                         </a>
+                        {% endif %}
                         {% elif user.is_customer_care %}
+                        {% if 'view_reports' in feats %}
                         <a class="mobile-nav-link" href="{% url 'orders:customer_care_reports' %}">
                             <i class="fas fa-chart-bar me-2"></i>My Reports
                         </a>
                         {% endif %}
-                        {% if user.is_cashier %}
+                        {% endif %}
+                        {% if user.is_cashier and 'manage_waste' in feats %}
                         <a class="mobile-nav-link" href="#" data-bs-toggle="modal" data-bs-target="#recordWasteModal">
                             <i class="fas fa-trash-alt me-2"></i>Record Waste
                         </a>
                         {% endif %}
+                        {% endwith %}
                         <hr class="my-2">
                         {% if user.is_owner or user.is_manager %}
                         <a class="mobile-nav-link" href="{% url 'admin_panel:admin_dashboard' %}">
@@ -376,11 +394,11 @@
                         <a class="mobile-nav-link" href="{% url 'accounts:profile' %}">
                             <i class="fas fa-user me-2"></i>Profile
                         </a>
-                        <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
+                        <a class="mobile-nav-link" href="#" onclick="document.getElementById('logoutFormMobile').submit(); return false;">
+                            <i class="fas fa-sign-out-alt me-2"></i>Logout
+                        </a>
+                        <form id="logoutFormMobile" method="post" action="{% url 'accounts:logout' %}" style="display:none;">
                             {% csrf_token %}
-                            <button type="submit" class="mobile-nav-link" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
-                                <i class="fas fa-sign-out-alt me-2"></i>Logout
-                            </button>
                         </form>
                     </div>
                 </div>

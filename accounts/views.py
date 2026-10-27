@@ -78,8 +78,8 @@ def login_view(request):
                 messages.success(request, f'Welcome back, {user.first_name or user.username}!')
                 
                 # Role-based redirect
-                if user.is_administrator():
-                    return redirect('system_admin:dashboard')  # Redirect admins to system dashboard
+                if user.is_administrator() or user.is_admin_staff():
+                    return redirect('system_admin:dashboard')  # Redirect admins & admin staff to system dashboard
                 elif user.is_owner():
                     return redirect('admin_panel:admin_dashboard')  # Owners now use admin panel
                 elif user.is_manager():
