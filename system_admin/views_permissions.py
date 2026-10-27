@@ -30,7 +30,10 @@ BUILT_IN_ROLES = [
 
 
 def _require_admin(request):
-    return request.user.is_authenticated and request.user.is_administrator()
+    if not request.user.is_authenticated:
+        return False
+    from system_admin.views import _can_access
+    return _can_access(request.user, 'restaurants', 'edit')
 
 
 @login_required

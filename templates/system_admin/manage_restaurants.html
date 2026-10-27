@@ -335,6 +335,7 @@
                                     </td>
                                     <!-- Delivery & Pickup toggle -->
                                     <td class="text-center align-middle">
+                                        {% if can_edit %}
                                         <div class="del-toggle {% if restaurant.allow_remote_orders %}on{% endif %}"
                                              id="remote-toggle-{{ restaurant.id }}"
                                              data-restaurant-id="{{ restaurant.id }}"
@@ -342,6 +343,11 @@
                                             <span class="del-knob"></span>
                                             <span class="del-text">{% if restaurant.allow_remote_orders %}ON{% else %}OFF{% endif %}</span>
                                         </div>
+                                        {% else %}
+                                        <span class="badge {% if restaurant.allow_remote_orders %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {% if restaurant.allow_remote_orders %}ON{% else %}OFF{% endif %}
+                                        </span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if restaurant.parent_restaurant %}
