@@ -479,16 +479,20 @@
                                     <button class="btn btn-sm btn-outline-info" onclick="viewOrderDetails({{ order.id }})" title="View Details">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    {% if can_edit %}
                                     <button class="btn btn-sm btn-outline-warning" onclick="updateOrderStatus({{ order.id }})" title="Update Status">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-sm btn-outline-success" onclick="updatePaymentStatus({{ order.id }})" title="Update Payment">
                                         <i class="fas fa-credit-card"></i>
                                     </button>
+                                    {% endif %}
+                                    {% if can_delete %}
                                     {% if order.status != 'cancelled' and order.status != 'served' %}
                                     <button class="btn btn-sm btn-outline-danger" onclick="cancelOrder({{ order.id }}, '{{ order.order_number }}')" title="Cancel">
                                         <i class="fas fa-times-circle"></i>
                                     </button>
+                                    {% endif %}
                                     {% endif %}
                                 </td>
                             </tr>

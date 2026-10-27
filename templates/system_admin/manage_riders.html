@@ -42,9 +42,11 @@
         <span class="badge bg-secondary ms-2">{{ total_count }}</span>
       </h5>
     </div>
+    {% if can_create %}
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRiderModal">
       <i class="fas fa-user-plus me-1"></i> Add Rider
     </button>
+    {% endif %}
   </div>
 
   <!-- Filters -->
@@ -145,11 +147,13 @@
                     onclick="viewRiderDetails({{ rider.id }})"
                     title="View details"
                   ><i class="fas fa-eye"></i></button>
+                  {% if can_delete %}
                   <button
                     class="btn btn-outline-danger"
                     onclick="confirmDeleteRider({{ rider.id }}, '{{ rider.user.get_full_name|default:rider.user.username }}')"
                     title="Delete rider"
                   ><i class="fas fa-trash"></i></button>
+                  {% endif %}
                 </div>
               </td>
             </tr>

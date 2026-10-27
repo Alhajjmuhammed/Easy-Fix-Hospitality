@@ -181,8 +181,10 @@
                                 data-table-id="{{ table.id }}" title="Edit Table">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-{% if table.is_available %}warning{% else %}success{% endif %} toggle-status-btn" 
-                                data-table-id="{{ table.id }}" title="{% if table.is_available %}Mark as Occupied{% else %}Mark as Available{% endif %}">
+                        <button type="button" class="btn btn-sm btn-outline-{% if table.is_available %}warning{% else %}success{% endif %} toggle-status-btn"
+                                data-table-id="{{ table.id }}"
+                                data-is-available="{{ table.is_available|yesno:'true,false' }}"
+                                title="{% if table.is_available %}Mark as Occupied{% else %}Mark as Available{% endif %}">
                             <i class="fas fa-{% if table.is_available %}lock{% else %}unlock{% endif %}"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-danger delete-table-btn" 
@@ -566,12 +568,15 @@ $(document).ready(function() {
     // Toggle Status Button Click
     $('.toggle-status-btn').on('click', function() {
         const tableId = $(this).data('table-id');
-        
+        const isAvailable = $(this).data('is-available') === true || $(this).data('is-available') === 'true';
+        const action = isAvailable ? 'occupy' : 'free';
+
         $.ajax({
             url: '{% url "admin_panel:toggle_table_status" %}',
             type: 'POST',
             data: {
                 'table_id': tableId,
+                'action': action,
                 'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
             },
             success: function(response) {

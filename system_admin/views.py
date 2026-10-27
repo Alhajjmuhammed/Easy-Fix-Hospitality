@@ -474,8 +474,11 @@ def manage_all_restaurants(request):
         'per_page_options': per_page_options,
         'paginator': paginator,
         'page_obj': restaurants_page,
+        'can_create': _can_access(request.user, 'restaurants', 'create'),
+        'can_edit': _can_access(request.user, 'restaurants', 'edit'),
+        'can_delete': _can_access(request.user, 'restaurants', 'delete'),
     }
-    
+
     return render(request, 'system_admin/manage_restaurants.html', context)
 
 @login_required
@@ -562,8 +565,11 @@ def manage_all_users(request):
         'per_page': per_page,
         'total_users': total_users,
         'filtered_count': filtered_count,
+        'can_create': _can_access(request.user, 'users', 'create'),
+        'can_edit': _can_access(request.user, 'users', 'edit'),
+        'can_delete': _can_access(request.user, 'users', 'delete'),
     }
-    
+
     return render(request, 'system_admin/manage_users.html', context)
 
 @login_required
@@ -600,8 +606,11 @@ def view_all_orders(request):
         'status_filter': status_filter,
         'restaurant_filter': restaurant_filter,
         'status_choices': Order.STATUS_CHOICES,
+        'can_create': _can_access(request.user, 'orders', 'create'),
+        'can_edit': _can_access(request.user, 'orders', 'edit'),
+        'can_delete': _can_access(request.user, 'orders', 'delete'),
     }
-    
+
     return render(request, 'system_admin/view_orders.html', context)
 
 @login_required
@@ -1493,6 +1502,9 @@ def manage_categories(request):
         'per_page': per_page,
         'total_categories': total_categories,
         'filtered_count': filtered_count,
+        'can_create': _can_access(request.user, 'categories', 'create'),
+        'can_edit': _can_access(request.user, 'categories', 'edit'),
+        'can_delete': _can_access(request.user, 'categories', 'delete'),
     }
     return render(request, 'system_admin/manage_categories.html', context)
 
@@ -1858,6 +1870,9 @@ def manage_products(request):
         'per_page': per_page,
         'total_products': total_products,
         'filtered_count': filtered_count,
+        'can_create': _can_access(request.user, 'products', 'create'),
+        'can_edit': _can_access(request.user, 'products', 'edit'),
+        'can_delete': _can_access(request.user, 'products', 'delete'),
     }
     return render(request, 'system_admin/manage_products.html', context)
 
@@ -2181,6 +2196,9 @@ def manage_tables(request):
         'per_page_options': per_page_options,
         'paginator': paginator,
         'page_obj': tables_page,
+        'can_create': _can_access(request.user, 'tables', 'create'),
+        'can_edit': _can_access(request.user, 'tables', 'edit'),
+        'can_delete': _can_access(request.user, 'tables', 'delete'),
     }
     return render(request, 'system_admin/manage_tables.html', context)
 
@@ -2458,6 +2476,9 @@ def manage_orders(request):
         'per_page_options': per_page_options,
         'paginator': paginator,
         'page_obj': orders_page,
+        'can_create': _can_access(request.user, 'orders', 'create'),
+        'can_edit': _can_access(request.user, 'orders', 'edit'),
+        'can_delete': _can_access(request.user, 'orders', 'delete'),
     }
     return render(request, 'system_admin/manage_orders.html', context)
 
@@ -3384,6 +3405,9 @@ def manage_riders(request):
         'restaurant_filter': restaurant_filter,
         'restaurant_owners': restaurant_owners,
         'total_count': qs.count(),
+        'can_create': _can_access(request.user, 'riders', 'create'),
+        'can_edit': _can_access(request.user, 'riders', 'edit'),
+        'can_delete': _can_access(request.user, 'riders', 'delete'),
     })
 
 
@@ -3432,6 +3456,9 @@ def create_rider_form(request):
             'total_count': qs.count(),
             'rider_error': msg,
             'form_data': form_data,
+            'can_create': _can_access(request.user, 'riders', 'create'),
+            'can_edit': _can_access(request.user, 'riders', 'edit'),
+            'can_delete': _can_access(request.user, 'riders', 'delete'),
         })
 
     if not username or not password:

@@ -196,9 +196,11 @@
             {% endif %}
         </small>
     </div>
+    {% if can_create %}
     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createRestaurantModal">
         <i class="fas fa-plus me-1"></i>Add New Restaurant
     </button>
+    {% endif %}
 </div>
 
 <div class="row mb-4">
@@ -407,10 +409,12 @@
                                                     data-restaurant-id="{{ restaurant.id }}" title="View Details">
                                                 <i class="fas fa-eye me-1"></i>View
                                             </button>
+                                            {% if can_edit %}
                                             <button class="btn btn-sm btn-outline-warning edit-restaurant"
                                                     data-restaurant-id="{{ restaurant.id }}" title="Edit Restaurant">
                                                 <i class="fas fa-edit me-1"></i>Edit
                                             </button>
+                                            {% endif %}
                                             <a class="btn btn-sm btn-outline-info"
                                                href="{% url 'system_admin:restaurant_permissions' restaurant.main_owner.id %}"
                                                title="Manage Permissions">
@@ -451,11 +455,13 @@
                                                 {% endif %}
                                             {% endif %}
                                             
-                                            <button class="btn btn-sm btn-outline-danger delete-restaurant" 
-                                                    data-restaurant-id="{{ restaurant.id }}" 
+                                            {% if can_delete %}
+                                            <button class="btn btn-sm btn-outline-danger delete-restaurant"
+                                                    data-restaurant-id="{{ restaurant.id }}"
                                                     data-restaurant-name="{{ restaurant.restaurant_name|default:restaurant.username }}" title="Delete Restaurant">
                                                 <i class="fas fa-trash me-1"></i>Delete
                                             </button>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
@@ -526,9 +532,11 @@
                         <i class="fas fa-store fa-3x text-muted mb-3"></i>
                         <h4 class="text-muted">No Restaurants Found</h4>
                         <p class="text-muted">Start by creating the first restaurant</p>
+                        {% if can_create %}
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRestaurantModal">
                             <i class="fas fa-plus me-1"></i> Add New Restaurant
                         </button>
+                        {% endif %}
                     </div>
                 {% endif %}
             </div>
