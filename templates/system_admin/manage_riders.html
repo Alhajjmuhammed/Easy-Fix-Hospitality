@@ -125,6 +125,7 @@
                 </span>
               </td>
               <td class="text-center">
+                {% if can_edit %}
                 <div class="form-check form-switch d-inline-block mb-0">
                   <input
                     class="form-check-input rider-active-toggle"
@@ -136,6 +137,11 @@
                     style="cursor:pointer;"
                   >
                 </div>
+                {% else %}
+                <span class="badge {% if rider.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                  {% if rider.is_active %}Active{% else %}Inactive{% endif %}
+                </span>
+                {% endif %}
               </td>
               <td class="text-center">
                 <span class="badge bg-secondary">{{ rider.assignments.count }}</span>

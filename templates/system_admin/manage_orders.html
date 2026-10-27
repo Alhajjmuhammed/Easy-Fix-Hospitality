@@ -345,13 +345,15 @@
                                         <li><a class="dropdown-item" href="#" onclick="viewOrderDetails({{ order.id }})">
                                             <i class="fas fa-eye"></i> View Details
                                         </a></li>
+                                        {% if can_edit %}
                                         <li><a class="dropdown-item" href="#" onclick="updateOrderStatus({{ order.id }})">
                                             <i class="fas fa-edit"></i> Update Status
                                         </a></li>
                                         <li><a class="dropdown-item" href="#" onclick="updatePaymentStatus({{ order.id }})">
                                             <i class="fas fa-credit-card"></i> Update Payment
                                         </a></li>
-                                        {% if order.status != 'cancelled' and order.status != 'served' %}
+                                        {% endif %}
+                                        {% if can_edit and order.status != 'cancelled' and order.status != 'served' %}
                                         <li><hr class="dropdown-divider"></li>
                                         <li><a class="dropdown-item text-danger" href="#" onclick="cancelOrder({{ order.id }}, '{{ order.order_number }}')">
                                             <i class="fas fa-times-circle"></i> Cancel Order
