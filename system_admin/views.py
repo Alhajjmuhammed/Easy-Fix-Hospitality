@@ -1176,6 +1176,60 @@ def edit_restaurant(request, restaurant_id):
     
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
+def _delete_restaurant_users(owner_user):
+    """Delete all users (staff + owner) for a restaurant.
+    Must be called AFTER restaurant.delete() so the Restaurant→User PROTECT is gone."""
+    if not owner_user:
+        return
+    staff_qs = User.objects.filter(owner=owner_user)
+    # Clear PROTECT references that point to staff users
+    try:
+        from reports.models import SalesReport
+        SalesReport.objects.filter(generated_by__in=staff_qs).delete()
+    except Exception:
+        pass
+    # Clear PROTECT references that point to the owner user
+    try:
+        from orders.models_printjob import PrintJob
+        PrintJob.objects.filter(restaurant=owner_user).delete()
+    except Exception:
+        pass
+    try:
+        from restaurant.models import HappyHour
+        HappyHour.objects.filter(owner=owner_user).delete()
+    except Exception:
+        pass
+    try:
+        from restaurant.models import Event
+        Event.objects.filter(owner=owner_user).delete()
+    except Exception:
+        pass
+    try:
+        from reports.models import SalesReport
+        SalesReport.objects.filter(owner=owner_user).delete()
+        SalesReport.objects.filter(generated_by=owner_user).delete()
+    except Exception:
+        pass
+    try:
+        from waste_management.models import WasteReportSummary
+        WasteReportSummary.objects.filter(owner=owner_user).delete()
+    except Exception:
+        pass
+    try:
+        sub = owner_user.subscription
+        SubscriptionLog.objects.filter(subscription=sub).delete()
+        sub.delete()
+    except Exception:
+        pass
+    # Delete all staff/customer users (PROTECT blocks owner deletion while they exist)
+    staff_qs.delete()
+    # Now delete the owner user itself
+    try:
+        owner_user.delete()
+    except Exception as e:
+        logger.warning(f'Could not delete owner user {owner_user.username}: {e}')
+
+
 def _cascade_delete_restaurant(restaurant):
     """Delete all PROTECT-referenced data for a restaurant in the correct dependency order."""
     # 1. Cashier payment chain (PROTECT → Payment → Order)
@@ -1240,14 +1294,18 @@ def delete_restaurant(request, restaurant_id):
                 branches = list(restaurant.branches.all())
                 branch_count = len(branches)
                 for branch in branches:
+                    branch_owner_user = branch.branch_owner
                     _cascade_delete_restaurant(branch)
                     branch.delete()
+                    _delete_restaurant_users(branch_owner_user)
                 success_msg = f'Main restaurant "{restaurant_name}" and {branch_count} branch(es) deleted successfully.'
             else:
                 success_msg = f'Branch "{restaurant_name}" deleted successfully.'
 
+            owner_user = restaurant.main_owner if is_main else restaurant.branch_owner
             _cascade_delete_restaurant(restaurant)
             restaurant.delete()
+            _delete_restaurant_users(owner_user)
 
             messages.success(request, success_msg)
             logger.info(f"[SYSTEM ADMIN] Restaurant deleted: {restaurant_name} (is_main={is_main}) by {request.user.username}")
@@ -3293,12 +3351,16 @@ def delete_restaurant_admin(request):
 
             if restaurant.is_main_restaurant:
                 for branch in list(restaurant.branches.all()):
+                    branch_owner_user = branch.branch_owner
                     _cascade_delete_restaurant(branch)
                     branch.delete()
+                    _delete_restaurant_users(branch_owner_user)
 
+            owner_user = restaurant.main_owner if restaurant.is_main_restaurant else restaurant.branch_owner
             _cascade_delete_restaurant(restaurant)
             restaurant.delete()
-            
+            _delete_restaurant_users(owner_user)
+
             return JsonResponse({
                 'success': True,
                 'message': f'Successfully deleted restaurant: {restaurant_name}.'
