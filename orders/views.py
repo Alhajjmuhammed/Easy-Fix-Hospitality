@@ -3505,10 +3505,13 @@ def request_bill(request, table_id):
 @login_required
 def mark_bill_request_completed(request, request_id):
     """Staff marks bill request as completed"""
-    if not (request.user.is_customer_care() or request.user.is_owner() or 
+    if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_cashier() or request.user.is_manager()):
         messages.error(request, 'Access denied. Staff privileges required.')
         return redirect('orders:my_orders')
+    if not request.user.has_feature('process_payments'):
+        messages.error(request, "You don't have permission to process payments.")
+        return redirect('restaurant:home')
     
     try:
         bill_request = BillRequest.objects.get(id=request_id)
