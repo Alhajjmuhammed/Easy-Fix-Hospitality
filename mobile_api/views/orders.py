@@ -829,6 +829,8 @@ def transfer_table(request, order_id):
             user.is_owner() or user.is_main_owner() or
             user.is_branch_owner() or user.is_manager()):
         return Response({'error': 'Access denied.'}, status=403)
+    if not user.has_feature('transfer_orders'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:
@@ -917,6 +919,8 @@ def cancel_order(request, order_id):
     is_privileged = (user.is_owner() or user.is_main_owner() or
                      user.is_branch_owner() or user.is_manager() or user.is_cashier())
     if not (user.is_customer() or user.is_customer_care() or is_privileged):
+        return Response({'error': 'Access denied.'}, status=403)
+    if not user.is_customer() and not user.has_feature('cancel_orders'):
         return Response({'error': 'Access denied.'}, status=403)
 
     if user.is_customer():
