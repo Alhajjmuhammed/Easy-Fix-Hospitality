@@ -2273,6 +2273,9 @@ def customer_cancel_order(request, order_id):
     if not (request.user.is_customer() or request.user.is_customer_care()):
         messages.error(request, 'Access denied. Customer privileges required.')
         return redirect('restaurant:home')
+    if request.user.is_customer_care() and not request.user.has_feature('cancel_orders'):
+        messages.error(request, "You don't have permission to cancel orders.")
+        return redirect('orders:customer_care_dashboard')
     
     # Get the order - ensure it belongs to the user for customers
     _order_qs = Order.objects.prefetch_related('order_items__product')
