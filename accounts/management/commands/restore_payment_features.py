@@ -1,6 +1,6 @@
 """
 One-time command: ensure all cashier and customer_care RolePermissionSets
-include the payment features that are enabled by default.
+include the core operational features enabled by default.
 Additive only — never removes existing features.
 """
 from django.core.management.base import BaseCommand
@@ -8,19 +8,26 @@ from accounts.models import RolePermissionSet
 from accounts.models import Feature
 
 
+# Core features each role must have to function correctly
 REQUIRED = {
-    'cashier': ['process_payments', 'void_payments', 'view_receipts'],
-    'customer_care': ['process_payments', 'view_receipts'],
+    'cashier': [
+        'place_orders', 'manage_orders', 'process_payments',
+        'void_payments', 'view_receipts', 'manage_waste', 'view_reports',
+    ],
+    'customer_care': [
+        'place_orders', 'manage_orders', 'process_payments',
+        'view_receipts', 'manage_waste', 'view_reports', 'view_attendance',
+    ],
 }
+
+ALL_SLUGS = list({s for slugs in REQUIRED.values() for s in slugs})
 
 
 class Command(BaseCommand):
-    help = 'Add missing payment features to cashier/customer_care role permission sets'
+    help = 'Restore missing core features to cashier/customer_care role permission sets'
 
     def handle(self, *args, **options):
-        feature_cache = {f.slug: f for f in Feature.objects.filter(slug__in=[
-            'process_payments', 'void_payments', 'view_receipts'
-        ])}
+        feature_cache = {f.slug: f for f in Feature.objects.filter(slug__in=ALL_SLUGS)}
 
         total_fixed = 0
         for role_name, slugs in REQUIRED.items():
@@ -41,4 +48,4 @@ class Command(BaseCommand):
                 f'\nFixed {total_fixed} role permission set(s).'
             ))
         else:
-            self.stdout.write(self.style.SUCCESS('All role permission sets already have payment features.'))
+            self.stdout.write(self.style.SUCCESS('All role permission sets already have the required features.'))
