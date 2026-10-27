@@ -164,6 +164,8 @@ def assign_rider(request):
             user.is_cashier() or user.is_customer_care() or user.is_manager() or
             user.is_administrator()):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.is_administrator() and not user.has_feature('manage_delivery'):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     order_id = request.data.get('order_id')
     rider_id = request.data.get('rider_id')
@@ -244,6 +246,8 @@ def auto_assign_rider(request):
     if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or
             user.is_cashier() or user.is_customer_care() or user.is_manager() or
             user.is_administrator()):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.is_administrator() and not user.has_feature('manage_delivery'):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     order_id = request.data.get('order_id')

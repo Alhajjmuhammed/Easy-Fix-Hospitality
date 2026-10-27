@@ -146,6 +146,8 @@ def _create_bill_request(request):
 def complete_bill_request(request, request_id):
     if not _is_bill_staff(request.user):
         return Response({'error': 'Access denied.'}, status=403)
+    if not request.user.has_feature('process_payments'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:
