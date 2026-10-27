@@ -725,6 +725,8 @@ def print_bill(request, order_id):
             user.is_owner() or user.is_main_owner() or
             user.is_branch_owner() or user.is_manager()):
         return Response({'error': 'Access denied.'}, status=403)
+    if not user.has_feature('view_receipts'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:

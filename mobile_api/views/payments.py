@@ -92,6 +92,8 @@ def _list_payments(request):
 def _process_payment(request):
     if not _is_payment_staff(request.user):
         return Response({'error': 'Access denied.'}, status=403)
+    if not request.user.has_feature('process_payments'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     s = ProcessPaymentSerializer(data=request.data)
     if not s.is_valid():
@@ -200,6 +202,8 @@ def _process_payment(request):
 def void_payment(request, payment_id):
     """Void a payment with a mandatory reason."""
     if not _is_payment_staff(request.user):
+        return Response({'error': 'Access denied.'}, status=403)
+    if not request.user.has_feature('void_payments'):
         return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
