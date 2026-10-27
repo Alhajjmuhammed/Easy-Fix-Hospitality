@@ -547,6 +547,8 @@ def transfer_table(request, order_id):
             request.user.is_owner() or request.user.is_main_owner() or
             request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('transfer_orders'):
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
 
     owner = get_owner_filter(request.user)
     _oq_tt = (
@@ -624,6 +626,8 @@ def cancel_order(request, order_id):
     """Cancel an unpaid order"""
     if not (request.user.is_cashier() or request.user.is_customer_care() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    if not request.user.has_feature('cancel_orders'):
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
     
     owner = get_owner_filter(request.user)
     _oq_co = (

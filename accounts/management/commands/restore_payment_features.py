@@ -11,16 +11,22 @@ from accounts.models import Feature
 # Core features each role must have to function correctly
 REQUIRED = {
     'cashier': [
-        'place_orders', 'manage_orders', 'process_payments',
-        'void_payments', 'view_receipts', 'manage_waste', 'view_reports',
+        'place_orders', 'manage_orders', 'cancel_orders', 'transfer_orders',
+        'process_payments', 'void_payments', 'view_receipts', 'manage_waste', 'view_reports',
     ],
     'customer_care': [
-        'place_orders', 'manage_orders', 'process_payments',
-        'view_receipts', 'manage_waste', 'view_reports', 'view_attendance',
+        'place_orders', 'manage_orders', 'cancel_orders', 'transfer_orders',
+        'process_payments', 'view_receipts', 'manage_waste', 'view_reports', 'view_attendance',
+    ],
+    'manager': [
+        'cancel_orders', 'transfer_orders',
     ],
 }
 
 ALL_SLUGS = list({s for slugs in REQUIRED.values() for s in slugs})
+
+
+
 
 
 class Command(BaseCommand):

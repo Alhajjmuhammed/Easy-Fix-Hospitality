@@ -429,14 +429,14 @@ $(document).ready(function() {
                                                     {% endif %}
 
                                                     {% if order.status != 'cancelled' and order.total_paid == 0 %}
-                                                        {% if 'manage_orders' in feats %}
+                                                        {% if 'cancel_orders' in feats %}
                                                         <button type="button" class="btn btn-danger btn-sm" onclick="cancelOrder({{ order.id }})">
                                                             ❌ Cancel
                                                         </button>
                                                         {% endif %}
                                                     {% endif %}
                                                     {% if order.status != 'cancelled' and order.payment_status != 'paid' and order.table_info %}
-                                                        {% if 'manage_orders' in feats %}
+                                                        {% if 'transfer_orders' in feats %}
                                                         <button type="button" class="btn btn-warning btn-sm" onclick="openTransferModal({{ order.id }}, '{{ order.order_number|escapejs }}', '{{ order.table_info.tbl_no|escapejs }}')">
                                                             🔄 Transfer
                                                         </button>

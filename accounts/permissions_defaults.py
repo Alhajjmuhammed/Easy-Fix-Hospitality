@@ -6,7 +6,8 @@ preserving the system's current hardcoded behavior exactly.
 
 DEFAULT_ROLE_FEATURES = {
     'manager': [
-        'place_orders', 'manage_orders', 'process_payments', 'void_payments',
+        'place_orders', 'manage_orders', 'cancel_orders', 'transfer_orders',
+        'process_payments', 'void_payments',
         'view_receipts', 'kitchen_dashboard', 'bar_dashboard', 'buffet_dashboard',
         'service_dashboard', 'manage_menu', 'manage_categories', 'manage_promotions',
         'manage_events', 'manage_staff', 'view_reports', 'export_reports',
@@ -14,7 +15,8 @@ DEFAULT_ROLE_FEATURES = {
         'manage_tables', 'manage_delivery',
     ],
     'customer_care': [
-        'place_orders', 'manage_orders', 'process_payments', 'view_receipts',
+        'place_orders', 'manage_orders', 'cancel_orders', 'transfer_orders',
+        'process_payments', 'view_receipts',
         'manage_waste', 'view_reports', 'view_attendance',
     ],
     'kitchen': ['kitchen_dashboard'],
@@ -22,7 +24,8 @@ DEFAULT_ROLE_FEATURES = {
     'buffet': ['buffet_dashboard'],
     'service': ['service_dashboard'],
     'cashier': [
-        'place_orders', 'manage_orders', 'process_payments', 'void_payments',
+        'place_orders', 'manage_orders', 'cancel_orders', 'transfer_orders',
+        'process_payments', 'void_payments',
         'view_receipts', 'manage_waste', 'view_reports', 'export_reports',
     ],
     'delivery_rider': ['manage_delivery'],
@@ -31,7 +34,9 @@ DEFAULT_ROLE_FEATURES = {
 # (slug, display_name, description, category)
 ALL_FEATURES = [
     ('place_orders',      'Place Orders',            'Place new orders for customers at the table, delivery or pickup', 'orders'),
-    ('manage_orders',     'Manage Orders',            'Edit, cancel, transfer and update existing orders', 'orders'),
+    ('manage_orders',     'Manage Orders',            'Edit and update existing orders', 'orders'),
+    ('cancel_orders',     'Cancel Orders',            'Cancel pending orders before payment', 'orders'),
+    ('transfer_orders',   'Transfer Table',           'Transfer orders between tables', 'orders'),
     ('manage_delivery',   'Manage Delivery',          'Assign riders and manage delivery order lifecycle', 'orders'),
     ('process_payments',  'Process Payments',         'Accept cash, card, digital and voucher payments', 'payments'),
     ('void_payments',     'Void Payments',            'Void and reverse processed payments with audit trail', 'payments'),
