@@ -521,13 +521,17 @@ def view_cart(request):
 @require_table_selection
 def place_order(request):
     """Place order from cart - handles both new orders and adding to existing"""
+    if request.user.is_authenticated and not request.user.is_customer() and not request.user.has_feature('place_orders'):
+        messages.error(request, "You don't have permission to place orders.")
+        return redirect('restaurant:menu')
+
     # Roles whose staff can be "ordered for" by a cashier (defined once — used in both POST and GET)
     _STAFF_ROLES_FOR_ENTRY = ['customer_care', 'kitchen', 'bar', 'buffet', 'service']
 
     # Validate cart
     cart = validate_cart_data(request.session.get('cart', {}))
     request.session['cart'] = cart
-    
+
     if not cart:
         messages.error(request, 'Your cart is empty.')
         return redirect('restaurant:menu')

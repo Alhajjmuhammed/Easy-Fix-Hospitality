@@ -1018,6 +1018,8 @@ def add_items_to_order(request, order_id):
 
     if not (is_staff or user.is_customer()):
         return Response({'error': 'Access denied.'}, status=403)
+    if not user.is_customer() and not user.has_feature('place_orders'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = None
 
