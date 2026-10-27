@@ -86,6 +86,8 @@ def sync_push(request):
 
 
 def _sync_order(user, owner, data):
+    if not user.has_feature('place_orders'):
+        return {'status': 'error', 'error': 'Access denied.'}
     offline_id = data.get('offline_id', '').strip()
 
     # All DB writes are in the atomic block; _notify_ws (async_to_sync) is called after.
@@ -358,6 +360,8 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
 
 
 def _sync_payment(user, owner, data):
+    if not user.has_feature('process_payments'):
+        return {'status': 'error', 'error': 'Access denied.'}
     # Customers cannot create payment records — only cashiers/owners/managers may.
     # This mirrors the guard on the direct payments endpoint (_is_payment_staff).
     is_privileged = (
