@@ -257,6 +257,8 @@ def _list_orders(request):
 
 def _place_order(request):
     """Create a new order. Supports offline de-duplication via offline_id."""
+    if not request.user.is_customer() and not request.user.has_feature('place_orders'):
+        return Response({'error': 'Access denied.'}, status=403)
     s = PlaceOrderSerializer(data=request.data)
     if not s.is_valid():
         logger.warning('PlaceOrder validation failed for user %s: %s | raw data: %s',
@@ -597,11 +599,11 @@ def _send_push_async(token, title, body, data=None):
 def update_order_status(request, order_id):
     """Update order status (staff only)."""
     user = request.user
-    _STATION_ROLES = {'kitchen', 'bar', 'buffet', 'service'}
-    _is_station_staff = bool(user.role and user.role.name in _STATION_ROLES)
-    if not (user.is_cashier() or user.is_customer_care() or
-            user.is_owner() or user.is_main_owner() or
-            user.is_branch_owner() or user.is_manager() or _is_station_staff):
+    if not (user.has_feature('manage_orders') or
+            user.has_feature('kitchen_dashboard') or
+            user.has_feature('bar_dashboard') or
+            user.has_feature('buffet_dashboard') or
+            user.has_feature('service_dashboard')):
         return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
