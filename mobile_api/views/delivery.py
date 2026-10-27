@@ -351,8 +351,8 @@ def update_location(request):
     Persists to DB and broadcasts via WebSocket group.
     """
     user = request.user
-    if not user.is_delivery_rider():
-        return Response({'error': 'Only delivery riders can update location.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.has_feature('manage_delivery'):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     lat = request.data.get('lat')
     lng = request.data.get('lng')
@@ -486,8 +486,8 @@ def mark_picked_up(request, order_id):
     Only the assigned rider can call this.
     """
     user = request.user
-    if not user.is_delivery_rider():
-        return Response({'error': 'Only delivery riders can call this.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.has_feature('manage_delivery'):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     # Fetch the assignment scoped to this rider — so a rider cannot probe other orders.
     assignment = get_object_or_404(
@@ -523,8 +523,8 @@ def mark_delivered(request, order_id):
     Only the assigned rider can call this.
     """
     user = request.user
-    if not user.is_delivery_rider():
-        return Response({'error': 'Only delivery riders can call this.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.has_feature('manage_delivery'):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     # Fetch the assignment scoped to this rider — so a rider cannot probe other orders.
     assignment = get_object_or_404(
@@ -578,8 +578,8 @@ def my_assignments(request):
     Returns the rider's active and recent assignments.
     """
     user = request.user
-    if not user.is_delivery_rider():
-        return Response({'error': 'Only delivery riders can call this.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.has_feature('manage_delivery'):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
         rider = user.rider_profile
@@ -608,8 +608,8 @@ def toggle_availability(request):
     Rider toggles their own availability flag.
     """
     user = request.user
-    if not user.is_delivery_rider():
-        return Response({'error': 'Only delivery riders can call this.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.has_feature('manage_delivery'):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
         rider = user.rider_profile
