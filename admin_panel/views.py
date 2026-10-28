@@ -466,7 +466,7 @@ def manage_users(request):
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_staff'):
+    if not (request.user.has_feature('view_staff') or request.user.has_feature('manage_staff')):
         messages.error(request, "You don't have permission to access Staff Management.")
         return redirect('admin_panel:admin_dashboard')
 
@@ -663,7 +663,7 @@ def manage_products(request):
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_menu'):
+    if not (request.user.has_feature('view_menu') or request.user.has_feature('add_menu_items') or request.user.has_feature('manage_menu')):
         messages.error(request, "You don't have permission to access Products.")
         return redirect('admin_panel:admin_dashboard')
 
@@ -1019,7 +1019,7 @@ def manage_tables(request):
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_tables'):
+    if not (request.user.has_feature('view_tables') or request.user.has_feature('add_tables') or request.user.has_feature('manage_tables')):
         messages.error(request, "You don't have permission to access Tables.")
         return redirect('admin_panel:admin_dashboard')
 
@@ -1133,7 +1133,7 @@ def manage_categories(request):
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator/Owner privileges required.")
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_categories'):
+    if not (request.user.has_feature('view_categories') or request.user.has_feature('add_categories') or request.user.has_feature('manage_categories')):
         messages.error(request, "You don't have permission to access Categories.")
         return redirect('admin_panel:admin_dashboard')
 
@@ -1271,7 +1271,7 @@ def add_main_category(request):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    if not request.user.has_feature('manage_categories'):
+    if not (request.user.has_feature('add_categories') or request.user.has_feature('manage_categories')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
@@ -1608,7 +1608,7 @@ def add_subcategory(request):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    if not request.user.has_feature('manage_categories'):
+    if not (request.user.has_feature('add_categories') or request.user.has_feature('manage_categories')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
@@ -1881,7 +1881,7 @@ def get_subcategories(request, main_category_id):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    if not request.user.has_feature('manage_categories'):
+    if not (request.user.has_feature('view_categories') or request.user.has_feature('add_categories') or request.user.has_feature('manage_categories')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
@@ -2107,7 +2107,7 @@ def add_product(request):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    if not request.user.has_feature('manage_menu'):
+    if not (request.user.has_feature('add_menu_items') or request.user.has_feature('manage_menu')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
@@ -2694,7 +2694,7 @@ def get_user_data(request, user_id):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    if not request.user.has_feature('manage_staff'):
+    if not (request.user.has_feature('view_staff') or request.user.has_feature('manage_staff')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
@@ -3249,7 +3249,7 @@ def add_table(request):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    if not request.user.has_feature('manage_tables'):
+    if not (request.user.has_feature('add_tables') or request.user.has_feature('manage_tables')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     try:
@@ -3327,7 +3327,7 @@ def get_table(request):
     if not (request.user.is_administrator() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'})
-    if not request.user.has_feature('manage_tables'):
+    if not (request.user.has_feature('view_tables') or request.user.has_feature('add_tables') or request.user.has_feature('manage_tables')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
 
     table_id = request.GET.get('table_id')
@@ -4606,8 +4606,8 @@ def import_products_csv(request):
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
-    if not request.user.has_feature('manage_menu'):
-        messages.error(request, "You don't have permission to manage products.")
+    if not (request.user.has_feature('add_menu_items') or request.user.has_feature('manage_menu')):
+        messages.error(request, "You don't have permission to add products.")
         return redirect('admin_panel:admin_dashboard')
 
     if request.method != 'POST':
@@ -4824,8 +4824,8 @@ def import_products_excel(request):
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Administrator or Owner privileges required.")
         return redirect('admin_panel:manage_products')
-    if not request.user.has_feature('manage_menu'):
-        messages.error(request, "You don't have permission to manage products.")
+    if not (request.user.has_feature('add_menu_items') or request.user.has_feature('manage_menu')):
+        messages.error(request, "You don't have permission to add products.")
         return redirect('admin_panel:admin_dashboard')
 
     if request.method != 'POST':

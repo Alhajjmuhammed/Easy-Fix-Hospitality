@@ -106,13 +106,14 @@ def riders_list(request):
     GET /api/v1/delivery/riders/
     Returns riders belonging to the caller's restaurant.
     Allowed for: owner, cashier, customer_care, manager, administrator.
+    Requires view_delivery or manage_delivery feature.
     """
     user = request.user
     if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or
             user.is_cashier() or user.is_customer_care() or user.is_manager() or
             user.is_administrator()):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
-    if not user.is_administrator() and not user.has_feature('manage_delivery'):
+    if not user.is_administrator() and not (user.has_feature('view_delivery') or user.has_feature('manage_delivery')):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     owner = get_restaurant_owner(request)
@@ -586,7 +587,7 @@ def my_assignments(request):
     Returns the rider's active and recent assignments.
     """
     user = request.user
-    if not user.has_feature('manage_delivery'):
+    if not (user.has_feature('view_delivery') or user.has_feature('manage_delivery')):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:

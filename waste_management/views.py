@@ -111,7 +111,7 @@ def waste_dashboard(request):
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Only owners and administrators can access waste management dashboard.")
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_waste'):
+    if not (request.user.has_feature('view_waste') or request.user.has_feature('log_waste') or request.user.has_feature('manage_waste')):
         messages.error(request, "You don't have permission to access waste management.")
         return redirect('restaurant:home')
     
@@ -945,12 +945,12 @@ def record_food_waste(request):
     """Record a food waste incident"""
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager() or request.user.is_cashier()):
         return JsonResponse({'error': 'Access denied. Only owners, administrators, and cashiers can record waste.'}, status=403)
-    if not request.user.has_feature('manage_waste'):
+    if not (request.user.has_feature('log_waste') or request.user.has_feature('manage_waste')):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
-    
+
     try:
         data = json.loads(request.body)
-        
+
         # Get required data
         product_id = data.get('product_id')
         quantity_wasted = int(data.get('quantity_wasted', 0))
@@ -1899,23 +1899,23 @@ def cashier_record_waste(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. This page is for cashiers only.")
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_waste'):
+    if not (request.user.has_feature('log_waste') or request.user.has_feature('manage_waste')):
         messages.error(request, "You don't have permission to record waste.")
         return redirect('restaurant:home')
 
     owner_filter = get_owner_filter(request.user)
-    
+
     # Get products for the dropdown - filter by main_category owner
     products = Product.objects.filter(
         Q(main_category__owner=owner_filter) |
         Q(main_category__restaurant__main_owner=owner_filter) |
         Q(main_category__restaurant__branch_owner=owner_filter)
     ).distinct()
-    
+
     context = {
         'products': products,
     }
-    
+
     return render(request, 'waste_management/cashier_record.html', context)
 
 
@@ -1956,12 +1956,12 @@ def cashier_waste_form(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. This page is for cashiers only.")
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_waste'):
+    if not (request.user.has_feature('log_waste') or request.user.has_feature('manage_waste')):
         messages.error(request, "You don't have permission to manage waste.")
         return redirect('restaurant:home')
-    
+
     owner_filter = get_owner_filter(request.user)
-    
+
     # Get products for the dropdown - filter by main_category owner
     products = Product.objects.filter(
         Q(main_category__owner=owner_filter) |
@@ -1969,11 +1969,11 @@ def cashier_waste_form(request):
         Q(main_category__restaurant__branch_owner=owner_filter),
         is_available=True,
     ).distinct().select_related('main_category').order_by('name')
-    
+
     context = {
         'products': products,
     }
-    
+
     return render(request, 'waste_management/cashier_waste_form.html', context)
 
 
@@ -1983,12 +1983,12 @@ def cashier_waste_interface(request):
     if not request.user.is_cashier():
         messages.error(request, "Access denied. This page is for cashiers only.")
         return redirect('accounts:login')
-    if not request.user.has_feature('manage_waste'):
+    if not (request.user.has_feature('log_waste') or request.user.has_feature('manage_waste')):
         messages.error(request, "You don't have permission to manage waste.")
         return redirect('restaurant:home')
-    
+
     owner_filter = get_owner_filter(request.user)
-    
+
     # Get products for the dropdown - filter by main_category__owner
     products = Product.objects.filter(
         Q(main_category__owner=owner_filter) |

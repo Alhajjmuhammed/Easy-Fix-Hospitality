@@ -34,12 +34,21 @@ def _get_currency_symbol(owner, user):
         return '$'
 
 
-def _require_inventory_access(user):
-    """Return True if the user is allowed to access inventory pages."""
+def _require_inventory_access(user, level='view'):
+    """Return True if user has the required inventory access level.
+    level: 'view' | 'add' | 'manage'
+    Hierarchy: manage implies add implies view.
+    """
     if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner()
             or user.is_manager() or user.is_administrator()):
         return False
-    return user.has_feature('manage_inventory')
+    if level == 'manage':
+        return user.has_feature('manage_inventory')
+    if level == 'add':
+        return user.has_feature('add_inventory') or user.has_feature('manage_inventory')
+    # view
+    return (user.has_feature('view_inventory') or user.has_feature('add_inventory')
+            or user.has_feature('manage_inventory'))
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +57,7 @@ def _require_inventory_access(user):
 
 @login_required
 def dashboard(request):
-    if not _require_inventory_access(request.user):
+    if not _require_inventory_access(request.user, level='view'):
         return redirect('admin_panel:admin_dashboard')
 
     owner = get_owner_filter(request.user)
@@ -122,13 +131,20 @@ def dashboard(request):
 
 @login_required
 def manage_items(request):
-    if not _require_inventory_access(request.user):
+    if not _require_inventory_access(request.user, level='view'):
         return redirect('admin_panel:admin_dashboard')
 
     owner = get_owner_filter(request.user)
 
     if request.method == 'POST':
         action = request.POST.get('action')
+
+        if action == 'add':
+            if not _require_inventory_access(request.user, level='add'):
+                return JsonResponse({'success': False, 'error': 'You do not have permission to add inventory items.'})
+        elif action in ('edit', 'delete', 'toggle'):
+            if not _require_inventory_access(request.user, level='manage'):
+                return JsonResponse({'success': False, 'error': 'You do not have permission to edit or delete inventory items.'})
 
         if action == 'add':
             name = request.POST.get('name', '').strip()
@@ -308,7 +324,7 @@ def manage_items(request):
 
 @login_required
 def add_record(request):
-    if not _require_inventory_access(request.user):
+    if not _require_inventory_access(request.user, level='add'):
         return redirect('admin_panel:admin_dashboard')
 
     owner = get_owner_filter(request.user)
@@ -395,7 +411,7 @@ def add_record(request):
 
 @login_required
 def history(request):
-    if not _require_inventory_access(request.user):
+    if not _require_inventory_access(request.user, level='view'):
         return redirect('admin_panel:admin_dashboard')
 
     owner = get_owner_filter(request.user)
@@ -728,7 +744,7 @@ def _export_pdf(records_qs, currency_symbol='$', total_spent=0, total_refunds=0,
 @login_required
 def manage_settings(request):
     """CRUD for the owner's custom inventory categories and units."""
-    if not _require_inventory_access(request.user):
+    if not _require_inventory_access(request.user, level='manage'):
         return redirect('admin_panel:admin_dashboard')
 
     owner = get_owner_filter(request.user)

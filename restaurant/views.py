@@ -488,8 +488,8 @@ def manage_staff(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_staff'):
-        messages.error(request, "You don't have permission to manage staff.")
+    if not (request.user.has_feature('view_staff') or request.user.has_feature('manage_staff')):
+        messages.error(request, "You don't have permission to view staff.")
         return redirect('restaurant:owner_dashboard')
 
     # Get staff members belonging to this owner only
@@ -603,8 +603,8 @@ def manage_promotions(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_promotions'):
-        messages.error(request, "You don't have permission to manage promotions.")
+    if not (request.user.has_feature('view_promotions') or request.user.has_feature('add_promotions') or request.user.has_feature('manage_promotions')):
+        messages.error(request, "You don't have permission to view promotions.")
         return redirect('restaurant:owner_dashboard')
 
     # Import restaurant context utilities
@@ -714,8 +714,8 @@ def add_promotion(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_promotions'):
-        messages.error(request, "You don't have permission to manage promotions.")
+    if not (request.user.has_feature('add_promotions') or request.user.has_feature('manage_promotions')):
+        messages.error(request, "You don't have permission to add promotions.")
         return redirect('restaurant:manage_promotions')
 
     # Import restaurant context utilities
@@ -1071,8 +1071,8 @@ def promotion_preview(request, promotion_id):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_promotions'):
-        messages.error(request, "You don't have permission to manage promotions.")
+    if not (request.user.has_feature('view_promotions') or request.user.has_feature('add_promotions') or request.user.has_feature('manage_promotions')):
+        messages.error(request, "You don't have permission to view promotions.")
         return redirect('restaurant:home')
 
     from accounts.models import get_owner_filter
@@ -1120,8 +1120,8 @@ def manage_events(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_events'):
-        messages.error(request, "You don't have permission to manage events.")
+    if not (request.user.has_feature('view_events') or request.user.has_feature('add_events') or request.user.has_feature('manage_events')):
+        messages.error(request, "You don't have permission to view events.")
         return redirect('restaurant:owner_dashboard')
     
     from accounts.models import get_owner_filter
@@ -1242,8 +1242,8 @@ def add_event(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_events'):
-        messages.error(request, "You don't have permission to manage events.")
+    if not (request.user.has_feature('add_events') or request.user.has_feature('manage_events')):
+        messages.error(request, "You don't have permission to add events.")
         return redirect('restaurant:manage_events')
 
     from accounts.models import get_owner_filter
@@ -1335,7 +1335,7 @@ def view_event(request, event_id):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_events'):
+    if not (request.user.has_feature('view_events') or request.user.has_feature('add_events') or request.user.has_feature('manage_events')):
         messages.error(request, 'Access denied.')
         return redirect('restaurant:home')
 
@@ -1439,7 +1439,7 @@ def event_reports(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    if not request.user.has_feature('manage_events'):
+    if not (request.user.has_feature('view_events') or request.user.has_feature('add_events') or request.user.has_feature('manage_events')):
         messages.error(request, 'Access denied.')
         return redirect('restaurant:home')
 
@@ -1679,7 +1679,7 @@ def export_events_csv(request):
 
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return HttpResponse('Access denied', status=403)
-    if not request.user.has_feature('manage_events'):
+    if not (request.user.has_feature('view_events') or request.user.has_feature('add_events') or request.user.has_feature('manage_events')):
         return HttpResponse('Access denied', status=403)
     
     from accounts.models import get_owner_filter
@@ -1799,7 +1799,7 @@ def export_events_pdf(request):
 
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return HttpResponse('Access denied', status=403)
-    if not request.user.has_feature('manage_events'):
+    if not (request.user.has_feature('view_events') or request.user.has_feature('add_events') or request.user.has_feature('manage_events')):
         return HttpResponse('Access denied', status=403)
 
     from accounts.models import get_owner_filter
