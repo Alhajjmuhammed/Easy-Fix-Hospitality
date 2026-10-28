@@ -1335,7 +1335,10 @@ def view_event(request, event_id):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_events'):
+        messages.error(request, 'Access denied.')
+        return redirect('restaurant:home')
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
     
@@ -1397,7 +1400,9 @@ def update_event_status(request, event_id):
     """Update event status via AJAX"""
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
-    
+    if not request.user.has_feature('manage_events'):
+        return JsonResponse({'success': False, 'message': 'Access denied.'}, status=403)
+
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Invalid request method.'})
     
@@ -1434,10 +1439,13 @@ def event_reports(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_events'):
+        messages.error(request, 'Access denied.')
+        return redirect('restaurant:home')
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
-    
+
     # Get restaurant for currency
     from .models_restaurant import Restaurant
     from django.db.models import Q as DBQ
@@ -1445,7 +1453,7 @@ def event_reports(request):
         DBQ(main_owner=owner_filter) | DBQ(branch_owner=owner_filter)
     ).first()
     currency_symbol = restaurant.get_currency_symbol() if restaurant else '$'
-    
+
     # Date range filter
     from django.utils.timezone import localtime
     period = request.GET.get('period', 'month')
@@ -1554,10 +1562,12 @@ def record_event_payment(request, event_id):
     """Record a payment for an event"""
     import logging
     logger = logging.getLogger(__name__)
-    
+
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied.'})
-    
+    if not request.user.has_feature('manage_events'):
+        return JsonResponse({'success': False, 'message': 'Access denied.'}, status=403)
+
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Invalid request method.'})
     
@@ -1623,10 +1633,12 @@ def approve_event_payment(request, event_id):
     """Approve/confirm an event payment"""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Invalid request method'})
-    
+
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
-    
+    if not request.user.has_feature('manage_events'):
+        return JsonResponse({'success': False, 'message': 'Access denied.'}, status=403)
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
     
@@ -1664,8 +1676,10 @@ def export_events_csv(request):
     """Export events to CSV"""
     import csv
     from django.http import HttpResponse
-    
+
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
+        return HttpResponse('Access denied', status=403)
+    if not request.user.has_feature('manage_events'):
         return HttpResponse('Access denied', status=403)
     
     from accounts.models import get_owner_filter
@@ -1782,10 +1796,12 @@ def export_events_pdf(request):
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from io import BytesIO
-    
+
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return HttpResponse('Access denied', status=403)
-    
+    if not request.user.has_feature('manage_events'):
+        return HttpResponse('Access denied', status=403)
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
     
