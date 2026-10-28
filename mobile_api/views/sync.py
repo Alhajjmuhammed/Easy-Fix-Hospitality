@@ -55,7 +55,14 @@ def sync_push(request):
 
     results = {'orders': [], 'payments': [], 'bill_requests': []}
 
+    # If the mobile app signals local-print via HTTP header (online path convention),
+    # propagate it into every order item so _sync_order/_sync_order_append don't
+    # double-print when the app is also printing via Bluetooth.
+    _header_local_print = request.META.get('HTTP_X_LOCAL_PRINT') == 'true'
+
     for item in data.get('orders', []):
+        if _header_local_print:
+            item['local_print'] = True
         offline_id = item.get('offline_id', '')
         try:
             result = _sync_order(request.user, owner, item)
