@@ -269,6 +269,13 @@ def _place_order(request):
     user = request.user
     offline_id = data.get('offline_id', '').strip()
 
+    if not offline_id:
+        logger.warning(
+            'PlaceOrder called without offline_id by user %s — '
+            'retry after connectivity loss will create a duplicate order.',
+            user,
+        )
+
     # De-duplication: already synced?
     if offline_id:
         existing = Order.objects.filter(

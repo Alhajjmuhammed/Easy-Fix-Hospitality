@@ -493,6 +493,17 @@ def _sync_bill_request(user, owner, data):
             payment_status__in=['unpaid', 'partial'],
         ).exists()
         if not has_active_order:
+            # If the order was already paid in the same sync cycle (payment processed
+            # first in sync_push), treat this as a no-op rather than an error so
+            # the client doesn't show a confusing failure message.
+            already_paid = _Order.objects.filter(
+                table_info=table,
+                status__in=['pending', 'confirmed', 'preparing', 'ready', 'served',
+                            'out_for_delivery', 'delivered'],
+                payment_status='paid',
+            ).exists()
+            if already_paid:
+                return {'status': 'already_paid', 'message': 'Order at this table is already paid.'}
             return {'status': 'error', 'error': 'No active order at this table.'}
 
     # Prevent duplicate pending bill requests — mirrors _create_bill_request.
