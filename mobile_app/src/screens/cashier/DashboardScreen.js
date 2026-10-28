@@ -535,7 +535,7 @@ export default function CashierDashboardScreen({ navigation }) {
                         onPress={() => {
                           setMenuOpenId(null);
                           if (order._is_offline_pending) {
-                            setExpandedId(isExpanded ? null : order.id);
+                            setExpandedId(isExpanded ? null : orderId);
                           } else {
                             navigation.navigate('OrderDetail', { orderId: order.id });
                           }
