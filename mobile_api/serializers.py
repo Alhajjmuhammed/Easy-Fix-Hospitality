@@ -225,6 +225,8 @@ class TableSerializer(serializers.ModelSerializer):
         return f"Table {obj.tbl_no}"
 
     def get_is_available(self, obj):
+        if hasattr(obj, '_active_orders_prefetch'):
+            return obj.is_available and len(obj._active_orders_prefetch) == 0
         return obj.is_truly_available()
 
 

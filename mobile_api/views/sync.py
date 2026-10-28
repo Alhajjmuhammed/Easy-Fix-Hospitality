@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 from django.utils import timezone
 
 from orders.models import Order, OrderItem, BillRequest
@@ -128,6 +128,8 @@ def _sync_order_atomic(user, owner, data, offline_id):
         return _sync_order_append(user, owner, data, offline_id, int(existing_order_id))
 
     # Dedup check inside the transaction to prevent TOCTOU duplicate creation.
+    if not offline_id:
+        logger.warning('sync_order: missing offline_id for user=%s — duplicate detection disabled for this push', user.pk)
     if offline_id:
         existing = Order.objects.filter(
             ordered_by=user,
@@ -202,17 +204,21 @@ def _sync_order_atomic(user, owner, data, offline_id):
         except (TypeError, ValueError):
             qty = 1
         qty = max(1, min(qty, 100))
+        pid = i.get('product_id')
+        if not pid:
+            dropped_items.append(None)
+            continue
         product = Product.objects.select_for_update(of=('self',)).filter(
             Q(main_category__owner=owner) |
             Q(main_category__restaurant__main_owner=owner) |
             Q(main_category__restaurant__branch_owner=owner)
-        ).filter(id=i['product_id']).first()
+        ).filter(id=pid).first()
         if product is None:
-            dropped_items.append(i.get('product_id'))  # Unknown product — skip, note drop
+            dropped_items.append(pid)  # Unknown product — skip, note drop
         elif not product.is_available:
-            dropped_items.append(i.get('product_id'))  # Product unavailable — skip, note drop
+            dropped_items.append(pid)  # Product unavailable — skip, note drop
         elif False:  # stock gate removed — negative stock allowed
-            dropped_items.append(i.get('product_id'))  # Out of stock — skip, note drop
+            dropped_items.append(pid)  # Out of stock — skip, note drop
         else:
             fn = getattr(product, 'get_current_price', None)
             server_price = float(fn()) if fn else float(product.price)
@@ -409,6 +415,11 @@ def _sync_payment(user, owner, data):
     if amount <= 0:
         return {'status': 'error', 'error': 'Payment amount must be positive.'}
 
+    _valid_methods = {'cash', 'card', 'digital', 'voucher'}
+    payment_method = data.get('payment_method', 'cash')
+    if payment_method not in _valid_methods:
+        return {'status': 'error', 'error': f'Invalid payment method. Allowed: {", ".join(sorted(_valid_methods))}'}
+
     from django.db.models import Sum as _Sum2, Sum
     with transaction.atomic():
         # Lock the order row first, then dedup-check — this serialises concurrent
@@ -429,7 +440,7 @@ def _sync_payment(user, owner, data):
         payment = Payment.objects.create(
             order=order,
             amount=amount,
-            payment_method=data.get('payment_method', 'cash'),
+            payment_method=payment_method,
             processed_by=user,
             reference_number=data.get('reference_number', ''),
             notes=notes,
@@ -553,7 +564,16 @@ def sync_pull(request):
         Q(restaurant__main_owner=owner) |
         Q(restaurant__branch_owner=owner)
     )
-    tables = TableInfo.objects.filter(pull_table_q).distinct().order_by('tbl_no')
+    tables = TableInfo.objects.filter(pull_table_q).distinct().order_by('tbl_no').prefetch_related(
+        Prefetch(
+            'orders',
+            queryset=Order.objects.filter(
+                status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
+                payment_status__in=['unpaid', 'partial'],
+            ),
+            to_attr='_active_orders_prefetch',
+        )
+    )
 
     order_table_q = (
         Q(table_info__owner=owner) |
