@@ -188,7 +188,8 @@ class SubCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'products']
 
     def get_products(self, obj):
-        # only available products; sub_category already known via traversal path
+        if hasattr(obj, '_available_products'):
+            return ProductSerializer(obj._available_products, many=True, context=self.context).data
         qs = obj.products.filter(is_available=True)
         return ProductSerializer(qs, many=True, context=self.context).data
 
@@ -201,6 +202,8 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'subcategories']
 
     def get_subcategories(self, obj):
+        if hasattr(obj, '_active_subs'):
+            return SubCategorySerializer(obj._active_subs, many=True, context=self.context).data
         qs = obj.subcategories.filter(is_active=True)
         return SubCategorySerializer(qs, many=True, context=self.context).data
 

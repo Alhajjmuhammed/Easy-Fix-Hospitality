@@ -17,7 +17,7 @@ from django.db.models import Q, Prefetch
 from django.utils import timezone
 
 from orders.models import Order, OrderItem, BillRequest
-from restaurant.models import TableInfo, Product, MainCategory
+from restaurant.models import TableInfo, Product, MainCategory, SubCategory
 from cashier.models import Payment
 from ..serializers import (
     CategorySerializer, TableSerializer, OrderSerializer,
@@ -152,6 +152,11 @@ def _sync_order_atomic(user, owner, data, offline_id):
     if table is None and not is_remote:
         return {'status': 'error', 'error': f'Table {table_id} not found.'}
 
+    # Lock the table row so two different users syncing the same table simultaneously
+    # cannot both pass validation and create duplicate orders.
+    if table is not None:
+        table = TableInfo.objects.select_for_update(of=('self',)).get(pk=table.pk)
+
     items = data.get('items', [])
     if not items:
         return {'status': 'error', 'error': 'No items provided.'}
@@ -229,8 +234,8 @@ def _sync_order_atomic(user, owner, data, offline_id):
                 unit_price=server_price,
             )
             if product.available_in_stock is not None:
-                product.available_in_stock = product.available_in_stock - qty
-                product.save(update_fields=['available_in_stock'])
+                from django.db.models import F as _F
+                Product.objects.filter(pk=product.pk).update(available_in_stock=_F('available_in_stock') - qty)
 
     # Reject order if no items were actually created (all product IDs were invalid).
     # Must release the table first — Order.save() called occupy_table() on creation,
@@ -327,8 +332,8 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
             )
             new_items.append(oi)
             if product.available_in_stock is not None:
-                product.available_in_stock = product.available_in_stock - qty
-                product.save(update_fields=['available_in_stock'])
+                from django.db.models import F as _F
+                Product.objects.filter(pk=product.pk).update(available_in_stock=_F('available_in_stock') - qty)
 
     if not new_items:
         return {'status': 'error', 'error': 'No valid products found — items could not be added.'}
@@ -465,6 +470,8 @@ def _sync_payment(user, owner, data):
 
 
 def _sync_bill_request(user, owner, data):
+    if not user.is_customer() and not user.has_feature('request_bill'):
+        return {'status': 'error', 'error': 'Access denied.'}
     table_id = data.get('table_id')
     table = TableInfo.objects.filter(
         Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
@@ -484,6 +491,13 @@ def _sync_bill_request(user, owner, data):
             payment_status__in=['unpaid', 'partial'],
         ).exists()
         if not has_active_order:
+            already_paid = _Order.objects.filter(
+                table_info=table,
+                ordered_by=user,
+                payment_status='paid',
+            ).exists()
+            if already_paid:
+                return {'status': 'already_paid', 'message': 'Order at this table is already paid.'}
             return {'status': 'error', 'error': 'You do not have an active order at this table.'}
     else:
         # Staff (cashier, waiter, etc.): check that any active order exists at the table
@@ -567,7 +581,13 @@ def sync_pull(request):
         Q(restaurant__branch_owner=owner)
     )
     categories = MainCategory.objects.filter(_cat_q).distinct().prefetch_related(
-        'subcategories__products'
+        Prefetch(
+            'subcategories',
+            queryset=SubCategory.objects.filter(is_active=True).prefetch_related(
+                Prefetch('products', queryset=Product.objects.filter(is_available=True), to_attr='_available_products')
+            ),
+            to_attr='_active_subs',
+        ),
     ).order_by('name')
 
     pull_table_q = (
