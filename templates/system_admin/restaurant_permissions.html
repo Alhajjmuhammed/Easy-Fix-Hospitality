@@ -658,7 +658,6 @@
                 Enable or disable individual features for this restaurant. A disabled feature blocks <strong>everyone</strong> — including the owner — from using it.
             </p>
             {% for cat_key, cat_data in module_labels.items %}
-            {% with cat_features=features_by_cat_key|default_if_none:"" %}
             <div class="mod-section">
                 <div class="mod-section-header">
                     <div class="mod-section-icon"><i class="bi {{ cat_data.1 }}"></i></div>
@@ -680,7 +679,6 @@
                     {% endif %}{% endfor %}
                 </div>
             </div>
-            {% endwith %}
             {% endfor %}
             <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
                 <button id="saveModulesBtn" class="btn-save-modules">
