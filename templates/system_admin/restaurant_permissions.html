@@ -351,6 +351,41 @@
 
 .no-staff-msg { padding: 60px 20px; text-align: center; color: var(--perm-muted); background: #fff; border: 1px solid var(--perm-border); border-radius: 14px; }
 .no-staff-msg i { font-size: 2.5rem; opacity: .2; display: block; margin-bottom: 14px; }
+
+/* Module Access tab */
+.module-card {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; border-radius: 12px; border: 1.5px solid var(--perm-border);
+    background: #fff; gap: 14px; transition: border-color .2s, box-shadow .2s;
+}
+.module-card.module-on { border-color: #bbf7d0; background: #f0fdf4; }
+.module-card.module-off { border-color: #fecaca; background: #fff5f5; opacity: .85; }
+.module-card-left { display: flex; align-items: center; gap: 14px; }
+.module-icon {
+    width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    background: var(--perm-blue-light); color: var(--perm-blue); font-size: 1.2rem; flex-shrink: 0;
+}
+.module-icon-off { background: #fee2e2; color: #dc2626; }
+.module-name { font-size: .9rem; font-weight: 600; color: var(--perm-text); }
+.module-desc { font-size: .775rem; color: var(--perm-muted); margin-top: 2px; }
+/* Toggle switch */
+.module-toggle { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; cursor: pointer; }
+.module-toggle input { opacity: 0; width: 0; height: 0; }
+.module-slider {
+    position: absolute; inset: 0; background: #e5e7eb; border-radius: 13px; transition: .2s;
+}
+.module-slider::before {
+    content: ''; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.module-chk:checked + .module-slider { background: #16a34a; }
+.module-chk:checked + .module-slider::before { transform: translateX(20px); }
+.btn-save-modules {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 22px; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer;
+    background: var(--perm-blue); color: #fff; border: none; transition: background .15s;
+}
+.btn-save-modules:hover { background: #1e40af; }
 </style>
 
 <div class="perm-page">
@@ -387,6 +422,10 @@
         <button class="perm-tab-btn" data-tab="tabAssign">
             <i class="fas fa-user-check"></i> Assign Roles
             <span class="tab-badge">{{ staff|length }}</span>
+        </button>
+        <button class="perm-tab-btn" data-tab="tabModules">
+            <i class="fas fa-toggle-on"></i> Module Access
+            {% if disabled_categories %}<span class="tab-badge" style="background:#fee2e2;color:#dc2626;">{{ disabled_categories|length }} off</span>{% endif %}
         </button>
     </div>
 
@@ -604,6 +643,44 @@
             <div style="font-size:.84rem;">This restaurant has no staff accounts yet.</div>
         </div>
         {% endif %}
+    </div>
+
+    <!-- TAB 4: Module Access -->
+    <div class="perm-tab-pane" id="tabModules">
+        <div style="max-width:820px;">
+            <p style="color:var(--perm-muted);font-size:.875rem;margin-bottom:24px;">
+                Toggle entire modules ON or OFF for this restaurant. A disabled module blocks <strong>everyone</strong> — including the owner — from accessing those features.
+            </p>
+            <div id="moduleGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:28px;">
+                {% for cat_key, cat_data in module_labels.items %}
+                {% with icon=cat_data.1 label=cat_data.0 desc=cat_data.2 %}
+                <div class="module-card {% if cat_key in disabled_categories %}module-off{% else %}module-on{% endif %}"
+                     data-cat="{{ cat_key }}" id="mc-{{ cat_key }}">
+                    <div class="module-card-left">
+                        <div class="module-icon {% if cat_key in disabled_categories %}module-icon-off{% endif %}">
+                            <i class="bi {{ icon }}"></i>
+                        </div>
+                        <div>
+                            <div class="module-name">{{ label }}</div>
+                            <div class="module-desc">{{ desc }}</div>
+                        </div>
+                    </div>
+                    <label class="module-toggle">
+                        <input type="checkbox" class="module-chk" data-cat="{{ cat_key }}"
+                               {% if cat_key not in disabled_categories %}checked{% endif %}>
+                        <span class="module-slider"></span>
+                    </label>
+                </div>
+                {% endwith %}
+                {% endfor %}
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button id="saveModulesBtn" class="btn-save-modules">
+                    <i class="fas fa-save"></i> Save Module Access
+                </button>
+                <span id="moduleSaveMsg" style="font-size:.84rem;display:none;"></span>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -939,6 +1016,71 @@
         var roleDisplay = firstRoleBtn.querySelector('.role-item-name').textContent;
         selectRole(roleName, roleDisplay);
     }
+})();
+
+// --- Module Access ---
+(function() {
+    var disabledCats = {{ disabled_categories_json }};
+    var moduleUrl = "{% url 'system_admin:admin_save_module_access' restaurant_id %}";
+    var csrfToken = "{{ csrf_token }}";
+
+    // Sync card style when toggle changes
+    document.querySelectorAll('.module-chk').forEach(function(chk) {
+        chk.addEventListener('change', function() {
+            var card = document.getElementById('mc-' + chk.dataset.cat);
+            var icon = card.querySelector('.module-icon');
+            if (chk.checked) {
+                card.classList.remove('module-off'); card.classList.add('module-on');
+                icon.classList.remove('module-icon-off');
+            } else {
+                card.classList.remove('module-on'); card.classList.add('module-off');
+                icon.classList.add('module-icon-off');
+            }
+        });
+    });
+
+    document.getElementById('saveModulesBtn').addEventListener('click', function() {
+        var btn = this;
+        var msg = document.getElementById('moduleSaveMsg');
+        var disabled = [];
+        document.querySelectorAll('.module-chk').forEach(function(chk) {
+            if (!chk.checked) disabled.push(chk.dataset.cat);
+        });
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+        fetch(moduleUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ disabled_categories: disabled }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Module Access';
+            if (data.success) {
+                msg.style.display = 'inline'; msg.style.color = '#16a34a';
+                msg.innerHTML = '<i class="fas fa-check-circle"></i> Saved — ' + (disabled.length ? disabled.length + ' module(s) disabled.' : 'All modules enabled.');
+                // Update tab badge
+                var badge = document.querySelector('[data-tab="tabModules"] .tab-badge');
+                if (disabled.length) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'tab-badge';
+                        document.querySelector('[data-tab="tabModules"]').appendChild(badge);
+                    }
+                    badge.style.background = '#fee2e2'; badge.style.color = '#dc2626';
+                    badge.textContent = disabled.length + ' off';
+                } else if (badge) { badge.remove(); }
+            } else {
+                msg.style.display = 'inline'; msg.style.color = '#dc2626';
+                msg.textContent = 'Error: ' + (data.error || 'Unknown error');
+            }
+            setTimeout(function() { msg.style.display = 'none'; }, 4000);
+        })
+        .catch(function() {
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Module Access';
+            msg.style.display = 'inline'; msg.style.color = '#dc2626';
+            msg.textContent = 'Network error — please try again.';
+        });
+    });
 })();
 </script>
 {% endblock %}

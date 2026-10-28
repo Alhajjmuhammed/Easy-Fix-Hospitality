@@ -86,6 +86,7 @@ urlpatterns = [
     path('restaurant-permissions/<int:restaurant_id>/delete-custom-role/', views_permissions.admin_delete_custom_role, name='admin_delete_custom_role'),
     path('restaurant-permissions/<int:restaurant_id>/assign-custom-role/', views_permissions.admin_assign_custom_role, name='admin_assign_custom_role'),
     path('restaurant-permissions/<int:restaurant_id>/reset-defaults/', views_permissions.admin_reset_to_defaults, name='admin_reset_to_defaults'),
+    path('restaurant-permissions/<int:restaurant_id>/module-access/', views_permissions.admin_save_module_access, name='admin_save_module_access'),
 
     # Admin Staff Management
     path('admin-staff/', views_staff.admin_staff_list, name='admin_staff_list'),

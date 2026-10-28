@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.db import transaction
 
-from accounts.models import CustomRole, Feature, RolePermissionSet, User
+from accounts.models import CustomRole, Feature, RolePermissionSet, RestaurantSubscription, User
 from accounts.permissions_defaults import DEFAULT_ROLE_FEATURES
 
 logger = logging.getLogger(__name__)
@@ -89,6 +89,31 @@ def restaurant_permissions(request, restaurant_id):
         .order_by('username')
     )
 
+    # Module access: which categories are currently disabled for this restaurant
+    disabled_categories = []
+    try:
+        sub = owner.subscription
+        disabled_cats = set(sub.disabled_features.values_list('category', flat=True).distinct())
+        all_cats = set(c for c, _ in Feature.CATEGORY_CHOICES)
+        # A category is "disabled" only if ALL its features are in disabled_features
+        for cat in all_cats:
+            cat_slugs = set(Feature.objects.filter(category=cat).values_list('slug', flat=True))
+            disabled_slugs = set(sub.disabled_features.filter(category=cat).values_list('slug', flat=True))
+            if cat_slugs and cat_slugs == disabled_slugs:
+                disabled_categories.append(cat)
+    except Exception:
+        pass
+
+    MODULE_LABELS = {
+        'orders': ('Orders & Tables', 'bi-bag-check', 'Place, manage and track orders, table transfers, bill requests'),
+        'payments': ('Payments & Receipts', 'bi-credit-card', 'Process payments, void transactions, print receipts'),
+        'station': ('Kitchen / Bar Dashboards', 'bi-display', 'Station screens for kitchen, bar, buffet and service'),
+        'menu': ('Menu & Promotions', 'bi-book', 'Manage products, categories, promotions and events'),
+        'staff': ('Staff Management', 'bi-people', 'Add and manage staff accounts'),
+        'reports': ('Reports & Analytics', 'bi-bar-chart', 'View and export sales and performance reports'),
+        'operations': ('Attendance, Inventory & Waste', 'bi-clipboard-check', 'Attendance tracking, stock inventory and waste logging'),
+    }
+
     context = {
         'owner': owner,
         'features': features,
@@ -99,6 +124,9 @@ def restaurant_permissions(request, restaurant_id):
         'staff': staff,
         'built_in_roles': BUILT_IN_ROLES,
         'restaurant_id': restaurant_id,
+        'module_labels': MODULE_LABELS,
+        'disabled_categories': disabled_categories,
+        'disabled_categories_json': json.dumps(disabled_categories),
     }
     return render(request, 'system_admin/restaurant_permissions.html', context)
 
@@ -245,6 +273,44 @@ def admin_assign_custom_role(request, restaurant_id):
         return JsonResponse({'success': True})
     except Exception:
         logger.exception('admin_assign_custom_role error')
+        return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@login_required
+def admin_save_module_access(request, restaurant_id):
+    """AJAX: system admin enables/disables feature modules for a restaurant."""
+    if not _require_admin(request):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+
+    owner = get_object_or_404(
+        User,
+        pk=restaurant_id,
+        role__name__in=['owner', 'main_owner', 'branch_owner'],
+    )
+
+    try:
+        data = json.loads(request.body)
+        # disabled_categories: list of category slugs the admin wants to block
+        disabled_categories = data.get('disabled_categories', [])
+
+        sub, _ = RestaurantSubscription.objects.get_or_create(
+            restaurant_owner=owner,
+            defaults={
+                'subscription_start_date': __import__('datetime').date.today(),
+                'subscription_end_date': __import__('datetime').date.today() + __import__('datetime').timedelta(days=365),
+            },
+        )
+
+        disabled_features = Feature.objects.filter(category__in=disabled_categories)
+        sub.disabled_features.set(disabled_features)
+
+        return JsonResponse({
+            'success': True,
+            'disabled_count': disabled_features.count(),
+            'disabled_categories': disabled_categories,
+        })
+    except Exception:
+        logger.exception('admin_save_module_access error')
         return JsonResponse({'error': 'Server error'}, status=500)
 
 

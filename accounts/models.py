@@ -481,15 +481,29 @@ class User(AbstractUser):
         """Check if this user has access to a specific feature.
 
         Priority order:
-        1. Owners and administrators always have full access.
-        2. Custom role features (if the user has one assigned).
-        3. Restaurant-level RolePermissionSet (if configured by owner/admin).
-        4. Default built-in role features from permissions_defaults.py.
+        1. Administrators always have full access.
+        2. Restaurant-level module restriction (blocks owners AND staff if disabled).
+        3. Owners have full access to any non-disabled feature.
+        4. Custom role features (if the user has one assigned).
+        5. Restaurant-level RolePermissionSet (if configured by owner/admin).
+        6. Default built-in role features from permissions_defaults.py.
         """
-        if self.is_administrator() or self.is_owner():
+        if self.is_administrator():
             return True
 
-        owner = self.get_owner()
+        # Restaurant-level module restriction — applies to everyone including owners.
+        # If the system admin has disabled a feature for this restaurant, nobody can use it.
+        owner = self if self.is_owner() else self.get_owner()
+        if owner:
+            try:
+                if owner.subscription.disabled_features.filter(slug=slug).exists():
+                    return False
+            except Exception:
+                pass  # No subscription record = no restriction
+
+        if self.is_owner():
+            return True
+
         if not owner:
             return self._default_has_feature(slug)
 
@@ -678,6 +692,15 @@ class RestaurantSubscription(models.Model):
     )
     
     # Audit fields
+    # Features disabled at the restaurant level — blocked for everyone including the owner.
+    # Empty = all features available (default, fully backward-compatible).
+    disabled_features = models.ManyToManyField(
+        'Feature',
+        blank=True,
+        related_name='restricted_subscriptions',
+        help_text='Features the system admin has disabled for this restaurant.',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
