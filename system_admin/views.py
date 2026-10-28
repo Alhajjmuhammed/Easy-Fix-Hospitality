@@ -172,6 +172,10 @@ def upload_app_release(request):
         messages.error(request, 'Only .apk files are allowed.')
         return redirect('system_admin:dashboard')
 
+    if apk_file.size > 150 * 1024 * 1024:
+        messages.error(request, 'APK file must be under 150 MB.')
+        return redirect('system_admin:dashboard')
+
     # Delete the old APK file from disk before replacing
     old = MobileAppRelease.objects.filter(is_active=True).first()
     if old:
