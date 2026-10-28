@@ -526,14 +526,16 @@ export async function printOrderTicket(order, restaurantName = '', stationFilter
         await _printTicketBtClassic(opts);
         return true;
       } catch (btErr) {
-        if (__DEV__) console.warn('[Printer] Ticket BT failed → system dialog:', btErr?.message);
+        if (__DEV__) console.warn('[Printer] Ticket BT failed (silent — no native dialog for KOT/BOT):', btErr?.message);
       }
     }
+    // Auto mode: KOT/BOT never fall back to the native OS dialog.
+    // Showing a print dialog interrupts the waiter mid-order. The order
+    // is already saved (offline queue or server); this is only the local print.
+    return false;
   }
 
-  // Network / system / auto-fallback → system dialog
-  // Network mode: server queue already handles KOT/BOT when X-Local-Print is NOT set;
-  // if we reach here it means server queue is skipped, so system dialog is the fallback.
+  // Network / system modes only → system dialog (explicit receipt/bill prints, not auto KOT/BOT)
   return printTicketLocal(opts);
 }
 
