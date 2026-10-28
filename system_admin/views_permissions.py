@@ -90,20 +90,21 @@ def restaurant_permissions(request, restaurant_id):
         .order_by('username')
     )
 
-    # Module access: which categories are currently disabled for this restaurant
+    # Module access: which categories are currently disabled for this restaurant.
+    # Wrapped in atomic() so a DB error on the M2M join table rolls back to a
+    # savepoint rather than poisoning the whole request transaction.
     disabled_categories = []
     try:
-        sub = owner.subscription
-        disabled_cats = set(sub.disabled_features.values_list('category', flat=True).distinct())
-        all_cats = set(c for c, _ in Feature.CATEGORY_CHOICES)
-        # A category is "disabled" only if ALL its features are in disabled_features
-        for cat in all_cats:
-            cat_slugs = set(Feature.objects.filter(category=cat).values_list('slug', flat=True))
-            disabled_slugs = set(sub.disabled_features.filter(category=cat).values_list('slug', flat=True))
-            if cat_slugs and cat_slugs == disabled_slugs:
-                disabled_categories.append(cat)
+        with transaction.atomic():
+            sub = owner.subscription
+            all_cats = set(c for c, _ in Feature.CATEGORY_CHOICES)
+            for cat in all_cats:
+                cat_slugs = set(Feature.objects.filter(category=cat).values_list('slug', flat=True))
+                disabled_slugs = set(sub.disabled_features.filter(category=cat).values_list('slug', flat=True))
+                if cat_slugs and cat_slugs == disabled_slugs:
+                    disabled_categories.append(cat)
     except Exception:
-        pass
+        disabled_categories = []
 
     MODULE_LABELS = {
         'orders': ('Orders & Tables', 'bi-bag-check', 'Place, manage and track orders, table transfers, bill requests'),
