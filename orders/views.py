@@ -2150,11 +2150,11 @@ def update_order_status(request, order_id):
 @login_required
 def cancel_order(request, order_id):
     """Cancel an order with reason"""
-    if not request.user.has_feature('kitchen_dashboard'):
+    if not request.user.has_feature('cancel_orders'):
         if request.headers.get('Content-Type') == 'application/json':
-            return JsonResponse({'success': False, 'message': 'Access denied. Kitchen dashboard access required.'})
-        messages.error(request, 'Access denied. Kitchen dashboard access required.')
-        return redirect('orders:kitchen_dashboard')
+            return JsonResponse({'success': False, 'message': 'Access denied.'})
+        messages.error(request, 'Access denied. You do not have permission to cancel orders.')
+        return redirect('restaurant:home')
     
     try:
         owner_filter = get_owner_filter(request.user)
