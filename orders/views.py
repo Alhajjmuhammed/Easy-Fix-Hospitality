@@ -1099,6 +1099,10 @@ def track_order(request, order_number):
 @login_required
 def order_list(request):
     """Order list with role-based filtering"""
+    if not request.user.has_feature('view_orders'):
+        from django.contrib import messages
+        messages.error(request, "You don't have permission to view orders.")
+        return redirect('restaurant:home')
     # Customer care users can only see their own orders
     if request.user.is_customer_care():
         orders = Order.objects.filter(ordered_by=request.user)

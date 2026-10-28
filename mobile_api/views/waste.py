@@ -27,8 +27,12 @@ def _allowed(user):
 def waste(request):
     if not _allowed(request.user):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
-    if not request.user.has_feature('manage_waste'):
-        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+    if request.method == 'GET':
+        if not (request.user.has_feature('view_waste') or request.user.has_feature('log_waste') or request.user.has_feature('manage_waste')):
+            return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+    else:
+        if not (request.user.has_feature('log_waste') or request.user.has_feature('manage_waste')):
+            return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     owner = get_restaurant_owner(request)
     if owner is None:
