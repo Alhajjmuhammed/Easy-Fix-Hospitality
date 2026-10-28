@@ -593,7 +593,7 @@ def sync_pull(request):
         Q(restaurant__main_owner=owner) |
         Q(restaurant__branch_owner=owner)
     )
-    categories = MainCategory.objects.filter(_cat_q).distinct().prefetch_related(
+    categories = MainCategory.objects.filter(_cat_q, is_active=True).distinct().prefetch_related(
         Prefetch(
             'subcategories',
             queryset=SubCategory.objects.filter(is_active=True).prefetch_related(
