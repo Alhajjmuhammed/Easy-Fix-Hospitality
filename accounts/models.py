@@ -203,30 +203,38 @@ class User(AbstractUser):
     @property
     def visible_features(self):
         """Returns the set of feature slugs this user can access — for sidebar/template use."""
-        if (self.is_administrator() or self.is_owner() or
-                self.is_main_owner() or self.is_branch_owner()):
+        if self.is_administrator():
+            return set(Feature.objects.values_list('slug', flat=True))
+
+        if self.is_owner():
+            slugs = set(Feature.objects.values_list('slug', flat=True))
+        else:
+            slugs = set()
             try:
-                from accounts.models import Feature
-                return set(Feature.objects.values_list('slug', flat=True))
-            except Exception:
-                return set()
-        slugs = set()
-        try:
-            from accounts.permissions_defaults import DEFAULT_ROLE_FEATURES
-            role_name = self.role.name if self.role else ''
-            # Custom role overrides everything else (mirrors has_feature priority)
-            if self.custom_role_id:
-                slugs = set(self.custom_role.features.values_list('slug', flat=True))
-            elif self.owner:
-                rps = RolePermissionSet.objects.filter(owner=self.owner, role_name=role_name).first()
-                if rps:
-                    slugs = set(rps.features.values_list('slug', flat=True))
+                from accounts.permissions_defaults import DEFAULT_ROLE_FEATURES
+                role_name = self.role.name if self.role else ''
+                if self.custom_role_id:
+                    slugs = set(self.custom_role.features.values_list('slug', flat=True))
+                elif self.owner:
+                    rps = RolePermissionSet.objects.filter(owner=self.owner, role_name=role_name).first()
+                    if rps:
+                        slugs = set(rps.features.values_list('slug', flat=True))
+                    else:
+                        slugs = set(DEFAULT_ROLE_FEATURES.get(role_name, []))
                 else:
                     slugs = set(DEFAULT_ROLE_FEATURES.get(role_name, []))
-            else:
-                slugs = set(DEFAULT_ROLE_FEATURES.get(role_name, []))
-        except Exception:
-            pass
+            except Exception:
+                pass
+
+        # Filter out features disabled at the restaurant level by the system admin.
+        owner = self if self.is_owner() else self.owner
+        if owner:
+            try:
+                disabled = set(owner.subscription.disabled_features.values_list('slug', flat=True))
+                slugs -= disabled
+            except Exception:
+                pass
+
         return slugs
 
     def is_admin(self):

@@ -3,6 +3,7 @@ System admin views for managing per-restaurant permissions.
 Allows the system administrator to view and edit any restaurant's
 RolePermissionSets and CustomRoles without logging in as that restaurant.
 """
+import datetime
 import json
 import logging
 
@@ -296,8 +297,8 @@ def admin_save_module_access(request, restaurant_id):
         sub, _ = RestaurantSubscription.objects.get_or_create(
             restaurant_owner=owner,
             defaults={
-                'subscription_start_date': __import__('datetime').date.today(),
-                'subscription_end_date': __import__('datetime').date.today() + __import__('datetime').timedelta(days=365),
+                'subscription_start_date': datetime.date.today(),
+                'subscription_end_date': datetime.date.today() + datetime.timedelta(days=365),
             },
         )
 
