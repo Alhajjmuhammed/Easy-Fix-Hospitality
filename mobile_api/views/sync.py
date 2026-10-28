@@ -407,7 +407,20 @@ def _sync_payment(user, owner, data):
         try:
             order = Order.objects.filter(restaurant_q, order_number=order_number).distinct().get()
         except (Order.DoesNotExist, Order.MultipleObjectsReturned):
-            return {'status': 'error', 'error': f'Order {order_id} not found.'}
+            # Third fallback: order was created in the same sync push so the client
+            # only knows its offline_id — look up by the dedup tag in special_instructions.
+            order_offline_id = data.get('order_offline_id', '').strip()
+            if order_offline_id:
+                _tag = f'[offline:{order_offline_id}]'
+                try:
+                    order = Order.objects.filter(
+                        restaurant_q,
+                        special_instructions__contains=_tag,
+                    ).distinct().get()
+                except (Order.DoesNotExist, Order.MultipleObjectsReturned):
+                    return {'status': 'error', 'error': f'Order {order_id} not found.'}
+            else:
+                return {'status': 'error', 'error': f'Order {order_id} not found.'}
     # CC staff can only pay for their own orders (same constraint as regular payments endpoint).
     if user.is_customer_care() and order.ordered_by != user:
         return {'status': 'error', 'error': 'Access denied.'}
