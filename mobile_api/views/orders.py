@@ -798,6 +798,16 @@ def print_station_ticket(request, order_id):
         return Response({'error': 'Access denied.'}, status=403)
 
     station = role if role in _STATION_ROLES else request.data.get('station')
+
+    _station_feature_map = {
+        'kitchen': 'kitchen_dashboard',
+        'bar': 'bar_dashboard',
+        'buffet': 'buffet_dashboard',
+        'service': 'service_dashboard',
+    }
+    _required_feature = _station_feature_map.get(station, 'manage_orders')
+    if not user.has_feature(_required_feature) and not user.has_feature('manage_orders'):
+        return Response({'error': 'Access denied.'}, status=403)
     if station not in _STATION_ROLES:
         return Response({'error': 'Invalid or missing station.'}, status=400)
 

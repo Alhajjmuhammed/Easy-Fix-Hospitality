@@ -548,8 +548,10 @@ def mark_delivered(request, order_id):
         assignment.delivered_at = timezone.now()
         assignment.save(update_fields=['status', 'delivered_at'])
 
-        # Mark rider available again
-        rider = assignment.rider
+        # Mark rider available again — re-fetch under lock so concurrent
+        # assign_rider cannot race with this availability reset.
+        from orders.models import DeliveryRider as _DR
+        rider = _DR.objects.select_for_update(of=('self',)).get(pk=assignment.rider_id)
         rider.is_available = True
         rider.save(update_fields=['is_available'])
 

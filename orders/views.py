@@ -670,8 +670,10 @@ def place_order(request):
                         )
 
                         # Update stock
-                        product.available_in_stock -= item['quantity']
-                        product.save(update_fields=['available_in_stock'])
+                        if product.available_in_stock is not None:
+                            type(product).objects.filter(pk=product.pk).update(
+                                available_in_stock=F('available_in_stock') - item['quantity']
+                            )
 
                         total_amount += float(unit_price_paid) * item['quantity']
 
@@ -3779,10 +3781,12 @@ def handle_add_to_existing_order(request, order_id, cart):
                 )
                 
                 new_items.append(order_item)
-                
+
                 # Update stock
-                product.available_in_stock -= item['quantity']
-                product.save(update_fields=['available_in_stock'])
+                if product.available_in_stock is not None:
+                    type(product).objects.filter(pk=product.pk).update(
+                        available_in_stock=F('available_in_stock') - item['quantity']
+                    )
 
                 total_added += unit_price_paid * item['quantity']
             
