@@ -90,36 +90,37 @@ def restaurant_permissions(request, restaurant_id):
         .order_by('username')
     )
 
-    # Module access: which categories are currently disabled for this restaurant.
-    # Wrapped in atomic() so a DB error on the M2M join table rolls back to a
-    # savepoint rather than poisoning the whole request transaction.
-    disabled_categories = []
+    # Module access: individual feature slugs disabled for this restaurant.
+    # Savepoint prevents a DB error on the M2M join table from corrupting the
+    # outer transaction (SQLite lock contention, table not yet visible, etc.).
+    disabled_slugs = []
     try:
         with transaction.atomic():
             sub = owner.subscription
-            all_cats = set(c for c, _ in Feature.CATEGORY_CHOICES)
-            for cat in all_cats:
-                cat_slugs = set(Feature.objects.filter(category=cat).values_list('slug', flat=True))
-                disabled_slugs = set(sub.disabled_features.filter(category=cat).values_list('slug', flat=True))
-                if cat_slugs and cat_slugs == disabled_slugs:
-                    disabled_categories.append(cat)
+            disabled_slugs = list(sub.disabled_features.values_list('slug', flat=True))
     except Exception:
-        disabled_categories = []
+        disabled_slugs = []
 
     MODULE_LABELS = {
-        'orders': ('Orders & Tables', 'bi-bag-check', 'Place, manage and track orders, table transfers, bill requests'),
-        'payments': ('Payments & Receipts', 'bi-credit-card', 'Process payments, void transactions, print receipts'),
-        'station': ('Kitchen / Bar Dashboards', 'bi-display', 'Station screens for kitchen, bar, buffet and service'),
-        'menu': ('Menu & Promotions', 'bi-book', 'Manage products, categories, promotions and events'),
-        'staff': ('Staff Management', 'bi-people', 'Add and manage staff accounts'),
-        'reports': ('Reports & Analytics', 'bi-bar-chart', 'View and export sales and performance reports'),
-        'operations': ('Attendance, Inventory & Waste', 'bi-clipboard-check', 'Attendance tracking, stock inventory and waste logging'),
+        'orders': ('Orders & Tables', 'bi-bag-check'),
+        'payments': ('Payments & Receipts', 'bi-credit-card'),
+        'station': ('Kitchen / Bar Dashboards', 'bi-display'),
+        'menu': ('Menu & Promotions', 'bi-book'),
+        'staff': ('Staff Management', 'bi-people'),
+        'reports': ('Reports & Analytics', 'bi-bar-chart'),
+        'operations': ('Attendance, Inventory & Waste', 'bi-clipboard-check'),
     }
+
+    # Build features grouped by category key (not display name) for the template.
+    features_by_cat_key = {}
+    for f in features:
+        features_by_cat_key.setdefault(f.category, []).append(f)
 
     context = {
         'owner': owner,
         'features': features,
         'features_by_category': features_by_category,
+        'features_by_cat_key': features_by_cat_key,
         'role_sets_json': role_sets_json,
         'custom_roles': custom_roles,
         'custom_roles_json': custom_roles_json,
@@ -127,8 +128,8 @@ def restaurant_permissions(request, restaurant_id):
         'built_in_roles': BUILT_IN_ROLES,
         'restaurant_id': restaurant_id,
         'module_labels': MODULE_LABELS,
-        'disabled_categories': disabled_categories,
-        'disabled_categories_json': json.dumps(disabled_categories),
+        'disabled_slugs': disabled_slugs,
+        'disabled_slugs_json': json.dumps(disabled_slugs),
     }
     return render(request, 'system_admin/restaurant_permissions.html', context)
 
@@ -292,8 +293,8 @@ def admin_save_module_access(request, restaurant_id):
 
     try:
         data = json.loads(request.body)
-        # disabled_categories: list of category slugs the admin wants to block
-        disabled_categories = data.get('disabled_categories', [])
+        # disabled_slugs: individual feature slugs the admin wants to block
+        disabled_slugs = data.get('disabled_slugs', [])
 
         sub, _ = RestaurantSubscription.objects.get_or_create(
             restaurant_owner=owner,
@@ -303,13 +304,13 @@ def admin_save_module_access(request, restaurant_id):
             },
         )
 
-        disabled_features = Feature.objects.filter(category__in=disabled_categories)
+        disabled_features = Feature.objects.filter(slug__in=disabled_slugs)
         sub.disabled_features.set(disabled_features)
 
         return JsonResponse({
             'success': True,
             'disabled_count': disabled_features.count(),
-            'disabled_categories': disabled_categories,
+            'disabled_slugs': disabled_slugs,
         })
     except Exception:
         logger.exception('admin_save_module_access error')

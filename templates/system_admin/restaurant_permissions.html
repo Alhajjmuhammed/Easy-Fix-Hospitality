@@ -353,21 +353,27 @@
 .no-staff-msg i { font-size: 2.5rem; opacity: .2; display: block; margin-bottom: 14px; }
 
 /* Module Access tab */
-.module-card {
+.mod-section { margin-bottom: 28px; }
+.mod-section-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 10px 10px 0 0;
+    background: var(--perm-blue-light); border: 1.5px solid var(--perm-border); border-bottom: none;
+}
+.mod-section-icon {
+    width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    background: var(--perm-blue); color: #fff; font-size: .95rem; flex-shrink: 0;
+}
+.mod-section-title { font-size: .875rem; font-weight: 700; color: var(--perm-text); }
+.mod-feature-list { border: 1.5px solid var(--perm-border); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
+.mod-feature-row {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 18px; border-radius: 12px; border: 1.5px solid var(--perm-border);
-    background: #fff; gap: 14px; transition: border-color .2s, box-shadow .2s;
+    padding: 11px 16px; background: #fff; border-bottom: 1px solid var(--perm-border);
+    transition: background .15s;
 }
-.module-card.module-on { border-color: #bbf7d0; background: #f0fdf4; }
-.module-card.module-off { border-color: #fecaca; background: #fff5f5; opacity: .85; }
-.module-card-left { display: flex; align-items: center; gap: 14px; }
-.module-icon {
-    width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
-    background: var(--perm-blue-light); color: var(--perm-blue); font-size: 1.2rem; flex-shrink: 0;
-}
-.module-icon-off { background: #fee2e2; color: #dc2626; }
-.module-name { font-size: .9rem; font-weight: 600; color: var(--perm-text); }
-.module-desc { font-size: .775rem; color: var(--perm-muted); margin-top: 2px; }
+.mod-feature-row:last-child { border-bottom: none; }
+.mod-feature-row.feat-off { background: #fff5f5; }
+.mod-feature-name { font-size: .85rem; font-weight: 500; color: var(--perm-text); }
+.mod-feature-desc { font-size: .75rem; color: var(--perm-muted); margin-top: 1px; }
 /* Toggle switch */
 .module-toggle { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; cursor: pointer; }
 .module-toggle input { opacity: 0; width: 0; height: 0; }
@@ -425,7 +431,7 @@
         </button>
         <button class="perm-tab-btn" data-tab="tabModules">
             <i class="fas fa-toggle-on"></i> Module Access
-            {% if disabled_categories %}<span class="tab-badge" style="background:#fee2e2;color:#dc2626;">{{ disabled_categories|length }} off</span>{% endif %}
+            {% if disabled_slugs %}<span class="tab-badge" style="background:#fee2e2;color:#dc2626;">{{ disabled_slugs|length }} off</span>{% endif %}
         </button>
     </div>
 
@@ -647,34 +653,36 @@
 
     <!-- TAB 4: Module Access -->
     <div class="perm-tab-pane" id="tabModules">
-        <div style="max-width:820px;">
+        <div style="max-width:700px;">
             <p style="color:var(--perm-muted);font-size:.875rem;margin-bottom:24px;">
-                Toggle entire modules ON or OFF for this restaurant. A disabled module blocks <strong>everyone</strong> — including the owner — from accessing those features.
+                Enable or disable individual features for this restaurant. A disabled feature blocks <strong>everyone</strong> — including the owner — from using it.
             </p>
-            <div id="moduleGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:28px;">
-                {% for cat_key, cat_data in module_labels.items %}
-                {% with icon=cat_data.1 label=cat_data.0 desc=cat_data.2 %}
-                <div class="module-card {% if cat_key in disabled_categories %}module-off{% else %}module-on{% endif %}"
-                     data-cat="{{ cat_key }}" id="mc-{{ cat_key }}">
-                    <div class="module-card-left">
-                        <div class="module-icon {% if cat_key in disabled_categories %}module-icon-off{% endif %}">
-                            <i class="bi {{ icon }}"></i>
-                        </div>
-                        <div>
-                            <div class="module-name">{{ label }}</div>
-                            <div class="module-desc">{{ desc }}</div>
-                        </div>
-                    </div>
-                    <label class="module-toggle">
-                        <input type="checkbox" class="module-chk" data-cat="{{ cat_key }}"
-                               {% if cat_key not in disabled_categories %}checked{% endif %}>
-                        <span class="module-slider"></span>
-                    </label>
+            {% for cat_key, cat_data in module_labels.items %}
+            {% with cat_features=features_by_cat_key|default_if_none:"" %}
+            <div class="mod-section">
+                <div class="mod-section-header">
+                    <div class="mod-section-icon"><i class="bi {{ cat_data.1 }}"></i></div>
+                    <span class="mod-section-title">{{ cat_data.0 }}</span>
                 </div>
-                {% endwith %}
-                {% endfor %}
+                <div class="mod-feature-list">
+                    {% for feature in features %}{% if feature.category == cat_key %}
+                    <div class="mod-feature-row {% if feature.slug in disabled_slugs %}feat-off{% endif %}" id="fr-{{ feature.slug }}">
+                        <div>
+                            <div class="mod-feature-name">{{ feature.name }}</div>
+                            {% if feature.description %}<div class="mod-feature-desc">{{ feature.description }}</div>{% endif %}
+                        </div>
+                        <label class="module-toggle">
+                            <input type="checkbox" class="module-chk" data-slug="{{ feature.slug }}"
+                                   {% if feature.slug not in disabled_slugs %}checked{% endif %}>
+                            <span class="module-slider"></span>
+                        </label>
+                    </div>
+                    {% endif %}{% endfor %}
+                </div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;">
+            {% endwith %}
+            {% endfor %}
+            <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
                 <button id="saveModulesBtn" class="btn-save-modules">
                     <i class="fas fa-save"></i> Save Module Access
                 </button>
@@ -1020,21 +1028,17 @@
 
 // --- Module Access ---
 (function() {
-    var disabledCats = {{ disabled_categories_json }};
     var moduleUrl = "{% url 'system_admin:admin_save_module_access' restaurant_id %}";
     var csrfToken = "{{ csrf_token }}";
 
-    // Sync card style when toggle changes
+    // Toggle row highlight when a feature is switched
     document.querySelectorAll('.module-chk').forEach(function(chk) {
         chk.addEventListener('change', function() {
-            var card = document.getElementById('mc-' + chk.dataset.cat);
-            var icon = card.querySelector('.module-icon');
+            var row = document.getElementById('fr-' + chk.dataset.slug);
             if (chk.checked) {
-                card.classList.remove('module-off'); card.classList.add('module-on');
-                icon.classList.remove('module-icon-off');
+                row.classList.remove('feat-off');
             } else {
-                card.classList.remove('module-on'); card.classList.add('module-off');
-                icon.classList.add('module-icon-off');
+                row.classList.add('feat-off');
             }
         });
     });
@@ -1044,21 +1048,20 @@
         var msg = document.getElementById('moduleSaveMsg');
         var disabled = [];
         document.querySelectorAll('.module-chk').forEach(function(chk) {
-            if (!chk.checked) disabled.push(chk.dataset.cat);
+            if (!chk.checked) disabled.push(chk.dataset.slug);
         });
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
         fetch(moduleUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({ disabled_categories: disabled }),
+            body: JSON.stringify({ disabled_slugs: disabled }),
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Module Access';
             if (data.success) {
                 msg.style.display = 'inline'; msg.style.color = '#16a34a';
-                msg.innerHTML = '<i class="fas fa-check-circle"></i> Saved — ' + (disabled.length ? disabled.length + ' module(s) disabled.' : 'All modules enabled.');
-                // Update tab badge
+                msg.innerHTML = '<i class="fas fa-check-circle"></i> Saved — ' + (disabled.length ? disabled.length + ' feature(s) disabled.' : 'All features enabled.');
                 var badge = document.querySelector('[data-tab="tabModules"] .tab-badge');
                 if (disabled.length) {
                     if (!badge) {
