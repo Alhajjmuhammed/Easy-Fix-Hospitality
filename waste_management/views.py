@@ -924,7 +924,9 @@ def auto_detect_waste(request):
     """API endpoint to manually trigger automatic waste detection"""
     if not (request.user.is_administrator() or request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
-    
+    if not request.user.is_administrator() and not request.user.has_feature('manage_waste'):
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
+
     try:
         detected_count = detect_automatic_waste()
         return JsonResponse({

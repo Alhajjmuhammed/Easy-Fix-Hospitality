@@ -1071,7 +1071,10 @@ def promotion_preview(request, promotion_id):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, 'Access denied. Owner privileges required.')
         return redirect('restaurant:home')
-    
+    if not request.user.has_feature('manage_promotions'):
+        messages.error(request, "You don't have permission to manage promotions.")
+        return redirect('restaurant:home')
+
     from accounts.models import get_owner_filter
     owner_filter = get_owner_filter(request.user)
     

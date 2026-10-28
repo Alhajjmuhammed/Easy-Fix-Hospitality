@@ -175,6 +175,8 @@ def owner_reports(request):
     user = request.user
     if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager()):
         return Response({'error': 'Access denied. Owner or manager role required.'}, status=403)
+    if not user.has_feature('view_reports'):
+        return Response({'error': 'Access denied.'}, status=403)
 
     owner = get_restaurant_owner(request)
     if owner is None:

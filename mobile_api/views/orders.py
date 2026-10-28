@@ -634,6 +634,7 @@ def update_order_status(request, order_id):
 
     # Station staff may only advance orders to 'preparing' or 'ready'.
     STATION_ALLOWED_STATUSES = ('preparing', 'ready')
+    _is_station_staff = user.role and user.role.name in _STATION_ROLES
     if _is_station_staff and new_status not in STATION_ALLOWED_STATUSES:
         return Response(
             {'error': f'Station staff can only set status to: {", ".join(STATION_ALLOWED_STATUSES)}'},

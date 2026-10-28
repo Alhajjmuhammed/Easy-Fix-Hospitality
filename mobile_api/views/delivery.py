@@ -112,6 +112,8 @@ def riders_list(request):
             user.is_cashier() or user.is_customer_care() or user.is_manager() or
             user.is_administrator()):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+    if not user.is_administrator() and not user.has_feature('manage_delivery'):
+        return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     owner = get_restaurant_owner(request)
     if not owner and not user.is_administrator():
