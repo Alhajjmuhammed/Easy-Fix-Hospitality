@@ -1,180 +1,118 @@
 {% extends 'base.html' %}
 {% load restaurant_tags %}
 
-{% block title %}Customer Care Profile - Restaurant System{% endblock %}
+{% block title %}Customer Care Profile - {{ user.get_restaurant_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root{--role-color:#0891b2;--role-dark:#0e7490;--role-light:#f0f9ff}
+{% include "accounts/_profile_styles.html" %}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10">
-        <div class="card shadow">
-            <div class="card-header bg-info text-white">
-                <h4 class="mb-0">
-                    <i class="bi bi-headset"></i> Customer Care Profile
-                </h4>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <!-- Personal Information -->
-                    <div class="col-md-6">
-                        <h6 class="text-muted mb-3">
-                            <i class="bi bi-person-fill"></i> Personal Information
-                        </h6>
-                        <div class="mb-2">
-                            <strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Username:</strong> {{ user.username }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Email:</strong> {{ user.email }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Phone:</strong> {{ user.phone_number|default:"Not provided" }}
-                        </div>
-                    </div>
+<div class="profile-page">
 
-                    <!-- Account Details -->
-                    <div class="col-md-6">
-                        <h6 class="text-muted mb-3">
-                            <i class="bi bi-shield-check"></i> Account Details
-                        </h6>
-                        <div class="mb-2">
-                            <strong>Role:</strong>
-                            <span class="badge bg-info">{{ user.role.get_name_display|default:"Customer Care" }}</span>
-                        </div>
-                        <div class="mb-2">
-                            <strong>Member Since:</strong> {{ user.date_joined|date:"F d, Y" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Last Login:</strong> {{ user.last_login|date:"F d, Y H:i"|default:"Never" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Status:</strong>
-                            {% if user.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-danger">Inactive</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                {% if user.address %}
-                <div class="mt-3">
-                    <h6 class="text-muted">
-                        <i class="bi bi-geo-alt-fill"></i> Address
-                    </h6>
-                    <p class="mb-0">{{ user.address }}</p>
-                </div>
-                {% endif %}
-
-                <!-- Customer Care Actions -->
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="text-muted mb-3">
-                        <i class="bi bi-tools"></i> Customer Care Tools
-                    </h6>
-                    <div class="row">
-                        <div class="col-md-4 mb-2">
-                            <a href="{% url 'orders:select_table' %}" class="btn btn-info w-100">
-                                <i class="bi bi-table"></i> Take Order
-                            </a>
-                        </div>
-                        <div class="col-md-4 mb-2">
-                            <a href="{% url 'orders:customer_care_dashboard' %}" class="btn btn-outline-info w-100">
-                                <i class="bi bi-speedometer2"></i> Dashboard
-                            </a>
-                        </div>
-                        <div class="col-md-4 mb-2">
-                            <a href="{% url 'orders:my_orders' %}" class="btn btn-outline-secondary w-100">
-                                <i class="bi bi-receipt"></i> Order History
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Stats -->
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="text-muted mb-3">
-                        <i class="bi bi-graph-up"></i> Today's Activity
-                    </h6>
-                    <div class="row text-center">
-                        <div class="col-md-3 mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h4 class="text-primary mb-1">0</h4>
-                                    <small class="text-muted">Orders Taken</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h4 class="text-success mb-1">{% currency_symbol %}0.00</h4>
-                                    <small class="text-muted">Revenue</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h4 class="text-warning mb-1">0</h4>
-                                    <small class="text-muted">Tables Served</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h4 class="text-info mb-1">0</h4>
-                                    <small class="text-muted">Avg. Order Time</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Orders -->
-        {% if recent_orders %}
-        <div class="card shadow mt-4">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">
-                    <i class="bi bi-clock-history"></i> Recent Orders Assisted
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    {% for order in recent_orders %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card border">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="mb-0">Order #{{ order.id }}</h6>
-                                    <span class="badge bg-{% if order.status == 'pending' %}warning{% elif order.status == 'confirmed' %}info{% elif order.status == 'preparing' %}primary{% elif order.status == 'ready' %}success{% elif order.status == 'delivered' %}success{% else %}secondary{% endif %}">
-                                        {{ order.status|title }}
-                                    </span>
-                                </div>
-                                <div class="small text-muted mb-2">
-                                    <i class="bi bi-calendar"></i> {{ order.created_at|date:"M d, Y H:i" }}
-                                </div>
-                                <div class="mb-2">
-                                    <strong>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
-                                </div>
-                                <div class="mb-2">
-                                    <i class="bi bi-table"></i> Table {{ order.table.tbl_no }}
-                                </div>
-                                <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-eye"></i> View Details
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
+  <div class="profile-hero">
+    <div class="profile-avatar">{% if user.first_name %}{{ user.first_name|first|upper }}{% if user.last_name %}{{ user.last_name|first|upper }}{% endif %}{% else %}{{ user.username|first|upper }}{% endif %}</div>
+    <div class="profile-hero-info">
+      <h3>{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</h3>
+      <div class="profile-role-badge"><i class="fas fa-headset me-1"></i>{{ user.role.get_name_display|default:"Customer Care" }}</div>
+      <div class="profile-restaurant"><i class="fas fa-store me-1"></i>{{ user.get_restaurant_name }}</div>
+      <div class="profile-meta">
+        <span><i class="fas fa-calendar-alt me-1"></i>Joined {{ user.date_joined|date:"M Y" }}</span>
+        <span><i class="fas fa-clock me-1"></i>{{ user.last_login|date:"M d, Y H:i"|default:"Never logged in" }}</span>
+        {% if user.is_active %}<span class="profile-status">● Active</span>{% else %}<span class="profile-status">● Inactive</span>{% endif %}
+      </div>
     </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-user"></i> Personal Information</div>
+        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
+        <div class="info-row"><span class="info-label">Username</span><span class="info-value">{{ user.username }}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ user.email|default:"Not provided" }}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{ user.phone_number|default:"Not provided" }}</span></div>
+        {% if user.address %}<div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
+      </div>
+    </div>
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-shield-alt"></i> Account Details</div>
+        <div class="info-row"><span class="info-label">Role</span><span class="info-value"><span class="role-chip">{{ user.role.get_name_display|default:"Customer Care" }}</span></span></div>
+        <div class="info-row"><span class="info-label">Restaurant</span><span class="info-value">{{ user.get_restaurant_name }}</span></div>
+        {% if user.owner %}<div class="info-row"><span class="info-label">Manager / Owner</span><span class="info-value">{{ user.owner.get_full_name|default:user.owner.username }}</span></div>{% endif %}
+        <div class="info-row"><span class="info-label">Member Since</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-danger">Inactive</span>{% endif %}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card mb-3">
+    <div class="profile-card-title"><i class="fas fa-tools"></i> Customer Care Tools</div>
+    <div class="row g-2">
+      <div class="col-6 col-md-3"><a href="{% url 'orders:customer_care_dashboard' %}" class="action-btn action-btn-primary w-100"><i class="fas fa-tachometer-alt"></i> Dashboard</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'orders:select_table' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-concierge-bell"></i> Take Order</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'orders:my_orders' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-receipt"></i> Order History</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'restaurant:menu' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-utensils"></i> View Menu</a></div>
+    </div>
+  </div>
+
+  <div class="profile-card mb-3">
+    <div class="profile-card-title"><i class="fas fa-check-circle"></i> Customer Care Responsibilities</div>
+    <div class="row">
+      <div class="col-12 col-md-6">
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Take and manage customer orders</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Assist guests and handle special requests</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Track tables and order status</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Coordinate with kitchen and cashier</div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Process delivery and pickup orders</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Cancel and modify pending orders</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>View payment history</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Generate order reports</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card mb-3">
+    <div class="profile-card-title"><i class="fas fa-chart-bar"></i> Today's Activity</div>
+    <div class="row g-3">
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value">0</div><div class="stat-label">Orders Taken</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value">{% currency_symbol %}0.00</div><div class="stat-label">Revenue</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value" style="color:#f39c12">0</div><div class="stat-label">Tables Served</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value" style="color:#27ae60">0</div><div class="stat-label">Avg. Order Time</div></div></div>
+    </div>
+  </div>
+
+  {% if recent_orders %}
+  <div class="profile-card mb-3">
+    <div class="profile-card-title"><i class="fas fa-history"></i> Recent Orders Assisted</div>
+    <div class="row g-3">
+      {% for order in recent_orders %}
+      <div class="col-12 col-md-6">
+        <div class="border rounded p-3" style="border-color:#e9ecef!important">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <strong>Order #{{ order.id }}</strong>
+            <span class="badge bg-{% if order.status == 'pending' %}warning{% elif order.status == 'ready' or order.status == 'delivered' %}success{% elif order.status == 'preparing' or order.status == 'confirmed' %}primary{% else %}secondary{% endif %}">{{ order.status|title }}</span>
+          </div>
+          <div class="text-muted small mb-1"><i class="fas fa-calendar me-1"></i>{{ order.created_at|date:"M d, Y H:i" }}</div>
+          <div class="mb-2"><strong>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong></div>
+          <a href="{% url 'orders:order_detail' order.id %}" class="action-btn action-btn-outline" style="padding:.3rem .75rem;font-size:.8rem"><i class="fas fa-eye"></i> View</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="profile-footer">
+    <span>Account created: {{ user.date_joined|date:"F d, Y" }}</span>
+    <span>Profile updated: {% now "F d, Y H:i" %}</span>
+  </div>
+
 </div>
 {% endblock %}

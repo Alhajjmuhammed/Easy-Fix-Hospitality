@@ -1,403 +1,222 @@
 ﻿{% extends 'base.html' %}
 {% load restaurant_tags %}
 
-{% block title %}Owner Dashboard - Restaurant System{% endblock %}
+{% block title %}Owner Profile - {{ user.restaurant_name|default:"Restaurant" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root{--role-color:#16a34a;--role-dark:#15803d;--role-light:#f0fdf4}
+{% include "accounts/_profile_styles.html" %}
+.staff-item{display:flex;justify-content:space-between;align-items:center;padding:.55rem .75rem;border-radius:8px;background:#f8f9fa;margin-bottom:.5rem;font-size:.88rem}
+.staff-item:last-child{margin-bottom:0}
+.staff-role-tag{font-size:.72rem;font-weight:600;color:var(--role-color);background:var(--role-light);border-radius:12px;padding:1px 9px}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <div class="card shadow">
-            <div class="card-header bg-success text-white">
-                <h4 class="mb-0">
-                    <i class="bi bi-person-badge"></i> Owner Profile
-                </h4>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <!-- Personal Information -->
-                    <div class="col-md-6">
-                        <h6 class="text-muted mb-3">
-                            <i class="bi bi-person-fill"></i> Personal Information
-                        </h6>
-                        <div class="mb-2">
-                            <strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Username:</strong> {{ user.username }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Email:</strong> {{ user.email }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Phone:</strong> {{ user.phone_number|default:"Not provided" }}
-                        </div>
-                    </div>
+<div class="profile-page">
 
-                    <!-- Account Details -->
-                    <div class="col-md-6">
-                        <h6 class="text-muted mb-3">
-                            <i class="bi bi-shield-check"></i> Account Details
-                        </h6>
-                        <div class="mb-2">
-                            <strong>Role:</strong>
-                            <span class="badge bg-success">{{ user.role.get_name_display|default:"Owner" }}</span>
-                        </div>
-                        <div class="mb-2">
-                            <strong>Member Since:</strong> {{ user.date_joined|date:"F d, Y" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Last Login:</strong> {{ user.last_login|date:"F d, Y H:i"|default:"Never" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Status:</strong>
-                            {% if user.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-danger">Inactive</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                {% if user.address %}
-                <div class="mt-3">
-                    <h6 class="text-muted">
-                        <i class="bi bi-geo-alt-fill"></i> Address
-                    </h6>
-                    <p class="mb-0">{{ user.address }}</p>
-                </div>
-                {% endif %}
-
-                <!-- Restaurant Information -->
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="text-muted mb-3">
-                        <i class="bi bi-shop"></i> Restaurant Information
-                    </h6>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-2">
-                                <strong>Restaurant Name:</strong> {{ user.restaurant_name|default:"Not set" }}
-                            </div>
-                            <div class="mb-2">
-                                <strong>QR Code:</strong> {{ user.restaurant_qr_code|default:"Not generated" }}
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-2">
-                                <strong>Tax Rate:</strong> 
-                                <span class="badge bg-info">{{ user.get_tax_rate_percentage|floatformat:2 }}%</span>
-                            </div>
-                            <div class="mb-2">
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#taxSettingsModal">
-                                    <i class="bi bi-gear"></i> Update Tax Rate
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    {% if user.restaurant_description %}
-                    <div class="mt-2">
-                        <strong>Description:</strong>
-                        <p class="text-muted mb-0">{{ user.restaurant_description }}</p>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <!-- Management Actions -->
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="text-muted mb-3">
-                        <i class="bi bi-gear"></i> Restaurant Management
-                    </h6>
-                    <div class="row">
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:add_product' %}" class="btn btn-success w-100">
-                                <i class="bi bi-plus-circle"></i> Add Product
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-outline-success w-100">
-                                <i class="bi bi-list-ul"></i> Manage Products
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:admin_dashboard' %}" class="btn btn-outline-primary w-100">
-                                <i class="bi bi-graph-up"></i> Dashboard
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-outline-warning w-100">
-                                <i class="bi bi-receipt"></i> All Orders
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="profile-hero">
+    <div class="profile-avatar">{% if user.first_name %}{{ user.first_name|first|upper }}{% if user.last_name %}{{ user.last_name|first|upper }}{% endif %}{% else %}{{ user.username|first|upper }}{% endif %}</div>
+    <div class="profile-hero-info">
+      <h3>{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</h3>
+      <div class="profile-role-badge"><i class="fas fa-crown me-1"></i>{{ user.role.get_name_display|default:"Owner" }}</div>
+      <div class="profile-restaurant"><i class="fas fa-store me-1"></i>{{ user.restaurant_name|default:"My Restaurant" }}</div>
+      <div class="profile-meta">
+        <span><i class="fas fa-calendar-alt me-1"></i>Joined {{ user.date_joined|date:"M Y" }}</span>
+        <span><i class="fas fa-clock me-1"></i>{{ user.last_login|date:"M d, Y H:i"|default:"Never logged in" }}</span>
+        {% if user.is_active %}<span class="profile-status">● Active</span>{% else %}<span class="profile-status">● Inactive</span>{% endif %}
+      </div>
     </div>
+  </div>
 
-    <!-- Staff Management Sidebar -->
-    <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0">
-                    <i class="bi bi-people"></i> Staff Management
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0">Staff Members</h6>
-                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addStaffModal">
-                        <i class="bi bi-plus"></i> Add Staff
-                    </button>
-                </div>
-
-                {% if staff_users %}
-                    {% for staff in staff_users %}
-                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
-                        <div>
-                            <div class="fw-bold">{{ staff.username }}</div>
-                            <small class="text-muted">{{ staff.role.get_name_display }}</small>
-                        </div>
-                        <div class="btn-group" role="group">
-                            <button class="btn btn-sm btn-outline-secondary staff-action-btn" data-action="edit" data-staff="{{ staff.id }}">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger staff-action-btn" data-action="delete" data-staff="{{ staff.id }}">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted mb-0">No staff members yet.</p>
-                {% endif %}
-
-                <div class="mt-3 pt-3 border-top">
-                    <div class="row text-center">
-                        <div class="col-6">
-                            <div class="fw-bold text-primary">{{ staff_users|length }}</div>
-                            <small class="text-muted">Total Staff</small>
-                        </div>
-                        <div class="col-6">
-                            <div class="fw-bold text-success">{{ staff_users|length }}</div>
-                            <small class="text-muted">Active</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-user"></i> Personal Information</div>
+        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
+        <div class="info-row"><span class="info-label">Username</span><span class="info-value">{{ user.username }}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ user.email|default:"Not provided" }}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{ user.phone_number|default:"Not provided" }}</span></div>
+        {% if user.address %}<div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
+      </div>
     </div>
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-store"></i> Restaurant Details</div>
+        <div class="info-row"><span class="info-label">Role</span><span class="info-value"><span class="role-chip">{{ user.role.get_name_display|default:"Owner" }}</span></span></div>
+        <div class="info-row"><span class="info-label">Restaurant</span><span class="info-value">{{ user.restaurant_name|default:"Not set" }}</span></div>
+        <div class="info-row">
+          <span class="info-label">Tax Rate</span>
+          <span class="info-value">
+            <span class="role-chip">{{ user.get_tax_rate_percentage|floatformat:2 }}%</span>
+            <button type="button" class="btn btn-sm btn-link p-0 ms-1" style="color:var(--role-color);font-size:.78rem" data-bs-toggle="modal" data-bs-target="#taxSettingsModal">Edit</button>
+          </span>
+        </div>
+        <div class="info-row"><span class="info-label">Member Since</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-danger">Inactive</span>{% endif %}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card mb-3">
+    <div class="profile-card-title"><i class="fas fa-tools"></i> Restaurant Management</div>
+    <div class="row g-2">
+      <div class="col-6 col-md-3"><a href="{% url 'admin_panel:admin_dashboard' %}" class="action-btn action-btn-primary w-100"><i class="fas fa-tachometer-alt"></i> Dashboard</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'admin_panel:manage_products' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-box"></i> Products</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'admin_panel:manage_orders' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-receipt"></i> All Orders</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'admin_panel:add_product' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-plus"></i> Add Product</a></div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-8">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-check-circle"></i> Owner Capabilities</div>
+        <div class="row">
+          <div class="col-12 col-md-6">
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Full restaurant management access</div>
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage staff accounts and roles</div>
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Configure menu and pricing</div>
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Access all financial reports</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage promotions and discounts</div>
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Process and void payments</div>
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Configure tax rates and settings</div>
+            <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage delivery and riders</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="profile-card">
+        <div class="profile-card-title d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-users"></i> Staff Members</span>
+          <button class="btn btn-sm" style="background:var(--role-color);color:#fff;border-radius:6px;font-size:.75rem;padding:2px 10px" data-bs-toggle="modal" data-bs-target="#addStaffModal"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        {% if staff_users %}
+          {% for staff in staff_users %}
+          <div class="staff-item">
+            <div>
+              <div style="font-weight:600">{{ staff.get_full_name|default:staff.username }}</div>
+              <div class="staff-role-tag">{{ staff.role.get_name_display }}</div>
+            </div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-secondary" style="padding:2px 8px;font-size:.75rem" data-action="edit" data-staff="{{ staff.id }}"><i class="fas fa-pen"></i></button>
+              <button class="btn btn-sm btn-outline-danger" style="padding:2px 8px;font-size:.75rem" data-action="delete" data-staff="{{ staff.id }}"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>
+          {% endfor %}
+          <div class="d-flex gap-3 mt-3 pt-2 border-top text-center">
+            <div style="flex:1"><div style="font-weight:700;font-size:1.1rem;color:var(--role-color)">{{ staff_users|length }}</div><div style="font-size:.75rem;color:#6c757d">Total Staff</div></div>
+            <div style="flex:1"><div style="font-weight:700;font-size:1.1rem;color:#27ae60">{{ staff_users|length }}</div><div style="font-size:.75rem;color:#6c757d">Active</div></div>
+          </div>
+        {% else %}
+          <p class="text-muted mb-0" style="font-size:.88rem">No staff members yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-footer">
+    <span>Account created: {{ user.date_joined|date:"F d, Y" }}</span>
+    <span>Profile updated: {% now "F d, Y H:i" %}</span>
+  </div>
+
 </div>
 
 <!-- Tax Settings Modal -->
 <div class="modal fade" id="taxSettingsModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-percent"></i> Tax Rate Settings
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-percent me-2"></i>Tax Rate Settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="taxSettingsForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="alert alert-info small"><i class="fas fa-info-circle me-1"></i>This tax rate applies to all orders at your restaurant.</div>
+          <div class="mb-3">
+            <label class="form-label">Tax Rate (%)</label>
+            <div class="input-group">
+              <input type="number" class="form-control" id="taxRateInput" step="0.01" min="0" max="99.99" value="{{ user.get_tax_rate_percentage|floatformat:2 }}" required>
+              <span class="input-group-text">%</span>
             </div>
-            <form id="taxSettingsForm">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
-                        Set the tax rate for your restaurant. This will be applied to all orders.
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="taxRateInput" class="form-label">
-                            Tax Rate (%)
-                        </label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="taxRateInput" 
-                                   step="0.01" min="0" max="99.99"
-                                   value="{{ user.get_tax_rate_percentage|floatformat:2 }}" required>
-                            <span class="input-group-text">%</span>
-                        </div>
-                        <div class="form-text">
-                            Examples: Enter 8.00 for 8%, 5.50 for 5.5%, 0 for no tax
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Current Tax Rate Preview</label>
-                        <div class="border rounded p-3 bg-light">
-                            <div class="d-flex justify-content-between">
-                                <span>Subtotal:</span>
-                                <span>{% currency_symbol %}100.00</span>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <span>Tax (<span id="previewTaxRate">{{ user.get_tax_rate_percentage|floatformat:2 }}</span>%):</span>
-                                <span>{% currency_symbol %}<span id="previewTaxAmount">{{ user.get_tax_rate_percentage|floatformat:2 }}</span></span>
-                            </div>
-                            <hr class="my-2">
-                            <div class="d-flex justify-content-between fw-bold">
-                                <span>Total:</span>
-                                <span>{% currency_symbol %}<span id="previewTotal">{{ user.get_tax_rate_percentage|add:100|floatformat:2 }}</span></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Update Tax Rate
-                    </button>
-                </div>
-            </form>
+          </div>
+          <div class="border rounded p-3 bg-light small">
+            <div class="d-flex justify-content-between mb-1"><span>Subtotal:</span><span>{% currency_symbol %}100.00</span></div>
+            <div class="d-flex justify-content-between mb-1"><span>Tax (<span id="previewTaxRate">{{ user.get_tax_rate_percentage|floatformat:2 }}</span>%):</span><span>{% currency_symbol %}<span id="previewTaxAmount">{{ user.get_tax_rate_percentage|floatformat:2 }}</span></span></div>
+            <div class="d-flex justify-content-between fw-bold border-top pt-1"><span>Total:</span><span>{% currency_symbol %}<span id="previewTotal">{{ user.get_tax_rate_percentage|add:100|floatformat:2 }}</span></span></div>
+          </div>
         </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn" style="background:var(--role-color);color:#fff"><i class="fas fa-check me-1"></i>Update</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
 
 <!-- Add Staff Modal -->
 <div class="modal fade" id="addStaffModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Staff Member</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="addStaffForm">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="staffUsername" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="staffUsername" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="staffEmail" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="staffEmail" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="staffRole" class="form-label">Role</label>
-                        <select class="form-select" id="staffRole" required>
-                            <option value="customer_care">Customer Care</option>
-                            <option value="kitchen">Kitchen Staff</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Staff</button>
-                </div>
-            </form>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Staff Member</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addStaffForm">
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" id="staffUsername" required></div>
+          <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="staffEmail" required></div>
+          <div class="mb-3"><label class="form-label">Role</label><select class="form-select" id="staffRole" required><option value="customer_care">Customer Care</option><option value="kitchen">Kitchen Staff</option></select></div>
         </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn" style="background:var(--role-color);color:#fff">Add Staff</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
 
 {% block extra_js %}
 <script>
-function editStaff(staffId) {
-    // TODO: Implement edit staff functionality
-    alert('Edit staff functionality will be implemented');
-}
+document.addEventListener('DOMContentLoaded', function () {
+  const taxInput = document.getElementById('taxRateInput');
+  function updatePreview() {
+    const r = parseFloat(taxInput.value) || 0;
+    document.getElementById('previewTaxRate').textContent = r.toFixed(2);
+    document.getElementById('previewTaxAmount').textContent = (r).toFixed(2);
+    document.getElementById('previewTotal').textContent = (100 + r).toFixed(2);
+  }
+  if (taxInput) taxInput.addEventListener('input', updatePreview);
 
-function deleteStaff(staffId) {
-    if (confirm('Are you sure you want to delete this staff member?')) {
-        // TODO: Implement delete staff functionality
-        alert('Delete staff functionality will be implemented');
-    }
-}
-
-// Tax rate preview functionality
-function updateTaxPreview() {
-    const taxRateInput = document.getElementById('taxRateInput');
-    const previewTaxRate = document.getElementById('previewTaxRate');
-    const previewTaxAmount = document.getElementById('previewTaxAmount');
-    const previewTotal = document.getElementById('previewTotal');
-    
-    const taxRate = parseFloat(taxRateInput.value) || 0;
-    const subtotal = 100.00;
-    const taxAmount = subtotal * (taxRate / 100);
-    const total = subtotal + taxAmount;
-    
-    previewTaxRate.textContent = taxRate.toFixed(2);
-    previewTaxAmount.textContent = taxAmount.toFixed(2);
-    previewTotal.textContent = total.toFixed(2);
-}
-
-// Event delegation for staff action buttons
-document.addEventListener('DOMContentLoaded', function() {
-    // Tax rate input listener
-    const taxRateInput = document.getElementById('taxRateInput');
-    if (taxRateInput) {
-        taxRateInput.addEventListener('input', updateTaxPreview);
-    }
-    
-    // Handle tax settings form
-    const taxSettingsForm = document.getElementById('taxSettingsForm');
-    if (taxSettingsForm) {
-        taxSettingsForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const taxRate = parseFloat(taxRateInput.value) || 0;
-            
-            // Convert percentage to decimal for backend
-            const taxRateDecimal = taxRate / 100;
-            
-            fetch("{% url 'accounts:update_tax_rate' %}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify({
-                    'tax_rate': taxRateDecimal
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Update the display badge
-                    const taxBadge = document.querySelector('.badge.bg-info');
-                    if (taxBadge) {
-                        taxBadge.textContent = taxRate.toFixed(2) + '%';
-                    }
-                    
-                    // Close modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('taxSettingsModal'));
-                    if (modal) modal.hide();
-                    
-                    // Show success message
-                    alert('Tax rate updated successfully!');
-                    location.reload();
-                } else {
-                    alert('Error updating tax rate: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error updating tax rate. Please try again.');
-            });
-        });
-    }
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('staff-action-btn') || e.target.closest('.staff-action-btn')) {
-            e.preventDefault();
-            const button = e.target.classList.contains('staff-action-btn') ? e.target : e.target.closest('.staff-action-btn');
-            const action = button.getAttribute('data-action');
-            const staffId = parseInt(button.getAttribute('data-staff'));
-
-            if (action === 'edit') {
-                editStaff(staffId);
-            } else if (action === 'delete') {
-                deleteStaff(staffId);
-            }
-        }
+  const taxForm = document.getElementById('taxSettingsForm');
+  if (taxForm) {
+    taxForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      fetch("{% url 'accounts:update_tax_rate' %}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+        body: JSON.stringify({'tax_rate': (parseFloat(taxInput.value) || 0) / 100})
+      }).then(r => r.json()).then(d => {
+        if (d.success) { bootstrap.Modal.getInstance(document.getElementById('taxSettingsModal')).hide(); location.reload(); }
+        else alert('Error: ' + d.message);
+      });
     });
+  }
 
-    // Handle add staff form
-    const addStaffForm = document.getElementById('addStaffForm');
-    if (addStaffForm) {
-        addStaffForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            // TODO: Implement add staff functionality
-            alert('Add staff functionality will be implemented');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addStaffModal'));
-            if (modal) modal.hide();
-        });
-    }
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action, staffId = btn.dataset.staff;
+    if (action === 'delete' && confirm('Delete this staff member?')) alert('Delete staff: ' + staffId);
+    if (action === 'edit') alert('Edit staff: ' + staffId);
+  });
 });
 </script>
 {% endblock %}

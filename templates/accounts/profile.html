@@ -1,43 +1,59 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
-{% block title %}Profile - Restaurant System{% endblock %}
+{% block title %}Profile - {{ user.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root{--role-color:#4361ee;--role-dark:#3a0ca3;--role-light:#eef2ff}
+{% include "accounts/_profile_styles.html" %}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">
-                    <i class="bi bi-person-circle"></i> User Profile
-                </h4>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Personal Information</h6>
-                        <p><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
-                        <p><strong>Username:</strong> {{ user.username }}</p>
-                        <p><strong>Email:</strong> {{ user.email }}</p>
-                        <p><strong>Phone:</strong> {{ user.phone_number|default:"Not provided" }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Account Details</h6>
-                        <p><strong>Role:</strong> 
-                            <span class="badge bg-primary">{{ user.role.get_name_display|default:"No Role" }}</span>
-                        </p>
-                        <p><strong>Member Since:</strong> {{ user.date_joined|date:"F d, Y" }}</p>
-                        <p><strong>Last Login:</strong> {{ user.last_login|date:"F d, Y H:i"|default:"Never" }}</p>
-                    </div>
-                </div>
-                
-                {% if user.address %}
-                <div class="mt-3">
-                    <h6 class="text-muted">Address</h6>
-                    <p>{{ user.address }}</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
+<div class="profile-page">
+
+  <div class="profile-hero">
+    <div class="profile-avatar">{% if user.first_name %}{{ user.first_name|first|upper }}{% if user.last_name %}{{ user.last_name|first|upper }}{% endif %}{% else %}{{ user.username|first|upper }}{% endif %}</div>
+    <div class="profile-hero-info">
+      <h3>{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</h3>
+      <div class="profile-role-badge"><i class="fas fa-user me-1"></i>{{ user.role.get_name_display|default:"Staff" }}</div>
+      {% if user.get_restaurant_name %}<div class="profile-restaurant"><i class="fas fa-store me-1"></i>{{ user.get_restaurant_name }}</div>{% endif %}
+      <div class="profile-meta">
+        <span><i class="fas fa-calendar-alt me-1"></i>Joined {{ user.date_joined|date:"M Y" }}</span>
+        <span><i class="fas fa-clock me-1"></i>{{ user.last_login|date:"M d, Y H:i"|default:"Never logged in" }}</span>
+        {% if user.is_active %}<span class="profile-status">● Active</span>{% else %}<span class="profile-status">● Inactive</span>{% endif %}
+      </div>
     </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-user"></i> Personal Information</div>
+        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
+        <div class="info-row"><span class="info-label">Username</span><span class="info-value">{{ user.username }}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ user.email|default:"Not provided" }}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{ user.phone_number|default:"Not provided" }}</span></div>
+        {% if user.address %}<div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
+      </div>
+    </div>
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-shield-alt"></i> Account Details</div>
+        <div class="info-row"><span class="info-label">Role</span><span class="info-value"><span class="role-chip">{{ user.role.get_name_display|default:"No Role" }}</span></span></div>
+        {% if user.get_restaurant_name %}<div class="info-row"><span class="info-label">Restaurant</span><span class="info-value">{{ user.get_restaurant_name }}</span></div>{% endif %}
+        {% if user.owner %}<div class="info-row"><span class="info-label">Manager / Owner</span><span class="info-value">{{ user.owner.get_full_name|default:user.owner.username }}</span></div>{% endif %}
+        <div class="info-row"><span class="info-label">Member Since</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-danger">Inactive</span>{% endif %}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-footer">
+    <span>Account created: {{ user.date_joined|date:"F d, Y" }}</span>
+    <span>Profile updated: {% now "F d, Y H:i" %}</span>
+  </div>
+
 </div>
 {% endblock %}

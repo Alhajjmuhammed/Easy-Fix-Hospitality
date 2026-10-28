@@ -1,288 +1,87 @@
 {% extends 'base.html' %}
+{% load restaurant_tags %}
 
-{% block title %}Administrator Profile - Restaurant System{% endblock %}
+{% block title %}Administrator Profile - EasyFix{% endblock %}
+
+{% block extra_css %}
+<style>
+:root{--role-color:#1e3a8a;--role-dark:#1e40af;--role-light:#eff6ff}
+{% include "accounts/_profile_styles.html" %}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <div class="card shadow">
-            <div class="card-header bg-dark text-white">
-                <h4 class="mb-0">
-                    <i class="bi bi-shield-lock"></i> Administrator Profile
-                </h4>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <!-- Personal Information -->
-                    <div class="col-md-6">
-                        <h6 class="text-muted mb-3">
-                            <i class="bi bi-person-fill"></i> Personal Information
-                        </h6>
-                        <div class="mb-2">
-                            <strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Username:</strong> {{ user.username }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Email:</strong> {{ user.email }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Phone:</strong> {{ user.phone_number|default:"Not provided" }}
-                        </div>
-                    </div>
+<div class="profile-page">
 
-                    <!-- Account Details -->
-                    <div class="col-md-6">
-                        <h6 class="text-muted mb-3">
-                            <i class="bi bi-shield-check"></i> Account Details
-                        </h6>
-                        <div class="mb-2">
-                            <strong>Role:</strong>
-                            <span class="badge bg-dark">{{ user.role.get_name_display|default:"Administrator" }}</span>
-                        </div>
-                        <div class="mb-2">
-                            <strong>Member Since:</strong> {{ user.date_joined|date:"F d, Y" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Last Login:</strong> {{ user.last_login|date:"F d, Y H:i"|default:"Never" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Status:</strong>
-                            {% if user.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-danger">Inactive</span>
-                            {% endif %}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Superuser:</strong>
-                            {% if user.is_superuser %}
-                                <span class="badge bg-warning text-dark">Yes</span>
-                            {% else %}
-                                <span class="badge bg-secondary">No</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                {% if user.address %}
-                <div class="mt-3">
-                    <h6 class="text-muted">
-                        <i class="bi bi-geo-alt-fill"></i> Address
-                    </h6>
-                    <p class="mb-0">{{ user.address }}</p>
-                </div>
-                {% endif %}
-
-                <!-- Admin Actions -->
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="text-muted mb-3">
-                        <i class="bi bi-gear"></i> System Administration
-                    </h6>
-                    <div class="row">
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin:index' %}" class="btn btn-dark w-100">
-                                <i class="bi bi-shield"></i> Django Admin
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:admin_dashboard' %}" class="btn btn-outline-dark w-100">
-                                <i class="bi bi-speedometer2"></i> Admin Panel
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-primary w-100">
-                                <i class="bi bi-people"></i> Manage Users
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-outline-success w-100">
-                                <i class="bi bi-box-seam"></i> Manage Products
-                            </a>
-                        </div>
-                    </div>
-                    <div class="row mt-2">
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-outline-warning w-100">
-                                <i class="bi bi-receipt"></i> Manage Orders
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:manage_tables' %}" class="btn btn-outline-info w-100">
-                                <i class="bi bi-table"></i> Manage Tables
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-outline-secondary w-100">
-                                <i class="bi bi-list-ul"></i> Restaurant Mgmt
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <button class="btn btn-outline-danger w-100" onclick="systemBackup()">
-                                <i class="bi bi-download"></i> System Backup
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="profile-hero">
+    <div class="profile-avatar">{% if user.first_name %}{{ user.first_name|first|upper }}{% if user.last_name %}{{ user.last_name|first|upper }}{% endif %}{% else %}{{ user.username|first|upper }}{% endif %}</div>
+    <div class="profile-hero-info">
+      <h3>{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</h3>
+      <div class="profile-role-badge"><i class="fas fa-shield-alt me-1"></i>{{ user.role.get_name_display|default:"Administrator" }}</div>
+      <div class="profile-restaurant"><i class="fas fa-network-wired me-1"></i>System Administrator</div>
+      <div class="profile-meta">
+        <span><i class="fas fa-calendar-alt me-1"></i>Joined {{ user.date_joined|date:"M Y" }}</span>
+        <span><i class="fas fa-clock me-1"></i>{{ user.last_login|date:"M d, Y H:i"|default:"Never logged in" }}</span>
+        {% if user.is_active %}<span class="profile-status">● Active</span>{% else %}<span class="profile-status">● Inactive</span>{% endif %}
+      </div>
     </div>
+  </div>
 
-    <!-- System Overview Sidebar -->
-    <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-info-circle"></i> System Overview
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row text-center mb-3">
-                    <div class="col-6">
-                        <h4 class="text-primary mb-1">0</h4>
-                        <small class="text-muted">Total Users</small>
-                    </div>
-                    <div class="col-6">
-                        <h4 class="text-success mb-1">0</h4>
-                        <small class="text-muted">Active Orders</small>
-                    </div>
-                </div>
-
-                <div class="row text-center mb-3">
-                    <div class="col-6">
-                        <h4 class="text-warning mb-1">0</h4>
-                        <small class="text-muted">Products</small>
-                    </div>
-                    <div class="col-6">
-                        <h4 class="text-info mb-1">0</h4>
-                        <small class="text-muted">Tables</small>
-                    </div>
-                </div>
-
-                <hr>
-
-                <div class="mb-3">
-                    <h6 class="mb-2">System Health</h6>
-                    <div class="progress mb-2">
-                        <div class="progress-bar bg-success" style="width: 100%">All Systems Operational</div>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <h6 class="mb-2">Database Status</h6>
-                    <div class="d-flex align-items-center">
-                        <span class="badge bg-success me-2">Connected</span>
-                        <small class="text-muted">SQLite</small>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <h6 class="mb-2">Server Status</h6>
-                    <div class="d-flex align-items-center">
-                        <span class="badge bg-success me-2">Running</span>
-                        <small class="text-muted">Development</small>
-                    </div>
-                </div>
-
-                <hr>
-
-                <div class="text-center">
-                    <button class="btn btn-outline-primary btn-sm w-100" onclick="refreshStats()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh Stats
-                    </button>
-                </div>
-            </div>
-        </div>
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-user"></i> Personal Information</div>
+        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
+        <div class="info-row"><span class="info-label">Username</span><span class="info-value">{{ user.username }}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ user.email|default:"Not provided" }}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{ user.phone_number|default:"Not provided" }}</span></div>
+        {% if user.address %}<div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
+      </div>
     </div>
+    <div class="col-12 col-lg-6">
+      <div class="profile-card">
+        <div class="profile-card-title"><i class="fas fa-shield-alt"></i> Account Details</div>
+        <div class="info-row"><span class="info-label">Role</span><span class="info-value"><span class="role-chip">{{ user.role.get_name_display|default:"Administrator" }}</span></span></div>
+        <div class="info-row"><span class="info-label">Access Level</span><span class="info-value">Full System Access</span></div>
+        <div class="info-row"><span class="info-label">Member Since</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
+        <div class="info-row"><span class="info-label">Last Login</span><span class="info-value">{{ user.last_login|date:"F d, Y H:i"|default:"Never" }}</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-danger">Inactive</span>{% endif %}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card mb-3">
+    <div class="profile-card-title"><i class="fas fa-tools"></i> Admin Tools</div>
+    <div class="row g-2">
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:admin_dashboard' %}" class="action-btn action-btn-primary w-100"><i class="fas fa-tachometer-alt"></i> Dashboard</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:manage_restaurants' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-store"></i> Restaurants</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:manage_users' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-users"></i> All Users</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:admin_statistics' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-chart-line"></i> Statistics</a></div>
+    </div>
+  </div>
+
+  <div class="profile-card mb-3">
+    <div class="profile-card-title"><i class="fas fa-check-circle"></i> Administrator Capabilities</div>
+    <div class="row">
+      <div class="col-12 col-md-6">
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage all restaurants and branches</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Create, edit and delete any user</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Access system-wide reports and statistics</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage subscriptions and billing</div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Override all restaurant settings</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage role permissions and features</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>View and export all data</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>System configuration and maintenance</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-footer">
+    <span>Account created: {{ user.date_joined|date:"F d, Y" }}</span>
+    <span>Profile updated: {% now "F d, Y H:i" %}</span>
+  </div>
+
 </div>
-
-<!-- Admin Tools -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card shadow">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0">
-                    <i class="bi bi-tools"></i> Administrative Tools
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-database text-primary" style="font-size: 2rem;"></i>
-                                <h6 class="mt-2">Database</h6>
-                                <button class="btn btn-outline-primary btn-sm" onclick="dbMaintenance()">
-                                    Maintenance
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-shield-check text-success" style="font-size: 2rem;"></i>
-                                <h6 class="mt-2">Security</h6>
-                                <button class="btn btn-outline-success btn-sm" onclick="securityAudit()">
-                                    Audit
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-graph-up text-info" style="font-size: 2rem;"></i>
-                                <h6 class="mt-2">Analytics</h6>
-                                <button class="btn btn-outline-info btn-sm" onclick="viewAnalytics()">
-                                    Reports
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body text-center">
-                                <i class="bi bi-gear text-warning" style="font-size: 2rem;"></i>
-                                <h6 class="mt-2">Settings</h6>
-                                <button class="btn btn-outline-warning btn-sm" onclick="systemSettings()">
-                                    Configure
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% block extra_js %}
-<script>
-function systemBackup() {
-    alert('System backup functionality will be implemented');
-}
-
-function refreshStats() {
-    alert('Refresh stats functionality will be implemented');
-}
-
-function dbMaintenance() {
-    alert('Database maintenance functionality will be implemented');
-}
-
-function securityAudit() {
-    alert('Security audit functionality will be implemented');
-}
-
-function viewAnalytics() {
-    alert('Analytics functionality will be implemented');
-}
-
-function systemSettings() {
-    alert('System settings functionality will be implemented');
-}
-</script>
-{% endblock %}
 {% endblock %}

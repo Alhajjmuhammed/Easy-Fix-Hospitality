@@ -1,0 +1,38 @@
+.profile-page{max-width:960px;margin:0 auto;padding:0 0 2rem}
+.profile-hero{background:linear-gradient(135deg,var(--role-color),var(--role-dark));border-radius:14px;padding:2rem 2rem 1.75rem;color:#fff;display:flex;align-items:center;gap:1.5rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.profile-avatar{width:82px;height:82px;border-radius:50%;background:rgba(255,255,255,.22);border:3px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:1.9rem;font-weight:700;flex-shrink:0;letter-spacing:1px}
+.profile-hero-info h3{margin:0 0 .3rem;font-weight:700;font-size:1.35rem}
+.profile-role-badge{display:inline-block;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:2px 13px;font-size:.75rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:.3rem}
+.profile-restaurant{font-size:.9rem;opacity:.88;margin-bottom:.4rem}
+.profile-meta{font-size:.82rem;opacity:.82;display:flex;gap:.9rem;flex-wrap:wrap;align-items:center}
+.profile-status{display:inline-flex;align-items:center;gap:.35rem;background:rgba(255,255,255,.18);border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:600}
+.profile-card{background:#fff;border-radius:12px;border:1px solid #e9ecef;padding:1.25rem;height:100%}
+.profile-card-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.9px;font-weight:700;color:var(--role-color);margin-bottom:1rem;display:flex;align-items:center;gap:.4rem}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:.45rem 0;border-bottom:1px solid #f1f3f5;font-size:.88rem;gap:.5rem}
+.info-row:last-child{border-bottom:none}
+.info-label{color:#6c757d;white-space:nowrap}
+.info-value{font-weight:500;color:#212529;text-align:right;word-break:break-word}
+.role-chip{background:var(--role-light,#f0f0f0);color:var(--role-color);border-radius:20px;padding:2px 12px;font-size:.8rem;font-weight:600}
+.action-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;padding:.6rem .9rem;border-radius:8px;font-size:.85rem;font-weight:600;text-decoration:none;transition:all .18s;border:2px solid transparent;white-space:nowrap}
+.action-btn-primary{background:var(--role-color);border-color:var(--role-color);color:#fff}
+.action-btn-primary:hover{background:var(--role-dark);border-color:var(--role-dark);color:#fff;transform:translateY(-1px)}
+.action-btn-outline{background:transparent;border-color:var(--role-color);color:var(--role-color)}
+.action-btn-outline:hover{background:var(--role-color);color:#fff;transform:translateY(-1px)}
+.capability-item{display:flex;align-items:flex-start;gap:.5rem;padding:.32rem 0;font-size:.87rem;color:#495057}
+.capability-icon{color:var(--role-color);flex-shrink:0;margin-top:2px}
+.stat-tile{text-align:center;background:#f8f9fa;border-radius:10px;padding:1rem .75rem}
+.stat-value{font-size:1.45rem;font-weight:700;color:var(--role-color);line-height:1;margin-bottom:.25rem}
+.stat-label{font-size:.76rem;color:#6c757d;font-weight:500}
+.profile-footer{display:flex;justify-content:space-between;font-size:.76rem;color:#adb5bd;margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e9ecef;flex-wrap:wrap;gap:.4rem}
+@media(max-width:575px){
+  .profile-hero{flex-direction:column;text-align:center;padding:1.5rem 1rem}
+  .profile-meta{justify-content:center}
+  .profile-avatar{width:72px;height:72px;font-size:1.6rem}
+  .profile-footer{flex-direction:column;align-items:center}
+  .profile-card{border-radius:10px}
+  .info-value{text-align:left}
+}
+@media(max-width:767px){
+  .profile-hero{padding:1.75rem 1.25rem}
+  .profile-page{padding:0 0 1.5rem}
+}
