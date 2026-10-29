@@ -47,20 +47,24 @@ class AttendanceEnforcementMiddleware:
         if self._should_enforce(request):
             from .models import AttendanceRecord, AttendancePolicy
             user = request.user
+            redirect_to = None
             try:
                 owner = user.get_owner()
-                policy = AttendancePolicy.objects.get(owner=owner, require_checkin_before_work=True)
-                today = timezone.localdate()
-                checked_in = AttendanceRecord.objects.filter(
-                    staff=user, date=today, check_in__isnull=False
+                # Most restaurants have no policy or have enforcement switched off.
+                enforced = AttendancePolicy.objects.filter(
+                    owner=owner, require_checkin_before_work=True
                 ).exists()
-                if not checked_in:
+                if enforced and not AttendanceRecord.objects.filter(
+                    staff=user, date=timezone.localdate(), check_in__isnull=False
+                ).exists():
                     checkin_url = reverse('attendance:web_checkin')
                     if request.path != checkin_url:
-                        return redirect(checkin_url)
+                        redirect_to = checkin_url
             except Exception as _e:
                 logger.warning("Attendance enforcement error for %s: %s", user, _e, exc_info=True)
-                pass  # fail open — never block staff due to a middleware bug
+                # fail open — never block staff due to a middleware bug
+            if redirect_to:
+                return redirect(redirect_to)
 
         return self.get_response(request)
 
