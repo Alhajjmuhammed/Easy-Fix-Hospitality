@@ -22,6 +22,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = [
     'hospitality.easyfixsoft.com',
     'www.hospitality.easyfixsoft.com',
+    'alhajjmuhammed.co.tz',
+    'www.alhajjmuhammed.co.tz',
     '72.62.51.225',
     'localhost',
     '127.0.0.1',
