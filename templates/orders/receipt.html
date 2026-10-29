@@ -228,6 +228,12 @@
                         <span>Tax ({{ order.tax_rate }}%):</span>
                         <span>{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
                     </div>
+                    {% if order.delivery_fee > 0 %}
+                    <div class="total-row">
+                        <span>Delivery fee:</span>
+                        <span>{% currency_symbol %}{{ order.delivery_fee|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
                     <div class="total-row grand-total">
                         <span>Total Paid:</span>
                         <span>{% currency_symbol %}{{ total_amount|floatformat:2 }}</span>

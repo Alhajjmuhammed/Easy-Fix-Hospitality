@@ -226,8 +226,18 @@
 
                 <div class="d-flex justify-content-between mb-3">
                     <span>Tax ({{ tax_percentage|floatformat:"-2" }}%):</span>
-                    <span>{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
+                    <span id="tax-amount">{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
                 </div>
+
+                {% if show_delivery_fee %}
+                <div class="d-flex justify-content-between mb-3">
+                    <span>Delivery fee:</span>
+                    <span id="delivery-fee">{% if delivery_fee > 0 %}{% currency_symbol %}{{ delivery_fee|floatformat:2 }}{% else %}Free{% endif %}</span>
+                </div>
+                {% if free_delivery_minimum %}
+                <div class="small text-muted mb-3">Free delivery for orders from {% currency_symbol %}{{ free_delivery_minimum|floatformat:2 }}</div>
+                {% endif %}
+                {% endif %}
 
                 <hr>
 
@@ -258,6 +268,22 @@
 // Get dynamic tax rate from template context
 const TAX_RATE = {{ tax_rate|stringformat:"f" }};  // 0 is a valid rate — no fallback
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
+// Delivery fee settings — same rule as Restaurant.delivery_fee_for / Order.compute_total on the server
+const SHOW_DELIVERY_FEE = {{ show_delivery_fee|yesno:"true,false" }};
+const FEE_SETTING = {{ fee_setting|stringformat:"f" }};
+const FEE_TAXABLE = {{ fee_taxable|yesno:"true,false" }};
+const FREE_MIN = {% if free_delivery_minimum is not None %}{{ free_delivery_minimum|stringformat:"f" }}{% else %}null{% endif %};
+
+function updateTotals(cartTotal) {
+    let fee = SHOW_DELIVERY_FEE ? FEE_SETTING : 0;
+    if (FREE_MIN !== null && cartTotal >= FREE_MIN) fee = 0;
+    const tax = (cartTotal + (FEE_TAXABLE && fee > 0 ? fee : 0)) * TAX_RATE;
+    document.getElementById('cart-total').textContent = `${CURRENCY_SYMBOL}${cartTotal.toFixed(2)}`;
+    document.getElementById('tax-amount').textContent = `${CURRENCY_SYMBOL}${tax.toFixed(2)}`;
+    const feeEl = document.getElementById('delivery-fee');
+    if (feeEl) feeEl.textContent = fee > 0 ? `${CURRENCY_SYMBOL}${fee.toFixed(2)}` : 'Free';
+    document.getElementById('final-total').textContent = `${CURRENCY_SYMBOL}${(cartTotal + fee + tax).toFixed(2)}`;
+}
 
 function updateQuantity(productId, newQuantity) {
     if (newQuantity < 1) return;
@@ -288,10 +314,7 @@ function updateQuantity(productId, newQuantity) {
             // Update item total
             document.getElementById(`item-total-${productId}`).textContent = `${CURRENCY_SYMBOL}${data.item_total.toFixed(2)}`;
             
-            // Update cart total
-            document.getElementById('cart-total').textContent = `${CURRENCY_SYMBOL}${data.cart_total.toFixed(2)}`;
-            // Use dynamic tax rate instead of hardcoded 1.08
-            document.getElementById('final-total').textContent = `${CURRENCY_SYMBOL}${(data.cart_total * (1 + TAX_RATE)).toFixed(2)}`;
+            updateTotals(data.cart_total);
         } else {
             showToast(data.message, 'error');
         }
@@ -322,10 +345,7 @@ function removeFromCart(productId) {
             // Remove item from DOM
             document.getElementById(`cart-item-${productId}`).remove();
             
-            // Update totals
-            document.getElementById('cart-total').textContent = `${CURRENCY_SYMBOL}${data.cart_total.toFixed(2)}`;
-            // Use dynamic tax rate instead of hardcoded 1.08
-            document.getElementById('final-total').textContent = `${CURRENCY_SYMBOL}${(data.cart_total * (1 + TAX_RATE)).toFixed(2)}`;
+            updateTotals(data.cart_total);
             
             // If cart is empty, redirect to menu
             if (data.cart_count === 0) {

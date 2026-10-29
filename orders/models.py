@@ -49,6 +49,9 @@ class Order(models.Model):
     delivery_phone = models.CharField(max_length=30, blank=True, default='')
     delivery_lat = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     delivery_lng = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    # Fee charged on this delivery order (fixed when the order is placed; 0 otherwise)
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    delivery_fee_taxed = models.BooleanField(default=False)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     payment_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid')
@@ -104,10 +107,36 @@ class Order(models.Model):
                 total_discount += discount_per_item * item.quantity
         return total_discount
     
+    @staticmethod
+    def compute_total(food_subtotal, tax_rate, delivery_fee=Decimal('0'), fee_taxed=False):
+        """The one formula for an order total: food + fee + tax (tax on the fee only if the restaurant chose so)."""
+        food = Decimal(str(food_subtotal))
+        fee = Decimal(str(delivery_fee or 0))
+        taxable = food + (fee if fee_taxed else Decimal('0'))
+        return food + fee + taxable * Decimal(str(tax_rate))
+
     def get_tax_amount(self):
         """Calculate tax from stored order total — historically accurate regardless of current tax rate."""
-        tax = self.total_amount - self.get_subtotal()
+        tax = self.total_amount - self.get_subtotal() - (self.delivery_fee or Decimal('0'))
         return max(Decimal('0.00'), tax)
+
+    def charged_tax_rate(self, subtotal=None):
+        """
+        Tax rate this order was actually charged at, recovered from the stored total.
+        Call it BEFORE items change; pass the pre-change food subtotal if already known.
+        """
+        if subtotal is None:
+            subtotal = self.get_subtotal()
+        subtotal = Decimal(str(subtotal))
+        fee = self.delivery_fee or Decimal('0')
+        base = subtotal + (fee if self.delivery_fee_taxed else Decimal('0'))
+        if base > 0 and self.total_amount:
+            return max(Decimal('0'), (self.total_amount - subtotal - fee) / base)
+        return self._get_tax_rate_decimal()
+
+    def total_for_subtotal(self, food_subtotal, tax_rate):
+        """New total after items change: same tax rate, delivery fee kept as charged."""
+        return self.compute_total(food_subtotal, tax_rate, self.delivery_fee, self.delivery_fee_taxed)
     
     def _get_tax_rate_decimal(self):
         """Resolve applicable tax rate for dine-in, delivery, and pickup orders."""
@@ -131,15 +160,14 @@ class Order(models.Model):
         return float(self._get_tax_rate_decimal() * 100)
 
     def get_total(self):
-        """Get final total including tax"""
+        """Get final total including tax and delivery fee"""
         subtotal = self.get_subtotal()
         tax = self.get_tax_amount()
-        return subtotal + tax
+        return subtotal + tax + (self.delivery_fee or Decimal('0'))
 
     def calculate_total(self):
         subtotal = sum(item.get_subtotal() for item in self.order_items.all())
-        tax_rate = self._get_tax_rate_decimal()
-        self.total_amount = subtotal * (1 + tax_rate)
+        self.total_amount = self.total_for_subtotal(subtotal, self._get_tax_rate_decimal())
         return self.total_amount
     
     def is_table_occupying(self):

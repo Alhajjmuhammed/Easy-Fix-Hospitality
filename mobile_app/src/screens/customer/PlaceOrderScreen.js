@@ -21,6 +21,7 @@ import { usePrinterStore } from '../../store/usePrinterStore';
 import { printOrderTicket } from '../../utils/printer';
 import { saveOfflineOrder, cacheOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
+import { checkoutTotals } from '../../utils/checkoutTotals';
 
 export default function PlaceOrderScreen({ navigation }) {
   const theme = useTheme();
@@ -43,9 +44,13 @@ export default function PlaceOrderScreen({ navigation }) {
   const checkoutIdRef = useRef(`chk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
   const subtotal = getSubtotal();
-  const taxRate = Math.min(1, Math.max(0, parseFloat(user?.tax_rate) || 0));
-  const cartTotal = subtotal * (1 + taxRate);   // tax-inclusive, matches CartScreen and server
   const isAddingToExisting = !!existingOrderId;
+  // Same formula as CartScreen and the server. Adding items to an existing order never
+  // charges a new delivery fee (the fee was fixed when that order was placed).
+  const {
+    fee: deliveryFee, total: cartTotal, rate: taxRate, isDelivery,
+  } = checkoutTotals(subtotal, user, isAddingToExisting ? 'dine-in' : orderType);
+  const deliveryFeeTaxed = !!(user?.delivery_fee_taxable && deliveryFee > 0);
 
   const handleConfirmOrder = async () => {
     // Station-aware ticket helper — prints one ticket per station (KOT/BOT/etc.),
@@ -144,6 +149,8 @@ export default function PlaceOrderScreen({ navigation }) {
           user_id: user?.id,
           total_amount: cartTotal,
           tax_rate: taxRate,
+          delivery_fee: deliveryFee,
+          delivery_fee_taxed: deliveryFeeTaxed,
           // Signal that the BT ticket was already fired locally so the sync
           // endpoint skips auto_print_new_items and avoids a duplicate print.
           local_print_fired: localKotBot,
@@ -256,6 +263,16 @@ export default function PlaceOrderScreen({ navigation }) {
             </View>
           ))}
           <Divider style={{ marginVertical: 8 }} />
+          {isDelivery && (
+            <View style={styles.summaryRow}>
+              <Text variant="bodyMedium" style={[styles.summaryName, { fontFamily: 'Poppins_400Regular' }]}>
+                Delivery fee
+              </Text>
+              <Text variant="bodyMedium" style={{ color: deliveryFee > 0 ? undefined : '#2e7d32' }}>
+                {deliveryFee > 0 ? format(deliveryFee) : 'Free'}
+              </Text>
+            </View>
+          )}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold', flex: 1 }}>
               Total

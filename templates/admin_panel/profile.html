@@ -268,6 +268,34 @@
                                     <small class="d-block text-muted">Customers can browse your restaurant in the app and place delivery or pickup orders without scanning a QR code.</small>
                                 </label>
                             </div>
+
+                            <hr>
+                            <h6 class="mb-3"><i class="fas fa-truck me-2"></i>Delivery Charges</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="delivery_fee" class="form-label">Delivery fee</label>
+                                    <input type="number" class="form-control" id="delivery_fee" name="delivery_fee"
+                                           min="0" step="0.01" value="{{ current_restaurant.delivery_fee|default:'0'|stringformat:'s' }}">
+                                    <small class="text-muted">Added to every delivery order. Use 0 for no fee.</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="free_delivery_minimum" class="form-label">Free delivery from (optional)</label>
+                                    <input type="number" class="form-control" id="free_delivery_minimum" name="free_delivery_minimum"
+                                           min="0" step="0.01" placeholder="Leave empty to always charge"
+                                           value="{% if current_restaurant.free_delivery_minimum is not None %}{{ current_restaurant.free_delivery_minimum|stringformat:'s' }}{% endif %}">
+                                    <small class="text-muted">Orders with food total at or above this amount get free delivery.</small>
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="delivery_fee_taxable"
+                                               name="delivery_fee_taxable" {% if current_restaurant.delivery_fee_taxable %}checked{% endif %}>
+                                        <label class="form-check-label" for="delivery_fee_taxable">
+                                            <strong>Charge tax on the delivery fee</strong>
+                                            <small class="d-block text-muted">If on, your tax rate is also applied to the delivery fee.</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

@@ -333,6 +333,12 @@
                     <div>Tax ({{ order.tax_rate|floatformat:1 }}%):</div>
                     <div>{% currency_symbol %}{{ order.get_tax_amount|floatformat:2 }}</div>
                 </div>
+                {% if order.delivery_fee > 0 %}
+                <div class="total-row">
+                    <div>Delivery fee:</div>
+                    <div>{% currency_symbol %}{{ order.delivery_fee|floatformat:2 }}</div>
+                </div>
+                {% endif %}
                 <div class="total-row grand-total">
                     <div>TOTAL:</div>
                     <div>{% currency_symbol %}{{ order.get_total|floatformat:2 }}</div>

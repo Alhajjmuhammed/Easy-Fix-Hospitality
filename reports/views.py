@@ -291,7 +291,8 @@ def dashboard(request):
         )['t'] or Decimal('0.00')
         # sum(total_amount) is tax-inclusive; derive pre-tax base to avoid double-counting
         _total_rev_with_tax = Decimal(str(total_revenue))
-        total_tax = max(Decimal('0.00'), _total_rev_with_tax - _items_subtotal)
+        _fees = orders.aggregate(f=Sum('delivery_fee'))['f'] or Decimal('0.00')  # delivery fees are revenue, not tax
+        total_tax = max(Decimal('0.00'), _total_rev_with_tax - _items_subtotal - _fees)
         total_revenue = _total_rev_with_tax - total_tax
         avg_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
     total_revenue_with_tax = Decimal(str(total_revenue)) + total_tax
@@ -314,7 +315,8 @@ def dashboard(request):
             t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
         )['t'] or Decimal('0.00')
         _paid_rev_with_tax = Decimal(str(paid_revenue))
-        paid_tax = max(Decimal('0.00'), _paid_rev_with_tax - _paid_items_subtotal)
+        _paid_fees = paid_orders.aggregate(f=Sum('delivery_fee'))['f'] or Decimal('0.00')
+        paid_tax = max(Decimal('0.00'), _paid_rev_with_tax - _paid_items_subtotal - _paid_fees)
         paid_revenue = _paid_rev_with_tax - paid_tax
     paid_revenue_with_tax = Decimal(str(paid_revenue)) + paid_tax
 
@@ -331,7 +333,8 @@ def dashboard(request):
             t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
         )['t'] or Decimal('0.00')
         _unpaid_rev_with_tax = Decimal(str(unpaid_revenue))
-        unpaid_tax = max(Decimal('0.00'), _unpaid_rev_with_tax - _unpaid_items_subtotal)
+        _unpaid_fees = unpaid_orders.aggregate(f=Sum('delivery_fee'))['f'] or Decimal('0.00')
+        unpaid_tax = max(Decimal('0.00'), _unpaid_rev_with_tax - _unpaid_items_subtotal - _unpaid_fees)
         unpaid_revenue = _unpaid_rev_with_tax - unpaid_tax
     unpaid_revenue_with_tax = Decimal(str(unpaid_revenue)) + unpaid_tax
 
@@ -348,7 +351,8 @@ def dashboard(request):
             t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
         )['t'] or Decimal('0.00')
         _partial_rev_with_tax = Decimal(str(partial_revenue))
-        partial_tax = max(Decimal('0.00'), _partial_rev_with_tax - _partial_items_subtotal)
+        _partial_fees = partial_orders.aggregate(f=Sum('delivery_fee'))['f'] or Decimal('0.00')
+        partial_tax = max(Decimal('0.00'), _partial_rev_with_tax - _partial_items_subtotal - _partial_fees)
         partial_revenue = _partial_rev_with_tax - partial_tax
     partial_revenue_with_tax = Decimal(str(partial_revenue)) + partial_tax
     

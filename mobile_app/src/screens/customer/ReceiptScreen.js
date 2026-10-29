@@ -226,6 +226,12 @@ export default function ReceiptScreen({ route }) {
               <Text style={{ fontFamily: P400 }}>{fmt(order.tax_amount)}</Text>
             </View>
           )}
+          {order.delivery_fee > 0 && (
+            <View style={styles.infoRow}>
+              <Text style={{ fontFamily: P400 }}>Delivery fee</Text>
+              <Text style={{ fontFamily: P400 }}>{fmt(order.delivery_fee)}</Text>
+            </View>
+          )}
           {order.discount_amount > 0 && (
             <View style={styles.infoRow}>
               <Text style={{ fontFamily: P400, color: '#2E7D32' }}>Discount</Text>

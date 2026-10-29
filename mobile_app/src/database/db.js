@@ -225,6 +225,15 @@ export const initDatabase = async () => {
   try { await db.runAsync(`ALTER TABLE offline_orders ADD COLUMN tax_rate REAL DEFAULT 0`); } catch (_) {}
   try { await db.runAsync(`ALTER TABLE offline_orders ADD COLUMN local_print_fired INTEGER DEFAULT 0`); } catch (_) {}
 
+  // Migration: delivery fee (offline queue + cached server orders)
+  for (const stmt of [
+    `ALTER TABLE offline_orders ADD COLUMN delivery_fee REAL DEFAULT 0`,
+    `ALTER TABLE offline_orders ADD COLUMN delivery_fee_taxed INTEGER DEFAULT 0`,
+    `ALTER TABLE orders ADD COLUMN delivery_fee REAL DEFAULT 0`,
+  ]) {
+    try { await db.runAsync(stmt); } catch (_) {}
+  }
+
   // Migration: indexes for common filter/sort queries
   for (const stmt of [
     `CREATE INDEX IF NOT EXISTS idx_orders_status       ON orders (status)`,

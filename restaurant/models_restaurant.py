@@ -6,6 +6,7 @@ Supports main owners with multiple branches based on subscription plans.
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from decimal import Decimal
 import uuid
 import os
@@ -270,6 +271,29 @@ class Restaurant(models.Model):
         default=False,
         help_text="Allow customers to place delivery/pickup orders from outside the restaurant (without scanning a QR code)"
     )
+
+    # Delivery charges (each restaurant decides; defaults charge nothing)
+    delivery_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Fixed fee added to every delivery order (0 = no fee)"
+    )
+    delivery_fee_taxable = models.BooleanField(
+        default=False,
+        help_text="Charge the restaurant's tax rate on the delivery fee too"
+    )
+    free_delivery_minimum = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Delivery is free when the food subtotal reaches this amount (empty = always charge)"
+    )
+
+    def delivery_fee_for(self, food_subtotal):
+        """(fee, fee_is_taxed) for a delivery order with this food subtotal (before tax)."""
+        fee = self.delivery_fee or Decimal('0.00')
+        if self.free_delivery_minimum is not None and Decimal(str(food_subtotal)) >= self.free_delivery_minimum:
+            fee = Decimal('0.00')
+        return fee, bool(self.delivery_fee_taxable and fee > 0)
 
     # Status and Settings
     is_active = models.BooleanField(

@@ -231,8 +231,11 @@ def add_branch(request):
                     auto_print_kot=main_restaurant.auto_print_kot if main_restaurant else True,
                     auto_print_bot=main_restaurant.auto_print_bot if main_restaurant else True,
                     allow_remote_orders=allow_remote_orders,
+                    delivery_fee=main_restaurant.delivery_fee if main_restaurant else Decimal('0.00'),
+                    delivery_fee_taxable=main_restaurant.delivery_fee_taxable if main_restaurant else False,
+                    free_delivery_minimum=main_restaurant.free_delivery_minimum if main_restaurant else None,
                 )
-                
+
                 success_message = f'Branch "{name}" created successfully!'
                 
                 # If new credentials were created, show them in context instead of messages
@@ -299,7 +302,17 @@ def edit_branch(request, restaurant_id):
             restaurant.bar_printer_name = request.POST.get('bar_printer_name', '').strip()
             restaurant.receipt_printer_name = request.POST.get('receipt_printer_name', '').strip()
             restaurant.allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
-            
+            from .views import _parse_delivery_settings
+            try:
+                _fee, _free_min = _parse_delivery_settings(request.POST)
+            except ValueError as e:
+                messages.error(request, str(e))
+                return render(request, 'admin_panel/edit_branch.html', {'restaurant': restaurant})
+            if _fee is not None:
+                restaurant.delivery_fee = _fee
+                restaurant.free_delivery_minimum = _free_min
+                restaurant.delivery_fee_taxable = request.POST.get('delivery_fee_taxable') == 'on'
+
             # Update branch owner details if they exist
             if restaurant.branch_owner:
                 # Get new values from form

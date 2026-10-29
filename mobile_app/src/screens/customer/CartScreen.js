@@ -14,10 +14,11 @@ import {
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useCurrency } from '../../hooks/useCurrency';
+import { checkoutTotals } from '../../utils/checkoutTotals';
 
 export default function CartScreen({ navigation }) {
   const theme = useTheme();
-  const { items, tableName, updateQuantity, removeItem, getSubtotal } = useCartStore();
+  const { items, tableName, updateQuantity, removeItem, getSubtotal, orderType, existingOrderId } = useCartStore();
   const { user } = useAuthStore();
   const { format } = useCurrency();
 
@@ -25,10 +26,9 @@ export default function CartScreen({ navigation }) {
   const [removeId, setRemoveId] = useState(null);
 
   const subtotal = getSubtotal();
-  // stored as decimal fraction: 0.08 = 8%; clamp to [0, 1] to guard against server data-entry errors
-  const taxRate = Math.min(1, Math.max(0, parseFloat(user?.tax_rate) || 0));
-  const taxAmount = subtotal * taxRate;
-  const finalTotal = subtotal + taxAmount;
+  // Same formula as the server: food + delivery fee (if any) + tax
+  const { fee: deliveryFee, tax: taxAmount, total: finalTotal, rate: taxRate, isDelivery } =
+    checkoutTotals(subtotal, user, existingOrderId ? 'dine-in' : orderType);
 
   if (!items.length) {
     return (
@@ -118,6 +118,14 @@ export default function CartScreen({ navigation }) {
           <View style={styles.totalRow}>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Tax ({parseFloat((taxRate * 100).toFixed(2))}%)</Text>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{format(taxAmount)}</Text>
+          </View>
+        )}
+        {isDelivery && (
+          <View style={styles.totalRow}>
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Delivery fee</Text>
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular', color: deliveryFee > 0 ? undefined : '#2e7d32' }}>
+              {deliveryFee > 0 ? format(deliveryFee) : 'Free'}
+            </Text>
           </View>
         )}
         <View style={[styles.totalRow, styles.grandTotalRow]}>

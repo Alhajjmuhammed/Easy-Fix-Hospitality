@@ -375,6 +375,12 @@ export default function OrderTrackingScreen({ route }) {
               <Text variant="bodySmall" style={{ fontFamily: P400 }}>{fmt(order.tax_amount)}</Text>
             </View>
           )}
+          {order.delivery_fee > 0 && (
+            <View style={styles.itemRow}>
+              <Text variant="bodySmall" style={{ fontFamily: P400 }}>Delivery fee</Text>
+              <Text variant="bodySmall" style={{ fontFamily: P400 }}>{fmt(order.delivery_fee)}</Text>
+            </View>
+          )}
           <View style={styles.itemRow}>
             <Text variant="titleSmall" style={{ fontFamily: P700 }}>Total</Text>
             <Text variant="titleSmall" style={{ fontFamily: P700 }}>{fmt(order.total)}</Text>

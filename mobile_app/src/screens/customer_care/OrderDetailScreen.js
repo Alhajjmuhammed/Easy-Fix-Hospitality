@@ -324,6 +324,12 @@ export default function OrderDetailScreen({ route, navigation }) {
               <Text variant="bodyMedium">{format(order.tax_amount)}</Text>
             </View>
           )}
+          {order.delivery_fee > 0 && (
+            <View style={styles.summaryRow}>
+              <Text variant="bodyMedium">Delivery fee</Text>
+              <Text variant="bodyMedium">{format(order.delivery_fee)}</Text>
+            </View>
+          )}
           <Divider style={styles.divider} />
           <View style={styles.summaryRow}>
             <Text variant="titleMedium">Total</Text>

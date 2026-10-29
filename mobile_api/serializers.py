@@ -20,6 +20,9 @@ class UserSerializer(serializers.ModelSerializer):
     currency_code = serializers.SerializerMethodField()
     currency_symbol = serializers.SerializerMethodField()
     tax_rate = serializers.SerializerMethodField()
+    delivery_fee = serializers.SerializerMethodField()
+    delivery_fee_taxable = serializers.SerializerMethodField()
+    free_delivery_minimum = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -27,7 +30,20 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'phone_number', 'address', 'date_joined', 'last_login',
             'role_name', 'restaurant_name', 'restaurant_logo_url', 'currency_code', 'currency_symbol', 'tax_rate',
+            'delivery_fee', 'delivery_fee_taxable', 'free_delivery_minimum',
         ]
+
+    def get_delivery_fee(self, obj):
+        row = self._get_restaurant_row(obj)
+        return float(row.delivery_fee) if row is not None else 0.0
+
+    def get_delivery_fee_taxable(self, obj):
+        row = self._get_restaurant_row(obj)
+        return bool(row and row.delivery_fee_taxable)
+
+    def get_free_delivery_minimum(self, obj):
+        row = self._get_restaurant_row(obj)
+        return float(row.free_delivery_minimum) if row is not None and row.free_delivery_minimum is not None else None
 
     def _get_effective_owner(self, obj):
         """
@@ -317,6 +333,10 @@ class OrderSerializer(serializers.ModelSerializer):
     pending_bill_requested_at = serializers.SerializerMethodField()
     delivery_lat = serializers.SerializerMethodField()
     delivery_lng = serializers.SerializerMethodField()
+    delivery_fee = serializers.SerializerMethodField()
+
+    def get_delivery_fee(self, obj):
+        return float(obj.delivery_fee or 0)
 
     class Meta:
         model = Order
@@ -324,6 +344,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'id', 'order_number', 'table_info', 'table_number',
             'ordered_by_name', 'ordered_by_id', 'ordered_by_role', 'confirmed_by_name', 'entered_by_name', 'status', 'payment_status',
             'order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng',
+            'delivery_fee',
             'total_amount', 'subtotal', 'tax_amount', 'discount_amount', 'total',
             'total_paid', 'balance_due', 'items_count',
             'special_instructions', 'reason_if_cancelled',

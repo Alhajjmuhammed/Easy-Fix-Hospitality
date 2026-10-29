@@ -79,6 +79,12 @@
                                 <span>Tax ({{ tax_percentage|floatformat:"-2" }}%):</span>
                                 <span>{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
                             </div>
+                            {% if show_delivery_fee %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Delivery fee:</span>
+                                <span>{% if delivery_fee > 0 %}{% currency_symbol %}{{ delivery_fee|floatformat:2 }}{% else %}<span class="text-success">Free</span>{% endif %}</span>
+                            </div>
+                            {% endif %}
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-2">
                                 <strong>Total:</strong>
                                 <strong class="text-primary">{% currency_symbol %}{{ final_total|floatformat:2 }}</strong>

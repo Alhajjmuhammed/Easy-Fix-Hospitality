@@ -56,6 +56,14 @@ def _charged_amounts(order, subtotal):
     return tax_amount, float(rate * 100), subtotal + tax_amount
 
 
+def _delivery_fee_lines(order, currency_symbol, width):
+    fee = getattr(order, 'delivery_fee', None)
+    if not fee:
+        return []
+    label, value = "Delivery fee:", f"{currency_symbol}{float(fee):.2f}"
+    return [label + (" " * max(1, width - len(label) - len(value))) + value]
+
+
 def _strip_sync_tags(text):
     """Strip offline dedup tags from special_instructions before printing on tickets."""
     if not text:
@@ -1689,10 +1697,11 @@ def _generate_bill_content(order, printed_by=None):
     tax_value = f"{currency_symbol}{float(tax_amount):.2f}"
     spacing = width - len(tax_label) - len(tax_value)
     lines.append(tax_label + (" " * spacing) + tax_value)
-    
+    lines.extend(_delivery_fee_lines(order, currency_symbol, width))
+
     # Separator
     lines.append("-" * width)
-    
+
     # Grand Total
     total_label = "TOTAL DUE:"
     total_value = f"{currency_symbol}{float(total):.2f}"
@@ -2599,10 +2608,11 @@ def _generate_receipt_content(payment):
     tax_value = f"{currency_symbol}{float(tax_amount):.2f}"
     spacing = width - len(tax_label) - len(tax_value)
     lines.append(tax_label + (" " * spacing) + tax_value)
-    
+    lines.extend(_delivery_fee_lines(order, currency_symbol, width))
+
     # Dotted separator - EXACTLY like HTML
     lines.append("-" * width)
-    
+
     # Grand Total - right-aligned EXACTLY like HTML
     total_label = "TOTAL:"
     total_value = f"{currency_symbol}{float(total):.2f}"

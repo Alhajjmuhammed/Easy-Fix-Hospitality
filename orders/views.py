@@ -91,6 +91,31 @@ def _session_tax_rate(request, owner, is_remote):
     return Decimal('0.0800')
 
 
+def _checkout_preview(request, cart_total, order_type):
+    """Tax, delivery fee and total exactly as place_order will charge them."""
+    is_remote = order_type in ('delivery', 'pickup')
+    owner = _session_order_owner(request)
+    tax_rate = _session_tax_rate(request, owner, is_remote)
+    food = Decimal(str(cart_total))
+    fee, fee_taxed = Decimal('0'), False
+    rest = _remote_restaurant_for(owner) if order_type == 'delivery' else None
+    if rest is not None:
+        fee, fee_taxed = rest.delivery_fee_for(food)
+    total = Order.compute_total(food, tax_rate, fee, fee_taxed)
+    return {
+        'tax_rate': float(tax_rate),
+        'tax_percentage': round(float(tax_rate) * 100, 2),
+        'tax_amount': float(total - food - fee),
+        'delivery_fee': float(fee),
+        'final_total': float(total),
+        'show_delivery_fee': rest is not None,
+        # For the cart page JS (quantities change without a reload)
+        'fee_setting': float(rest.delivery_fee) if rest is not None else 0.0,
+        'fee_taxable': bool(rest is not None and rest.delivery_fee_taxable),
+        'free_delivery_minimum': float(rest.free_delivery_minimum) if rest is not None and rest.free_delivery_minimum is not None else None,
+    }
+
+
 def _resolve_order_owner(order, request):
     """Return the restaurant owner for an order, safely handling delivery/pickup orders."""
     if order.table_info:
@@ -535,14 +560,9 @@ def view_cart(request):
             'image': item.get('image'),
         })
     
-    # Same tax rate the order will actually be charged at (table / restaurant setting)
-    _is_remote_cart = request.session.get('order_type', 'dine-in') in ('delivery', 'pickup')
-    tax_rate = float(_session_tax_rate(request, _session_order_owner(request), _is_remote_cart))
+    # Tax, delivery fee and total exactly as the order will be charged
+    preview = _checkout_preview(request, cart_total, request.session.get('order_type', 'dine-in'))
 
-    # Calculate tax and final total
-    tax_amount = cart_total * tax_rate
-    final_total = cart_total + tax_amount
-    
     # Determine base template based on user role
     if request.user.is_authenticated:
         if request.user.is_cashier() or request.user.is_customer_care():
@@ -555,10 +575,7 @@ def view_cart(request):
     context = {
         'cart_items': cart_items,
         'cart_total': cart_total,
-        'tax_amount': tax_amount,
-        'tax_rate': tax_rate,
-        'tax_percentage': round(tax_rate * 100, 2),
-        'final_total': final_total,
+        **preview,
         'table_number': request.session.get('selected_table', ''),
         'order_type': request.session.get('order_type', 'dine-in'),
         'delivery_address': request.session.get('delivery_address', ''),
@@ -732,12 +749,17 @@ def place_order(request):
 
                         total_amount += float(unit_price_paid) * item['quantity']
 
-                    # Update order total — include tax
+                    # Update order total — include tax and (for delivery) the restaurant's delivery fee
+                    food_subtotal = Decimal(str(total_amount))
                     if is_remote_order:
                         tax_rate = remote_tax_rate
+                        if order_type_session == 'delivery' and rest_obj is not None:
+                            order.delivery_fee, order.delivery_fee_taxed = rest_obj.delivery_fee_for(food_subtotal)
                     else:
                         tax_rate = table.get_tax_rate()
-                    order.total_amount = Decimal(str(total_amount)) * (1 + tax_rate)
+                    order.total_amount = Order.compute_total(
+                        food_subtotal, tax_rate, order.delivery_fee, order.delivery_fee_taxed
+                    )
                     order.save()
                     # --- transaction ends here, order is committed to DB ---
 
@@ -862,13 +884,9 @@ def place_order(request):
     # Display copy with per-line totals (never written back to the session cart)
     cart_display = {pid: {**item, 'total': float(item['price']) * item['quantity']} for pid, item in cart.items()}
 
-    # Same tax rate the order will actually be charged at (table / restaurant setting)
-    tax_rate = float(_session_tax_rate(request, _session_order_owner(request), is_remote_order))
+    # Tax, delivery fee and total exactly as the order will be charged
+    preview = _checkout_preview(request, cart_total, order_type_session)
 
-    # Calculate tax and final total
-    tax_amount = cart_total * tax_rate
-    final_total = cart_total + tax_amount
-    
     # Determine base template based on user role
     if request.user.is_cashier() or request.user.is_customer_care():
         base_template = 'cashier_base.html'
@@ -896,10 +914,7 @@ def place_order(request):
         'form': form,
         'cart': cart_display,
         'cart_total': cart_total,
-        'tax_amount': tax_amount,
-        'tax_rate': tax_rate,
-        'tax_percentage': round(tax_rate * 100, 2),
-        'final_total': final_total,
+        **preview,
         'table_number': request.session.get('selected_table', ''),
         'order_type': order_type_session,
         'delivery_address': request.session.get('delivery_address', ''),
@@ -3849,7 +3864,11 @@ def handle_add_to_existing_order(request, order_id, cart):
                 total_added += unit_price_paid * item['quantity']
             
             # Update order total — total_amount is tax-inclusive, so gross the added subtotal
-            tax_rate = order.table_info.get_tax_rate() if order.table_info else 0
+            if order.table_info:
+                tax_rate = order.table_info.get_tax_rate()
+            else:
+                # Remote order: keep the rate it was charged at (items already include the new ones)
+                tax_rate = order.charged_tax_rate(order.get_subtotal() - total_added)
             order.total_amount += total_added * (1 + tax_rate)
             order.save(update_fields=['total_amount'])
 
@@ -4290,8 +4309,13 @@ def cancel_order_item(request, item_id):
         
         # Get cancellation reason
         import json
-        data = json.loads(request.body) if request.body else {}
-        reason = data.get('reason', 'Item cancelled by staff').strip()
+        try:
+            data = json.loads(request.body) if request.body else {}
+        except (ValueError, UnicodeDecodeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        reason = (str(data.get('reason') or '') or 'Item cancelled by staff').strip()
         
         # Store item details before deletion
         item_name = item.product.name if item.product else '[deleted product]'
@@ -4313,16 +4337,14 @@ def cancel_order_item(request, item_id):
             if order.table_info:
                 tax_rate = order.table_info.get_tax_rate()
             else:
-                from decimal import Decimal as _D
-                pre_subtotal = sum(oi.get_subtotal() for oi in order.order_items.all())
-                tax_rate = (order.total_amount / pre_subtotal - 1) if pre_subtotal else 0
+                tax_rate = order.charged_tax_rate()
 
             # Delete the item
             item.delete()
 
-            # Recalculate order total including tax after item cancellation
+            # Recalculate order total (tax + delivery fee as charged) after item cancellation
             subtotal = sum(oi.get_subtotal() for oi in order.order_items.select_related('product').all())
-            order.total_amount = subtotal * (1 + tax_rate)
+            order.total_amount = order.total_for_subtotal(subtotal, tax_rate)
             order.save(update_fields=['total_amount'])
 
         logger.info(

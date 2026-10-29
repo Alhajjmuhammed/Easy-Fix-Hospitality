@@ -10,6 +10,14 @@ from accounts.models import RestaurantSubscription
 logger = logging.getLogger(__name__)
 
 
+def _delivery_settings(r):
+    return {
+        'delivery_fee': float(r.delivery_fee or 0),
+        'delivery_fee_taxable': r.delivery_fee_taxable,
+        'free_delivery_minimum': float(r.free_delivery_minimum) if r.free_delivery_minimum is not None else None,
+    }
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
 def restaurant_by_qr(request):
@@ -61,6 +69,7 @@ def restaurant_by_qr(request):
             'address': restaurant_obj.address or '',
             'logo_url': logo_url,
             'allow_remote_orders': restaurant_obj.allow_remote_orders,
+            **_delivery_settings(restaurant_obj),
         }
     })
 
@@ -116,6 +125,7 @@ def restaurants_list(request):
             'address': r.address or '',
             'logo_url': logo_url,
             'allow_remote_orders': r.allow_remote_orders,
+            **_delivery_settings(r),
         })
 
     return Response({'restaurants': data})

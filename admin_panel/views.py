@@ -82,6 +82,45 @@ def _cleanup_product_dependencies(product_ids):
         pass
 
 
+_MAX_MONEY = Decimal('99999999.99')  # fits DecimalField(max_digits=10, decimal_places=2)
+
+
+def _parse_delivery_settings(data):
+    """
+    Read delivery fee settings from a submitted form.
+    Returns (delivery_fee, free_delivery_minimum); delivery_fee is None when the form
+    has no delivery section, free_delivery_minimum is None when left empty.
+    Raises ValueError with a user-facing message on invalid input.
+    """
+    if 'delivery_fee' not in data:
+        return None, None
+
+    def money(raw, label):
+        try:
+            value = Decimal(str(raw).strip().replace(',', ''))
+        except (InvalidOperation, ValueError):
+            raise ValueError(f'{label} must be a number.')
+        if not value.is_finite() or value < 0 or value > _MAX_MONEY:
+            raise ValueError(f'{label} must be between 0 and {_MAX_MONEY:,}.')
+        return value.quantize(Decimal('0.01'))
+
+    fee_raw = (data.get('delivery_fee') or '').strip()
+    fee = money(fee_raw, 'Delivery fee') if fee_raw else Decimal('0.00')
+    min_raw = (data.get('free_delivery_minimum') or '').strip()
+    free_min = money(min_raw, 'Free delivery amount') if min_raw else None
+    return fee, free_min
+
+
+def _own_restaurant(user):
+    """The restaurant an owner's profile page shows and edits: their branch, or their main restaurant."""
+    from restaurant.models_restaurant import Restaurant
+    if user.is_branch_owner():
+        return Restaurant.objects.filter(branch_owner=user, is_main_restaurant=False).first() \
+            or Restaurant.objects.filter(branch_owner=user).first()
+    return Restaurant.objects.filter(main_owner=user, is_main_restaurant=True).first() \
+        or Restaurant.objects.filter(models.Q(main_owner=user) | models.Q(branch_owner=user)).first()
+
+
 def get_production_qr_url(request, qr_code):
     """Build absolute QR URL using the current request scheme and host.
     SECURE_PROXY_SSL_HEADER in production_settings ensures HTTPS is detected correctly."""
@@ -4217,9 +4256,22 @@ def profile(request):
                 )
                 logger.info(f"UPDATE_RESTAURANT: Found {user_restaurants.count()} restaurants for user")
                 allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
+                try:
+                    delivery_fee, free_delivery_minimum = _parse_delivery_settings(request.POST)
+                except ValueError as e:
+                    messages.error(request, str(e))
+                    return redirect('admin_panel:profile')
+                delivery_fee_taxable = request.POST.get('delivery_fee_taxable') == 'on'
+                own_restaurant = _own_restaurant(request.user)
                 for restaurant in user_restaurants:
                     restaurant.tax_rate = tax_rate_decimal
                     restaurant.allow_remote_orders = allow_remote_orders
+                    # Only the restaurant shown on this page — branches keep their own delivery settings.
+                    # (field absent from the form → keep current settings)
+                    if delivery_fee is not None and own_restaurant is not None and restaurant.pk == own_restaurant.pk:
+                        restaurant.delivery_fee = delivery_fee
+                        restaurant.free_delivery_minimum = free_delivery_minimum
+                        restaurant.delivery_fee_taxable = delivery_fee_taxable
                     restaurant.save()
                     logger.info(f"UPDATE_RESTAURANT: Updated restaurant {restaurant.name} tax_rate to {tax_rate_decimal}")
                 
@@ -4329,9 +4381,7 @@ def profile(request):
     if request.user.is_owner():
         from restaurant.models_restaurant import Restaurant
         try:
-            restaurant = Restaurant.objects.filter(
-                models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
-            ).first()
+            restaurant = _own_restaurant(request.user)
             if restaurant:
                 if restaurant.logo:
                     context['restaurant_logo'] = restaurant.logo

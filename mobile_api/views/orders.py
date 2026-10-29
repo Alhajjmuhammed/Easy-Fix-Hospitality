@@ -474,9 +474,14 @@ def _place_order(request):
             raise _ItemsUnavailable()
 
         from decimal import Decimal as _Dec
-        total_amount = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated_items)
+        food_subtotal = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated_items)
         tax_rate = table.get_tax_rate() if table is not None else _delivery_tax_rate
-        total_amount = total_amount * (_Dec('1') + tax_rate)
+        delivery_fee, delivery_fee_taxed = _Dec('0'), False
+        if order_type == 'delivery':
+            _fee_rest = _rest_obj or (table.restaurant if table is not None else None)
+            if _fee_rest is not None:
+                delivery_fee, delivery_fee_taxed = _fee_rest.delivery_fee_for(food_subtotal)
+        total_amount = Order.compute_total(food_subtotal, tax_rate, delivery_fee, delivery_fee_taxed)
 
         order = Order.objects.create(
             order_number=order_number,
@@ -484,6 +489,8 @@ def _place_order(request):
             ordered_by=user,
             status='pending',
             total_amount=total_amount,
+            delivery_fee=delivery_fee,
+            delivery_fee_taxed=delivery_fee_taxed,
             special_instructions=special,
             order_type=order_type,
             restaurant_owner=owner if table is None else None,
@@ -1120,13 +1127,7 @@ def add_items_to_order(request, order_id):
     if order.table_info:
         _add_tax_rate = order.table_info.get_tax_rate()
     else:
-        _orig_subtotal = sum(
-            oi.get_subtotal() for oi in order.order_items.select_related('product').all()
-        )
-        _add_tax_rate = (
-            _Dec(str(order.total_amount)) / _Dec(str(_orig_subtotal)) - _Dec('1')
-            if _orig_subtotal else _Dec('0')
-        )
+        _add_tax_rate = order.charged_tax_rate()  # excludes the delivery fee
 
     class _StockConflict(Exception):
         def __init__(self, msg): self.msg = msg
@@ -1342,13 +1343,7 @@ def cancel_order_item(request, item_id):
         if order.table_info:
             tax_rate = order.table_info.get_tax_rate()
         else:
-            pre_subtotal = sum(
-                oi.get_subtotal() for oi in order.order_items.select_related('product').all()
-            )
-            tax_rate = (
-                _Dec(str(order.total_amount)) / _Dec(str(pre_subtotal)) - _Dec('1')
-                if pre_subtotal else _Dec('0')
-            )
+            tax_rate = order.charged_tax_rate()  # excludes the delivery fee
         if item.product_id and item.product and item.product.available_in_stock is not None:
             from restaurant.models import Product as _Prod
             from django.db.models import F as _F2
@@ -1359,7 +1354,7 @@ def cancel_order_item(request, item_id):
         subtotal = sum(
             oi.get_subtotal() for oi in order.order_items.select_related('product').all()
         )
-        order.total_amount = subtotal * (_Dec('1') + tax_rate)
+        order.total_amount = order.total_for_subtotal(subtotal, tax_rate)
         order.save(update_fields=['total_amount', 'updated_at'])
         # --- transaction commits here ---
 

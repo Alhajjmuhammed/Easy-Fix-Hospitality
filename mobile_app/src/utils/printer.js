@@ -253,6 +253,8 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol, 
   await BluetoothEscposPrinter.printText(pad('Subtotal:', `${sym}${fmt(subtotal)}`) + '\n\r', {});
   if (discount > 0) await BluetoothEscposPrinter.printText(pad('Discount:', `-${sym}${fmt(discount)}`) + '\n\r', {});
   if (tax > 0)      await BluetoothEscposPrinter.printText(pad('Tax:', `${sym}${fmt(tax)}`) + '\n\r', {});
+  const deliveryFee = parseFloat(order.delivery_fee ?? 0);
+  if (deliveryFee > 0) await BluetoothEscposPrinter.printText(pad('Delivery fee:', `${sym}${fmt(deliveryFee)}`) + '\n\r', {});
 
   // Bill: partial payment rows
   const totalPaid = parseFloat(order.total_paid || 0);

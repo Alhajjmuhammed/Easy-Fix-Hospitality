@@ -156,8 +156,9 @@ export const saveOfflineOrder = async (orderData) => {
   await dbExec(
     `INSERT INTO offline_orders
       (offline_id, table_id, items_json, special_instructions, restaurant_id, total_amount, created_at, sync_status,
-       order_type, delivery_address, delivery_phone, delivery_lat, delivery_lng, existing_order_id, tax_rate, local_print_fired)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+       order_type, delivery_address, delivery_phone, delivery_lat, delivery_lng, existing_order_id, tax_rate, local_print_fired,
+       delivery_fee, delivery_fee_taxed)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       offlineId,
       orderData.table_id ?? null,
@@ -174,6 +175,8 @@ export const saveOfflineOrder = async (orderData) => {
       orderData.existing_order_id ?? null,
       orderData.tax_rate ?? 0,
       orderData.local_print_fired ? 1 : 0,
+      orderData.delivery_fee ?? 0,
+      orderData.delivery_fee_taxed ? 1 : 0,
     ],
   );
   return offlineId;
@@ -369,8 +372,9 @@ export const saveOrders = async (orders) => {
          items_json, payments_json,
          pending_bill_requested, pending_bill_requested_at,
          order_type, synced_at,
-         delivery_address, delivery_phone, delivery_lat, delivery_lng
-       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         delivery_address, delivery_phone, delivery_lat, delivery_lng,
+         delivery_fee
+       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          order_number              = excluded.order_number,
          table_info                = excluded.table_info,
@@ -400,7 +404,8 @@ export const saveOrders = async (orders) => {
          delivery_address          = excluded.delivery_address,
          delivery_phone            = excluded.delivery_phone,
          delivery_lat              = excluded.delivery_lat,
-         delivery_lng              = excluded.delivery_lng`,
+         delivery_lng              = excluded.delivery_lng,
+         delivery_fee              = excluded.delivery_fee`,
       [
         o.id,
         o.order_number || '',
@@ -432,6 +437,7 @@ export const saveOrders = async (orders) => {
         o.delivery_phone || null,
         o.delivery_lat ?? null,
         o.delivery_lng ?? null,
+        o.delivery_fee ?? 0,
       ],
     );
   }
@@ -477,8 +483,9 @@ export const cacheOrders = async (orders) => {
            items_json, payments_json,
            pending_bill_requested, pending_bill_requested_at,
            order_type, synced_at,
-           delivery_address, delivery_phone, delivery_lat, delivery_lng
-         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           delivery_address, delivery_phone, delivery_lat, delivery_lng,
+           delivery_fee
+         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(id) DO UPDATE SET
            order_number              = excluded.order_number,
            table_info                = excluded.table_info,
@@ -508,7 +515,8 @@ export const cacheOrders = async (orders) => {
            delivery_address          = excluded.delivery_address,
            delivery_phone            = excluded.delivery_phone,
            delivery_lat              = excluded.delivery_lat,
-           delivery_lng              = excluded.delivery_lng`,
+           delivery_lng              = excluded.delivery_lng,
+           delivery_fee              = excluded.delivery_fee`,
         [
           o.id,
           o.order_number || '',
@@ -540,6 +548,7 @@ export const cacheOrders = async (orders) => {
           o.delivery_phone || null,
           o.delivery_lat ?? null,
           o.delivery_lng ?? null,
+          o.delivery_fee ?? 0,
         ],
       );
     }
@@ -660,12 +669,12 @@ export const getOfflinePendingOrders = async () => {
     const paymentStatus = row.payment_status || 'unpaid';
 
     // Compute subtotal/tax from stored tax_rate so receipt prints correctly.
-    // total_amount is tax-inclusive: subtotal = total / (1 + taxRate)
+    // total = food×(1+rate) + fee×(1+rate if fee taxed else 1)  →  solve for food.
     const taxRate = parseFloat(row.tax_rate) || 0;
-    const computedSubtotal = taxRate > 0
-      ? (row.total_amount || 0) / (1 + taxRate)
-      : (row.total_amount || 0);
-    const computedTax = (row.total_amount || 0) - computedSubtotal;
+    const deliveryFee = parseFloat(row.delivery_fee) || 0;
+    const feeWithTax = deliveryFee * (row.delivery_fee_taxed ? 1 + taxRate : 1);
+    const computedSubtotal = ((row.total_amount || 0) - feeWithTax) / (1 + taxRate);
+    const computedTax = (row.total_amount || 0) - computedSubtotal - deliveryFee;
 
     // Use pre-loaded payment map (batch query above) — no per-row DB call
     const queuedPayments = (paymentsByRef[row.offline_id] || []).map((p) => ({
@@ -687,6 +696,7 @@ export const getOfflinePendingOrders = async () => {
       total: row.total_amount || 0,
       total_amount: row.total_amount || 0,
       subtotal: computedSubtotal,
+      delivery_fee: deliveryFee,
       balance_due: balanceDue,
       total_paid: totalPaid,
       tax_amount: computedTax,

@@ -637,6 +637,12 @@ export default function CashierMyOrdersScreen({ navigation }) {
                         <Text variant="bodySmall">{format(order.tax_amount)}</Text>
                       </View>
                     )}
+                    {order.delivery_fee > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>Delivery fee</Text>
+                        <Text variant="bodySmall">{format(order.delivery_fee)}</Text>
+                      </View>
+                    )}
                     {!!order.special_instructions && (
                       <Text variant="bodySmall" style={{ opacity: 0.6, marginTop: 4 }}>Note: {order.special_instructions}</Text>
                     )}

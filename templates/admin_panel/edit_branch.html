@@ -351,6 +351,27 @@
                                     <small class="d-block text-muted">Customers can see this branch in the mobile app and place delivery or pickup orders without scanning a QR code.</small>
                                 </label>
                             </div>
+                            <div class="row g-3 mt-2">
+                                <div class="col-md-6">
+                                    <label for="delivery_fee" class="form-label">Delivery fee</label>
+                                    <input type="number" class="form-control" id="delivery_fee" name="delivery_fee"
+                                           min="0" step="0.01" value="{{ restaurant.delivery_fee|stringformat:'s' }}">
+                                    <small class="text-muted">Added to every delivery order from this branch. Use 0 for no fee.</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="free_delivery_minimum" class="form-label">Free delivery from (optional)</label>
+                                    <input type="number" class="form-control" id="free_delivery_minimum" name="free_delivery_minimum"
+                                           min="0" step="0.01" placeholder="Leave empty to always charge"
+                                           value="{% if restaurant.free_delivery_minimum is not None %}{{ restaurant.free_delivery_minimum|stringformat:'s' }}{% endif %}">
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="delivery_fee_taxable" name="delivery_fee_taxable"
+                                               {% if restaurant.delivery_fee_taxable %}checked{% endif %}>
+                                        <label class="form-check-label" for="delivery_fee_taxable">Charge tax on the delivery fee</label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Submit Buttons -->

@@ -177,6 +177,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
         for i in items
     )
 
+    _r = None
     if table is not None:
         tax_rate = table.get_tax_rate()
     else:
@@ -255,8 +256,12 @@ def _sync_order_atomic(user, owner, data, offline_id):
 
     # Recalculate total from items that were actually created (excludes skipped products)
     actual_subtotal = sum(oi.get_subtotal() for oi in order.order_items.all())
-    order.total_amount = actual_subtotal * (Decimal('1') + tax_rate)
-    order.save(update_fields=['total_amount'])
+    if order_type == 'delivery':
+        _fee_rest = _r if table is None else table.restaurant
+        if _fee_rest is not None:
+            order.delivery_fee, order.delivery_fee_taxed = _fee_rest.delivery_fee_for(actual_subtotal)
+    order.total_amount = order.total_for_subtotal(actual_subtotal, tax_rate)
+    order.save(update_fields=['total_amount', 'delivery_fee', 'delivery_fee_taxed'])
 
     if table is not None:
         table.is_available = False
@@ -357,11 +362,8 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
         orig_subtotal = sum(
             oi.get_subtotal() for oi in all_items if oi not in new_items
         )
-        tax_rate = (
-            (Decimal(str(order.total_amount)) / Decimal(str(orig_subtotal)) - Decimal('1'))
-            if orig_subtotal else Decimal('0')
-        )
-    order.total_amount = actual_subtotal * (Decimal('1') + tax_rate)
+        tax_rate = order.charged_tax_rate(orig_subtotal)  # excludes the delivery fee
+    order.total_amount = order.total_for_subtotal(actual_subtotal, tax_rate)
     # Stamp the dedup tag so a retry push doesn't double-add the same items.
     order.special_instructions = ((order.special_instructions or '').rstrip() + f' {dedup_tag}').strip()
     order.save(update_fields=['total_amount', 'special_instructions'])

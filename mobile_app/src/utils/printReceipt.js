@@ -57,6 +57,10 @@ export function buildReceiptHtml({
   const taxRow = taxAmount > 0
     ? `<tr><td>Tax (${fmt(taxRate)}%)</td><td style="text-align:right;">${currencySymbol}${fmt(taxAmount)}</td></tr>`
     : '';
+  const deliveryFee = parseFloat(order.delivery_fee || 0);
+  const deliveryFeeRow = deliveryFee > 0
+    ? `<tr><td>Delivery fee</td><td style="text-align:right;">${currencySymbol}${fmt(deliveryFee)}</td></tr>`
+    : '';
 
   // Bill: show partial payments if any
   const partialRows = isBill && totalPaid > 0
@@ -141,6 +145,7 @@ export function buildReceiptHtml({
       <tr><td>Subtotal</td><td style="text-align:right;">${currencySymbol}${fmt(subtotal)}</td></tr>
       ${discountRow}
       ${taxRow}
+      ${deliveryFeeRow}
       ${partialRows}
       ${paymentSection}
     </tbody>
