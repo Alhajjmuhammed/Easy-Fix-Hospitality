@@ -65,9 +65,6 @@ def _deliver(messages):
             _post(messages[i:i + _BATCH])
     except Exception as e:
         logger.warning('Push notification send failed: %s', e)
-    finally:
-        from django.db import connection
-        connection.close()  # this thread may have opened a DB connection (dead-token cleanup)
 
 
 def send_push(tokens, title, body, data=None):
@@ -83,7 +80,17 @@ def send_push(tokens, title, body, data=None):
 
 
 def _in_background(fn, *args):
-    threading.Thread(target=fn, args=args, daemon=True).start()
+    threading.Thread(target=_run_and_close_db, args=(fn, *args), daemon=True).start()
+
+
+def _run_and_close_db(fn, *args):
+    """Thread body: run fn, then close the DB connection this thread may have opened.
+    Only ever runs in its own thread, so it never closes a request's connection."""
+    from django.db import connection
+    try:
+        fn(*args)
+    finally:
+        connection.close()
 
 
 def _restaurant_owner(order):

@@ -227,6 +227,28 @@ class ExpoResponseTests(TestCase):
         self.assertIsNone(u.expo_push_token)
         self.assertEqual(keep.expo_push_token, tok('ok'))
 
+    def test_sending_never_closes_the_callers_db_connection(self):
+        # On PostgreSQL a closed connection breaks the rest of the request/test
+        # (SQLite test DBs ignore close(), so assert on the call itself).
+        from django.db import connection
+        with mock.patch('orders.push._post'), mock.patch.object(connection, 'close') as closed:
+            push._deliver([{'to': tok('x')}])
+        closed.assert_not_called()
+
+    def test_background_thread_closes_its_own_connection(self):
+        from django.db import connection
+        # The thread is started with the closing wrapper...
+        with mock.patch('orders.push.threading.Thread') as thread_cls:
+            push._in_background(push._deliver, [])
+        self.assertIs(thread_cls.call_args.kwargs['target'], push._run_and_close_db)
+        # ...and the wrapper runs the work, then closes (also when the work fails).
+        ran = []
+        with mock.patch.object(connection, 'close') as closed:
+            push._run_and_close_db(ran.append, 1)
+            with self.assertRaises(ValueError):
+                push._run_and_close_db(mock.Mock(side_effect=ValueError))
+        self.assertEqual((ran, closed.call_count), ([1], 2))
+
     def test_batches_of_100(self):
         calls = []
         with mock.patch('orders.push._post', side_effect=lambda msgs: calls.append(len(msgs))):
