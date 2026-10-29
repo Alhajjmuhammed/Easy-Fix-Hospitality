@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "434398893630",
+    "project_id": "restaurants-59efe",
+    "storage_bucket": "restaurants-59efe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:434398893630:android:6f6852f85144d6999b236f",
+        "android_client_info": {
+          "package_name": "com.easyfix.hospitality"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAW_TVeosux8Ypx2zZA5Hg1ghbAhuxaY5w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

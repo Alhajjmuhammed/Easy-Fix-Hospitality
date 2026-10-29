@@ -26,7 +26,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e40af"
       },
-      "package": "com.easyfix.hospitality"
+      "package": "com.easyfix.hospitality",
+      "googleServicesFile": "./google-services.json"
     },
     "ios": {
       "supportsTablet": true,
