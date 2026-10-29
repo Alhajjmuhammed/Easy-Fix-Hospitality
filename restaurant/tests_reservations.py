@@ -223,6 +223,18 @@ class ReservationTests(TestCase):
         r = self._api(self.cust).post(f'/api/v1/reservations/{rid}/cancel/')
         self.assertEqual(r.json()['reservation']['status'], 'cancelled')
 
+    def test_api_booking_uses_explicit_restaurant_not_last_ordered(self):
+        d, t = local_parts(self.when)
+        # Header says "Other R" (where the customer last ordered); the booking is for "Main R".
+        r = self._api(self.cust, self.other.id).post('/api/v1/reservations/', {
+            'restaurant_id': self.r.id, 'party_size': 2, 'date': d, 'time': t}, format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Reservation.objects.get().restaurant, self.r)
+
+    def test_tables_payload_has_restaurant_id(self):
+        tables = self._api(self.cashier).get('/api/v1/tables/').json()['tables']
+        self.assertEqual({t['restaurant_id'] for t in tables}, {self.r.id})
+
     def test_api_blocked_restaurant(self):
         self.main.subscription.block_restaurant(reason='t')
         d, t = local_parts(self.when)

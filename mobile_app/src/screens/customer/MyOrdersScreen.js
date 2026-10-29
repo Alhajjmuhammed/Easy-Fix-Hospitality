@@ -206,6 +206,14 @@ export default function MyOrdersScreen() {
             {tab.label}
           </Chip>
         ))}
+        <Chip
+          icon="calendar-check"
+          onPress={() => navigation.navigate('MyReservations')}
+          style={styles.filterChip}
+          textStyle={styles.filterChipText}
+        >
+          My Reservations
+        </Chip>
       </ScrollView>
 
       <FlatList

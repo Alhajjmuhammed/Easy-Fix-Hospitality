@@ -266,7 +266,7 @@ class TableSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TableInfo
-        fields = ['id', 'tbl_no', 'table_number', 'is_available', 'capacity', 'display_name']
+        fields = ['id', 'tbl_no', 'table_number', 'is_available', 'capacity', 'display_name', 'restaurant_id']
 
     def get_display_name(self, obj):
         return f"Table {obj.tbl_no}"

@@ -16,6 +16,8 @@ import MyOrdersScreen            from '../screens/customer/MyOrdersScreen';
 import ReceiptScreen             from '../screens/customer/ReceiptScreen';
 import ProfileScreen             from '../screens/customer/ProfileScreen';
 import DeliveryTrackingScreen    from '../screens/customer/DeliveryTrackingScreen';
+import BookTableScreen           from '../screens/customer/BookTableScreen';
+import MyReservationsScreen      from '../screens/customer/MyReservationsScreen';
 import CustomerHeader            from '../components/CustomerHeader';
 
 const Tab            = createBottomTabNavigator();
@@ -53,6 +55,8 @@ function OrderStackNavigator() {
       <OrderStack.Screen name="OrderTracking"     component={OrderTrackingScreen} />
       <OrderStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: 'Track Delivery' }} />
       <OrderStack.Screen name="Receipt"          component={ReceiptScreen} />
+      <OrderStack.Screen name="BookTable"        component={BookTableScreen} />
+      <OrderStack.Screen name="MyReservations"   component={MyReservationsScreen} />
     </OrderStack.Navigator>
   );
 }
@@ -73,6 +77,7 @@ function MyOrdersStackNavigator() {
       <MyOrdersStack.Screen name="OrderTracking"   component={OrderTrackingScreen} />
       <MyOrdersStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: 'Track Delivery' }} />
       <MyOrdersStack.Screen name="Receipt"         component={ReceiptScreen} />
+      <MyOrdersStack.Screen name="MyReservations"  component={MyReservationsScreen} />
     </MyOrdersStack.Navigator>
   );
 }

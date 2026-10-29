@@ -24,13 +24,33 @@ const ORDER_TYPES = [
   },
 ];
 
+const BOOK_TABLE = {
+  type: 'reserve',
+  icon: 'calendar-check',
+  title: 'Book a table',
+  subtitle: 'Reserve a table for dining in',
+  color: '#2E7D32',
+  bg: '#E8F5E9',
+};
+
 export default function OrderTypeScreen({ route, navigation }) {
   const { restaurant } = route.params;   // { id, name, address, ... }
   const { setRemoteOrder } = useCartStore();
   const { setRestaurant } = useAuthStore();
   const [snack, setSnack] = useState('');
 
+  // Older payloads have no flags: keep showing delivery/pickup for them.
+  const options = [
+    ...(restaurant.allow_remote_orders !== false ? ORDER_TYPES : []),
+    ...(restaurant.reservations_enabled ? [BOOK_TABLE] : []),
+  ];
+
   const handleSelect = async (type) => {
+    if (type === 'reserve') {
+      // Booking sends restaurant_id itself; don't switch the ordering restaurant.
+      navigation.navigate('BookTable', { restaurant });
+      return;
+    }
     try {
       await setRestaurant(restaurant.id);
     } catch {
@@ -55,9 +75,9 @@ export default function OrderTypeScreen({ route, navigation }) {
         <Text variant="bodyMedium" style={styles.subtitle}>{restaurant.address}</Text>
       </View>
 
-      <Text variant="titleMedium" style={styles.sectionLabel}>How would you like to receive your order?</Text>
+      <Text variant="titleMedium" style={styles.sectionLabel}>What would you like to do?</Text>
 
-      {ORDER_TYPES.map((opt) => (
+      {options.map((opt) => (
         <Card
           key={opt.type}
           style={[styles.card, { borderLeftColor: opt.color }]}

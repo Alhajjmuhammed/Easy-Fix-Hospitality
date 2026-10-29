@@ -15,7 +15,7 @@ from restaurant.models_reservation import Reservation, reservations_for_owner
 from restaurant.models_restaurant import Restaurant
 from restaurant import reservations as svc
 from ..permissions import IsSubscriptionActive
-from .helpers import get_restaurant_owner
+from .helpers import get_restaurant_owner, open_restaurant_owner
 
 
 def _is_staff(user):
@@ -134,15 +134,14 @@ def _customer_reservations(request):
         cutoff = timezone.now() - timedelta(days=30)
         return Response({'reservations': [_serialize(r) for r in qs.filter(start__gte=cutoff).order_by('-start')[:50]]})
 
-    # Booking: the restaurant comes from X-Restaurant-ID and must be bookable and not blocked.
-    if get_restaurant_owner(request) is None:
-        return Response({'error': 'Restaurant not found.'}, status=status.HTTP_404_NOT_FOUND)
-    rid = request.headers.get('X-Restaurant-ID') or request.data.get('restaurant_id')
+    # Booking: an explicit restaurant_id wins over X-Restaurant-ID (which is the restaurant the
+    # customer last ordered from, not necessarily the one they're booking). It must be open.
+    rid = request.data.get('restaurant_id') or request.headers.get('X-Restaurant-ID')
     try:
-        restaurant = Restaurant.objects.filter(id=int(rid)).first()
+        restaurant = Restaurant.objects.select_related('branch_owner', 'main_owner').filter(id=int(rid)).first()
     except (TypeError, ValueError):
         restaurant = None
-    if restaurant is None:
+    if restaurant is None or open_restaurant_owner(restaurant) is None:
         return Response({'error': 'Restaurant not found.'}, status=status.HTTP_404_NOT_FOUND)
     try:
         start = svc.parse_start(request.data.get('date'), request.data.get('time'))

@@ -111,7 +111,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
   // Only show restaurants that allow remote ordering in the list.
   // QR scan (inside restaurant) is the path for dine-in.
   const filtered = restaurants.filter((r) =>
-    r.allow_remote_orders && (
+    (r.allow_remote_orders || r.reservations_enabled) && (
       r.name.toLowerCase().includes(search.toLowerCase()) ||
       (r.address || '').toLowerCase().includes(search.toLowerCase())
     )

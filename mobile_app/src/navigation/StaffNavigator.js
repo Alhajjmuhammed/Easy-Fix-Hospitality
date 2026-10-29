@@ -26,6 +26,7 @@ import RestaurantHeader          from '../components/RestaurantHeader';
 import PrinterSettingsScreen     from '../screens/settings/PrinterSettingsScreen';
 import AttendanceScreen          from '../screens/attendance/AttendanceScreen';
 import MyAttendanceScreen        from '../screens/attendance/MyAttendanceScreen';
+import StaffReservationsScreen   from '../screens/reservations/StaffReservationsScreen';
 
 const Tab = createBottomTabNavigator();
 const CCOrderStack          = createNativeStackNavigator();
@@ -50,9 +51,22 @@ function CashierDashboardStackNavigator() {
         ),
       })}
     >
-      <CashierDashboardStack.Screen name="DashboardMain" component={CashierDashboardScreen} />
+      <CashierDashboardStack.Screen
+        name="DashboardMain"
+        component={CashierDashboardScreen}
+        options={({ navigation }) => ({
+          header: () => (
+            <RestaurantHeader
+              extraMenuItems={[
+                { icon: 'calendar-check', label: 'Reservations', onPress: () => navigation.navigate('Reservations') },
+              ]}
+            />
+          ),
+        })}
+      />
       <CashierDashboardStack.Screen name="OrderDetail"   component={CCOrderDetailScreen} />
       <CashierDashboardStack.Screen name="Receipt"       component={CCReceiptScreen} />
+      <CashierDashboardStack.Screen name="Reservations"  component={StaffReservationsScreen} />
     </CashierDashboardStack.Navigator>
   );
 }
@@ -137,6 +151,11 @@ function CCPaymentStackNavigator() {
                   label: 'Receipt Management',
                   onPress: () => navigation.navigate('ReceiptManagement'),
                 },
+                {
+                  icon: 'calendar-check',
+                  label: 'Reservations',
+                  onPress: () => navigation.navigate('Reservations'),
+                },
               ]}
             />
           ),
@@ -145,6 +164,7 @@ function CCPaymentStackNavigator() {
       <CCPaymentStack.Screen name="OrderDetail"   component={CCOrderDetailScreen} />
       <CCPaymentStack.Screen name="Receipt"        component={CCReceiptScreen} />
       <CCPaymentStack.Screen name="ReceiptManagement" component={CCReceiptManagementScreen} />
+      <CCPaymentStack.Screen name="Reservations"      component={StaffReservationsScreen} />
     </CCPaymentStack.Navigator>
   );
 }

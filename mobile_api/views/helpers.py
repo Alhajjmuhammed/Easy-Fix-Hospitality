@@ -34,6 +34,22 @@ def customer_restaurant_q(request, owner, prefix=''):
     return Q(**{f'{prefix}restaurant_id': rid}) | Q(**{f'{prefix}restaurant__isnull': True, f'{prefix}owner': owner})
 
 
+def open_restaurant_owner(restaurant):
+    """
+    The restaurant's owner account if customers may use it right now, else None
+    (restaurant inactive, owner deactivated, or subscription blocked/expired).
+    """
+    owner = restaurant.branch_owner or restaurant.main_owner
+    # Blocking/expiring a subscription deactivates the owner account.
+    if not restaurant.is_active or not owner or not owner.is_active:
+        return None
+    from accounts.models import RestaurantSubscription
+    sub = RestaurantSubscription.objects.filter(restaurant_owner=restaurant.main_owner or owner).first()
+    if sub and not sub.is_active:
+        return None
+    return owner
+
+
 def get_restaurant_owner(request):
     """
     Return the restaurant owner (User with owner role) relevant to this request.
@@ -64,17 +80,7 @@ def get_restaurant_owner(request):
             restaurant = Restaurant.objects.select_related(
                 'branch_owner', 'main_owner'
             ).get(id=int(restaurant_id))
-            owner = restaurant.branch_owner or restaurant.main_owner
-            # Blocking/expiring a subscription deactivates the owner account.
-            if not restaurant.is_active or not owner or not owner.is_active:
-                return None
-            from accounts.models import RestaurantSubscription
-            sub = RestaurantSubscription.objects.filter(
-                restaurant_owner=restaurant.main_owner or owner
-            ).first()
-            if sub and not sub.is_active:
-                return None
-            return owner
+            return open_restaurant_owner(restaurant)
         except Exception:
             pass
 

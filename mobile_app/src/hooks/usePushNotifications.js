@@ -31,6 +31,11 @@ if (!IS_EXPO_GO) {
 
 /** Where a tapped notification should take each role. */
 function targetFor(role, data) {
+  if (data?.kind === 'reservation') {
+    if (role === 'customer') return ['Customer', { screen: 'MyOrders', params: { screen: 'MyReservations', initial: false } }];
+    if (role === 'customer_care') return ['Staff', { screen: 'Payments', params: { screen: 'Reservations', initial: false } }];
+    return ['Staff', { screen: 'Dashboard', params: { screen: 'Reservations', initial: false } }];
+  }
   const orderId = data?.orderId;
   if (role === 'customer') {
     // initial: false keeps the list screen underneath so Back returns to it
