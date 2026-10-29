@@ -128,6 +128,41 @@ class PushTests(TestCase):
             order.save()
         self.assertEqual(self.sent, [])
 
+    def test_partial_save_does_not_hide_later_status_change(self):
+        order = self._customer_pickup()
+        self.sent.clear()
+        order = Order.objects.get(pk=order.pk)
+        order.status = 'confirmed'                                     # changed in memory...
+        with self.captureOnCommitCallbacks(execute=True):
+            order.save(update_fields=['special_instructions'])         # ...but this save doesn't write it
+            order.save(update_fields=['status'])                       # now it is written → must notify
+        self.assertEqual([m['data'].get('status') for m in self.sent], ['confirmed'])
+
+    def test_refresh_from_db_does_not_cause_duplicate(self):
+        order = self._customer_pickup()
+        stale = Order.objects.get(pk=order.pk)
+        Order.objects.filter(pk=order.pk).update(status='confirmed')   # changed elsewhere (already notified there)
+        stale.refresh_from_db()
+        self.sent.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            stale.save()                                               # status unchanged → no push
+        self.assertEqual(self.sent, [])
+
+    def test_customer_own_cancellation_not_notified_but_staff_cancel_is(self):
+        order = self._customer_pickup()
+        self.sent.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self._api(self.cust, self.r.id).post(f'/api/v1/orders/{order.id}/cancel/', {}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual([m for m in self.sent if m['data'].get('kind') == 'order_status'], [])
+        Order.objects.filter(ordered_by=self.cust).delete()
+        order2 = self._customer_pickup()
+        self.sent.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self._api(self.main).post(f'/api/v1/orders/{order2.id}/cancel/', {'reason': 'out of stock'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual([m['data'].get('status') for m in self.sent], ['cancelled'])
+
     def test_staff_who_placed_order_gets_no_customer_status_alert(self):
         order = Order.objects.create(order_number='ORD-STAFF', table_info=self.table, ordered_by=self.cashier)
         order = Order.objects.get(pk=order.pk)

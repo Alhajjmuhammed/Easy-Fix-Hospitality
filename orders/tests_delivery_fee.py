@@ -57,11 +57,16 @@ class DeliveryFeeTests(TestCase):
                                             price=D('2000.00'), available_in_stock=500)
 
     # ---------- helpers ----------
-    def _api(self, user, rid=None):
+    def _api(self, user, rid=None, new_app=True):
+        """new_app=True sends the header that app builds with delivery-fee support send."""
         c = APIClient()
         c.force_authenticate(user)
+        headers = {}
         if rid:
-            c.credentials(HTTP_X_RESTAURANT_ID=str(rid))
+            headers['HTTP_X_RESTAURANT_ID'] = str(rid)
+        if new_app:
+            headers['HTTP_X_APP_FEATURES'] = 'delivery-fee'
+        c.credentials(**headers)
         return c
 
     def _items(self, *pairs):
@@ -233,7 +238,7 @@ class DeliveryFeeTests(TestCase):
 
     def test_owner_profile_rejects_invalid_fee(self):
         self.client.force_login(self.main)
-        for bad in ('-5', 'abc', '1e12'):
+        for bad in ('-5', 'abc', '1e12', '1,5', 'NaN', 'Infinity'):
             self.client.post('/admin-panel/profile/', {
                 'action': 'update_restaurant', 'restaurant_name': 'Main R', 'restaurant_description': '',
                 'tax_rate': '18', 'delivery_fee': bad})
@@ -283,6 +288,105 @@ class DeliveryFeeTests(TestCase):
         self.assertNotIn('your-font-awesome-kit', page)
         self.client.force_login(self.cust)
         self.assertIn('https://wa.me/?text=', self.client.get(f'/orders/receipt/{o.id}/').content.decode())
+
+    # ---------- review fixes ----------
+    def test_main_restaurant_staff_get_main_fee_not_branch(self):
+        Restaurant.objects.filter(pk=self.branch.pk).update(tax_rate=D('0.1000'))
+        r = self._api(self.cashier).post('/api/v1/orders/', {
+            'order_type': 'delivery', 'delivery_phone': '0777', 'delivery_address': 'x',
+            'items': self._items((self.food, 2))}, format='json')
+        self.assertIn(r.status_code, (200, 201), r.content)
+        o = Order.objects.get(id=r.json()['order']['id'])
+        self.assertEqual((o.delivery_fee, o.total_amount), (D('3000.00'), D('14800.00')))  # main: 3,000 fee, 18%
+
+    def test_old_app_blocked_only_when_fee_applies(self):
+        old = self._api(self.cust, self.r.id, new_app=False)
+        payload = {'order_type': 'delivery', 'delivery_phone': '0777', 'delivery_address': 'x',
+                   'items': self._items((self.food, 1))}
+        r = old.post('/api/v1/orders/', payload, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertTrue(r.json().get('update_required'))
+        self.assertFalse(Order.objects.filter(ordered_by=self.cust).exists())
+        # pickup and fee-free restaurants still work on the old app
+        self.assertIn(old.post('/api/v1/orders/', {**payload, 'order_type': 'pickup'}, format='json').status_code, (200, 201))
+        self._set(delivery_fee=D('0'))
+        self.assertIn(old.post('/api/v1/orders/', payload, format='json').status_code, (200, 201))
+
+    def test_old_staff_app_offline_delivery_synced_without_fee(self):
+        item = {'offline_id': 'old-1', 'order_type': 'delivery', 'delivery_phone': '0777', 'restaurant_id': self.r.id,
+                'items': self._items((self.food, 2)), '_fee_supported': True}  # client value must be ignored
+        r = self._api(self.cashier, new_app=False).post('/api/v1/sync/push/', {'orders': [item]}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        o = Order.objects.get(special_instructions__contains='[offline:old-1]')
+        self.assertEqual((o.delivery_fee, o.total_amount), (D('0.00'), D('11800.00')))
+        item2 = {**item, 'offline_id': 'new-1'}
+        self._api(self.cashier).post('/api/v1/sync/push/', {'orders': [item2]}, format='json')
+        o2 = Order.objects.get(special_instructions__contains='[offline:new-1]')
+        self.assertEqual(o2.delivery_fee, D('3000.00'))
+
+    def test_old_customer_app_offline_delivery_still_charged(self):
+        item = {'offline_id': 'c-1', 'order_type': 'delivery', 'delivery_phone': '0777', 'restaurant_id': self.r.id,
+                'items': self._items((self.food, 2))}
+        self._api(self.cust, self.r.id, new_app=False).post('/api/v1/sync/push/', {'orders': [item]}, format='json')
+        o = Order.objects.get(special_instructions__contains='[offline:c-1]')
+        self.assertEqual(o.delivery_fee, D('3000.00'))
+
+    def test_printed_tax_percent_with_taxed_fee(self):
+        from orders.printing import _generate_bill_content
+        self._set(delivery_fee_taxable=True)
+        bill = _generate_bill_content(self._mobile_delivery((self.food, 2)))
+        self.assertIn('Tax (18.0%)', bill)
+
+    def test_web_add_items_to_own_pickup_order(self):
+        o = self._mobile_delivery((self.food, 1), order_type='pickup')       # 5,900
+        self.client.force_login(self.cust)
+        s = self.client.session
+        s.update({'selected_restaurant_id': self.main.id, 'add_to_order_id': o.id,
+                  'order_type': 'pickup',
+                  'cart': {str(self.chips.id): {'name': 'Chips', 'price': '2000.00', 'quantity': 1}}})
+        s.save()
+        self.client.post('/orders/place-order/', {'special_instructions': ''})
+        o.refresh_from_db()
+        self.assertTrue(o.order_items.filter(product=self.chips).exists())
+        self.assertEqual(o.total_amount, D('8260.00'))                       # 7,000 x 1.18
+
+    def test_same_table_number_in_branch_uses_selected_table(self):
+        Restaurant.objects.filter(pk=self.branch.pk).update(tax_rate=D('0.1000'))
+        TableInfo.objects.all().delete()
+        TableInfo.objects.create(restaurant=self.branch, owner=self.branch_owner, tbl_no='T1')   # created first
+        main_t1 = TableInfo.objects.create(restaurant=self.r, owner=self.main, tbl_no='T1')
+        self.client.force_login(self.cashier)
+        self.client.post('/orders/table/', {'table_id': main_t1.id})
+        s = self.client.session
+        s['cart'] = {str(self.food.id): {'name': 'Pilau', 'price': '5000.00', 'quantity': 1}}
+        s.save()
+        self.assertIn('Tax (18%)', self.client.get('/orders/place-order/').content.decode())
+        self.client.post('/orders/place-order/', {'special_instructions': ''})
+        o = Order.objects.get(ordered_by=self.cashier)
+        self.assertEqual((o.table_info_id, o.total_amount), (main_t1.id, D('5900.00')))
+
+    def test_staff_cannot_read_other_restaurant_settings_via_header(self):
+        other_owner = User.objects.create_user('oth', password='pw12345!x', role=role('main_owner'))
+        other = Restaurant.objects.create(name='Other', address='o', main_owner=other_owner, branch_owner=other_owner,
+                                          is_main_restaurant=True, qr_code='QROTH', delivery_fee=D('9999.00'))
+        me = self._api(self.cashier, other.id).get('/api/v1/auth/me/').json()
+        self.assertEqual(me['delivery_fee'], 3000.0)                         # own restaurant, not "Other"
+        Restaurant.objects.filter(pk=other.pk).update(is_active=False)
+        me = self._api(self.cust, other.id).get('/api/v1/auth/me/').json()
+        self.assertNotEqual(me['delivery_fee'], 9999.0)                      # inactive restaurant ignored
+
+    def test_customer_receipt_share_does_not_prefill_own_number(self):
+        from cashier.models import Payment
+        r = self._api(self.cust, self.r.id).post('/api/v1/orders/', {
+            'order_type': 'delivery', 'delivery_phone': '+255777000000', 'delivery_address': 'x',
+            'items': self._items((self.food, 1))}, format='json')
+        o = Order.objects.get(id=r.json()['order']['id'])
+        pay = Payment.objects.create(order=o, amount=o.total_amount, payment_method='cash', processed_by=self.main)
+        Order.objects.filter(pk=o.pk).update(payment_status='paid')
+        self.client.force_login(self.cust)
+        self.assertIn('https://wa.me/?text=', self.client.get(f'/orders/receipt/{o.id}/').content.decode())
+        self.client.force_login(self.main)
+        self.assertIn('https://wa.me/255777000000?text=', self.client.get(f'/cashier/receipt/{pay.id}/').content.decode())
 
     # ---------- existing orders unaffected ----------
     def test_existing_orders_without_fee_unchanged(self):

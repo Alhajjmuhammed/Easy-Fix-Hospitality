@@ -5,7 +5,8 @@ import { API_BASE_URL } from '../config';
 const client = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
+  // X-App-Features: lets the server know this build shows the delivery fee at checkout
+  headers: { 'Content-Type': 'application/json', 'X-App-Features': 'delivery-fee' },
 });
 
 // In-memory cache — avoids encrypted disk reads on every request (50-150ms each).

@@ -7,6 +7,12 @@ from django.db.models import Q
 User = get_user_model()
 
 
+def client_supports_delivery_fee(request):
+    """App builds that show the delivery fee send 'X-App-Features: delivery-fee'."""
+    features = request.headers.get('X-App-Features', '') if request is not None else ''
+    return 'delivery-fee' in {f.strip() for f in features.split(',')}
+
+
 def customer_restaurant_q(request, owner, prefix=''):
     """
     For customers, a Q limiting rows to the one restaurant they selected (plus legacy

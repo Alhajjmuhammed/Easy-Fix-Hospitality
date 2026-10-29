@@ -81,6 +81,12 @@ class Order(models.Model):
         """Alternative method to get owner for consistency"""
         return self.owner
 
+    def refresh_from_db(self, using=None, fields=None, **kwargs):
+        super().refresh_from_db(using=using, fields=fields, **kwargs)
+        # Keep the status-change push signal's baseline in step with the database.
+        if fields is None or 'status' in fields:
+            self._loaded_status = self.__dict__.get('status')
+
     @property
     def display_instructions(self):
         """special_instructions without the internal [offline:...] de-duplication tags."""

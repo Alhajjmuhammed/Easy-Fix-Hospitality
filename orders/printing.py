@@ -49,7 +49,9 @@ def _charged_amounts(order, subtotal):
     total = order.total_amount or _D('0')
     if total > 0 and total >= subtotal:
         tax_amount = order.get_tax_amount()
-        pct = float(tax_amount / subtotal * 100) if subtotal else 0.0
+        fee = order.delivery_fee or _D('0')
+        taxable = subtotal + (fee if order.delivery_fee_taxed else _D('0'))
+        pct = float(tax_amount / taxable * 100) if taxable else 0.0
         return tax_amount, pct, total
     rate = order.table_info.get_tax_rate() if order.table_info else _D('0')
     tax_amount = subtotal * rate

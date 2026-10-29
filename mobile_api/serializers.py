@@ -81,15 +81,13 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             request = self.context.get('request')
             rest_id = request.META.get('HTTP_X_RESTAURANT_ID') if request else None
-            if rest_id:
-                row = Restaurant.objects.filter(id=int(rest_id)).first()
-            if row is None:
-                owner = self._get_effective_owner(obj)
-                if owner:
-                    row = (
-                        Restaurant.objects.filter(branch_owner=owner, is_main_restaurant=False).first()
-                        or Restaurant.objects.filter(main_owner=owner, is_main_restaurant=True).first()
-                    )
+            # Only customers choose a restaurant; staff always see their own restaurant's settings.
+            if obj.is_customer():
+                # Customers: only an active restaurant they selected (no owner/header fallback).
+                if rest_id:
+                    row = Restaurant.objects.filter(id=int(rest_id), is_active=True).first()
+            else:
+                row = Restaurant.for_owner(obj.get_owner())
         except Exception:
             row = None
         cache[obj.pk] = row
@@ -137,7 +135,7 @@ class UserSerializer(serializers.ModelSerializer):
             row = self._get_restaurant_row(obj)
             if row and row.currency_code:
                 return row.currency_code
-            owner = self._get_effective_owner(obj)
+            owner = obj.get_owner()  # never the header: settings only from the user's own restaurant
             return owner.currency_code if owner else 'USD'
         except Exception:
             return 'USD'
@@ -154,7 +152,7 @@ class UserSerializer(serializers.ModelSerializer):
             row = self._get_restaurant_row(obj)
             if row is not None:
                 return float(row.tax_rate)
-            owner = self._get_effective_owner(obj)
+            owner = obj.get_owner()  # never the header: settings only from the user's own restaurant
             return float(owner.tax_rate) if owner else 0.0
         except Exception:
             return 0.0

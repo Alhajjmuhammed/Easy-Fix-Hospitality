@@ -331,9 +331,7 @@ export default function ReceiptScreen({ route }) {
         mode="outlined"
         icon="whatsapp"
         textColor="#25D366"
-        onPress={() => shareOnWhatsApp(
-          buildReceiptText(order, user?.restaurant_name, fmt), order.delivery_phone,
-        ).catch(() => {})}
+        onPress={() => shareOnWhatsApp(buildReceiptText(order, user?.restaurant_name, fmt)).catch(() => {})}
         style={[styles.backBtn, { marginBottom: 8 }]}
         labelStyle={{ fontFamily: P600 }}
       >

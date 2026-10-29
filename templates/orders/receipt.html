@@ -287,7 +287,7 @@
         <a href="{% url 'orders:my_orders' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Back to My Orders
         </a>
-        {% whatsapp_receipt_url order as wa_url %}
+        {% whatsapp_receipt_url order False as wa_url %}
         {% if wa_url %}
         <a href="{{ wa_url }}" target="_blank" rel="noopener" class="btn btn-success ms-2">
             <i class="bi bi-whatsapp"></i> Share on WhatsApp

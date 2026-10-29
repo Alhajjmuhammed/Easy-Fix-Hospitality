@@ -288,6 +288,21 @@ class Restaurant(models.Model):
         help_text="Delivery is free when the food subtotal reaches this amount (empty = always charge)"
     )
 
+    @classmethod
+    def for_owner(cls, owner):
+        """
+        The restaurant an owner account operates: a branch owner's branch, otherwise the
+        main restaurant. (Meta.ordering sorts branches first, so a bare .first() over
+        main_owner/branch_owner would wrongly pick a branch for a main owner.)
+        """
+        if owner is None:
+            return None
+        return (
+            cls.objects.filter(branch_owner=owner, is_main_restaurant=False).first()
+            or cls.objects.filter(main_owner=owner, is_main_restaurant=True).first()
+            or cls.objects.filter(models.Q(main_owner=owner) | models.Q(branch_owner=owner)).first()
+        )
+
     def delivery_fee_for(self, food_subtotal):
         """(fee, fee_is_taxed) for a delivery order with this food subtotal (before tax)."""
         fee = self.delivery_fee or Decimal('0.00')

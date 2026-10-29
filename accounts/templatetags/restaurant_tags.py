@@ -90,13 +90,16 @@ def currency_symbol(context):
 
 
 @register.simple_tag(takes_context=True)
-def whatsapp_receipt_url(context, order):
-    """wa.me link with this order's receipt text. Usage: {% whatsapp_receipt_url order %}"""
+def whatsapp_receipt_url(context, order, to_customer=True):
+    """
+    wa.me link with this order's receipt text. Usage: {% whatsapp_receipt_url order %}
+    Staff screens pre-fill the customer's number; pass False on the customer's own receipt.
+    """
     from orders.share import receipt_share_text, whatsapp_url
     try:
         code, symbol = get_user_currency_info(context.get('user'), context.get('request'))
         text = receipt_share_text(order, symbol, use_decimals=code not in INTEGER_CURRENCIES)
-        return whatsapp_url(text, getattr(order, 'delivery_phone', ''))
+        return whatsapp_url(text, getattr(order, 'delivery_phone', '') if to_customer else '')
     except Exception:
         return ''
 

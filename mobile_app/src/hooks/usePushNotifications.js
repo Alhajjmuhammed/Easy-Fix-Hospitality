@@ -33,8 +33,9 @@ if (!IS_EXPO_GO) {
 function targetFor(role, data) {
   const orderId = data?.orderId;
   if (role === 'customer') {
+    // initial: false keeps the list screen underneath so Back returns to it
     return orderId
-      ? ['Customer', { screen: 'MyOrders', params: { screen: 'OrderTracking', params: { orderId } } }]
+      ? ['Customer', { screen: 'MyOrders', params: { screen: 'OrderTracking', initial: false, params: { orderId } } }]
       : ['Customer', { screen: 'MyOrders' }];
   }
   if (role === 'delivery_rider') return ['Rider', { screen: 'Deliveries' }];
@@ -42,7 +43,7 @@ function targetFor(role, data) {
   if (role === 'customer_care') return ['Staff', { screen: 'Dashboard' }];
   // cashier, manager, owners
   return orderId
-    ? ['Staff', { screen: 'Dashboard', params: { screen: 'OrderDetail', params: { orderId } } }]
+    ? ['Staff', { screen: 'Dashboard', params: { screen: 'OrderDetail', initial: false, params: { orderId } } }]
     : ['Staff', { screen: 'Dashboard' }];
 }
 
@@ -56,13 +57,14 @@ function openFromNotification(response) {
   const role = useAuthStore.getState().user?.role_name;
   if (!data || !role) return;
   const [name, params] = targetFor(role, data);
-  // The navigator may not be mounted yet (cold start, PIN lock screen) — retry briefly.
+  // The navigator is not mounted during cold start or while the PIN lock screen is shown —
+  // keep retrying for up to 5 minutes so the tap still opens the order after unlocking.
   let tries = 0;
   const attempt = () => {
     if (navigationRef.isReady()) {
       try { navigationRef.navigate(name, params); } catch { /* route not in this role's navigator */ }
-    } else if (tries++ < 40) {
-      setTimeout(attempt, 500);
+    } else if (tries++ < 300) {
+      setTimeout(attempt, 1000);
     }
   };
   attempt();

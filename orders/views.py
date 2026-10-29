@@ -50,13 +50,7 @@ channel_layer = get_channel_layer()
 def _remote_restaurant_for(owner):
     """Restaurant row used for a delivery/pickup order placed with this owner account."""
     from restaurant.models_restaurant import Restaurant as RestaurantModel
-    if owner is None:
-        return None
-    return (
-        RestaurantModel.objects.filter(branch_owner=owner, is_main_restaurant=False).first()
-        or RestaurantModel.objects.filter(main_owner=owner, is_main_restaurant=True).first()
-        or RestaurantModel.objects.filter(Q(main_owner=owner) | Q(branch_owner=owner)).first()
-    )
+    return RestaurantModel.for_owner(owner)
 
 
 def _session_order_owner(request):
@@ -70,6 +64,22 @@ def _session_order_owner(request):
     return validate_session_restaurant_id(request.session)
 
 
+def _session_table(request, owner):
+    """
+    The table selected in this session. Uses the validated table id (unique) and only falls
+    back to the table number, which can repeat across a main restaurant and its branches.
+    """
+    table_number, table_id = validate_session_table(request.session, owner)
+    if not table_number:
+        return None
+    tq = Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner)
+    if table_id:
+        table = TableInfo.objects.filter(tq, id=table_id).distinct().first()
+        if table is not None:
+            return table
+    return TableInfo.objects.filter(tq, tbl_no=table_number).distinct().first()
+
+
 def _session_tax_rate(request, owner, is_remote):
     """Tax rate the order will actually be charged at, so cart/checkout pages match the bill."""
     if owner is not None:
@@ -78,14 +88,9 @@ def _session_tax_rate(request, owner, is_remote):
             if rest is not None:
                 return Decimal(str(rest.tax_rate))
         else:
-            table_number, _ = validate_session_table(request.session, owner)
-            if table_number:
-                table = TableInfo.objects.filter(
-                    Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
-                    tbl_no=table_number,
-                ).first()
-                if table is not None:
-                    return Decimal(str(table.get_tax_rate()))
+            table = _session_table(request, owner)
+            if table is not None:
+                return Decimal(str(table.get_tax_rate()))
         if getattr(owner, 'tax_rate', None) is not None:
             return Decimal(str(owner.tax_rate))
     return Decimal('0.0800')
@@ -690,19 +695,12 @@ def place_order(request):
                         table = None
                     else:
                         # Dine-in — table is required
-                        table_number, table_id = validate_session_table(request.session, current_restaurant)
+                        table_number, _ = validate_session_table(request.session, current_restaurant)
                         if not table_number:
                             messages.error(request, 'Invalid table selection.')
                             return redirect('orders:select_table')
 
-                        _tq_pt = (
-                            Q(owner=current_restaurant) |
-                            Q(restaurant__main_owner=current_restaurant) |
-                            Q(restaurant__branch_owner=current_restaurant)
-                        )
-                        table = TableInfo.objects.filter(
-                            _tq_pt, tbl_no=table_number
-                        ).first()
+                        table = _session_table(request, current_restaurant)
                         if not table:
                             messages.error(request, f'Table {table_number} not found in {current_restaurant.restaurant_name}.')
                             return redirect('orders:select_table')
@@ -2292,6 +2290,7 @@ def cancel_order(request, order_id):
                     order.reason_if_cancelled = reason
                     # Release the table when order is cancelled
                     order.release_table()
+                    order._skip_status_push = request.user.is_customer()  # no push for own cancellation
                     order.save(update_fields=['status', 'reason_if_cancelled'])
 
                     return JsonResponse({
@@ -2427,6 +2426,7 @@ def customer_cancel_order(request, order_id):
                     order.reason_if_cancelled = reason
                     # Release the table when order is cancelled
                     order.release_table()
+                    order._skip_status_push = request.user.is_customer()  # no push for own cancellation
                     order.save(update_fields=['status', 'reason_if_cancelled'])
 
                     return JsonResponse({
@@ -2475,6 +2475,7 @@ def customer_cancel_order(request, order_id):
                 order.reason_if_cancelled = reason if reason else 'Cancelled by customer'
                 # Release the table when order is cancelled
                 order.release_table()
+                order._skip_status_push = request.user.is_customer()  # no push for own cancellation
                 order.save(update_fields=['status', 'reason_if_cancelled'])
 
                 messages.success(request, f'Order {order.order_number} cancelled successfully.')
@@ -3812,13 +3813,17 @@ def handle_add_to_existing_order(request, order_id, cart):
                 restaurant = request.user.get_owner()
 
             if restaurant:
-                table_in_restaurant = TableInfo.objects.filter(
-                    Q(pk=order.table_info_id) & (
-                        Q(owner=restaurant) |
-                        Q(restaurant__main_owner=restaurant) |
-                        Q(restaurant__branch_owner=restaurant)
-                    )
-                ).exists()
+                if order.table_info_id:
+                    table_in_restaurant = TableInfo.objects.filter(
+                        Q(pk=order.table_info_id) & (
+                            Q(owner=restaurant) |
+                            Q(restaurant__main_owner=restaurant) |
+                            Q(restaurant__branch_owner=restaurant)
+                        )
+                    ).exists()
+                else:
+                    # Delivery/pickup order: no table — check the restaurant it was placed with
+                    table_in_restaurant = (order.restaurant_owner_id or getattr(order.ordered_by, 'owner_id', None)) == restaurant.id
                 if not table_in_restaurant:
                     request.session.pop('add_to_order_id', None)
                     request.session.pop('order_mode', None)

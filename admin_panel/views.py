@@ -97,9 +97,10 @@ def _parse_delivery_settings(data):
 
     def money(raw, label):
         try:
-            value = Decimal(str(raw).strip().replace(',', ''))
+            # No comma handling: "1,5" could mean 1.5 or 15 — reject rather than guess.
+            value = Decimal(str(raw).strip())
         except (InvalidOperation, ValueError):
-            raise ValueError(f'{label} must be a number.')
+            raise ValueError(f'{label} must be a number (use digits and a dot, e.g. 2500 or 2500.50).')
         if not value.is_finite() or value < 0 or value > _MAX_MONEY:
             raise ValueError(f'{label} must be between 0 and {_MAX_MONEY:,}.')
         return value.quantize(Decimal('0.01'))

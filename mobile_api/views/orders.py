@@ -18,7 +18,7 @@ from orders.models import Order, OrderItem
 from restaurant.models import TableInfo, Product
 from cashier.models import Payment
 from ..serializers import OrderSerializer, PlaceOrderSerializer
-from .helpers import get_restaurant_owner, customer_restaurant_q
+from .helpers import get_restaurant_owner, customer_restaurant_q, client_supports_delivery_fee
 from accounts.security_utils import sanitize_special_instructions
 
 logger = logging.getLogger(__name__)
@@ -334,12 +334,12 @@ def _place_order(request):
             request.headers.get('X-Restaurant-ID')
             or (request.data.get('restaurant_id') if hasattr(request, 'data') else None)
         )
-        if _rid:
-            try:
-                _rq = _rq & Q(id=int(_rid))
-            except (TypeError, ValueError):
-                pass
-        _rest_obj = _Restaurant.objects.filter(_rq).first()
+        try:
+            _rest_obj = _Restaurant.objects.filter(_rq, id=int(_rid)).first() if _rid else None
+        except (TypeError, ValueError):
+            _rest_obj = None
+        if _rest_obj is None:
+            _rest_obj = _Restaurant.for_owner(owner)
         from decimal import Decimal as _D
         _delivery_tax_rate = _rest_obj.tax_rate if _rest_obj else getattr(owner, 'tax_rate', _D('0.08'))
     else:
@@ -406,6 +406,19 @@ def _place_order(request):
         )
     if not pre_validated:
         return Response({'error': 'No valid items to order.'}, status=400)
+
+    # App builds older than the delivery-fee release compute their total without a fee:
+    # never charge such a client an amount its checkout screen did not show.
+    if order_type == 'delivery' and not client_supports_delivery_fee(request):
+        _fee_check_rest = _rest_obj or (table.restaurant if table is not None else None)
+        if _fee_check_rest is not None:
+            from decimal import Decimal as _DF
+            _food = sum(_DF(str(pv['unit_price'])) * pv['quantity'] for pv in pre_validated)
+            if _fee_check_rest.delivery_fee_for(_food)[0] > 0:
+                return Response({
+                    'error': 'This restaurant now charges a delivery fee. Please update the app to place delivery orders.',
+                    'update_required': True,
+                }, status=400)
 
     # Build special instructions before the transaction.
     raw_special = data.get('special_instructions', '') or ''
@@ -988,6 +1001,7 @@ def cancel_order(request, order_id):
         order.status = 'cancelled'
         order.reason_if_cancelled = reason
         order.release_table()
+        order._skip_status_push = user.is_customer()  # no push for the customer's own cancellation
         order.save(update_fields=['status', 'reason_if_cancelled', 'updated_at'])
         # --- transaction commits here ---
 

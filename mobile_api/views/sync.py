@@ -23,7 +23,7 @@ from ..serializers import (
     CategorySerializer, TableSerializer, OrderSerializer,
     BillRequestSerializer, SyncPushSerializer,
 )
-from .helpers import get_restaurant_owner
+from .helpers import get_restaurant_owner, client_supports_delivery_fee
 from .orders import _notify_ws
 
 logger = logging.getLogger(__name__)
@@ -59,10 +59,12 @@ def sync_push(request):
     # propagate it into every order item so _sync_order/_sync_order_append don't
     # double-print when the app is also printing via Bluetooth.
     _header_local_print = request.META.get('HTTP_X_LOCAL_PRINT') == 'true'
+    _fee_supported = client_supports_delivery_fee(request)
 
     for item in data.get('orders', []):
         if _header_local_print:
             item['local_print'] = True
+        item['_fee_supported'] = _fee_supported  # server-set; never trust a client value
         offline_id = item.get('offline_id', '')
         try:
             result = _sync_order(request.user, owner, item)
@@ -183,8 +185,11 @@ def _sync_order_atomic(user, owner, data, offline_id):
     else:
         from restaurant.models_restaurant import Restaurant as _Restaurant
         _rq = Q(main_owner=owner) | Q(branch_owner=owner)
-        _rid = data.get('restaurant_id') or 0
-        _r = _Restaurant.objects.filter(_rq, id=_rid).first() or _Restaurant.objects.filter(_rq).first()
+        try:
+            _rid = int(data.get('restaurant_id') or 0)
+        except (TypeError, ValueError):
+            _rid = 0
+        _r = (_Restaurant.objects.filter(_rq, id=_rid).first() if _rid else None) or _Restaurant.for_owner(owner)
         tax_rate = Decimal(str(_r.tax_rate)) if _r and _r.tax_rate else Decimal('0')
 
     _dlat = data.get('delivery_lat')
@@ -256,7 +261,9 @@ def _sync_order_atomic(user, owner, data, offline_id):
 
     # Recalculate total from items that were actually created (excludes skipped products)
     actual_subtotal = sum(oi.get_subtotal() for oi in order.order_items.all())
-    if order_type == 'delivery':
+    # Old staff app builds took this order (and maybe the money) at a total without a fee.
+    _charge_fee = data.get('_fee_supported', True) or user.is_customer()
+    if order_type == 'delivery' and _charge_fee:
         _fee_rest = _r if table is None else table.restaurant
         if _fee_rest is not None:
             order.delivery_fee, order.delivery_fee_taxed = _fee_rest.delivery_fee_for(actual_subtotal)
