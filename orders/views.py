@@ -47,6 +47,50 @@ logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
 
 
+def _remote_restaurant_for(owner):
+    """Restaurant row used for a delivery/pickup order placed with this owner account."""
+    from restaurant.models_restaurant import Restaurant as RestaurantModel
+    if owner is None:
+        return None
+    return (
+        RestaurantModel.objects.filter(branch_owner=owner, is_main_restaurant=False).first()
+        or RestaurantModel.objects.filter(main_owner=owner, is_main_restaurant=True).first()
+        or RestaurantModel.objects.filter(Q(main_owner=owner) | Q(branch_owner=owner)).first()
+    )
+
+
+def _session_order_owner(request):
+    """Owner account an order from this session will be placed with (same rule as place_order)."""
+    user = request.user
+    if user.is_authenticated and (
+        user.is_customer_care() or user.is_kitchen_staff() or user.is_bar_staff() or
+        user.is_buffet_staff() or user.is_service_staff() or user.is_cashier()
+    ):
+        return user.get_owner()
+    return validate_session_restaurant_id(request.session)
+
+
+def _session_tax_rate(request, owner, is_remote):
+    """Tax rate the order will actually be charged at, so cart/checkout pages match the bill."""
+    if owner is not None:
+        if is_remote:
+            rest = _remote_restaurant_for(owner)
+            if rest is not None:
+                return Decimal(str(rest.tax_rate))
+        else:
+            table_number, _ = validate_session_table(request.session, owner)
+            if table_number:
+                table = TableInfo.objects.filter(
+                    Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
+                    tbl_no=table_number,
+                ).first()
+                if table is not None:
+                    return Decimal(str(table.get_tax_rate()))
+        if getattr(owner, 'tax_rate', None) is not None:
+            return Decimal(str(owner.tax_rate))
+    return Decimal('0.0800')
+
+
 def _resolve_order_owner(order, request):
     """Return the restaurant owner for an order, safely handling delivery/pickup orders."""
     if order.table_info:
@@ -491,10 +535,10 @@ def view_cart(request):
             'image': item.get('image'),
         })
     
-    # Get restaurant owner's tax rate from validated session
-    restaurant = validate_session_restaurant_id(request.session)
-    tax_rate = float(restaurant.tax_rate) if restaurant else float(getattr(request.user, 'tax_rate', None) or Decimal('0.0800'))
-    
+    # Same tax rate the order will actually be charged at (table / restaurant setting)
+    _is_remote_cart = request.session.get('order_type', 'dine-in') in ('delivery', 'pickup')
+    tax_rate = float(_session_tax_rate(request, _session_order_owner(request), _is_remote_cart))
+
     # Calculate tax and final total
     tax_amount = cart_total * tax_rate
     final_total = cart_total + tax_amount
@@ -513,7 +557,7 @@ def view_cart(request):
         'cart_total': cart_total,
         'tax_amount': tax_amount,
         'tax_rate': tax_rate,
-        'tax_percentage': int(tax_rate * 100),  # For display purposes
+        'tax_percentage': round(tax_rate * 100, 2),
         'final_total': final_total,
         'table_number': request.session.get('selected_table', ''),
         'order_type': request.session.get('order_type', 'dine-in'),
@@ -602,17 +646,7 @@ def place_order(request):
                         delivery_address = request.session.get('delivery_address', '')
                         delivery_phone = request.session.get('delivery_phone', '')
 
-                        # Get tax rate from Restaurant model
-                        from restaurant.models_restaurant import Restaurant as RestaurantModel
-                        _rq = (
-                            Q(main_owner=current_restaurant) |
-                            Q(branch_owner=current_restaurant)
-                        )
-                        rest_obj = (
-                            RestaurantModel.objects.filter(branch_owner=current_restaurant, is_main_restaurant=False).first()
-                            or RestaurantModel.objects.filter(main_owner=current_restaurant, is_main_restaurant=True).first()
-                            or RestaurantModel.objects.filter(_rq).first()
-                        )
+                        rest_obj = _remote_restaurant_for(current_restaurant)
                         if request.user.is_customer():
                             if not rest_obj or not rest_obj.allow_remote_orders or not rest_obj.is_active:
                                 messages.error(request, 'This restaurant is not accepting delivery or pickup orders right now.')
@@ -825,24 +859,12 @@ def place_order(request):
     
     # Calculate cart total for display
     cart_total = sum(float(item['price']) * item['quantity'] for item in cart.values())
-    
-    # Get restaurant owner's tax rate
-    try:
-        selected_restaurant_id = request.session.get('selected_restaurant_id')
-        if selected_restaurant_id:
-            # Support all owner types: owner, main_owner, branch_owner
-            restaurant_owner = User.objects.get(
-                id=selected_restaurant_id,
-                role__name__in=['owner', 'main_owner', 'branch_owner']
-            )
-            tax_rate = float(restaurant_owner.tax_rate)  # Convert decimal to float
-        else:
-            # Use default tax rate from User model default
-            tax_rate = float(Decimal('0.0800'))  # Use same default as model
-    except (User.DoesNotExist, TypeError):
-        # Use default tax rate from User model default
-        tax_rate = float(Decimal('0.0800'))  # Use same default as model
-    
+    # Display copy with per-line totals (never written back to the session cart)
+    cart_display = {pid: {**item, 'total': float(item['price']) * item['quantity']} for pid, item in cart.items()}
+
+    # Same tax rate the order will actually be charged at (table / restaurant setting)
+    tax_rate = float(_session_tax_rate(request, _session_order_owner(request), is_remote_order))
+
     # Calculate tax and final total
     tax_amount = cart_total * tax_rate
     final_total = cart_total + tax_amount
@@ -872,11 +894,11 @@ def place_order(request):
 
     context = {
         'form': form,
-        'cart': cart,
+        'cart': cart_display,
         'cart_total': cart_total,
         'tax_amount': tax_amount,
         'tax_rate': tax_rate,
-        'tax_percentage': int(tax_rate * 100),  # For display purposes
+        'tax_percentage': round(tax_rate * 100, 2),
         'final_total': final_total,
         'table_number': request.session.get('selected_table', ''),
         'order_type': order_type_session,

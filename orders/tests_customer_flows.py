@@ -208,6 +208,64 @@ class CustomerFlowTests(TestCase):
         role_queries = [q for q in ctx.captured_queries if 'accounts_role' in q['sql'] and 'FROM "accounts_role"' in q['sql']]
         self.assertLessEqual(len(role_queries), 3, [q['sql'][:120] for q in role_queries])
 
+    # ---------- money shown/printed must equal money charged ----------
+    def _pickup_order(self):
+        Restaurant.objects.filter(id=self.r_main.id).update(tax_rate=Decimal('0.1800'))
+        self._place({'order_type': 'pickup', 'items': self._item(q=2)}, self.r_main.id)
+        return Order.objects.get(ordered_by=self.cust)
+
+    def test_printed_bill_and_receipt_match_charged_total_for_pickup(self):
+        from orders.printing import _generate_bill_content, _generate_receipt_content
+        from cashier.models import Payment
+        o = self._pickup_order()
+        self.assertEqual(o.total_amount, Decimal('11800.00'))  # 2 x 5000 + 18%
+        bill = _generate_bill_content(o)
+        self.assertIn('1800.00', bill)        # tax line (was 0.00 before the fix)
+        self.assertIn('11800.00', bill)       # total due = charged total
+        pay = Payment.objects.create(order=o, amount=Decimal('11800.00'), payment_method='cash', processed_by=self.cashier)
+        receipt = _generate_receipt_content(pay)
+        self.assertIn('1800.00', receipt)
+        self.assertIn('11800.00', receipt)
+
+    def test_printed_bill_legacy_order_without_stored_total(self):
+        from orders.printing import _generate_bill_content
+        from orders.models import OrderItem
+        o = Order.objects.create(order_number='ORD-LEG', table_info=self.table, ordered_by=self.cashier)  # total 0
+        OrderItem.objects.create(order=o, product=self.p, quantity=1, unit_price=Decimal('5000.00'))
+        bill = _generate_bill_content(o)
+        self.assertIn('5400.00', bill)  # falls back to table rate (8%)
+
+    def test_checkout_pages_show_charged_tax_rate(self):
+        Restaurant.objects.filter(id=self.r_main.id).update(tax_rate=Decimal('0.1800'))
+        User.objects.filter(pk=self.main.pk).update(tax_rate=Decimal('0.0800'))  # profile value differs
+        self.client.force_login(self.cashier)
+        self.client.post('/orders/table/', {'table_id': self.table.id})
+        s = self.client.session
+        s['cart'] = {str(self.p.id): {'name': 'Pilau', 'price': '5000.00', 'quantity': 2}}
+        s.save()
+        page = self.client.get('/orders/place-order/').content.decode()
+        self.assertIn('Tax (18%)', page)
+        self.assertIn('11800.00', page)   # final total incl. tax
+        self.assertIn('10000.00', page)   # line amount (was blank before)
+        cart = self.client.get('/orders/cart/').content.decode()
+        self.assertIn('Tax (18%)', cart)
+        self.assertIn('const TAX_RATE = 0.180000', cart)
+
+    def test_zero_tax_restaurant_cart_js_rate_is_zero(self):
+        Restaurant.objects.filter(id=self.r_main.id).update(tax_rate=Decimal('0'))
+        self.client.force_login(self.cashier)
+        self.client.post('/orders/table/', {'table_id': self.table.id})
+        s = self.client.session
+        s['cart'] = {str(self.p.id): {'name': 'Pilau', 'price': '5000.00', 'quantity': 1}}
+        s.save()
+        self.assertIn('const TAX_RATE = 0.000000', self.client.get('/orders/cart/').content.decode())
+
+    def test_app_profile_uses_restaurant_tax_and_currency(self):
+        Restaurant.objects.filter(id=self.r_branch.id).update(tax_rate=Decimal('0.1800'), currency_code='TZS')
+        User.objects.filter(pk=self.branch_owner.pk).update(tax_rate=Decimal('0.0800'), currency_code='USD')
+        me = self._api(self.cust, self.r_branch.id).get('/api/v1/auth/me/').json()
+        self.assertEqual((me['tax_rate'], me['currency_code']), (0.18, 'TZS'))
+
     def test_profile_tax_updates_restaurant(self):
         self.client.force_login(self.main)
         self.client.post('/accounts/update-tax-rate/', data='{"tax_rate": 0.18}', content_type='application/json')

@@ -38,6 +38,24 @@ from decimal import Decimal
 import textwrap
 import re
 
+def _charged_amounts(order, subtotal):
+    """
+    (tax_amount, tax_percentage, total) as actually charged on the order.
+    Uses the stored order total so remote orders (no table) and later tax-rate changes
+    print exactly what the customer owes. Falls back to the table rate for legacy
+    orders whose stored total was never set.
+    """
+    from decimal import Decimal as _D
+    total = order.total_amount or _D('0')
+    if total > 0 and total >= subtotal:
+        tax_amount = order.get_tax_amount()
+        pct = float(tax_amount / subtotal * 100) if subtotal else 0.0
+        return tax_amount, pct, total
+    rate = order.table_info.get_tax_rate() if order.table_info else _D('0')
+    tax_amount = subtotal * rate
+    return tax_amount, float(rate * 100), subtotal + tax_amount
+
+
 def _strip_sync_tags(text):
     """Strip offline dedup tags from special_instructions before printing on tickets."""
     if not text:
@@ -1651,11 +1669,7 @@ def _generate_bill_content(order, printed_by=None):
             if _promo:
                 discount += item.product.price * (_promo.discount_percentage / _D('100')) * item.quantity
 
-    # Get tax from table config (single FK access, no order_items queries)
-    tax_rate = order.table_info.get_tax_rate() if order.table_info else _D('0')
-    tax_amount = subtotal * tax_rate
-    tax_percentage = float(tax_rate * 100)
-    total = subtotal + tax_amount  # same as get_total(); computed from already-fetched values
+    tax_amount, tax_percentage, total = _charged_amounts(order, subtotal)
     
     # Subtotal
     subtotal_label = "Subtotal:"
@@ -2565,11 +2579,8 @@ def _generate_receipt_content(payment):
             _promo = item.product.get_active_promotion()
             if _promo:
                 discount += item.product.price * (_promo.discount_percentage / Decimal('100')) * item.quantity
-    tax_rate = order.table_info.get_tax_rate() if order.table_info else Decimal('0')
-    tax_amount = subtotal * tax_rate
-    tax_percentage = float(tax_rate * 100)
-    total = subtotal + tax_amount
-    
+    tax_amount, tax_percentage, total = _charged_amounts(order, subtotal)
+
     # Subtotal - right-aligned EXACTLY like HTML
     subtotal_label = "Subtotal:"
     subtotal_value = f"{currency_symbol}{float(subtotal):.2f}"

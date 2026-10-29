@@ -52,6 +52,33 @@ class UserSerializer(serializers.ModelSerializer):
             pass
         return None
 
+    def _get_restaurant_row(self, obj):
+        """
+        Restaurant record whose settings apply (same precedence as the web currency tag):
+        the restaurant chosen via X-Restaurant-ID, else the owner's branch/main restaurant.
+        Orders are charged with Restaurant.tax_rate, so the app must show that value.
+        """
+        cache = self.__dict__.setdefault('_restaurant_row_cache', {})
+        if obj.pk in cache:
+            return cache[obj.pk]
+        row = None
+        try:
+            request = self.context.get('request')
+            rest_id = request.META.get('HTTP_X_RESTAURANT_ID') if request else None
+            if rest_id:
+                row = Restaurant.objects.filter(id=int(rest_id)).first()
+            if row is None:
+                owner = self._get_effective_owner(obj)
+                if owner:
+                    row = (
+                        Restaurant.objects.filter(branch_owner=owner, is_main_restaurant=False).first()
+                        or Restaurant.objects.filter(main_owner=owner, is_main_restaurant=True).first()
+                    )
+        except Exception:
+            row = None
+        cache[obj.pk] = row
+        return row
+
     def get_role_name(self, obj):
         return obj.role.name if obj.role else None
 
@@ -91,6 +118,9 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_currency_code(self, obj):
         try:
+            row = self._get_restaurant_row(obj)
+            if row and row.currency_code:
+                return row.currency_code
             owner = self._get_effective_owner(obj)
             return owner.currency_code if owner else 'USD'
         except Exception:
@@ -98,16 +128,16 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_currency_symbol(self, obj):
         try:
-            owner = self._get_effective_owner(obj)
-            if not owner:
-                return '$'
             from accounts.models import User as _U
-            return _U.CURRENCY_SYMBOLS.get(owner.currency_code, '$')
+            return _U.CURRENCY_SYMBOLS.get(self.get_currency_code(obj), '$')
         except Exception:
             return '$'
 
     def get_tax_rate(self, obj):
         try:
+            row = self._get_restaurant_row(obj)
+            if row is not None:
+                return float(row.tax_rate)
             owner = self._get_effective_owner(obj)
             return float(owner.tax_rate) if owner else 0.0
         except Exception:
