@@ -341,6 +341,12 @@
             <button type="button" class="btn btn-primary me-2" onclick="window.print()">
                 <i class="fas fa-print"></i> Print Receipt
             </button>
+            {% whatsapp_receipt_url order as wa_url %}
+            {% if wa_url %}
+            <a href="{{ wa_url }}" target="_blank" rel="noopener" class="btn btn-success me-2">
+                <i class="fab fa-whatsapp"></i> Share on WhatsApp
+            </a>
+            {% endif %}
             <a href="{% url 'orders:customer_care_payments' %}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Payments
             </a>

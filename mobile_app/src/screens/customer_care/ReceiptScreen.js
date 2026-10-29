@@ -14,6 +14,7 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import { apiPaymentReceipt, apiReprintReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
+import { buildReceiptText, shareOnWhatsApp } from '../../utils/shareReceipt';
 import { printReceipt }     from '../../utils/printer';
 import { useAuthStore }     from '../../store/useAuthStore';
 const METHOD_LABEL = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
@@ -235,6 +236,20 @@ export default function ReceiptScreen({ route }) {
       >
         Smart Print (Uses Settings)
       </Button>
+
+      {data?.order && (
+        <Button
+          mode="outlined"
+          icon="whatsapp"
+          textColor="#25D366"
+          onPress={() => shareOnWhatsApp(
+            buildReceiptText(data.order, user?.restaurant_name, format), data.order.delivery_phone,
+          ).catch(() => setSnack('WhatsApp is not available on this device'))}
+          style={[styles.reprintBtn, { marginTop: 8 }]}
+        >
+          Share on WhatsApp
+        </Button>
+      )}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
         {snack}

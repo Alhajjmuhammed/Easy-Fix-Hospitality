@@ -89,6 +89,18 @@ def currency_symbol(context):
     return symbol
 
 
+@register.simple_tag(takes_context=True)
+def whatsapp_receipt_url(context, order):
+    """wa.me link with this order's receipt text. Usage: {% whatsapp_receipt_url order %}"""
+    from orders.share import receipt_share_text, whatsapp_url
+    try:
+        code, symbol = get_user_currency_info(context.get('user'), context.get('request'))
+        text = receipt_share_text(order, symbol, use_decimals=code not in INTEGER_CURRENCIES)
+        return whatsapp_url(text, getattr(order, 'delivery_phone', ''))
+    except Exception:
+        return ''
+
+
 @register.filter
 def currency(value, user=None):
     """

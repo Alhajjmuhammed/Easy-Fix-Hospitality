@@ -255,6 +255,35 @@ class DeliveryFeeTests(TestCase):
         lst = {x['id']: x for x in self._api(self.cust).get('/api/v1/restaurants/').json()['restaurants']}
         self.assertEqual(lst[self.branch.id]['delivery_fee'], 1000.0)
 
+    # ---------- WhatsApp share ----------
+    def test_whatsapp_receipt_text_and_link(self):
+        from urllib.parse import unquote
+        from cashier.models import Payment
+        from orders.share import receipt_share_text, whatsapp_url
+        o = self._mobile_delivery((self.food, 2))
+        Payment.objects.create(order=o, amount=D('10000.00'), payment_method='cash', processed_by=self.main)
+        text = receipt_share_text(o, 'TSh', use_decimals=False)
+        for expected in ('*Main R*', f'Order #{o.order_number}', '2 x Pilau - TSh10,000', 'Subtotal: TSh10,000',
+                         'Tax: TSh1,800', 'Delivery fee: TSh3,000', '*Total: TSh14,800*',
+                         'Paid: TSh10,000', 'Balance due: TSh4,800'):
+            self.assertIn(expected, text)
+        self.assertTrue(whatsapp_url(text, '0777000000').startswith('https://wa.me/?text='))      # local number → user picks
+        self.assertTrue(whatsapp_url(text, '+255 777 000 000').startswith('https://wa.me/255777000000?text='))
+        self.assertEqual(unquote(whatsapp_url(text).split('text=', 1)[1]), text)
+
+    def test_receipt_pages_show_whatsapp_button(self):
+        from cashier.models import Payment
+        o = self._mobile_delivery((self.food, 1))
+        pay = Payment.objects.create(order=o, amount=o.total_amount, payment_method='cash', processed_by=self.main)
+        Order.objects.filter(pk=o.pk).update(payment_status='paid')
+        self.client.force_login(self.main)
+        page = self.client.get(f'/cashier/receipt/{pay.id}/').content.decode()
+        self.assertIn('https://wa.me/?text=', page)
+        self.assertIn('Share on WhatsApp', page)
+        self.assertNotIn('your-font-awesome-kit', page)
+        self.client.force_login(self.cust)
+        self.assertIn('https://wa.me/?text=', self.client.get(f'/orders/receipt/{o.id}/').content.decode())
+
     # ---------- existing orders unaffected ----------
     def test_existing_orders_without_fee_unchanged(self):
         from orders.models import OrderItem

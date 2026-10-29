@@ -359,6 +359,12 @@
             <button type="button" class="btn btn-primary me-2" onclick="window.print()">
                 <i class="fas fa-print"></i> Print Receipt
             </button>
+            {% whatsapp_receipt_url order as wa_url %}
+            {% if wa_url %}
+            <a href="{{ wa_url }}" target="_blank" rel="noopener" class="btn btn-success me-2">
+                <i class="fab fa-whatsapp"></i> Share on WhatsApp
+            </a>
+            {% endif %}
             {% if user.is_cashier %}
                 <a href="{% url 'cashier:dashboard' %}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Back to Cashier
@@ -388,7 +394,7 @@
         </div>
     </div>
     
-    <!-- Include Font Awesome for icons -->
-    <script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
+    <!-- Font Awesome icons (same source as the customer care receipt) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </body>
 </html>

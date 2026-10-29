@@ -16,6 +16,7 @@ import { getOrderById } from '../../database/operations';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 import { useCurrency } from '../../hooks/useCurrency';
+import { buildReceiptText, shareOnWhatsApp } from '../../utils/shareReceipt';
 
 const PAYMENT_METHOD_LABELS = {
   cash:    'Cash',
@@ -324,6 +325,19 @@ export default function ReceiptScreen({ route }) {
         labelStyle={{ fontFamily: P600 }}
       >
         Print on This Device
+      </Button>
+
+      <Button
+        mode="outlined"
+        icon="whatsapp"
+        textColor="#25D366"
+        onPress={() => shareOnWhatsApp(
+          buildReceiptText(order, user?.restaurant_name, fmt), order.delivery_phone,
+        ).catch(() => {})}
+        style={[styles.backBtn, { marginBottom: 8 }]}
+        labelStyle={{ fontFamily: P600 }}
+      >
+        Share on WhatsApp
       </Button>
 
       <Button
