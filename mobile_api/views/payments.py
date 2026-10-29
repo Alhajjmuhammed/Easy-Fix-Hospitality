@@ -54,8 +54,8 @@ def _list_payments(request):
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
     qs = Payment.objects.filter(
         _otq,
@@ -112,8 +112,8 @@ def _process_payment(request):
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
     )
 
     # Quick access check before acquiring lock (avoids holding lock during CC IDOR check)
@@ -216,8 +216,8 @@ def void_payment(request, payment_id):
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
 
     reason = request.data.get('reason', '').strip()
@@ -298,8 +298,8 @@ def payment_receipt(request, payment_id):
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
     payment = get_object_or_404(
         Payment.objects.filter(_otq).distinct().select_related('order', 'order__table_info', 'processed_by'),
@@ -346,8 +346,8 @@ def reprint_receipt(request, payment_id):
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
     payment = get_object_or_404(
         Payment.objects.filter(_otq2).distinct().select_related('order'),

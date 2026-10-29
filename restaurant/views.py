@@ -435,8 +435,8 @@ def owner_dashboard(request):
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
             ).distinct().aggregate(
                 total=Count('id'),
                 pending=Count('id', filter=Q(status='pending')),
@@ -450,8 +450,8 @@ def owner_dashboard(request):
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
             ).distinct().select_related('table_info', 'ordered_by').order_by('-created_at')[:5]
         else:
             # Administrator sees all data

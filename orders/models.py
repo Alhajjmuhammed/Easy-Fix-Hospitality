@@ -39,6 +39,10 @@ class Order(models.Model):
     ordered_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='orders_placed')
     confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders_confirmed')
     entered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders_entered')
+    # Set only for delivery/pickup orders (no table): the restaurant owner the order
+    # was placed with. Self-registered customers have no owner, so without this
+    # remote orders could not be linked to a restaurant.
+    restaurant_owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='remote_orders')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES, default='dine-in')
     delivery_address = models.TextField(blank=True, default='')
@@ -66,11 +70,19 @@ class Order(models.Model):
     @property
     def owner(self):
         """Get the owner this order belongs to through the customer"""
+        if self.restaurant_owner_id:
+            return self.restaurant_owner
         return self.ordered_by.get_owner()
     
     def get_owner(self):
         """Alternative method to get owner for consistency"""
         return self.owner
+
+    @property
+    def display_instructions(self):
+        """special_instructions without the internal [offline:...] de-duplication tags."""
+        import re
+        return re.sub(r'\[offline(?:-append)?:[^\]]*\]', '', self.special_instructions or '').strip()
     
     def get_total_products(self):
         return sum(item.quantity for item in self.order_items.all())
@@ -102,10 +114,10 @@ class Order(models.Model):
         if self.table_info:
             return self.table_info.get_tax_rate()
         # Delivery/pickup: look up the restaurant linked to the ordering customer.
-        if self.ordered_by and self.ordered_by.owner:
+        _owner = self.restaurant_owner if self.restaurant_owner_id else (self.ordered_by.owner if self.ordered_by else None)
+        if _owner:
             from restaurant.models_restaurant import Restaurant as _Restaurant
             from django.db.models import Q as _Q
-            _owner = self.ordered_by.owner
             _r = _Restaurant.objects.filter(
                 _Q(main_owner=_owner) | _Q(branch_owner=_owner)
             ).first()

@@ -76,8 +76,8 @@ def cc_reports(request):
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
     )
     _start_dt = timezone.make_aware(datetime.combine(date_from, datetime.min.time()))
     _end_dt   = timezone.make_aware(datetime.combine(date_to + timedelta(days=1), datetime.min.time()))
@@ -229,8 +229,8 @@ def owner_reports(request):
     table_q = (
         Q(table_info__restaurant__in=owned_restaurants) |
         Q(table_info__owner=owner, table_info__restaurant__isnull=True) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
     )
 
     _start_dt = timezone.make_aware(_dt.combine(date_from, _dt.min.time()))
@@ -271,8 +271,8 @@ def owner_reports(request):
     cashier_table_q = (
         Q(order__table_info__restaurant__in=owned_restaurants) |
         Q(order__table_info__owner=owner, order__table_info__restaurant__isnull=True) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
     cashier_totals = (
         Payment.objects.filter(
@@ -392,8 +392,8 @@ def cashier_reports(request):
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
     )
     _start_dt = timezone.make_aware(_dt.combine(date_from, _dt.min.time()))
     _end_dt   = timezone.make_aware(_dt.combine(date_to + timedelta(days=1), _dt.min.time()))
@@ -436,8 +436,8 @@ def cashier_reports(request):
         Q(order__table_info__owner=owner) |
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) |
-        Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
     my_payments = Payment.objects.filter(
         _ptq,

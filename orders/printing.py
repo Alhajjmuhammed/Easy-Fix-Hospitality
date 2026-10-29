@@ -167,6 +167,7 @@ def get_restaurant_print_settings(order):
     # Fallback to User (owner) settings
     # For delivery/pickup orders table is None — resolve owner via the ordering user
     owner = (table.owner if table is not None else None) \
+            or getattr(order, 'restaurant_owner', None) \
             or getattr(getattr(order, 'ordered_by', None), 'owner', None) \
             or getattr(order, 'ordered_by', None)
     if owner:

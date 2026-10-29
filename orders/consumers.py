@@ -136,7 +136,9 @@ class OrderConsumer(AsyncWebsocketConsumer):
             # Get the restaurant this table belongs to
             table = order.table_info
             if not table:
-                order_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                order_owner = order.restaurant_owner or (
+                    getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
+                )
                 if order_owner:
                     if order_owner == user:
                         return True
@@ -540,9 +542,11 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
                         _Q(table_info__owner=_owner_user) |
                         _Q(table_info__restaurant__main_owner=_owner_user) |
                         _Q(table_info__restaurant__branch_owner=_owner_user) |
-                        _Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=_owner_user) |
+                        (_Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=_owner_user) | _Q(order_type__in=['delivery', 'pickup'], restaurant_owner=_owner_user)) |
                         _Q(order_type__in=['delivery', 'pickup'],
-                           ordered_by__owner__managed_restaurant__main_owner=_owner_user)
+                           ordered_by__owner__managed_restaurant__main_owner=_owner_user) |
+                        _Q(order_type__in=['delivery', 'pickup'],
+                           restaurant_owner__managed_restaurant__main_owner=_owner_user)
                     )
                     if Order.objects.filter(_stq, id=order_id).exists():
                         return True

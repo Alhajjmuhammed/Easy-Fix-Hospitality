@@ -192,6 +192,10 @@ export const useAuthStore = create((set, get) => ({
       try { await SecureStore.setItemAsync('restaurant_id', String(restaurantId)); } catch (_) {}
       setClientAuth(get().token, restaurantId);
       set({ restaurantId });
+      // Currency and tax rate in the profile are resolved per restaurant
+      // (X-Restaurant-ID); refresh in the background so menu/cart show the
+      // selected restaurant's values instead of the login-time defaults.
+      get().refreshProfile();
     }
   },
 

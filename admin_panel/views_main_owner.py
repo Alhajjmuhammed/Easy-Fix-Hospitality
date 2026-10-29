@@ -175,8 +175,8 @@ def branch_reports(request):
             query = Q(table_info__restaurant=selected_rest)
             if selected_rest.branch_owner:
                 query |= Q(table_info__owner=selected_rest.branch_owner)
-                query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_rest.branch_owner)
-                query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_rest.branch_owner)
+                query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_rest.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=selected_rest.branch_owner))
+                query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_rest.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=selected_rest.branch_owner))
             elif selected_rest.main_owner:
                 query |= Q(table_info__owner=selected_rest.main_owner)
                 query |= Q(order_type__in=['delivery', 'pickup'], ordered_by=selected_rest.main_owner)
@@ -189,8 +189,8 @@ def branch_reports(request):
             restaurant_query = Q(table_info__restaurant=restaurant)
             if restaurant.branch_owner:
                 restaurant_query |= Q(table_info__owner=restaurant.branch_owner)
-                restaurant_query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner)
-                restaurant_query |= Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
+                restaurant_query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.branch_owner))
+                restaurant_query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.branch_owner))
             elif restaurant.main_owner:
                 restaurant_query |= Q(table_info__owner=restaurant.main_owner)
                 restaurant_query |= Q(order_type__in=['delivery', 'pickup'], ordered_by=restaurant.main_owner)
@@ -289,8 +289,8 @@ def view_all_orders(request):
         restaurant_query = (
             Q(table_info__restaurant=restaurant) |
             Q(table_info__owner=restaurant.branch_owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.branch_owner)) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.branch_owner))
         )
         if query:
             query |= restaurant_query
@@ -315,8 +315,8 @@ def view_all_orders(request):
             orders = orders.filter(
                 Q(table_info__restaurant=selected_restaurant) |
                 Q(table_info__owner=selected_restaurant.branch_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_restaurant.branch_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_restaurant.branch_owner)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=selected_restaurant.branch_owner)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=selected_restaurant.branch_owner))
             )
         except Restaurant.DoesNotExist:
             pass
@@ -359,8 +359,8 @@ def branch_detail(request, restaurant_id):
     orders = Order.objects.filter(
         Q(table_info__restaurant=restaurant) |
         Q(table_info__owner=restaurant.branch_owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner)
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.branch_owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.branch_owner))
     )
     
     total_orders = orders.count()

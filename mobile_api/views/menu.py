@@ -8,7 +8,17 @@ from django.db.models import Prefetch, Q
 
 from restaurant.models import MainCategory, SubCategory, Product
 from ..serializers import CategorySerializer, ProductSerializer
-from .helpers import get_restaurant_owner
+from .helpers import get_restaurant_owner, customer_restaurant_q
+
+
+def _scoped(request, owner, prefix=''):
+    q = (
+        Q(**{f'{prefix}owner': owner}) |
+        Q(**{f'{prefix}restaurant__main_owner': owner}) |
+        Q(**{f'{prefix}restaurant__branch_owner': owner})
+    )
+    cust_q = customer_restaurant_q(request, owner, prefix)
+    return q & cust_q if cust_q is not None else q
 
 
 @api_view(['GET'])
@@ -26,21 +36,14 @@ def menu(request):
         return Response({'error': 'Restaurant not found.'}, status=404)
 
     since_param = request.GET.get('since')
-    _cat_q = (
-        Q(owner=owner) |
-        Q(restaurant__main_owner=owner) |
-        Q(restaurant__branch_owner=owner)
-    )
-    categories = MainCategory.objects.filter(_cat_q, is_active=True).distinct().order_by('name')
+    categories = MainCategory.objects.filter(_scoped(request, owner), is_active=True).distinct().order_by('name')
 
     if since_param:
         try:
             since_dt = parse_datetime(since_param)
             if since_dt:
                 changed_cat_ids = Product.objects.filter(
-                    Q(main_category__owner=owner) |
-                    Q(main_category__restaurant__main_owner=owner) |
-                    Q(main_category__restaurant__branch_owner=owner),
+                    _scoped(request, owner, 'main_category__'),
                     updated_at__gt=since_dt,
                 ).values_list('main_category_id', flat=True).distinct()
 
@@ -92,9 +95,7 @@ def menu_changes(request):
         return Response({'error': 'Invalid datetime format for since.'}, status=400)
 
     changed = Product.objects.filter(
-        Q(main_category__owner=owner) |
-        Q(main_category__restaurant__main_owner=owner) |
-        Q(main_category__restaurant__branch_owner=owner),
+        _scoped(request, owner, 'main_category__'),
         updated_at__gt=since_dt,
     ).distinct().select_related('main_category', 'sub_category')
 

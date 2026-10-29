@@ -415,8 +415,8 @@ def delete_branch(request, restaurant_id):
         ).count()
         dependent_orders = Order.objects.filter(
             Q(table_info__restaurant_id=restaurant_id) | Q(table_info__owner=branch_owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner)
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=branch_owner)) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=branch_owner))
         ).count()
         
         # Warning if there is dependent data
@@ -465,8 +465,8 @@ def delete_branch(request, restaurant_id):
         bill_requests = BillRequest.objects.filter(
             Q(table_info__restaurant_id=restaurant_id) |
             Q(table_info__owner=branch_owner) |
-            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=branch_owner) |
-            Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=branch_owner)
+            (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=branch_owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=branch_owner)) |
+            (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=branch_owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=branch_owner))
         )
         bill_count = bill_requests.count()
         bill_requests.delete()
@@ -476,8 +476,8 @@ def delete_branch(request, restaurant_id):
         orders = Order.objects.filter(
             Q(table_info__restaurant_id=restaurant_id) |
             Q(table_info__owner=branch_owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner)
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=branch_owner)) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=branch_owner))
         )
         order_count = orders.count()
         orders.delete()

@@ -8,7 +8,13 @@ from django.db.models import Q
 from restaurant.models import TableInfo
 from orders.models import Order
 from ..serializers import TableSerializer
-from .helpers import get_restaurant_owner
+from .helpers import get_restaurant_owner, customer_restaurant_q
+
+
+def _table_scope(request, owner):
+    q = Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner)
+    cust_q = customer_restaurant_q(request, owner)
+    return q & cust_q if cust_q is not None else q
 
 
 @api_view(['GET'])
@@ -19,11 +25,7 @@ def tables(request):
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
 
-    qs = TableInfo.objects.filter(
-        Q(owner=owner) |
-        Q(restaurant__main_owner=owner) |
-        Q(restaurant__branch_owner=owner)
-    ).distinct().order_by('tbl_no')
+    qs = TableInfo.objects.filter(_table_scope(request, owner)).distinct().order_by('tbl_no')
     return Response({'tables': TableSerializer(qs, many=True).data})
 
 
@@ -36,8 +38,7 @@ def table_detail(request, table_id):
         return Response({'error': 'Restaurant not found.'}, status=404)
 
     table = get_object_or_404(
-        TableInfo,
-        Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
+        TableInfo.objects.filter(_table_scope(request, owner)).distinct(),
         id=table_id,
     )
 

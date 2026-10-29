@@ -38,6 +38,9 @@ export default function PlaceOrderScreen({ navigation }) {
   useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+  // One id per checkout: if a request times out after the server saved the order,
+  // retrying with the same id returns that order instead of creating a duplicate.
+  const checkoutIdRef = useRef(`chk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
   const subtotal = getSubtotal();
   const taxRate = Math.min(1, Math.max(0, parseFloat(user?.tax_rate) || 0));
@@ -106,7 +109,7 @@ export default function PlaceOrderScreen({ navigation }) {
             fireTickets(newItemsOrder);
             navigation.replace('OrderConfirmation', { order: result.order });
           } else {
-            const result = await apiPlaceOrder(orderData, localKotBot);
+            const result = await apiPlaceOrder({ ...orderData, offline_id: checkoutIdRef.current }, localKotBot);
             // Cache immediately so the order is available offline
             cacheOrders([result.order]).catch(() => {});
             clearCart();

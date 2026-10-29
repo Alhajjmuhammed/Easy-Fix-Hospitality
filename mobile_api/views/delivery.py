@@ -193,7 +193,9 @@ def assign_rider(request):
             _Q(table_info__restaurant__main_owner=owner) |
             _Q(table_info__restaurant__branch_owner=owner) |
             _Q(ordered_by__owner=owner) |
-            _Q(ordered_by__owner__managed_restaurant__main_owner=owner)
+            _Q(ordered_by__owner__managed_restaurant__main_owner=owner) |
+            _Q(restaurant_owner=owner) |
+            _Q(restaurant_owner__managed_restaurant__main_owner=owner)
         )
         order = get_object_or_404(Order, order_scope, id=order_id, order_type='delivery')
     else:
@@ -268,7 +270,9 @@ def auto_assign_rider(request):
             _Q(table_info__restaurant__main_owner=owner) |
             _Q(table_info__restaurant__branch_owner=owner) |
             _Q(ordered_by__owner=owner) |
-            _Q(ordered_by__owner__managed_restaurant__main_owner=owner)
+            _Q(ordered_by__owner__managed_restaurant__main_owner=owner) |
+            _Q(restaurant_owner=owner) |
+            _Q(restaurant_owner__managed_restaurant__main_owner=owner)
         )
         order = get_object_or_404(Order, order_scope, id=order_id, order_type='delivery')
     else:
@@ -458,8 +462,8 @@ def track_order(request, order_id):
                 _Q(table_info__owner=owner) |
                 _Q(table_info__restaurant__main_owner=owner) |
                 _Q(table_info__restaurant__branch_owner=owner) |
-                _Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-                _Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+                (_Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | _Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+                (_Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | _Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
             )
             can_view = Order.objects.filter(_stq, id=order.id).exists()
 

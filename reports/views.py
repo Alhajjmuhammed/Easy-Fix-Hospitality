@@ -98,7 +98,7 @@ def dashboard(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
                 )
         else:
             # Branch restaurant: only show orders from tables specifically assigned to this branch
@@ -107,7 +107,7 @@ def dashboard(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
                 )
     elif request.user.is_administrator():
         # Administrator sees all orders
@@ -124,7 +124,7 @@ def dashboard(request):
                     Q(table_info__restaurant=restaurant) |
                     Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
                     Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]))
                 )
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
                 .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
@@ -669,7 +669,7 @@ def export_csv(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
                 )
         else:
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
@@ -678,7 +678,7 @@ def export_csv(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
                 )
     elif request.user.is_administrator():
         orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
@@ -693,7 +693,7 @@ def export_csv(request):
                     Q(table_info__restaurant=restaurant) |
                     Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
                     Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]))
                 )
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
                 .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
@@ -1253,7 +1253,7 @@ def export_pdf(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
                 )
         else:
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
@@ -1262,7 +1262,7 @@ def export_pdf(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
                 )
     elif request.user.is_administrator():
         orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
@@ -1277,7 +1277,7 @@ def export_pdf(request):
                     Q(table_info__restaurant=restaurant) |
                     Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
                     Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o])
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]))
                 )
             orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
                 .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
@@ -1916,8 +1916,8 @@ def money_flow(request):
         orders_qs = Order.objects.filter(
             DQ(table_info__owner=owner) |
             DQ(table_info__restaurant__main_owner=owner) |
-            DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-            DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+            (DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | DQ(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+            (DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | DQ(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
         )
     elif request.user.is_administrator():
         orders_qs = Order.objects.all()

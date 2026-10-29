@@ -288,11 +288,11 @@
             {% endfor %}
         </div>
 
-        {% if order.special_instructions %}
+        {% if order.display_instructions %}
         <div class="BUFFET-divider"></div>
         <div class="special-instructions">
             <div class="special-instructions-title">⚠️ SPECIAL INSTRUCTIONS</div>
-            {{ order.special_instructions }}
+            {{ order.display_instructions }}
         </div>
         {% endif %}
 

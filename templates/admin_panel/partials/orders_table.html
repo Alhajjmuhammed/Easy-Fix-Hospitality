@@ -58,8 +58,8 @@
                         <strong style="font-size: 0.8rem;">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                     </td>
                     <td>
-                        {% if order.special_instructions %}
-                            <small class="text-muted" style="font-size: 0.7rem;">{{ order.special_instructions|truncatechars:25 }}</small>
+                        {% if order.display_instructions %}
+                            <small class="text-muted" style="font-size: 0.7rem;">{{ order.display_instructions|truncatechars:25 }}</small>
                         {% else %}
                             <span class="text-muted">-</span>
                         {% endif %}

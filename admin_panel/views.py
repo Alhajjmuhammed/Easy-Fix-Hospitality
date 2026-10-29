@@ -165,8 +165,8 @@ def admin_dashboard(request):
                 total_orders = Order.objects.filter(
                     Q(table_info__restaurant=current_restaurant) |
                     Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner]) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=current_restaurant.main_owner)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=current_restaurant.main_owner))
                 ).count()
                 total_products = Product.objects.filter(
                     Q(main_category__restaurant=current_restaurant) |
@@ -200,8 +200,8 @@ def admin_dashboard(request):
                 total_orders = Order.objects.filter(
                     Q(table_info__restaurant__in=owned_restaurants) |
                     Q(table_info__owner__in=all_owner_ids) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=request.user)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=request.user))
                 ).count()
                 total_products = Product.objects.filter(
                     Q(main_category__restaurant__in=owned_restaurants) |
@@ -227,8 +227,8 @@ def admin_dashboard(request):
                 total_orders = Order.objects.filter(
                     Q(table_info__restaurant=current_restaurant) |
                     Q(table_info__owner=current_restaurant.branch_owner) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=request.user)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=request.user))
                 ).count()
                 total_products = Product.objects.filter(
                     Q(main_category__restaurant=current_restaurant) |
@@ -256,8 +256,8 @@ def admin_dashboard(request):
                 total_orders = Order.objects.filter(
                     Q(table_info__restaurant=current_restaurant) |
                     Q(table_info__owner=manager_owner) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=manager_owner) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=manager_owner)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=manager_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=manager_owner)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=manager_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=manager_owner))
                 ).count()
                 total_products = Product.objects.filter(
                     Q(main_category__restaurant=current_restaurant) |
@@ -277,8 +277,8 @@ def admin_dashboard(request):
                         Q(table_info__owner=manager_owner) |
                         Q(table_info__restaurant__main_owner=manager_owner) |
                         Q(table_info__restaurant__branch_owner=manager_owner) |
-                        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=manager_owner) |
-                        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=manager_owner)
+                        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=manager_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=manager_owner)) |
+                        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=manager_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=manager_owner))
                     ).distinct().count()
                     total_products = Product.objects.filter(
                         Q(main_category__owner=manager_owner) |
@@ -306,8 +306,8 @@ def admin_dashboard(request):
                 total_orders = Order.objects.filter(
                     Q(table_info__restaurant=current_restaurant) |
                     Q(table_info__owner=request.user) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=request.user)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=request.user))
                 ).count()
                 total_products = Product.objects.filter(
                     Q(main_category__restaurant=current_restaurant) |
@@ -327,8 +327,8 @@ def admin_dashboard(request):
                         Q(table_info__owner=owner_filter) |
                         Q(table_info__restaurant__main_owner=owner_filter) |
                         Q(table_info__restaurant__branch_owner=owner_filter) |
-                        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
-                        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
+                        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
+                        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
                     ).distinct().count()
                     total_products = Product.objects.filter(
                         Q(main_category__owner=owner_filter) |
@@ -354,8 +354,8 @@ def admin_dashboard(request):
             _restaurant_q = (
                 Q(table_info__restaurant=current_restaurant) |
                 Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner]) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=current_restaurant.main_owner)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=current_restaurant.main_owner))
             )
             _stats = Order.objects.filter(_restaurant_q).aggregate(
                 recent_orders=Count('id', filter=Q(created_at__gte=seven_days_ago)),
@@ -372,8 +372,8 @@ def admin_dashboard(request):
             _owner_q = (
                 Q(table_info__restaurant__in=owned_restaurants) |
                 Q(table_info__owner__in=_branch_owners) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=request.user)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=request.user))
             )
             _stats = Order.objects.filter(_owner_q).aggregate(
                 recent_orders=Count('id', filter=Q(created_at__gte=seven_days_ago)),
@@ -392,8 +392,8 @@ def admin_dashboard(request):
                     Q(table_info__owner=owner_filter) |
                     Q(table_info__restaurant__main_owner=owner_filter) |
                     Q(table_info__restaurant__branch_owner=owner_filter) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
                 )
                 _stats = Order.objects.filter(_oq_fb).aggregate(
                     recent_orders=Count('id', filter=Q(created_at__gte=seven_days_ago)),
@@ -854,15 +854,15 @@ def manage_orders(request):
                 base_orders = Order.objects.filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=target_restaurant.main_owner) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=target_restaurant.main_owner)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=target_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=target_restaurant.main_owner)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=target_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=target_restaurant.main_owner))
                 )
             else:
                 base_orders = Order.objects.filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=target_restaurant.branch_owner) |
-                    Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=target_restaurant.branch_owner)
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=target_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=target_restaurant.branch_owner)) |
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=target_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=target_restaurant.branch_owner))
                 )
         elif request.user.is_administrator():
             base_orders = Order.objects.all()
@@ -875,8 +875,8 @@ def manage_orders(request):
                         Q(table_info__restaurant=restaurant) |
                         Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
                         Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.main_owner) |
-                        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.main_owner)
+                        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.main_owner)) |
+                        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.main_owner))
                     )
                 base_orders = Order.objects.filter(order_query)
             else:
@@ -3670,8 +3670,8 @@ def view_order(request, order_id):
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
             )
             order = get_object_or_404(order_qs.filter(_oq_vod), id=order_id)
         else:
@@ -3714,8 +3714,8 @@ def update_order_status(request):
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
             )
             order = get_object_or_404(Order.objects.filter(_oq_uos), id=order_id)
         else:
@@ -3845,8 +3845,8 @@ def edit_order(request, order_id):
             Q(table_info__owner=owner_filter) |
             Q(table_info__restaurant__main_owner=owner_filter) |
             Q(table_info__restaurant__branch_owner=owner_filter) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter)
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
         )
         order = get_object_or_404(_order_qs.filter(_oq_eo), id=order_id)
     
@@ -3949,8 +3949,8 @@ def delete_order(request, order_id):
                         Q(id=order_id) & (
                             Q(table_info__restaurant=current_restaurant) |
                             Q(table_info__owner=current_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) |
-                            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner)
+                            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=current_restaurant.main_owner)) |
+                            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=current_restaurant.main_owner))
                         )
                     )
                 else:
@@ -3959,8 +3959,8 @@ def delete_order(request, order_id):
                         Q(id=order_id) & (
                             Q(table_info__restaurant=current_restaurant) |
                             Q(table_info__owner=current_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.branch_owner) |
-                            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.branch_owner)
+                            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=current_restaurant.branch_owner)) |
+                            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=current_restaurant.branch_owner))
                         )
                     )
             else:
@@ -3972,8 +3972,8 @@ def delete_order(request, order_id):
                             Q(table_info__restaurant=restaurant) |
                             Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
                             Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.main_owner) |
-                            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.main_owner)
+                            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.main_owner)) |
+                            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.main_owner))
                         )
                     order = get_object_or_404(Order, Q(id=order_id) & order_query)
                 else:

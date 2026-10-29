@@ -2,8 +2,30 @@
 Shared helper used by all mobile API views.
 """
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 User = get_user_model()
+
+
+def customer_restaurant_q(request, owner, prefix=''):
+    """
+    For customers, a Q limiting rows to the one restaurant they selected (plus legacy
+    rows that only carry the owner FK). A main owner is also main_owner of every branch,
+    so owner-based filters alone would mix branch menus/tables into the main restaurant.
+    Returns None for staff or when no restaurant id was sent.
+    """
+    if not request.user.is_customer():
+        return None
+    rid = (
+        request.headers.get('X-Restaurant-ID')
+        or request.GET.get('restaurant_id')
+        or (request.data.get('restaurant_id') if hasattr(request, 'data') else None)
+    )
+    try:
+        rid = int(rid)
+    except (TypeError, ValueError):
+        return None
+    return Q(**{f'{prefix}restaurant_id': rid}) | Q(**{f'{prefix}restaurant__isnull': True, f'{prefix}owner': owner})
 
 
 def get_restaurant_owner(request):

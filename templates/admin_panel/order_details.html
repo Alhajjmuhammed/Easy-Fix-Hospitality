@@ -69,10 +69,10 @@
                 {% endif %}
             </table>
             
-            {% if order.special_instructions %}
+            {% if order.display_instructions %}
             <h6 class="mb-2 mt-3">Special Instructions</h6>
             <div class="alert alert-info">
-                {{ order.special_instructions }}
+                {{ order.display_instructions }}
             </div>
             {% endif %}
             

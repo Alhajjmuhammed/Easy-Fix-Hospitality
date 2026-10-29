@@ -392,7 +392,7 @@
                             <div class="mt-2">
                                 <small class="text-muted">
                                     {{ order.get_total_products }} item{{ order.get_total_products|pluralize }}
-                                    {% if order.special_instructions %}
+                                    {% if order.display_instructions %}
                                     • <i class="fas fa-sticky-note"></i> Notes
                                     {% endif %}
                                 </small>
@@ -438,7 +438,7 @@
                                 </td>
                                 <td>
                                     <strong class="text-primary">{{ order.order_number }}</strong>
-                                    {% if order.special_instructions %}
+                                    {% if order.display_instructions %}
                                     <br><small class="text-muted"><i class="fas fa-sticky-note"></i> Has notes</small>
                                     {% endif %}
                                 </td>

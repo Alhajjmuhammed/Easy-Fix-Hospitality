@@ -56,13 +56,13 @@
             </div>
         </div>
         
-        {% if order.special_instructions %}
+        {% if order.display_instructions %}
             <div class="card mt-3">
                 <div class="card-header">
                     <h6 class="mb-0"><i class="bi bi-chat-text"></i> Special Instructions</h6>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0">{{ order.special_instructions }}</p>
+                    <p class="mb-0">{{ order.display_instructions }}</p>
                 </div>
             </div>
         {% endif %}

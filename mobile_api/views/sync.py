@@ -203,6 +203,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
         total_amount=total * (Decimal('1') + tax_rate),
         special_instructions=special,
         order_type=order_type,
+        restaurant_owner=owner if table is None else None,
         delivery_address=data.get('delivery_address', '') or '',
         delivery_phone=data.get('delivery_phone', '') or '',
         delivery_lat=Decimal(str(_dlat)) if _dlat is not None else None,
@@ -298,7 +299,7 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
     # Find the target order — must belong to this restaurant.
     # Q(ordered_by__owner=owner) covers delivery/pickup orders where table_info is None.
     order = Order.objects.select_for_update(of=('self',)).filter(
-        Q(ordered_by__owner=owner) | Q(table_info__owner=owner) |
+        Q(ordered_by__owner=owner) | Q(restaurant_owner=owner) | Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner),
         id=existing_order_id,
@@ -400,8 +401,8 @@ def _sync_payment(user, owner, data):
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
     )
     if not is_privileged:
         restaurant_q = restaurant_q & Q(ordered_by=user)
@@ -630,8 +631,8 @@ def sync_pull(request):
         Q(table_info__owner=owner) |
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) |
-        Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner)) |
         # Self-registered customers (owner=None) — their delivery/pickup orders have no owner FK
         Q(order_type__in=['delivery', 'pickup'], ordered_by=user, ordered_by__owner__isnull=True)
     )

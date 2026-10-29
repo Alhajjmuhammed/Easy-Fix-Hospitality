@@ -595,7 +595,7 @@ def view_all_orders(request):
     if restaurant_filter != 'all':
         orders = orders.filter(
             Q(table_info__owner__id=restaurant_filter) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__id=restaurant_filter)
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__id=restaurant_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__id=restaurant_filter))
         )
 
     # Get filter options - Updated for new role system
@@ -934,8 +934,8 @@ def get_restaurant_details(request, restaurant_id):
                 Q(table_info__owner=main_owner) |
                 Q(table_info__restaurant__main_owner=main_owner) |
                 Q(table_info__restaurant__branch_owner=main_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=main_owner) |
-                Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=main_owner)
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=main_owner)) |
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=main_owner))
             ).distinct().count(),
             'staff': User.objects.filter(owner=main_owner).count(),
         }
@@ -2491,7 +2491,7 @@ def manage_orders(request):
     if restaurant_filter:
         orders = orders.filter(
             Q(table_info__owner__id=restaurant_filter) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__id=restaurant_filter)
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__id=restaurant_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__id=restaurant_filter))
         )
         selected_restaurant = get_restaurant_owner_by_id(restaurant_filter)
     else:
