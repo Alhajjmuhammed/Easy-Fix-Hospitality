@@ -119,7 +119,7 @@ def select_table(request):
                 # Choosing a table means dine-in: drop leftovers from an abandoned
                 # delivery/pickup or add-to-order flow.
                 request.session['order_type'] = 'dine-in'
-                for key in ('delivery_address', 'delivery_phone', 'add_to_order_id', 'order_mode'):
+                for key in ('delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng', 'add_to_order_id', 'order_mode'):
                     request.session.pop(key, None)
                 # Store the restaurant owner for this session
                 if restaurant:
@@ -633,6 +633,8 @@ def place_order(request):
                             restaurant_owner=current_restaurant,
                             delivery_address=delivery_address,
                             delivery_phone=delivery_phone,
+                            delivery_lat=Decimal(request.session['delivery_lat']) if order_type_session == 'delivery' and request.session.get('delivery_lat') else None,
+                            delivery_lng=Decimal(request.session['delivery_lng']) if order_type_session == 'delivery' and request.session.get('delivery_lng') else None,
                         )
                         table = None
                     else:
@@ -761,7 +763,7 @@ def place_order(request):
                 # Clear cart. Keep table for dine-in (allows adding more items); clear remote order state.
                 del request.session['cart']
                 if is_remote_order:
-                    for key in ('order_type', 'delivery_address', 'delivery_phone'):
+                    for key in ('order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng'):
                         request.session.pop(key, None)
                 request.session.modified = True
 

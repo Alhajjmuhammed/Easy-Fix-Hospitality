@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, FlatList, StyleSheet, Image, RefreshControl, Modal, TouchableOpacity,
+  View, FlatList, StyleSheet, Image, RefreshControl, Modal, TouchableOpacity, Linking,
 } from 'react-native';
 import {
   Text, Card, Button, ActivityIndicator, Snackbar, Searchbar, useTheme,
@@ -8,6 +8,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { apiRestaurants, apiRestaurantByQR } from '../../api/restaurants';
+import { API_BASE_URL } from '../../config';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function RestaurantSelectorScreen({ navigation }) {
@@ -78,6 +79,17 @@ export default function RestaurantSelectorScreen({ navigation }) {
       // https://hospitality.easyfixsoft.com/r/<qr_code>/
       // so strip to just the code portion if a full URL was encoded
       let code = data.trim();
+      // View-only menu QR (/menu-view/<code>/): the restaurant takes orders through
+      // staff for these tables, so show the menu in the browser instead of ordering.
+      // Only the code is taken from the QR; the page is always opened on our own server.
+      const menuMatch = code.match(/\/menu-view\/([A-Za-z0-9_-]+)\/?$/);
+      if (menuMatch) {
+        setScannerOpen(false);
+        setSnack('This is a view-only menu. Please ask a waiter to place your order.');
+        const site = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+        Linking.openURL(`${site}/menu-view/${menuMatch[1]}/`).catch(() => {});
+        return;
+      }
       const urlMatch = code.match(/\/r\/([^/]+)\/?$/);
       if (urlMatch) code = urlMatch[1];
 

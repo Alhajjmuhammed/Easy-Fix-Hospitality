@@ -42,7 +42,7 @@ def browse_restaurants(request):
     # If user explicitly wants to switch, clear current remote session
     if request.GET.get('switch') == '1':
         for key in ('selected_restaurant_id', 'selected_restaurant_name',
-                    'order_type', 'delivery_address', 'delivery_phone',
+                    'order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng',
                     'selected_table', 'selected_table_id', 'cart'):
             request.session.pop(key, None)
         request.session.modified = True
@@ -67,6 +67,17 @@ def browse_restaurants(request):
         'active_restaurant_name': active_restaurant_name,
         'active_order_type': active_order_type,
     })
+
+
+def _parse_coords(lat, lng):
+    """Return (lat, lng) as strings with 7 decimals when both are valid, else (None, None)."""
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None, None
+    if not (-90 <= lat_f <= 90 and -180 <= lng_f <= 180) or (lat_f == 0 and lng_f == 0):
+        return None, None
+    return f'{lat_f:.7f}', f'{lng_f:.7f}'
 
 
 def _remote_order_owner(restaurant_obj):
@@ -100,7 +111,7 @@ def select_order_type(request, restaurant_id):
         request.session['delivery_address'] = ''
         request.session['delivery_phone'] = ''
         # Clear old table / add-to-order data so it doesn't interfere
-        for key in ('selected_table', 'selected_table_id', 'add_to_order_id', 'order_mode'):
+        for key in ('selected_table', 'selected_table_id', 'add_to_order_id', 'order_mode', 'delivery_lat', 'delivery_lng'):
             request.session.pop(key, None)
         return redirect('restaurant:menu')
 
@@ -134,6 +145,13 @@ def delivery_info(request, restaurant_id):
             request.session['order_type'] = 'delivery'
             request.session['delivery_address'] = address
             request.session['delivery_phone'] = phone
+            lat, lng = _parse_coords(request.POST.get('delivery_lat'), request.POST.get('delivery_lng'))
+            if lat is not None:
+                request.session['delivery_lat'] = lat
+                request.session['delivery_lng'] = lng
+            else:
+                request.session.pop('delivery_lat', None)
+                request.session.pop('delivery_lng', None)
             for key in ('selected_table', 'selected_table_id', 'add_to_order_id', 'order_mode'):
                 request.session.pop(key, None)
             return redirect('restaurant:menu')
@@ -142,6 +160,8 @@ def delivery_info(request, restaurant_id):
         'restaurant': restaurant_obj,
         'delivery_address': request.session.get('delivery_address', ''),
         'delivery_phone': request.session.get('delivery_phone', ''),
+        'delivery_lat': request.session.get('delivery_lat'),
+        'delivery_lng': request.session.get('delivery_lng'),
     })
 
 

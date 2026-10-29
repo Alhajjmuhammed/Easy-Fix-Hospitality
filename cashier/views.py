@@ -733,7 +733,7 @@ def generate_receipt(request, payment_id):
         return redirect('accounts:profile')
     if not request.user.has_feature('view_receipts'):
         messages.error(request, "You don't have permission to view receipts.")
-        return redirect('cashier:cashier_dashboard')
+        return redirect('cashier:dashboard')
     
     owner = get_owner_filter(request.user)
     _pq_gr = (
@@ -777,7 +777,7 @@ def reprint_receipt(request, payment_id):
         return redirect('accounts:profile')
     if not request.user.has_feature('view_receipts'):
         messages.error(request, "You don't have permission to view receipts.")
-        return redirect('cashier:cashier_dashboard')
+        return redirect('cashier:dashboard')
     
     owner = get_owner_filter(request.user)
     _pq_rr = (
@@ -826,7 +826,7 @@ def receipt_management(request):
         return redirect('accounts:profile')
     if not request.user.has_feature('view_receipts'):
         messages.error(request, "You don't have permission to manage receipts.")
-        return redirect('cashier:cashier_dashboard')
+        return redirect('cashier:dashboard')
 
     owner = get_owner_filter(request.user)
     
@@ -947,7 +947,7 @@ def cashier_reports(request):
         return redirect('accounts:profile')
     if not request.user.has_feature('view_reports'):
         messages.error(request, "You don't have permission to view reports.")
-        return redirect('cashier:cashier_dashboard')
+        return redirect('cashier:dashboard')
     
     from django.utils import timezone
     from django.db.models import Sum, Count, Q

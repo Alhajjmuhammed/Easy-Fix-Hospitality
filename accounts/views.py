@@ -375,7 +375,7 @@ def qr_code_access(request, qr_code):
         request.session['access_method'] = 'qr_code'
         # A table QR scan always starts a dine-in flow
         request.session['order_type'] = 'dine-in'
-        for _key in ('delivery_address', 'delivery_phone', 'add_to_order_id', 'order_mode'):
+        for _key in ('delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng', 'add_to_order_id', 'order_mode'):
             request.session.pop(_key, None)
         
         # If user is not logged in, show restaurant info and prompt for login/register

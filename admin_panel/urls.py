@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 from . import views
 from . import views_branches
 from . import views_main_owner
@@ -31,7 +32,7 @@ urlpatterns = [
     path('setup-main-restaurant/', views_branches.setup_main_restaurant, name='setup_main_restaurant'),
     
     # Temporary placeholder for reports - redirect to existing reports
-    path('consolidated-reports/', views.admin_dashboard, {'template': 'reports'}, name='consolidated_reports'),
+    path('consolidated-reports/', RedirectView.as_view(pattern_name='reports:dashboard'), name='consolidated_reports'),
     
     # Existing URLs continue below...
     path('profile/', views.profile, name='profile'),

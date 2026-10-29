@@ -256,7 +256,7 @@ class SecurityHeadersMiddleware:
         response['Cross-Origin-Opener-Policy'] = 'same-origin'
         response['Cross-Origin-Embedder-Policy'] = 'require-corp'
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        response['Permissions-Policy'] = 'geolocation=(self), microphone=(), camera=()'
         response['Content-Security-Policy'] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com; "
