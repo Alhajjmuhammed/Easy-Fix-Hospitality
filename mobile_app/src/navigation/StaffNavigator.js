@@ -213,6 +213,7 @@ export default function StaffNavigator() {
   const isCashier  = user?.role_name === 'cashier';
   const isStation  = STATION_ROLES.includes(user?.role_name);
   const isManager  = ['manager', 'branch_owner', 'main_owner', 'owner'].includes(user?.role_name);
+  const isCustomerCare = user?.role_name === 'customer_care';
 
   // Station staff (kitchen / bar / buffet / service) get Dashboard + Printer Settings
   if (isStation) {
@@ -248,7 +249,7 @@ export default function StaffNavigator() {
     );
   }
 
-  if (!isCashier && !isManager && !isStation) {
+  if (!isCashier && !isManager && !isStation && !isCustomerCare) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ fontSize: 16, textAlign: 'center', margin: 24 }}>

@@ -372,6 +372,7 @@
                                     </div>
                                 </div>
                             </div>
+                            {% if 'view_reservations' in user.visible_features %}
                             <div class="row g-3 mt-2">
                                 <div class="col-md-6">
                                     <div class="form-check form-switch">
@@ -391,6 +392,7 @@
                                            min="15" max="720" step="15" value="{{ restaurant.reservation_duration_minutes }}">
                                 </div>
                             </div>
+                            {% endif %}
                         </div>
 
                         <!-- Submit Buttons -->

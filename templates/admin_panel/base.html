@@ -668,12 +668,12 @@
                         <span>Event Menu</span>
                     </a>
                     {% endif %}
-                    {% if 'view_reservations' in feats %}
+                    {% if 'view_reservations' in feats or 'manage_reservations' in feats %}{% if not user.is_administrator %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'restaurant' and 'reservation' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'restaurant:manage_reservations' %}" data-tooltip="Reservations">
                         <i class="fas fa-chair text-success"></i>
                         <span>Reservations</span>
                     </a>
-                    {% endif %}
+                    {% endif %}{% endif %}
                 </div>
 
                 <!-- Branch Network Section (only for main owners with PRO plan) -->

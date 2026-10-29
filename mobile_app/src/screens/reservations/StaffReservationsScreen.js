@@ -36,7 +36,9 @@ export default function StaffReservationsScreen() {
   const [snack, setSnack] = useState('');
   const [tableMenuFor, setTableMenuFor] = useState(null);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', people: '2', date: upcomingDates(1)[0].value, time: '', notes: '' });
+  const [form, setForm] = useState({ name: '', phone: '', people: '2', date: upcomingDates(1)[0].value, time: '', notes: '', restaurantId: null });
+  const restaurants = data.restaurants || [];
+  const defaultRestaurantId = (restaurants.find((r) => r.default) || restaurants[0] || {}).id;
 
   const load = useCallback(async () => {
     try {
@@ -78,25 +80,33 @@ export default function StaffReservationsScreen() {
   };
 
   const addBooking = async () => {
+    const people = Number(form.people);
     if (!form.name.trim() || !form.phone.trim() || !form.time) {
       setSnack('Name, phone and time are required.');
       return;
     }
+    if (!Number.isInteger(people) || people < 1 || people > 100) {
+      setSnack('Number of people must be between 1 and 100.');
+      return;
+    }
     try {
       const r = await apiCreateReservation({
-        name: form.name.trim(), phone: form.phone.trim(), party_size: Number(form.people) || 1,
+        name: form.name.trim(), phone: form.phone.trim(), party_size: people,
         date: form.date, time: form.time, notes: form.notes.trim(),
+        restaurant_id: form.restaurantId || defaultRestaurantId,
       });
       setAdding(false);
       setForm((f) => ({ ...f, name: '', phone: '', notes: '', time: '' }));
-      setDay(form.date);
+      if (form.date === day) load(); else setDay(form.date);   // same day: reload explicitly
       showWarnings(r.warnings, `Booking added for ${r.reservation.name}`);
     } catch (err) {
       setSnack(err?.response?.data?.error || 'Could not add the booking.');
     }
   };
 
-  const tablesFor = (res) => tables.filter((t) => t.restaurant_id === res.restaurant_id);
+  // Older tables have no restaurant link; they belong to the owner's own (default) restaurant.
+  const tablesFor = (res) => tables.filter((t) => t.restaurant_id === res.restaurant_id
+    || (t.restaurant_id == null && res.restaurant_id === defaultRestaurantId));
 
   return (
     <View style={{ flex: 1 }}>
@@ -169,6 +179,14 @@ export default function StaffReservationsScreen() {
           <Dialog.Title>Add booking</Dialog.Title>
           <Dialog.ScrollArea>
             <ScrollView keyboardShouldPersistTaps="handled">
+              {restaurants.length > 1 && (
+                <View style={styles.restaurantRow}>
+                  {restaurants.map((r) => (
+                    <Chip key={r.id} compact selected={(form.restaurantId || defaultRestaurantId) === r.id}
+                          onPress={() => setForm((f) => ({ ...f, restaurantId: r.id }))}>{r.name}</Chip>
+                  ))}
+                </View>
+              )}
               <TextInput label="Name" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} mode="outlined" style={styles.input} />
               <TextInput label="Phone" value={form.phone} keyboardType="phone-pad" onChangeText={(v) => setForm({ ...form, phone: v })} mode="outlined" style={styles.input} />
               <TextInput label="People" value={form.people} keyboardType="number-pad" onChangeText={(v) => setForm({ ...form, people: v.replace(/\D/g, '') })} mode="outlined" style={styles.input} />
@@ -201,4 +219,5 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: '#888', marginTop: 40, fontFamily: 'Poppins_400Regular' },
   fab: { position: 'absolute', right: 16, bottom: 16 },
   input: { marginTop: 8 },
+  restaurantRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
 });

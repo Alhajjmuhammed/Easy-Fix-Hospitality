@@ -39,15 +39,7 @@ def open_restaurant_owner(restaurant):
     The restaurant's owner account if customers may use it right now, else None
     (restaurant inactive, owner deactivated, or subscription blocked/expired).
     """
-    owner = restaurant.branch_owner or restaurant.main_owner
-    # Blocking/expiring a subscription deactivates the owner account.
-    if not restaurant.is_active or not owner or not owner.is_active:
-        return None
-    from accounts.models import RestaurantSubscription
-    sub = RestaurantSubscription.objects.filter(restaurant_owner=restaurant.main_owner or owner).first()
-    if sub and not sub.is_active:
-        return None
-    return owner
+    return restaurant.open_owner()
 
 
 def get_restaurant_owner(request):

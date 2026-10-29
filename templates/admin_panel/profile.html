@@ -297,6 +297,7 @@
                                 </div>
                             </div>
 
+                            {% if 'view_reservations' in user.visible_features %}
                             <hr>
                             <h6 class="mb-3"><i class="fas fa-chair me-2"></i>Table Reservations</h6>
                             <div class="row g-3">
@@ -325,6 +326,7 @@
                                     <small class="text-muted">How long a booking holds its table. Used to warn about double-booking.</small>
                                 </div>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
 

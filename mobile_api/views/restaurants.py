@@ -5,6 +5,7 @@ from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
 
 from restaurant.models_restaurant import Restaurant
+from restaurant.reservations import open_for_bookings
 from accounts.models import RestaurantSubscription
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,8 @@ def _delivery_settings(r):
         'delivery_fee': float(r.delivery_fee or 0),
         'delivery_fee_taxable': r.delivery_fee_taxable,
         'free_delivery_minimum': float(r.free_delivery_minimum) if r.free_delivery_minimum is not None else None,
-        'reservations_enabled': r.reservations_enabled,
+        # "Can a customer book here now?" — includes the Module Access switch
+        'reservations_enabled': open_for_bookings(r) if r.reservations_enabled else False,
         'reservations_auto_confirm': r.reservations_auto_confirm,
     }
 

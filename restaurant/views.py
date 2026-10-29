@@ -57,14 +57,16 @@ def browse_restaurants(request):
     search = request.GET.get('q', '').strip()
     qs = RestaurantModel.objects.filter(
         Q(allow_remote_orders=True) | Q(reservations_enabled=True), is_active=True,
-    ).select_related('main_owner')
+    ).select_related('main_owner', 'branch_owner')
     if search:
         qs = qs.filter(
             Q(name__icontains=search) |
             Q(address__icontains=search)
         )
+    from restaurant.reservations import open_for_bookings
+    restaurants = [r for r in qs if r.allow_remote_orders or open_for_bookings(r)]
     return render(request, 'restaurant/browse_restaurants.html', {
-        'restaurants': qs,
+        'restaurants': restaurants,
         'search': search,
         'active_restaurant_name': active_restaurant_name,
         'active_order_type': active_order_type,
@@ -99,6 +101,11 @@ def select_order_type(request, restaurant_id):
         is_active=True,
     )
     owner = _remote_order_owner(restaurant_obj)
+    from restaurant.reservations import open_for_bookings
+    can_book = open_for_bookings(restaurant_obj)
+    if not restaurant_obj.allow_remote_orders and not can_book:
+        from django.http import Http404
+        raise Http404
 
     if request.method == 'POST':
         if not restaurant_obj.allow_remote_orders:  # booking-only restaurant: no delivery/pickup
@@ -121,6 +128,7 @@ def select_order_type(request, restaurant_id):
 
     return render(request, 'restaurant/select_order_type.html', {
         'restaurant': restaurant_obj,
+        'can_book': can_book,
     })
 
 

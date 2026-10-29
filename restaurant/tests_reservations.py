@@ -235,6 +235,100 @@ class ReservationTests(TestCase):
         tables = self._api(self.cashier).get('/api/v1/tables/').json()['tables']
         self.assertEqual({t['restaurant_id'] for t in tables}, {self.r.id})
 
+    # ---------- review fixes ----------
+    def test_legacy_table_without_restaurant_link_can_be_assigned(self):
+        legacy = TableInfo.objects.create(owner=self.main, tbl_no='L1', capacity=6)   # restaurant=None
+        self._web_book()
+        res = Reservation.objects.get()
+        self.client.force_login(self.cashier)
+        page = self.client.get(f'/restaurant/reservations/?date={local_parts(self.when)[0]}').content.decode()
+        self.assertIn('L1 (6)', page)
+        self.client.post(f'/restaurant/reservations/{res.pk}/action/', {'action': 'table', 'table_id': legacy.id})
+        res.refresh_from_db()
+        self.assertEqual(res.table, legacy)
+        r = self._api(self.cashier).post(f'/api/v1/reservations/{res.pk}/table/', {'table_id': self.t1.id}, format='json')
+        self.assertEqual(r.json()['reservation']['table_number'], 'T1')
+        r = self._api(self.cashier).post(f'/api/v1/reservations/{res.pk}/table/', {'table_id': legacy.id}, format='json')
+        self.assertEqual(r.json()['reservation']['table_number'], 'L1')
+
+    def test_module_access_off_blocks_customer_booking_everywhere(self):
+        self.main.subscription.disabled_features.add(Feature.objects.get(slug='view_reservations'))
+        self.assertEqual(self._web_book().status_code, 404)
+        d, t = local_parts(self.when)
+        r = self._api(self.cust).post('/api/v1/reservations/', {'restaurant_id': self.r.id, 'party_size': 2,
+                                                              'date': d, 'time': t}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Reservation.objects.exists())
+        lst = {x['id']: x for x in self._api(self.cust).get('/api/v1/restaurants/').json()['restaurants']}
+        self.assertFalse(lst.get(self.r.id, {}).get('reservations_enabled'))  # app hides the Book option
+        self.client.force_login(self.cust)
+        self.assertNotIn('Main R', self.client.get('/restaurant/browse/').content.decode())
+        self.client.force_login(self.main)
+        self.assertNotIn('Accept table reservations', self.client.get('/admin-panel/profile/').content.decode())
+
+    def test_customer_cancel_notifies_staff(self):
+        self._web_book()
+        res = Reservation.objects.get()
+        self.sent.reset_mock()
+        self.client.force_login(self.cust)
+        self.client.post(f'/restaurant/my-reservations/{res.pk}/cancel/')
+        self.assertEqual(self.sent.call_args_list[-1].args[0], ['ExponentPushToken[cash]'])
+        self.assertIn('cancelled', self.sent.call_args_list[-1].args[2])
+
+    def test_customer_limits_and_duplicate(self):
+        self._web_book()
+        self._web_book()                                                        # same time → refused
+        self.assertEqual(Reservation.objects.count(), 1)
+        for i in range(1, 6):
+            d, t = local_parts(self.when + datetime.timedelta(days=i))
+            self._web_book(date=d, time=t)
+        self.assertEqual(Reservation.objects.count(), 5)                        # capped at 5 upcoming
+
+    def test_bad_ids_do_not_crash(self):
+        self._web_book()
+        res = Reservation.objects.get()
+        self.client.force_login(self.cashier)
+        r = self.client.post(f'/restaurant/reservations/{res.pk}/action/', {'action': 'table', 'table_id': 'abc'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self._api(self.cashier).post(f'/api/v1/reservations/{res.pk}/table/',
+                                                      {'table_id': 'abc'}, format='json').status_code, 400)
+        d, t = local_parts(self.when)
+        self.assertEqual(self._api(self.cashier).post('/api/v1/reservations/', {
+            'restaurant_id': 'x', 'name': 'A', 'phone': '1', 'party_size': 2, 'date': d, 'time': t}, format='json').status_code, 404)
+
+    def test_push_skips_staff_without_permission(self):
+        from accounts.models import CustomRole
+        cr = CustomRole.objects.create(owner=self.main, name='Till only')
+        User.objects.filter(pk=self.cashier.pk).update(custom_role=cr)
+        self._web_book()
+        self.assertEqual(self.sent.call_args_list[0].args[0], [])
+
+    def test_undo_transitions(self):
+        self._web_book()
+        res = Reservation.objects.get()
+        self.client.force_login(self.cashier)
+        for s in ('declined', 'confirmed', 'no_show', 'seated'):
+            self.client.post(f'/restaurant/reservations/{res.pk}/action/', {'action': 'status', 'status': s})
+            res.refresh_from_db()
+            self.assertEqual(res.status, s)
+
+    def test_nav_link_for_manage_only_and_hidden_for_admin(self):
+        rps = RolePermissionSet.objects.create(owner=self.main, role_name='cashier')
+        rps.features.set([Feature.objects.get(slug='manage_reservations')])
+        self.client.force_login(self.cashier)
+        self.assertIn('Reservations', self.client.get('/restaurant/reservations/').content.decode())
+
+    def test_staff_api_lists_restaurants_for_picker(self):
+        branch_owner = User.objects.create_user('bown', password='pw12345!x', role=role('branch_owner'), owner=self.main)
+        branch = Restaurant.objects.create(name='Branch R', address='b', main_owner=self.main, branch_owner=branch_owner,
+                                           is_main_restaurant=False, parent_restaurant=self.r, qr_code='QRBR')
+        data = self._api(self.main).get('/api/v1/reservations/').json()
+        self.assertEqual([(x['id'], x['default']) for x in data['restaurants']], [(self.r.id, True), (branch.id, False)])
+        d, t = local_parts(self.when)
+        r = self._api(self.main).post('/api/v1/reservations/', {'restaurant_id': branch.id, 'name': 'B', 'phone': '1',
+                                                              'party_size': 2, 'date': d, 'time': t}, format='json')
+        self.assertEqual(Reservation.objects.get(pk=r.json()['reservation']['id']).restaurant, branch)
+
     def test_api_blocked_restaurant(self):
         self.main.subscription.block_restaurant(reason='t')
         d, t = local_parts(self.when)

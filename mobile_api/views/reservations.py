@@ -10,12 +10,18 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from restaurant.models import TableInfo
 from restaurant.models_reservation import Reservation, reservations_for_owner
 from restaurant.models_restaurant import Restaurant
 from restaurant import reservations as svc
 from ..permissions import IsSubscriptionActive
 from .helpers import get_restaurant_owner, open_restaurant_owner
+
+
+def _int_or_none(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _is_staff(user):
@@ -85,13 +91,16 @@ def reservations(request):
         if not user.has_feature('manage_reservations'):
             return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
         restaurants = Restaurant.objects.filter(Q(branch_owner=owner) | Q(main_owner=owner))
-        rid = request.data.get('restaurant_id')
+        rid = _int_or_none(request.data.get('restaurant_id'))
+        if request.data.get('restaurant_id') and rid is None:
+            return Response({'error': 'Restaurant not found.'}, status=status.HTTP_404_NOT_FOUND)
         restaurant = restaurants.filter(id=rid).first() if rid else Restaurant.for_owner(owner)
         if restaurant is None:
             return Response({'error': 'Restaurant not found.'}, status=status.HTTP_404_NOT_FOUND)
         table = None
         if request.data.get('table_id'):
-            table = TableInfo.objects.filter(id=request.data['table_id'], restaurant=restaurant).first()
+            table_id = _int_or_none(request.data.get('table_id'))
+            table = svc.tables_for_restaurant(restaurant).filter(id=table_id).first() if table_id else None
             if table is None:
                 return Response({'error': 'Table not found.'}, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -119,11 +128,18 @@ def reservations(request):
         qs = qs.filter(status=status_filter)
     pending = reservations_for_owner(owner).select_related('restaurant', 'table') \
         .filter(status='pending', start__gte=timezone.now()).order_by('start')[:20]
+    own = Restaurant.for_owner(owner)
     return Response({
         'date': day.isoformat(),
         'reservations': [_serialize(r, staff=True) for r in qs],
         'pending_upcoming': [_serialize(r, staff=True) for r in pending],
         'can_manage': user.has_feature('manage_reservations'),
+        # For the app's "Add booking" restaurant picker (main owner with branches)
+        'restaurants': [
+            {'id': r.id, 'name': r.name, 'default': own is not None and r.id == own.id}
+            for r in Restaurant.objects.filter(Q(branch_owner=owner) | Q(main_owner=owner))
+            .order_by('-is_main_restaurant', 'name')
+        ],
     })
 
 
@@ -183,7 +199,8 @@ def reservation_table(request, pk):
     res = get_object_or_404(reservations_for_owner(owner).select_related('restaurant'), pk=pk)
     table = None
     if request.data.get('table_id'):
-        table = TableInfo.objects.filter(id=request.data['table_id'], restaurant=res.restaurant).first()
+        table_id = _int_or_none(request.data.get('table_id'))
+        table = svc.tables_for_restaurant(res.restaurant).filter(id=table_id).first() if table_id else None
         if table is None:
             return Response({'error': 'Table not found.'}, status=status.HTTP_400_BAD_REQUEST)
     try:

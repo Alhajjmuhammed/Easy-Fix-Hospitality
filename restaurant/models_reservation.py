@@ -28,10 +28,11 @@ class Reservation(models.Model):
         'pending':   ('confirmed', 'declined', 'cancelled'),
         'confirmed': ('seated', 'no_show', 'cancelled'),
         'seated':    ('completed',),
-        'declined':  (),
-        'cancelled': (),
+        # Undo for an accidental tap / a late arrival
+        'declined':  ('confirmed',),
+        'cancelled': ('confirmed',),
+        'no_show':   ('seated',),
         'completed': (),
-        'no_show':   (),
     }
     SOURCE_CHOICES = [('web', 'Website'), ('app', 'Mobile app'), ('staff', 'Staff')]
 

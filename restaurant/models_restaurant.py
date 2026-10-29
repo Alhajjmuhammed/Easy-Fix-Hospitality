@@ -297,6 +297,21 @@ class Restaurant(models.Model):
         default=120, validators=[MinValueValidator(15), MaxValueValidator(720)],
         help_text="How long a booking holds its table (used to warn about double-booking)")
 
+    def open_owner(self):
+        """
+        The owner account if customers may use this restaurant right now, else None
+        (restaurant inactive, owner deactivated, or subscription blocked/expired).
+        """
+        owner = self.branch_owner or self.main_owner
+        # Blocking/expiring a subscription deactivates the owner account.
+        if not self.is_active or not owner or not owner.is_active:
+            return None
+        from accounts.models import RestaurantSubscription
+        sub = RestaurantSubscription.objects.filter(restaurant_owner=self.main_owner or owner).first()
+        if sub and not sub.is_active:
+            return None
+        return owner
+
     @classmethod
     def for_owner(cls, owner):
         """

@@ -11,10 +11,16 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import get_owner_filter
-from .models import TableInfo
 from .models_reservation import Reservation, reservations_for_owner
 from .models_restaurant import Restaurant
 from . import reservations as svc
+
+
+def _int_or_none(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _is_staff(user):
@@ -64,8 +70,9 @@ def manage_reservations(request):
             messages.error(request, 'Please choose the restaurant for this booking.')
             return redirect('restaurant:manage_reservations')
         table = None
-        if request.POST.get('table_id'):
-            table = TableInfo.objects.filter(id=request.POST['table_id'], restaurant=restaurant).first()
+        table_id = _int_or_none(request.POST.get('table_id'))
+        if table_id:
+            table = svc.tables_for_restaurant(restaurant).filter(id=table_id).first()
         try:
             start = svc.parse_start(request.POST.get('date'), request.POST.get('time'))
             res, warnings = svc.create_reservation(
@@ -94,9 +101,7 @@ def manage_reservations(request):
         qs = qs.filter(status__in=Reservation.ACTIVE_STATUSES)
     elif status_filter in dict(Reservation.STATUS_CHOICES):
         qs = qs.filter(status=status_filter)
-    tables_by_restaurant = {
-        r.id: list(TableInfo.objects.filter(restaurant=r).order_by('tbl_no')) for r in restaurants
-    }
+    tables_by_restaurant = {r.id: list(svc.tables_for_restaurant(r)) for r in restaurants}
     rows = [{'res': r, 'warnings': r.warnings() if r.is_active else [],
              'tables': tables_by_restaurant.get(r.restaurant_id, []),
              'next_statuses': [(s, dict(Reservation.STATUS_CHOICES)[s]) for s in Reservation.STAFF_TRANSITIONS[r.status]]}
@@ -138,8 +143,11 @@ def reservation_action(request, pk):
             messages.success(request, f'{res.name}: {res.get_status_display()}.')
         elif action == 'table':
             table = None
-            if request.POST.get('table_id'):
-                table = get_object_or_404(TableInfo, id=request.POST['table_id'], restaurant=res.restaurant)
+            table_id = _int_or_none(request.POST.get('table_id'))
+            if request.POST.get('table_id') and table_id is None:
+                raise ValidationError('Please choose a valid table.')
+            if table_id:
+                table = get_object_or_404(svc.tables_for_restaurant(res.restaurant), id=table_id)
             for w in svc.assign_table(res, table, request.user):
                 messages.warning(request, w)
             messages.success(request, f'{res.name}: table {"set to " + table.tbl_no if table else "cleared"}.')
@@ -160,8 +168,7 @@ def reservation_action(request, pk):
 
 def _bookable_restaurant(restaurant_id):
     restaurant = get_object_or_404(Restaurant, id=restaurant_id, is_active=True, reservations_enabled=True)
-    owner = restaurant.branch_owner or restaurant.main_owner
-    if owner is None or not owner.is_active:  # blocked/expired subscriptions deactivate the owner
+    if not svc.open_for_bookings(restaurant):  # module switched off, blocked or expired
         from django.http import Http404
         raise Http404
     return restaurant

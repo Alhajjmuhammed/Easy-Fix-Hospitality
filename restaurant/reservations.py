@@ -12,6 +12,44 @@ from .models_reservation import Reservation
 MIN_NOTICE = timedelta(minutes=15)   # customers can't book a table for "right now"
 MAX_AHEAD = timedelta(days=90)
 MAX_PARTY = 100
+MAX_ACTIVE_PER_CUSTOMER = 5         # upcoming pending/confirmed bookings per customer per restaurant
+
+
+def _restaurant_owner(restaurant):
+    return restaurant.branch_owner or restaurant.main_owner
+
+
+def tables_for_restaurant(restaurant):
+    """Tables of this restaurant, including older tables linked only to the owner account."""
+    from django.db.models import Q
+    from .models import TableInfo
+    return TableInfo.objects.filter(
+        Q(restaurant=restaurant) | Q(restaurant__isnull=True, owner=_restaurant_owner(restaurant))
+    ).order_by('tbl_no')
+
+
+def table_belongs(table, restaurant):
+    if table.restaurant_id:
+        return table.restaurant_id == restaurant.id
+    owner = _restaurant_owner(restaurant)
+    return owner is not None and table.owner_id == owner.id
+
+
+def module_enabled(restaurant):
+    """False when the system admin switched reservations off in Module Access."""
+    for owner in {restaurant.branch_owner, restaurant.main_owner} - {None}:
+        try:
+            if owner.subscription.disabled_features.filter(slug='view_reservations').exists():
+                return False
+        except Exception:
+            continue  # no subscription record → no restriction (same rule as User.has_feature)
+    return True
+
+
+def open_for_bookings(restaurant):
+    """Customers may book here right now (setting on, module allowed, restaurant open)."""
+    return (restaurant.reservations_enabled and module_enabled(restaurant)
+            and restaurant.open_owner() is not None)
 
 
 def parse_start(date_str, time_str):
@@ -49,15 +87,23 @@ def create_reservation(restaurant, *, name, phone, party_size, start, email='', 
 
     now = timezone.now()
     if not staff:
-        if not (restaurant.reservations_enabled and restaurant.is_active):
+        if not open_for_bookings(restaurant):
             raise ValidationError('This restaurant is not taking reservations right now.')
         if start < now + MIN_NOTICE:
             raise ValidationError('Please choose a time at least 15 minutes from now.')
+        if customer is not None:
+            mine = Reservation.objects.filter(customer=customer, restaurant=restaurant,
+                                              status__in=('pending', 'confirmed'), start__gte=now)
+            if mine.filter(start=start).exists():
+                raise ValidationError('You already have a booking at this time.')
+            if mine.count() >= MAX_ACTIVE_PER_CUSTOMER:
+                raise ValidationError(f'You can have at most {MAX_ACTIVE_PER_CUSTOMER} upcoming bookings here. '
+                                      'Please cancel one first.')
     elif start < now - timedelta(hours=12):
         raise ValidationError('That time is in the past.')
     if start > now + MAX_AHEAD:
         raise ValidationError('Bookings can be made up to 90 days ahead.')
-    if table is not None and table.restaurant_id != restaurant.id:
+    if table is not None and not table_belongs(table, restaurant):
         raise ValidationError('That table belongs to another restaurant.')
 
     status = 'confirmed' if (staff or restaurant.reservations_auto_confirm) else 'pending'
@@ -95,7 +141,7 @@ def change_status(res, new_status, by_user):
 
 def assign_table(res, table, by_user=None):
     """Assign (or clear with table=None) a table. Returns warnings (never blocks)."""
-    if table is not None and table.restaurant_id != res.restaurant_id:
+    if table is not None and not table_belongs(table, res.restaurant):
         raise ValidationError('That table belongs to another restaurant.')
     if not res.is_active:
         raise ValidationError('Tables can only be assigned to pending, confirmed or seated bookings.')
@@ -116,6 +162,12 @@ def customer_cancel(res, user):
         res.status_changed_by = user
         res.status_changed_at = timezone.now()
         res.save(update_fields=['status', 'status_changed_by', 'status_changed_at', 'updated_at'])
+    try:
+        from orders.push import notify_reservation_cancelled_by_customer
+        notify_reservation_cancelled_by_customer(res)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning('Cancel push failed for reservation %s', res.pk, exc_info=True)
     return res
 
 

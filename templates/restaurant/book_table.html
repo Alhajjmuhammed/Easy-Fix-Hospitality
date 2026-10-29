@@ -13,7 +13,7 @@
         {% endif %}
     </div>
 
-    <form method="post" novalidate>
+    <form method="post" novalidate onsubmit="var b=this.querySelector('button[type=submit]'); if (b) { b.disabled = true; b.innerText = 'Sending…'; }">
         {% csrf_token %}
         <div class="row g-3">
             <div class="col-6">

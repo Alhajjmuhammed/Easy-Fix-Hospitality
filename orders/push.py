@@ -156,21 +156,32 @@ def _reservation_when(res):
     return _tz.localtime(res.start).strftime('%a %d %b, %H:%M')
 
 
-def notify_new_reservation(res):
-    """Front-of-house staff of the restaurant (never the person who created it)."""
+def _reservation_staff_tokens(res, exclude_user_id=None):
+    """Front-of-house staff of the restaurant who can see reservations (role set / custom role)."""
     from accounts.models import User
     owner = res.restaurant.branch_owner or res.restaurant.main_owner
     if owner is None:
-        return
-    tokens = list(
-        User.objects.filter(owner=owner, is_active=True, role__name__in=RESERVATION_ROLES,
-                            expo_push_token__isnull=False)
-        .exclude(pk=res.created_by_id)
-        .values_list('expo_push_token', flat=True)
-    )
+        return []
+    staff = (User.objects.filter(owner=owner, is_active=True, role__name__in=RESERVATION_ROLES,
+                                 expo_push_token__isnull=False)
+             .exclude(expo_push_token='').exclude(pk=exclude_user_id)
+             .select_related('role', 'custom_role'))
+    return [u.expo_push_token for u in staff if u.has_feature('view_reservations')]
+
+
+def notify_new_reservation(res):
+    """Never notifies the person who created the booking."""
     status = 'awaiting confirmation' if res.status == 'pending' else 'confirmed'
-    send_push(tokens, f'New Reservation • {res.party_size} people',
+    send_push(_reservation_staff_tokens(res, exclude_user_id=res.created_by_id),
+              f'New Reservation • {res.party_size} people',
               f'{res.name} — {_reservation_when(res)} ({status})',
+              {'kind': 'reservation', 'reservationId': res.id})
+
+
+def notify_reservation_cancelled_by_customer(res):
+    send_push(_reservation_staff_tokens(res),
+              'Reservation Cancelled',
+              f'{res.name} cancelled the table for {res.party_size} on {_reservation_when(res)}.',
               {'kind': 'reservation', 'reservationId': res.id})
 
 

@@ -86,7 +86,7 @@
     </form>
     {% endif %}
 
-    {% if restaurant.reservations_enabled %}
+    {% if can_book %}
     <div class="row g-3 mb-4">
         <div class="col-12">
             <a href="{% url 'restaurant:book_table' restaurant.id %}"
