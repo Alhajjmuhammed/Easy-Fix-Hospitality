@@ -221,11 +221,10 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
                 await self.close(code=4001)
                 return
             
-            # Only staff members and managers can connect to restaurant updates
-            if not (user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager() or
-                    user.is_kitchen_staff() or user.is_bar_staff() or user.is_buffet_staff() or 
-                    user.is_service_staff() or user.is_customer_care() or user.is_cashier()):
-                logger.warning(f"User {user.username} with role {user.role} attempted unauthorized restaurant WebSocket connection")
+            # Only staff members and managers can connect to restaurant updates.
+            # Role checks hit the DB (user.role), so they must run off the event loop.
+            if not await self.is_restaurant_staff(user):
+                logger.warning(f"User {user.username} attempted unauthorized restaurant WebSocket connection")
                 await self.close(code=4003)
                 return
             
@@ -317,6 +316,14 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
             }))
         except Exception as e:
             logger.error(f"Error sending order_status_update to restaurant group: {e}")
+
+    @database_sync_to_async
+    def is_restaurant_staff(self, user):
+        return bool(
+            user.is_owner() or user.is_main_owner() or user.is_branch_owner() or user.is_manager() or
+            user.is_kitchen_staff() or user.is_bar_staff() or user.is_buffet_staff() or
+            user.is_service_staff() or user.is_customer_care() or user.is_cashier()
+        )
 
     @database_sync_to_async
     def check_restaurant_access(self, user, owner_id):

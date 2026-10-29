@@ -9,7 +9,8 @@ import sys
 from decimal import Decimal
 
 import django.test.client as _dtc
-from django.test import TestCase, RequestFactory
+from asgiref.sync import async_to_sync
+from django.test import TestCase, TransactionTestCase, RequestFactory
 from django.urls import get_resolver, URLPattern, URLResolver
 from rest_framework.test import APIClient
 
@@ -25,6 +26,40 @@ if sys.version_info >= (3, 14):
 
 def role(name):
     return Role.objects.get_or_create(name=name)[0]
+
+
+class RestaurantWebSocketTests(TransactionTestCase):
+    """Staff live-update socket: role checks must not run on the event loop."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user('wsowner', password='pw12345!x', role=role('main_owner'))
+        self.other_owner = User.objects.create_user('wsother', password='pw12345!x', role=role('main_owner'))
+        self.cashier = User.objects.create_user('wscash', password='pw12345!x', role=role('cashier'), owner=self.owner)
+        self.kitchen = User.objects.create_user('wskit', password='pw12345!x', role=role('kitchen'), owner=self.owner)
+        self.other_cashier = User.objects.create_user('wsocash', password='pw12345!x', role=role('cashier'), owner=self.other_owner)
+        self.customer = User.objects.create_user('wscust', password='pw12345!x', role=role('customer'))
+
+    def _connect(self, user, owner_id):
+        from channels.testing import WebsocketCommunicator
+        from orders.consumers import RestaurantConsumer
+        fresh = User.objects.get(pk=user.pk)  # role not cached, as when loaded by the auth middleware
+        comm = WebsocketCommunicator(RestaurantConsumer.as_asgi(), f'/ws/restaurant/{owner_id}/')
+        comm.scope['user'] = fresh
+        comm.scope['url_route'] = {'kwargs': {'owner_id': str(owner_id)}}
+        async def run():
+            connected, _ = await comm.connect()
+            await comm.disconnect()
+            return connected
+        return async_to_sync(run)()
+
+    def test_staff_and_owner_can_connect(self):
+        self.assertTrue(self._connect(self.cashier, self.owner.id))
+        self.assertTrue(self._connect(self.kitchen, self.owner.id))
+        self.assertTrue(self._connect(self.owner, self.owner.id))
+
+    def test_outsiders_rejected(self):
+        self.assertFalse(self._connect(self.customer, self.owner.id))
+        self.assertFalse(self._connect(self.other_cashier, self.owner.id))
 
 
 class CustomerFlowTests(TestCase):
