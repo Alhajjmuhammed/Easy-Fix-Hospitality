@@ -271,6 +271,7 @@ class OrderSerializer(serializers.ModelSerializer):
     table_number = serializers.SerializerMethodField()
     ordered_by_name = serializers.SerializerMethodField()
     ordered_by_id = serializers.SerializerMethodField()
+    ordered_by_role = serializers.SerializerMethodField()
     items = OrderItemSerializer(source='order_items', many=True, read_only=True)
     items_count = serializers.SerializerMethodField()
     subtotal = serializers.SerializerMethodField()
@@ -291,7 +292,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'order_number', 'table_info', 'table_number',
-            'ordered_by_name', 'ordered_by_id', 'confirmed_by_name', 'entered_by_name', 'status', 'payment_status',
+            'ordered_by_name', 'ordered_by_id', 'ordered_by_role', 'confirmed_by_name', 'entered_by_name', 'status', 'payment_status',
             'order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng',
             'total_amount', 'subtotal', 'tax_amount', 'discount_amount', 'total',
             'total_paid', 'balance_due', 'items_count',
@@ -319,6 +320,18 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_ordered_by_id(self, obj):
         return obj.ordered_by.id if obj.ordered_by else None
+
+    def get_ordered_by_role(self, obj):
+        role_id = obj.ordered_by.role_id if obj.ordered_by else None
+        if role_id is None:
+            return None
+        # Role labels loaded once per serialization (not once per order).
+        labels = getattr(self.root, '_role_labels', None)
+        if labels is None:
+            from accounts.models import Role
+            labels = {r.id: r.get_name_display() for r in Role.objects.all()}
+            self.root._role_labels = labels
+        return labels.get(role_id)
 
     def get_subtotal(self, obj):
         try:

@@ -1,8 +1,5 @@
 import uuid
 import logging
-import threading
-import urllib.request
-import json as _json
 from datetime import timedelta
 
 from rest_framework.decorators import api_view, permission_classes
@@ -42,6 +39,13 @@ def _notify_ws(order, updated_by_user, event_type='order_status_update'):
     All ORM values are captured NOW (before the callback) so the closure is a pure
     data snapshot with no further DB access.
     """
+    if event_type == 'new_order':
+        try:
+            from orders.push import notify_new_order
+            notify_new_order(order)
+        except Exception as e:
+            logger.warning('New-order push failed for order %s: %s', order.id, e)
+
     # ── Capture all data now, before handing off to on_commit ────────────────
     _order_id       = order.id
     _order_number   = order.order_number
@@ -575,45 +579,6 @@ def order_detail(request, order_id):
     return Response({'order': OrderSerializer(order, context={'request': request}).data})
 
 
-_PUSH_STATUS_MESSAGES = {
-    'confirmed': ('Order Confirmed! ✅', 'Your order has been confirmed and will be prepared shortly.'),
-    'preparing': ('Being Prepared 👨‍🍳', 'Your order is now being prepared!'),
-    'ready':     ('Order Ready! 🍽️', 'Your order is ready and will be served shortly.'),
-    'served':    ('Served! 🎉', 'Your order has been served. Enjoy your meal!'),
-    'cancelled': ('Order Cancelled ❌', 'Your order has been cancelled.'),
-}
-
-
-def _send_expo_push(token, title, body, data=None):
-    """Fire-and-forget Expo push notification using Python stdlib only."""
-    try:
-        payload = _json.dumps({
-            'to': token,
-            'title': title,
-            'body': body,
-            'data': data or {},
-            'sound': 'default',
-        }).encode('utf-8')
-        req = urllib.request.Request(
-            'https://exp.host/--/api/v2/push/send',
-            data=payload,
-            headers={
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            method='POST',
-        )
-        urllib.request.urlopen(req, timeout=5)
-    except Exception as e:
-        logger.warning('Expo push notification failed: %s', e)  # Best-effort — never block the order update
-
-
-def _send_push_async(token, title, body, data=None):
-    t = threading.Thread(target=_send_expo_push, args=(token, title, body, data))
-    t.daemon = True
-    t.start()
-
-
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
 def update_order_status(request, order_id):
@@ -715,18 +680,7 @@ def update_order_status(request, order_id):
             order.save(update_fields=['status', 'updated_at'])
         # --- transaction commits here ---
 
-    # Outside transaction: push notification + WebSocket
-    if new_status in _PUSH_STATUS_MESSAGES:
-        try:
-            customer = order.ordered_by
-            push_token = getattr(customer, 'expo_push_token', None)
-            if customer and push_token:
-                title, body = _PUSH_STATUS_MESSAGES[new_status]
-                _send_push_async(push_token, title, body,
-                                 {'orderId': order.id, 'status': new_status})
-        except Exception as e:
-            logger.warning('Push notification for order %s failed: %s', order.id, e)
-
+    # Customer push notification is sent by the Order status-change signal (orders/signals.py).
     _notify_ws(order, user)
 
     order = Order.objects.select_related(

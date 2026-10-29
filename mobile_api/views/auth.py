@@ -95,11 +95,14 @@ def login(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSubscriptionActive])
 def logout(request):
-    """Invalidate the current token."""
+    """Invalidate the current token and stop push notifications to this device."""
     try:
         request.user.auth_token.delete()
     except Exception:
         pass
+    if request.user.expo_push_token:
+        request.user.expo_push_token = None
+        request.user.save(update_fields=['expo_push_token'])
     return Response({'message': 'Logged out successfully.'})
 
 
@@ -120,6 +123,8 @@ def save_push_token(request):
         return Response({'error': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
     if len(token) > 200 or not _re.match(r'^Expo(?:nent)?PushToken\[.+\]$', token):
         return Response({'error': 'Invalid Expo push token format.'}, status=status.HTTP_400_BAD_REQUEST)
+    # One device = one token: a shared phone must only notify whoever is logged in now.
+    type(request.user).objects.filter(expo_push_token=token).exclude(pk=request.user.pk).update(expo_push_token=None)
     request.user.expo_push_token = token
     request.user.save(update_fields=['expo_push_token'])
     return Response({'message': 'Push token saved.'})

@@ -242,8 +242,13 @@ export default function OrderDetailScreen({ route, navigation }) {
             Table: {order.table_number}
           </Text>
           {order.ordered_by_name ? (
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+              Ordered by: {order.ordered_by_name}{order.ordered_by_role ? ` (${order.ordered_by_role})` : ''}
+            </Text>
+          ) : null}
+          {order.entered_by_name ? (
             <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              By: {order.ordered_by_name}
+              Entered by: {order.entered_by_name}
             </Text>
           ) : null}
           <View style={styles.chipRow}>

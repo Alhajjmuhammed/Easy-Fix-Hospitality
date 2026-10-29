@@ -10,6 +10,7 @@ import CustomerNavigator from './CustomerNavigator';
 import StaffNavigator from './StaffNavigator';
 import RiderNavigator from './RiderNavigator';
 import LockScreen from '../screens/LockScreen';
+import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator();
 
@@ -60,7 +61,7 @@ export default function AppNavigator() {
 
   return (
     <View style={{ flex: 1 }} onTouchStart={token && hasPin ? resetIdleTimer : undefined}>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!token ? (
             <>

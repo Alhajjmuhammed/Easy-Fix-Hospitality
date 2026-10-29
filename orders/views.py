@@ -760,6 +760,12 @@ def place_order(request):
                     # WebSocket notification failure shouldn't break order placement
                     logger.warning(f"WebSocket notification failed (non-critical): {ws_error}")
 
+                try:
+                    from orders.push import notify_new_order
+                    notify_new_order(order)
+                except Exception as push_error:
+                    logger.warning(f"New-order push failed (non-critical): {push_error}")
+
                 # Clear cart. Keep table for dine-in (allows adding more items); clear remote order state.
                 del request.session['cart']
                 if is_remote_order:

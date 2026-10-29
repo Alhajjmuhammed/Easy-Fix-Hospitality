@@ -127,7 +127,7 @@ function AppContent() {
 
   // Start network-sync listener once we know the auth state
   useNetworkSync();
-  // Register for Expo push notifications (customers only)
+  // Register for push notifications (all roles) and handle notification taps
   usePushNotifications();
 
   if (!ready) {

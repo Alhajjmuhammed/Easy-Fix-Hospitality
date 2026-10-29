@@ -41,6 +41,14 @@ def _notify_delivery_status(order_id, assignment_status, status_display, rider_n
     transaction.on_commit(_send)
 
 
+def _push_rider(order, rider_user):
+    try:
+        from orders.push import notify_rider_assigned
+        notify_rider_assigned(order, rider_user)
+    except Exception as e:
+        logger.warning('Rider push failed for order %s: %s', order.id, e)
+
+
 # ── Rider profile helpers ──────────────────────────────────────────────────────
 
 def _rider_data(rider, owner_id=None):
@@ -231,6 +239,7 @@ def assign_rider(request):
         rider_name=rider.user.get_full_name() or rider.user.username,
         vehicle=rider.get_vehicle_type_display(),
     )
+    _push_rider(order, rider.user)
     return Response({'success': True, 'assignment': _assignment_data(assignment)})
 
 
@@ -340,6 +349,7 @@ def auto_assign_rider(request):
         rider_name=rider.user.get_full_name() or rider.user.username,
         vehicle=rider.get_vehicle_type_display(),
     )
+    _push_rider(order, rider.user)
     return Response({
         'success': True,
         'source': source,

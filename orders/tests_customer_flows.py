@@ -189,6 +189,25 @@ class CustomerFlowTests(TestCase):
         o = Order.objects.get(ordered_by=self.cashier)
         self.assertEqual((o.table_info_id, o.order_type), (self.table.id, 'dine-in'))
 
+    def test_cashier_sees_who_placed_order(self):
+        self._place({'order_type': 'pickup', 'items': self._item()}, self.r_main.id)
+        Order.objects.create(order_number='ORD-CC', table_info=self.table, ordered_by=self.cc, entered_by=self.cashier)
+        orders = {o['order_number']: o for o in self._api(self.cashier).get('/api/v1/orders/').json()['orders']}
+        cust_order = next(o for n, o in orders.items() if n != 'ORD-CC')
+        self.assertEqual((cust_order['ordered_by_name'], cust_order['ordered_by_role']), ('cust', 'Customer'))
+        self.assertEqual(orders['ORD-CC']['ordered_by_role'], 'Customer Care')
+        self.assertEqual(orders['ORD-CC']['entered_by_name'], 'cash')
+
+    def test_order_list_role_lookup_is_not_per_order(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        for i in range(5):
+            Order.objects.create(order_number=f'ORD-Q{i}', table_info=self.table, ordered_by=self.cc)
+        with CaptureQueriesContext(connection) as ctx:
+            self._api(self.cashier).get('/api/v1/orders/')
+        role_queries = [q for q in ctx.captured_queries if 'accounts_role' in q['sql'] and 'FROM "accounts_role"' in q['sql']]
+        self.assertLessEqual(len(role_queries), 3, [q['sql'][:120] for q in role_queries])
+
     def test_profile_tax_updates_restaurant(self):
         self.client.force_login(self.main)
         self.client.post('/accounts/update-tax-rate/', data='{"tax_rate": 0.18}', content_type='application/json')

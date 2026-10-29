@@ -601,6 +601,12 @@ export default function CashierDashboardScreen({ navigation }) {
                 <Text variant="bodySmall" style={styles.meta}>
                   {isDelivery ? '🚴 Delivery' : `Table ${order.table_number}`} · {order.items_count ?? order.items?.length ?? '?'} item{(order.items_count ?? order.items?.length ?? 0) !== 1 ? 's' : ''} · Total: {format(order.total)}
                 </Text>
+                {!!order.ordered_by_name && (
+                  <Text variant="bodySmall" style={styles.meta}>
+                    👤 {order.ordered_by_name}{order.ordered_by_role ? ` · ${order.ordered_by_role}` : ''}
+                    {order.entered_by_name ? `  (entered by ${order.entered_by_name})` : ''}
+                  </Text>
+                )}
                 {order.balance_due > 0 && (
                   <Text variant="bodySmall" style={{ color: theme.colors.error, fontFamily: 'Poppins_600SemiBold' }}>
                     Due: {format(order.balance_due)}
