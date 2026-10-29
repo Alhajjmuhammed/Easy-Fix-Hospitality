@@ -93,7 +93,7 @@ def sync_push(request):
 
 
 def _sync_order(user, owner, data):
-    if not user.has_feature('place_orders'):
+    if not user.is_customer() and not user.has_feature('place_orders'):
         return {'status': 'error', 'error': 'Access denied.'}
     offline_id = data.get('offline_id', '').strip()
 
@@ -303,7 +303,7 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
         Q(table_info__restaurant__branch_owner=owner),
         id=existing_order_id,
     ).first()
-    if not order:
+    if not order or (user.is_customer() and order.ordered_by_id != user.id):
         return {'status': 'error', 'error': f'Order #{existing_order_id} not found.'}
     TERMINAL_STATUSES = {'cancelled', 'delivered', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted', 'out_for_delivery'}
     if order.status in TERMINAL_STATUSES:

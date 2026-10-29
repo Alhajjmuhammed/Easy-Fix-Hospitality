@@ -69,6 +69,13 @@ def browse_restaurants(request):
     })
 
 
+def _remote_order_owner(restaurant_obj):
+    """Branches are served by their branch_owner, main restaurants by main_owner (as in qr_code_access)."""
+    if not restaurant_obj.is_main_restaurant and restaurant_obj.branch_owner:
+        return restaurant_obj.branch_owner
+    return restaurant_obj.main_owner
+
+
 @login_required
 def select_order_type(request, restaurant_id):
     """Choose Delivery or Pickup for a remote-order restaurant."""
@@ -79,23 +86,23 @@ def select_order_type(request, restaurant_id):
         allow_remote_orders=True,
         is_active=True,
     )
-    owner = restaurant_obj.main_owner
+    owner = _remote_order_owner(restaurant_obj)
 
     if request.method == 'POST':
         chosen_type = request.POST.get('order_type', 'pickup')
+        if chosen_type == 'delivery':
+            # order_type is only set once delivery_info has captured address + phone
+            return redirect('restaurant:delivery_info', restaurant_id=restaurant_obj.id)
+
         request.session['selected_restaurant_id'] = owner.id
         request.session['selected_restaurant_name'] = restaurant_obj.name
-        request.session['order_type'] = chosen_type
-        # Clear old table data so it doesn't interfere
-        request.session.pop('selected_table', None)
-        request.session.pop('selected_table_id', None)
-
-        if chosen_type == 'delivery':
-            return redirect('restaurant:delivery_info', restaurant_id=restaurant_obj.id)
-        else:
-            request.session['delivery_address'] = ''
-            request.session['delivery_phone'] = ''
-            return redirect('restaurant:menu')
+        request.session['order_type'] = 'pickup'
+        request.session['delivery_address'] = ''
+        request.session['delivery_phone'] = ''
+        # Clear old table / add-to-order data so it doesn't interfere
+        for key in ('selected_table', 'selected_table_id', 'add_to_order_id', 'order_mode'):
+            request.session.pop(key, None)
+        return redirect('restaurant:menu')
 
     return render(request, 'restaurant/select_order_type.html', {
         'restaurant': restaurant_obj,
@@ -112,7 +119,7 @@ def delivery_info(request, restaurant_id):
         allow_remote_orders=True,
         is_active=True,
     )
-    owner = restaurant_obj.main_owner
+    owner = _remote_order_owner(restaurant_obj)
 
     if request.method == 'POST':
         address = request.POST.get('delivery_address', '').strip()
@@ -127,8 +134,8 @@ def delivery_info(request, restaurant_id):
             request.session['order_type'] = 'delivery'
             request.session['delivery_address'] = address
             request.session['delivery_phone'] = phone
-            request.session.pop('selected_table', None)
-            request.session.pop('selected_table_id', None)
+            for key in ('selected_table', 'selected_table_id', 'add_to_order_id', 'order_mode'):
+                request.session.pop(key, None)
             return redirect('restaurant:menu')
 
     return render(request, 'restaurant/delivery_info.html', {

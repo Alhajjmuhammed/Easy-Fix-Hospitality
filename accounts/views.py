@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -372,6 +373,10 @@ def qr_code_access(request, qr_code):
         request.session['selected_restaurant_id'] = restaurant.id  # User ID
         request.session['selected_restaurant_name'] = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
         request.session['access_method'] = 'qr_code'
+        # A table QR scan always starts a dine-in flow
+        request.session['order_type'] = 'dine-in'
+        for _key in ('delivery_address', 'delivery_phone', 'add_to_order_id', 'order_mode'):
+            request.session.pop(_key, None)
         
         # If user is not logged in, show restaurant info and prompt for login/register
         if not request.user.is_authenticated:
@@ -583,10 +588,17 @@ def update_tax_rate(request):
         if tax_rate < 0 or tax_rate > Decimal('0.9999'):
             return JsonResponse({'success': False, 'message': 'Tax rate must be between 0% and 99.99%'})
         
-        # Update user's tax rate
-        request.user.tax_rate = tax_rate
-        request.user.save()
-        
+        # Orders are charged with Restaurant.tax_rate, so keep it in sync —
+        # same rows the admin-panel profile form updates.
+        with transaction.atomic():
+            request.user.tax_rate = tax_rate
+            request.user.save()
+            if not request.user.is_manager():
+                from restaurant.models_restaurant import Restaurant
+                Restaurant.objects.filter(
+                    Q(main_owner=request.user) | Q(branch_owner=request.user)
+                ).update(tax_rate=tax_rate)
+
         return JsonResponse({'success': True, 'message': 'Tax rate updated successfully',
                             'tax_rate_percentage': float(tax_rate * 100)})
         

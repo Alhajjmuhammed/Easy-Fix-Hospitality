@@ -36,7 +36,17 @@ def get_restaurant_owner(request):
             restaurant = Restaurant.objects.select_related(
                 'branch_owner', 'main_owner'
             ).get(id=int(restaurant_id))
-            return restaurant.branch_owner or restaurant.main_owner
+            owner = restaurant.branch_owner or restaurant.main_owner
+            # Blocking/expiring a subscription deactivates the owner account.
+            if not restaurant.is_active or not owner or not owner.is_active:
+                return None
+            from accounts.models import RestaurantSubscription
+            sub = RestaurantSubscription.objects.filter(
+                restaurant_owner=restaurant.main_owner or owner
+            ).first()
+            if sub and not sub.is_active:
+                return None
+            return owner
         except Exception:
             pass
 

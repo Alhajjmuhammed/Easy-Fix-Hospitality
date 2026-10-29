@@ -312,6 +312,7 @@ def _place_order(request):
         table = TableInfo.objects.filter(_tq_place, id=data['table_id']).first()
 
     # For delivery/pickup get tax rate from the Restaurant model
+    _rest_obj = None
     if table is None:
         from restaurant.models_restaurant import Restaurant as _Restaurant
         _rq = Q(main_owner=owner) | Q(branch_owner=owner)
@@ -329,6 +330,13 @@ def _place_order(request):
         _delivery_tax_rate = _rest_obj.tax_rate if _rest_obj else getattr(owner, 'tax_rate', _D('0.08'))
     else:
         _delivery_tax_rate = None  # will use table.get_tax_rate() below
+
+    if user.is_customer() and order_type in ('delivery', 'pickup'):
+        _remote_rest = _rest_obj or (table.restaurant if table else None)
+        if not _remote_rest or not _remote_rest.allow_remote_orders:
+            return Response({'error': 'This restaurant is not accepting delivery or pickup orders.'}, status=400)
+        if order_type == 'delivery' and not (data.get('delivery_phone') or '').strip():
+            return Response({'error': 'A phone number is required for delivery orders.'}, status=400)
 
     # ── Phase 1: validate all items BEFORE opening the transaction ────────────
     # This ensures no return/error response happens inside the atomic block,

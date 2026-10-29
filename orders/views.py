@@ -114,6 +114,11 @@ def select_table(request):
                 # Store table selection regardless of availability
                 request.session['selected_table'] = table.tbl_no
                 request.session['selected_table_id'] = table.id
+                # Choosing a table means dine-in: drop leftovers from an abandoned
+                # delivery/pickup or add-to-order flow.
+                request.session['order_type'] = 'dine-in'
+                for key in ('delivery_address', 'delivery_phone', 'add_to_order_id', 'order_mode'):
+                    request.session.pop(key, None)
                 # Store the restaurant owner for this session
                 if restaurant:
                     request.session['selected_restaurant_owner'] = restaurant.id
@@ -601,7 +606,18 @@ def place_order(request):
                             Q(main_owner=current_restaurant) |
                             Q(branch_owner=current_restaurant)
                         )
-                        rest_obj = RestaurantModel.objects.filter(_rq).first()
+                        rest_obj = (
+                            RestaurantModel.objects.filter(branch_owner=current_restaurant, is_main_restaurant=False).first()
+                            or RestaurantModel.objects.filter(main_owner=current_restaurant, is_main_restaurant=True).first()
+                            or RestaurantModel.objects.filter(_rq).first()
+                        )
+                        if request.user.is_customer():
+                            if not rest_obj or not rest_obj.allow_remote_orders or not rest_obj.is_active:
+                                messages.error(request, 'This restaurant is not accepting delivery or pickup orders right now.')
+                                return redirect('restaurant:browse_restaurants')
+                            if order_type_session == 'delivery' and not (delivery_address.strip() and delivery_phone.strip()):
+                                messages.error(request, 'Please enter your delivery address and phone number.')
+                                return redirect('restaurant:delivery_info', restaurant_id=rest_obj.id)
                         remote_tax_rate = Decimal(str(rest_obj.tax_rate)) if rest_obj else Decimal(str(getattr(current_restaurant, 'tax_rate', None) or Decimal('0.08')))
 
                         order = Order.objects.create(
@@ -3614,9 +3630,10 @@ def choose_order_action(request):
                 # Create new order - clear any existing cart and go to menu
                 request.session['cart'] = {}
                 request.session['order_mode'] = 'new'
+                request.session.pop('add_to_order_id', None)
                 messages.info(request, f'Creating new order at Table {table.tbl_no}')
                 return redirect('restaurant:menu')
-            
+
             elif action == 'add':
                 # Add to existing order - redirect to order selection
                 return redirect('orders:add_to_existing_order')
@@ -3753,6 +3770,8 @@ def handle_add_to_existing_order(request, order_id, cart):
                     )
                 ).exists()
                 if not table_in_restaurant:
+                    request.session.pop('add_to_order_id', None)
+                    request.session.pop('order_mode', None)
                     messages.error(request, 'Order does not belong to this restaurant.')
                     return redirect('orders:select_table')
 
