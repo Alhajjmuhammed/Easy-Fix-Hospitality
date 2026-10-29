@@ -46,6 +46,12 @@ def _best_shift(owner, restaurant, now_time):
     return global_qs.first()
 
 
+def _shift_for(user, owner, restaurant, now_time):
+    """The shift this person is rostered for today (published roster), else the best match by time."""
+    from .roster import rostered_shift
+    return rostered_shift(user, timezone.localdate()) or _best_shift(owner, restaurant, now_time)
+
+
 def _record_to_dict(rec):
     def fmt(dt):
         return dt.isoformat() if dt else None
@@ -100,7 +106,7 @@ def attendance_scan(request):
     today = timezone.localdate()
     now_time = timezone.localtime().time()
     restaurant = qr.restaurant
-    shift = _best_shift(owner, restaurant, now_time)
+    shift = _shift_for(user, owner, restaurant, now_time)
 
     try:
         record = AttendanceRecord.objects.get(staff=user, date=today)
@@ -154,7 +160,7 @@ def attendance_confirm(request):
     now = timezone.now()
     now_time = timezone.localtime().time()
     restaurant = qr.restaurant
-    shift = _best_shift(owner, restaurant, now_time)
+    shift = _shift_for(user, owner, restaurant, now_time)
 
     with transaction.atomic():
         try:
@@ -225,7 +231,10 @@ def attendance_my(request):
 
     # Pagination: 30 per page
     from django.core.paginator import Paginator
-    page_num = int(request.query_params.get('page', 1))
+    try:
+        page_num = max(1, int(request.query_params.get('page', 1)))
+    except (TypeError, ValueError):
+        page_num = 1
     paginator = Paginator(records, 30)
     page = paginator.get_page(page_num)
 
@@ -253,3 +262,11 @@ def attendance_status(request):
         })
     except AttendanceRecord.DoesNotExist:
         return Response({'checked_in': False, 'checked_out': False, 'record': None})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSubscriptionActive])
+def roster_my(request):
+    """The authenticated staff member's published shifts for the next two weeks."""
+    from .roster import entry_to_dict, upcoming_entries
+    return Response({'entries': [entry_to_dict(e) for e in upcoming_entries(request.user)]})

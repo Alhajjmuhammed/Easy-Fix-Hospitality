@@ -149,6 +149,81 @@ class AttendanceRecord(models.Model):
                 self.overtime_minutes = int((self.check_out - expected_out).total_seconds() / 60)
 
 
+def shift_minutes(shift):
+    """Planned length of a shift in minutes (handles shifts that run past midnight;
+    the same start and end time means a full 24 hours)."""
+    start = shift.start_time.hour * 60 + shift.start_time.minute
+    end = shift.end_time.hour * 60 + shift.end_time.minute
+    return (end - start) % (24 * 60) or 24 * 60
+
+
+class RosterWeek(models.Model):
+    """One team's plan for one week (Monday–Sunday). Staff only see it once published."""
+    STATUS_CHOICES = [('draft', 'Draft'), ('published', 'Published')]
+
+    # The owner account the rostered staff belong to (branch owner, or main/single owner)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='roster_weeks',
+    )
+    week_start = models.DateField(help_text='Monday of the week')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['owner', 'week_start']
+        ordering = ['-week_start']
+
+    def __str__(self):
+        return f"Roster [{self.owner.username}] {self.week_start} ({self.status})"
+
+    @property
+    def is_published(self):
+        return self.status == 'published'
+
+
+class RosterEntry(models.Model):
+    """What one staff member does on one day: a shift, a day off, or leave."""
+    KIND_CHOICES = [('shift', 'Shift'), ('off', 'Day off'), ('leave', 'On leave')]
+
+    week = models.ForeignKey(RosterWeek, on_delete=models.CASCADE, related_name='entries')
+    staff = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='roster_entries',
+    )
+    date = models.DateField()
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='shift')
+    # Kept when the shift is deleted so the cell shows "shift removed" instead of vanishing
+    shift = models.ForeignKey(
+        Shift,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='roster_entries',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['staff', 'date']
+        ordering = ['date']
+
+    def __str__(self):
+        return f"{self.staff.username} {self.date} {self.kind}"
+
+    @property
+    def minutes(self):
+        return shift_minutes(self.shift) if self.kind == 'shift' and self.shift_id else 0
+
+
 class AttendancePolicy(models.Model):
     """Per-owner attendance policy settings."""
     owner = models.OneToOneField(

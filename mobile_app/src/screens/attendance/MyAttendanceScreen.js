@@ -6,7 +6,8 @@ import {
   Text, Card, Chip, ActivityIndicator, Divider, Button, useTheme,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { apiAttendanceMy, apiAttendanceStatus } from '../../api/attendance';
+import { useFocusEffect } from '@react-navigation/native';
+import { apiAttendanceMy, apiAttendanceStatus, apiMyRoster } from '../../api/attendance';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -83,6 +84,44 @@ function TodayStatusCard({ status, loading }) {
             ) : null}
           </View>
         ) : null}
+      </Card.Content>
+    </Card>
+  );
+}
+
+// ─── Upcoming shifts (published roster) ──────────────────────────────────────
+function localIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function fmtRosterDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function UpcomingShiftsCard({ entries }) {
+  if (!entries || entries.length === 0) return null;
+  const today = localIso(new Date());
+  return (
+    <Card style={styles.todayCard}>
+      <Card.Content>
+        <View style={styles.todayHeader}>
+          <MaterialCommunityIcons name="calendar-week" size={22} color="#1565C0" />
+          <Text style={[styles.todayTitle, { color: '#1565C0' }]}>My Upcoming Shifts</Text>
+        </View>
+        {entries.map((e) => (
+          <View key={e.date} style={[styles.shiftRow, e.date === today && styles.shiftRowToday]}>
+            <Text style={styles.shiftDate}>{e.date === today ? 'Today' : fmtRosterDate(e.date)}</Text>
+            {e.kind === 'shift' ? (
+              <Text style={styles.shiftTime}>
+                {e.start_time ? `${e.start_time}–${e.end_time}` : 'Shift to be confirmed'}
+                {e.shift_name ? <Text style={styles.shiftName}>  {e.shift_name}</Text> : null}
+              </Text>
+            ) : (
+              <Text style={[styles.shiftTime, { color: e.kind === 'leave' ? '#E65100' : '#888' }]}>{e.kind_display}</Text>
+            )}
+          </View>
+        ))}
       </Card.Content>
     </Card>
   );
@@ -183,10 +222,24 @@ export default function MyAttendanceScreen() {
 
   const [todayStatus,        setTodayStatus]        = useState(null);
   const [todayStatusLoading, setTodayStatusLoading] = useState(false);
+  const [roster,             setRoster]             = useState([]);
 
   useEffect(() => {
     return () => { mountedRef.current = false; };
   }, []);
+
+  // ── Upcoming shifts (older servers without the roster just return 404 → hidden) ──
+  const fetchRoster = useCallback(async () => {
+    try {
+      const data = await apiMyRoster();
+      if (mountedRef.current) setRoster(data.entries || []);
+    } catch {
+      // Card just won't show
+    }
+  }, []);
+
+  // Refetch whenever the screen comes into view (e.g. opened again from a roster notification)
+  useFocusEffect(useCallback(() => { fetchRoster(); }, [fetchRoster]));
 
   // ── Fetch today status once on mount ────────────────────────────────────────
   useEffect(() => {
@@ -260,6 +313,9 @@ export default function MyAttendanceScreen() {
     <View>
       {/* Today's status */}
       <TodayStatusCard status={todayStatus} loading={todayStatusLoading} />
+
+      {/* Planned shifts */}
+      <UpcomingShiftsCard entries={roster} />
 
       {/* Month selector */}
       <Card style={styles.monthCard}>
@@ -370,7 +426,7 @@ export default function MyAttendanceScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => fetchRecords(1, true)}
+              onRefresh={() => { fetchRoster(); fetchRecords(1, true); }}
               colors={[theme.colors.primary]}
             />
           }
@@ -425,6 +481,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#333',
   },
+
+  // Upcoming shifts
+  shiftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    gap: 10,
+  },
+  shiftRowToday: { backgroundColor: '#E3F2FD' },
+  shiftDate: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: '#2c3e50', width: 96 },
+  shiftTime: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: '#2E7D32', flex: 1 },
+  shiftName: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: '#888' },
 
   // Month selector
   monthCard: { marginBottom: 10, borderRadius: 10 },

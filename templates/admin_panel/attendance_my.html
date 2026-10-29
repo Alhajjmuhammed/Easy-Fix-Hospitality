@@ -105,6 +105,32 @@
 
 <div class="content-wrapper">
 
+    <!-- Upcoming shifts from the published roster -->
+    {% if upcoming_shifts %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="fw-bold mb-3" style="color: var(--primary-color);">
+                <i class="bi bi-calendar-week me-2" style="color: var(--accent-color);"></i>My Upcoming Shifts
+            </h6>
+            <div class="d-flex flex-wrap gap-2">
+                {% for e in upcoming_shifts %}
+                <div class="border rounded px-3 py-2 {% if e.date == today %}border-primary{% endif %}" style="min-width: 130px;">
+                    <div class="small fw-semibold">{{ e.date|date:"D j M" }}{% if e.date == today %} <span class="badge bg-primary" style="font-size: 0.65rem;">Today</span>{% endif %}</div>
+                    {% if e.kind == 'shift' and e.shift %}
+                    <div class="time-mono">{{ e.shift.start_time|time:"H:i" }}–{{ e.shift.end_time|time:"H:i" }}</div>
+                    <div class="small text-muted">{{ e.shift.name }}</div>
+                    {% elif e.kind == 'shift' %}
+                    <div class="small text-muted">Shift to be confirmed</div>
+                    {% else %}
+                    <div class="small text-muted">{{ e.get_kind_display }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Summary Stats -->
     {% if records %}
     <div class="row g-3 mb-4" id="summaryRow">

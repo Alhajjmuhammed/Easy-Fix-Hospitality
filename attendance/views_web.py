@@ -388,9 +388,9 @@ def attendance_web_checkin(request):
         restaurant = owner.get_current_restaurant(request)
 
     # Find appropriate shift
-    from .views_mobile import _best_shift
+    from .views_mobile import _shift_for
     now_time = timezone.localtime().time()
-    shift = _best_shift(owner, restaurant, now_time)
+    shift = _shift_for(user, owner, restaurant, now_time)
 
     try:
         record = AttendanceRecord.objects.get(staff=user, date=today)
@@ -471,7 +471,9 @@ def attendance_my(request):
         staff=user, date__range=(from_date, to_date)
     ).select_related('shift', 'restaurant').order_by('-date')
 
+    from .roster import upcoming_entries
     context = {
+        'upcoming_shifts': upcoming_entries(user),
         'records': records,
         'year': year,
         'month': month,
@@ -498,7 +500,7 @@ def attendance_qr_web_scan(request):
         return JsonResponse({'error': 'POST required'}, status=405)
 
     from django.db import IntegrityError
-    from .views_mobile import _best_shift
+    from .views_mobile import _shift_for
 
     token_str = (request.POST.get('qr_token') or '').strip()
     if not token_str:
@@ -518,7 +520,7 @@ def attendance_qr_web_scan(request):
     now = timezone.now()
     now_time = timezone.localtime().time()
     restaurant = qr.restaurant
-    shift = _best_shift(owner, restaurant, now_time)
+    shift = _shift_for(user, owner, restaurant, now_time)
 
     try:
         record, created = AttendanceRecord.objects.get_or_create(

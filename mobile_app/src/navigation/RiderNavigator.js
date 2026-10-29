@@ -6,9 +6,27 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import RiderDashboardScreen       from '../screens/delivery/RiderDashboardScreen';
 import RiderActiveDeliveryScreen  from '../screens/delivery/RiderActiveDeliveryScreen';
 import ProfileScreen              from '../screens/customer/ProfileScreen';
+import AttendanceScreen           from '../screens/attendance/AttendanceScreen';
+import MyAttendanceScreen         from '../screens/attendance/MyAttendanceScreen';
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const AttendanceStack = createNativeStackNavigator();
+
+const riderHeader = {
+  headerStyle: { backgroundColor: '#1565C0' },
+  headerTintColor: '#fff',
+  headerTitleStyle: { fontFamily: 'Poppins_700Bold' },
+};
+
+function RiderAttendanceStack() {
+  return (
+    <AttendanceStack.Navigator screenOptions={riderHeader}>
+      <AttendanceStack.Screen name="AttendanceMain" component={AttendanceScreen} options={{ title: 'Attendance' }} />
+      <AttendanceStack.Screen name="MyAttendance" component={MyAttendanceScreen} options={{ title: 'My Attendance' }} />
+    </AttendanceStack.Navigator>
+  );
+}
 
 function DeliveryStack() {
   return (
@@ -42,12 +60,13 @@ export default function RiderNavigator() {
         tabBarInactiveTintColor: '#9E9E9E',
         tabBarLabelStyle: { fontFamily: 'Poppins_600SemiBold', fontSize: 11 },
         tabBarIcon: ({ color, size }) => {
-          const icons = { Deliveries: 'motorbike', Profile: 'account-circle' };
+          const icons = { Deliveries: 'motorbike', Attendance: 'badge-account-outline', Profile: 'account-circle' };
           return <MaterialCommunityIcons name={icons[route.name] || 'circle'} size={size} color={color} />;
         },
       })}
     >
       <Tab.Screen name="Deliveries" component={DeliveryStack} options={{ title: 'Deliveries' }} />
+      <Tab.Screen name="Attendance" component={RiderAttendanceStack} options={{ title: 'Attendance' }} />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}

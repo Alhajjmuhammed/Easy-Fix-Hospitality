@@ -197,6 +197,13 @@ def notify_reservation_status(res):
               {'kind': 'reservation', 'reservationId': res.id, 'status': res.status})
 
 
+def notify_roster(staff_ids, title, body, week_start):
+    from accounts.models import User
+    tokens = User.objects.filter(pk__in=staff_ids, is_active=True, expo_push_token__isnull=False) \
+        .exclude(expo_push_token='').values_list('expo_push_token', flat=True)
+    send_push(list(tokens), title, body, {'kind': 'roster', 'week': week_start.isoformat()})
+
+
 def notify_rider_assigned(order, rider_user):
     if not rider_user or not rider_user.expo_push_token:
         return

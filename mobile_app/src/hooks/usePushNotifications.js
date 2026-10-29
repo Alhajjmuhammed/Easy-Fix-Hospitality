@@ -36,6 +36,10 @@ function targetFor(role, data) {
     if (role === 'customer_care') return ['Staff', { screen: 'Payments', params: { screen: 'Reservations', initial: false } }];
     return ['Staff', { screen: 'Dashboard', params: { screen: 'Reservations', initial: false } }];
   }
+  if (data?.kind === 'roster') {
+    const tabs = role === 'delivery_rider' ? 'Rider' : 'Staff';
+    return [tabs, { screen: 'Attendance', params: { screen: 'MyAttendance', initial: false } }];
+  }
   const orderId = data?.orderId;
   if (role === 'customer') {
     // initial: false keeps the list screen underneath so Back returns to it

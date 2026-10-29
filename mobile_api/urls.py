@@ -81,4 +81,5 @@ urlpatterns = [
     path('attendance/confirm/', attendance.attendance_confirm, name='attendance_confirm'),
     path('attendance/my/',      attendance.attendance_my,      name='attendance_my'),
     path('attendance/status/',  attendance.attendance_status,  name='attendance_status'),
+    path('attendance/roster/my/', attendance.roster_my,        name='attendance_roster_my'),
 ]

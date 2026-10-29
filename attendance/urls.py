@@ -1,7 +1,7 @@
 """URL patterns for the attendance app web views (mounted under admin-panel/attendance/)."""
 
 from django.urls import path
-from . import views_web
+from . import views_roster, views_web
 
 app_name = 'attendance'
 
@@ -18,5 +18,7 @@ urlpatterns = [
     path('checkin/qr-scan/', views_web.attendance_qr_web_scan, name='qr_web_scan'),
     path('policy/',       views_web.attendance_policy_toggle, name='policy_toggle'),
     path('my/',           views_web.attendance_my,            name='my'),
+    path('roster/',       views_roster.roster_week,           name='roster'),
+    path('roster/action/', views_roster.roster_action,        name='roster_action'),
 ]
 # Mobile API paths are registered directly in mobile_api/urls.py

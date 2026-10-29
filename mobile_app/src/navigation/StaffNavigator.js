@@ -224,7 +224,7 @@ export default function StaffNavigator() {
           tabBarActiveTintColor: '#2c3e50',
           tabBarInactiveTintColor: '#9E9E9E',
           tabBarIcon: ({ color, size }) => {
-            const icons = { Dashboard: 'view-dashboard', Settings: 'cog-outline' };
+            const icons = { Dashboard: 'view-dashboard', Settings: 'cog-outline', Attendance: 'badge-account-outline' };
             return (
               <MaterialCommunityIcons
                 name={icons[route.name] || 'circle'}
@@ -244,6 +244,11 @@ export default function StaffNavigator() {
           name="Settings"
           component={PrinterSettingsScreen}
           options={{ title: 'Printer', headerShown: false }}
+        />
+        <StationTab.Screen
+          name="Attendance"
+          component={AttendanceStackNavigator}
+          options={{ title: 'Attendance', headerShown: false }}
         />
       </StationTab.Navigator>
     );

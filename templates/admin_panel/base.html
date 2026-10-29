@@ -753,10 +753,16 @@
                 <div class="nav-section">
                     <div class="nav-section-title">Attendance</div>
                     {% if user.is_owner or user.is_branch_owner or user.is_main_owner or 'view_attendance' in feats %}
-                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name != 'my' %}active{% endif %}" href="{% url 'attendance:dashboard' %}" data-tooltip="Attendance">
+                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name != 'my' and request.resolver_match.url_name != 'roster' %}active{% endif %}" href="{% url 'attendance:dashboard' %}" data-tooltip="Attendance">
                         <i class="fas fa-clipboard-list"></i>
                         <span>Attendance</span>
                     </a>
+                    {% if user.is_any_owner or user.is_manager or user.is_customer_care %}{% if 'view_attendance' in feats %}
+                    <a class="nav-link {% if request.resolver_match.namespace == 'attendance' and request.resolver_match.url_name == 'roster' %}active{% endif %}" href="{% url 'attendance:roster' %}" data-tooltip="Weekly Roster">
+                        <i class="fas fa-calendar-week"></i>
+                        <span>Weekly Roster</span>
+                    </a>
+                    {% endif %}{% endif %}
                     {% else %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'attendance' %}active{% endif %}" href="{% url 'attendance:my' %}" data-tooltip="My Attendance">
                         <i class="fas fa-user-clock"></i>
