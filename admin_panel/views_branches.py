@@ -234,6 +234,8 @@ def add_branch(request):
                     delivery_fee=main_restaurant.delivery_fee if main_restaurant else Decimal('0.00'),
                     delivery_fee_taxable=main_restaurant.delivery_fee_taxable if main_restaurant else False,
                     free_delivery_minimum=main_restaurant.free_delivery_minimum if main_restaurant else None,
+                    reservations_auto_confirm=main_restaurant.reservations_auto_confirm if main_restaurant else False,
+                    reservation_duration_minutes=main_restaurant.reservation_duration_minutes if main_restaurant else 120,
                 )
 
                 success_message = f'Branch "{name}" created successfully!'
@@ -312,6 +314,15 @@ def edit_branch(request, restaurant_id):
                 restaurant.delivery_fee = _fee
                 restaurant.free_delivery_minimum = _free_min
                 restaurant.delivery_fee_taxable = request.POST.get('delivery_fee_taxable') == 'on'
+            from .views import _parse_reservation_settings
+            try:
+                _res_settings = _parse_reservation_settings(request.POST)
+            except ValueError as e:
+                messages.error(request, str(e))
+                return render(request, 'admin_panel/edit_branch.html', {'restaurant': restaurant})
+            if _res_settings is not None:
+                (restaurant.reservations_enabled, restaurant.reservations_auto_confirm,
+                 restaurant.reservation_duration_minutes) = _res_settings
 
             # Update branch owner details if they exist
             if restaurant.branch_owner:

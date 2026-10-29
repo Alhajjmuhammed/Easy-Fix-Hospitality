@@ -1,0 +1,139 @@
+{% extends base_template %}
+
+{% block title %}Reservations{% endblock %}
+
+{% block extra_css %}
+<style>
+.res-status { font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; }
+.res-status.pending   { background:#fff3cd; color:#7a5b00; }
+.res-status.confirmed { background:#d1e7dd; color:#0f5132; }
+.res-status.seated    { background:#cfe2ff; color:#084298; }
+.res-status.completed { background:#e2e3e5; color:#41464b; }
+.res-status.declined, .res-status.cancelled, .res-status.no_show { background:#f8d7da; color:#842029; }
+.res-time { font-weight: 700; font-size: 1.1rem; min-width: 4.5rem; }
+.res-card { border-left: 4px solid #dee2e6; }
+.res-card.pending { border-left-color: #ffc107; }
+.res-card.confirmed { border-left-color: #198754; }
+.res-card.seated { border-left-color: #0d6efd; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <h3 class="mb-0"><i class="fas fa-chair me-2 text-success"></i>Reservations</h3>
+        {% if can_manage %}
+        <button class="btn btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#addBooking">
+            <i class="fas fa-plus me-1"></i>Add booking
+        </button>
+        {% endif %}
+    </div>
+
+    {% if can_manage %}
+    <div class="collapse mb-3" id="addBooking">
+        <div class="card card-body">
+            <form method="post" class="row g-2">
+                {% csrf_token %}
+                {% if restaurants|length > 1 %}
+                <div class="col-md-3">
+                    <label class="form-label small">Restaurant</label>
+                    <select name="restaurant_id" class="form-select" required>
+                        {% for r in restaurants %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-3"><label class="form-label small">Name *</label><input name="name" class="form-control" required maxlength="120"></div>
+                <div class="col-md-2"><label class="form-label small">Phone *</label><input name="phone" class="form-control" required maxlength="30"></div>
+                <div class="col-md-1"><label class="form-label small">People *</label><input name="party_size" type="number" min="1" max="100" value="2" class="form-control" required></div>
+                <div class="col-md-2"><label class="form-label small">Date *</label><input name="date" type="date" class="form-control" value="{{ day|date:'Y-m-d' }}" required></div>
+                <div class="col-md-1"><label class="form-label small">Time *</label><input name="time" type="time" class="form-control" required></div>
+                {% if restaurants|length == 1 %}
+                <div class="col-md-2">
+                    <label class="form-label small">Table (optional)</label>
+                    <select name="table_id" class="form-select">
+                        <option value="">—</option>
+                        {% for t in single_restaurant_tables %}<option value="{{ t.id }}">{{ t.tbl_no }} ({{ t.capacity }})</option>{% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-8"><label class="form-label small">Notes</label><input name="notes" class="form-control" maxlength="1000" placeholder="Birthday, window seat…"></div>
+                <div class="col-md-2"><label class="form-label small">Email</label><input name="email" type="email" class="form-control"></div>
+                <div class="col-md-2 d-flex align-items-end"><button class="btn btn-success w-100" type="submit">Save</button></div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if pending_upcoming %}
+    <div class="alert alert-warning">
+        <strong><i class="fas fa-hourglass-half me-1"></i>{{ pending_upcoming|length }} booking{{ pending_upcoming|length|pluralize }} waiting for confirmation:</strong>
+        {% for p in pending_upcoming %}
+            <a class="ms-2" href="?date={{ p.start|date:'Y-m-d' }}&status=pending">{{ p.start|date:'D d M H:i' }} – {{ p.name }} ({{ p.party_size }})</a>{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <a class="btn btn-outline-secondary btn-sm" href="?date={{ prev_day|date:'Y-m-d' }}&status={{ status_filter }}">&laquo;</a>
+        <form method="get" class="d-flex gap-2">
+            <input type="date" name="date" class="form-control form-control-sm" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()">
+            <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                {% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </form>
+        <a class="btn btn-outline-secondary btn-sm" href="?date={{ next_day|date:'Y-m-d' }}&status={{ status_filter }}">&raquo;</a>
+        {% if day != today %}<a class="btn btn-link btn-sm" href="?status={{ status_filter }}">Today</a>{% endif %}
+        <span class="ms-auto text-muted">{{ day|date:'l, d F Y' }} · {{ rows|length }} booking{{ rows|length|pluralize }}</span>
+    </div>
+
+    {% for row in rows %}{% with res=row.res %}
+    <div class="card mb-2 res-card {{ res.status }}">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <div class="res-time">{{ res.start|date:'H:i' }}</div>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold">{{ res.name }} <span class="text-muted fw-normal">· {{ res.party_size }} people · {{ res.phone }}</span></div>
+                    <div class="small text-muted">
+                        {% if restaurants|length > 1 %}{{ res.restaurant.name }} · {% endif %}
+                        Table: {% if res.table %}{{ res.table.tbl_no }}{% else %}not assigned{% endif %}
+                        · {{ res.get_source_display }}
+                        {% if res.notes %}· “{{ res.notes }}”{% endif %}
+                    </div>
+                    {% for w in row.warnings %}<div class="small text-danger"><i class="fas fa-exclamation-triangle me-1"></i>{{ w }}</div>{% endfor %}
+                </div>
+                <span class="badge res-status {{ res.status }}">{{ res.get_status_display }}</span>
+            </div>
+            {% if can_manage %}
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                {% for value, label in row.next_statuses %}
+                <form method="post" action="{% url 'restaurant:reservation_action' res.pk %}">
+                    {% csrf_token %}<input type="hidden" name="action" value="status"><input type="hidden" name="status" value="{{ value }}">
+                    <button class="btn btn-sm {% if value == 'confirmed' or value == 'seated' or value == 'completed' %}btn-success{% elif value == 'declined' or value == 'cancelled' or value == 'no_show' %}btn-outline-danger{% else %}btn-outline-secondary{% endif %}" type="submit">{{ label }}</button>
+                </form>
+                {% endfor %}
+                {% if res.is_active %}
+                <form method="post" action="{% url 'restaurant:reservation_action' res.pk %}" class="d-flex gap-1">
+                    {% csrf_token %}<input type="hidden" name="action" value="table">
+                    <select name="table_id" class="form-select form-select-sm" style="width:auto">
+                        <option value="">No table</option>
+                        {% for t in row.tables %}<option value="{{ t.id }}" {% if res.table_id == t.id %}selected{% endif %}>{{ t.tbl_no }} ({{ t.capacity }})</option>{% endfor %}
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Set table</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{% url 'restaurant:reservation_action' res.pk %}" class="d-flex gap-1 flex-grow-1">
+                    {% csrf_token %}<input type="hidden" name="action" value="notes">
+                    <input name="staff_notes" class="form-control form-control-sm" value="{{ res.staff_notes }}" placeholder="Staff notes" maxlength="1000">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">Save</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endwith %}{% empty %}
+    <div class="text-center text-muted py-5"><i class="fas fa-chair fa-2x mb-2 d-block"></i>No bookings for this day.</div>
+    {% endfor %}
+</div>
+{% endblock %}

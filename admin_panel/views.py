@@ -112,6 +112,23 @@ def _parse_delivery_settings(data):
     return fee, free_min
 
 
+def _parse_reservation_settings(data):
+    """
+    (reservations_enabled, auto_confirm, duration_minutes) from a submitted form, or None
+    when the form has no reservations section. Raises ValueError with a user-facing message.
+    """
+    if 'reservation_duration_minutes' not in data:
+        return None
+    raw = (data.get('reservation_duration_minutes') or '').strip()
+    try:
+        duration = int(raw) if raw else 120
+    except ValueError:
+        raise ValueError('Booking length must be a whole number of minutes.')
+    if not 15 <= duration <= 720:
+        raise ValueError('Booking length must be between 15 and 720 minutes.')
+    return data.get('reservations_enabled') == 'on', data.get('reservations_auto_confirm') == 'on', duration
+
+
 def _own_restaurant(user):
     """The restaurant an owner's profile page shows and edits: their branch, or their main restaurant."""
     from restaurant.models_restaurant import Restaurant
@@ -4263,16 +4280,25 @@ def profile(request):
                     messages.error(request, str(e))
                     return redirect('admin_panel:profile')
                 delivery_fee_taxable = request.POST.get('delivery_fee_taxable') == 'on'
+                try:
+                    reservation_settings = _parse_reservation_settings(request.POST)
+                except ValueError as e:
+                    messages.error(request, str(e))
+                    return redirect('admin_panel:profile')
                 own_restaurant = _own_restaurant(request.user)
                 for restaurant in user_restaurants:
                     restaurant.tax_rate = tax_rate_decimal
                     restaurant.allow_remote_orders = allow_remote_orders
-                    # Only the restaurant shown on this page — branches keep their own delivery settings.
-                    # (field absent from the form → keep current settings)
-                    if delivery_fee is not None and own_restaurant is not None and restaurant.pk == own_restaurant.pk:
+                    # Only the restaurant shown on this page — branches keep their own delivery
+                    # and reservation settings. (field absent from the form → keep current settings)
+                    is_own = own_restaurant is not None and restaurant.pk == own_restaurant.pk
+                    if delivery_fee is not None and is_own:
                         restaurant.delivery_fee = delivery_fee
                         restaurant.free_delivery_minimum = free_delivery_minimum
                         restaurant.delivery_fee_taxable = delivery_fee_taxable
+                    if reservation_settings is not None and is_own:
+                        (restaurant.reservations_enabled, restaurant.reservations_auto_confirm,
+                         restaurant.reservation_duration_minutes) = reservation_settings
                     restaurant.save()
                     logger.info(f"UPDATE_RESTAURANT: Updated restaurant {restaurant.name} tax_rate to {tax_rate_decimal}")
                 

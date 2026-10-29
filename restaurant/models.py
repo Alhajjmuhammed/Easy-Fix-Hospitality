@@ -759,3 +759,8 @@ class Event(models.Model):
         # Auto-update payment status
         self.update_payment_status()
         super().save(*args, **kwargs)
+
+
+# Table reservations live in their own module
+from .models_reservation import Reservation, reservations_for_owner  # noqa: E402,F401
+

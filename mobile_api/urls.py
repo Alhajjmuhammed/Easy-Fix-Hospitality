@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants, delivery
+from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants, delivery, reservations
 from attendance import views_mobile as attendance
 
 app_name = 'mobile_api'
@@ -69,6 +69,12 @@ urlpatterns = [
     path('delivery/<int:order_id>/track/',         delivery.track_order,         name='delivery_track'),
     path('delivery/<int:order_id>/pickup/',        delivery.mark_picked_up,      name='delivery_pickup'),
     path('delivery/<int:order_id>/complete/',      delivery.mark_delivered,      name='delivery_complete'),
+
+    # ── Reservations ──────────────────────────────────────────────────────
+    path('reservations/',                       reservations.reservations,       name='reservations'),
+    path('reservations/<int:pk>/status/',       reservations.reservation_status, name='reservation_status'),
+    path('reservations/<int:pk>/table/',        reservations.reservation_table,  name='reservation_table'),
+    path('reservations/<int:pk>/cancel/',       reservations.reservation_cancel, name='reservation_cancel'),
 
     # ── Attendance ────────────────────────────────────────────────────────
     path('attendance/scan/',    attendance.attendance_scan,    name='attendance_scan'),

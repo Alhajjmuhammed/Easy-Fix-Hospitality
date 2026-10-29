@@ -15,6 +15,8 @@ def _delivery_settings(r):
         'delivery_fee': float(r.delivery_fee or 0),
         'delivery_fee_taxable': r.delivery_fee_taxable,
         'free_delivery_minimum': float(r.free_delivery_minimum) if r.free_delivery_minimum is not None else None,
+        'reservations_enabled': r.reservations_enabled,
+        'reservations_auto_confirm': r.reservations_auto_confirm,
     }
 
 

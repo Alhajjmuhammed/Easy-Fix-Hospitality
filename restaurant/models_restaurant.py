@@ -6,7 +6,7 @@ Supports main owners with multiple branches based on subscription plans.
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 import uuid
 import os
@@ -287,6 +287,15 @@ class Restaurant(models.Model):
         validators=[MinValueValidator(Decimal('0.00'))],
         help_text="Delivery is free when the food subtotal reaches this amount (empty = always charge)"
     )
+
+    # Table reservations (each restaurant decides; off by default)
+    reservations_enabled = models.BooleanField(
+        default=False, help_text="Customers can book a table online")
+    reservations_auto_confirm = models.BooleanField(
+        default=False, help_text="Confirm online bookings automatically (otherwise staff accept or decline each one)")
+    reservation_duration_minutes = models.PositiveSmallIntegerField(
+        default=120, validators=[MinValueValidator(15), MaxValueValidator(720)],
+        help_text="How long a booking holds its table (used to warn about double-booking)")
 
     @classmethod
     def for_owner(cls, owner):

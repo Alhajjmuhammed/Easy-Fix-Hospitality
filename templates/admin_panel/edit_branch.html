@@ -372,6 +372,25 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="row g-3 mt-2">
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="reservations_enabled" name="reservations_enabled"
+                                               {% if restaurant.reservations_enabled %}checked{% endif %}>
+                                        <label class="form-check-label" for="reservations_enabled"><strong>Accept table reservations</strong></label>
+                                    </div>
+                                    <div class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="reservations_auto_confirm" name="reservations_auto_confirm"
+                                               {% if restaurant.reservations_auto_confirm %}checked{% endif %}>
+                                        <label class="form-check-label" for="reservations_auto_confirm">Confirm bookings automatically</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="reservation_duration_minutes" class="form-label">Booking length (minutes)</label>
+                                    <input type="number" class="form-control" id="reservation_duration_minutes" name="reservation_duration_minutes"
+                                           min="15" max="720" step="15" value="{{ restaurant.reservation_duration_minutes }}">
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Submit Buttons -->

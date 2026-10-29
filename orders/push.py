@@ -142,6 +142,50 @@ def notify_new_order(order):
               {'kind': 'new_order', 'orderId': order.id})
 
 
+RESERVATION_ROLES = ('cashier', 'customer_care', 'manager')
+
+RESERVATION_STATUS_MESSAGES = {
+    'confirmed': ('Reservation Confirmed ✅', 'Your table for {party} on {when} is confirmed.'),
+    'declined':  ('Reservation Not Available', 'Sorry, we could not confirm your table for {when}.'),
+    'cancelled': ('Reservation Cancelled', 'Your reservation for {when} has been cancelled.'),
+}
+
+
+def _reservation_when(res):
+    from django.utils import timezone as _tz
+    return _tz.localtime(res.start).strftime('%a %d %b, %H:%M')
+
+
+def notify_new_reservation(res):
+    """Front-of-house staff of the restaurant (never the person who created it)."""
+    from accounts.models import User
+    owner = res.restaurant.branch_owner or res.restaurant.main_owner
+    if owner is None:
+        return
+    tokens = list(
+        User.objects.filter(owner=owner, is_active=True, role__name__in=RESERVATION_ROLES,
+                            expo_push_token__isnull=False)
+        .exclude(pk=res.created_by_id)
+        .values_list('expo_push_token', flat=True)
+    )
+    status = 'awaiting confirmation' if res.status == 'pending' else 'confirmed'
+    send_push(tokens, f'New Reservation • {res.party_size} people',
+              f'{res.name} — {_reservation_when(res)} ({status})',
+              {'kind': 'reservation', 'reservationId': res.id})
+
+
+def notify_reservation_status(res):
+    customer = res.customer
+    if not customer or not customer.expo_push_token or not customer.is_customer():
+        return
+    if res.status not in RESERVATION_STATUS_MESSAGES:
+        return
+    title, body = RESERVATION_STATUS_MESSAGES[res.status]
+    send_push([customer.expo_push_token], title,
+              body.format(party=f'{res.party_size} people', when=_reservation_when(res)),
+              {'kind': 'reservation', 'reservationId': res.id, 'status': res.status})
+
+
 def notify_rider_assigned(order, rider_user):
     if not rider_user or not rider_user.expo_push_token:
         return

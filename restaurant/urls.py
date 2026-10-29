@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import views_reservations
 
 app_name = 'restaurant'
 
@@ -34,4 +35,11 @@ urlpatterns = [
     path('events/<int:event_id>/record-payment/', views.record_event_payment, name='record_event_payment'),
     path('events/<int:event_id>/approve-payment/', views.approve_event_payment, name='approve_event_payment'),
     path('events/reports/', views.event_reports, name='event_reports'),
+
+    # Table Reservations
+    path('reservations/', views_reservations.manage_reservations, name='manage_reservations'),
+    path('reservations/<int:pk>/action/', views_reservations.reservation_action, name='reservation_action'),
+    path('browse/<int:restaurant_id>/book/', views_reservations.book_table, name='book_table'),
+    path('my-reservations/', views_reservations.my_reservations, name='my_reservations'),
+    path('my-reservations/<int:pk>/cancel/', views_reservations.cancel_my_reservation, name='cancel_my_reservation'),
 ]

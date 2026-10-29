@@ -47,11 +47,12 @@
 </div>
 
 <div class="container" style="max-width:560px; padding: 2.5rem 1rem;">
-    <h5 class="fw-bold mb-4 text-center" style="color:#1a1a2e">How would you like to receive your order?</h5>
+    <h5 class="fw-bold mb-4 text-center" style="color:#1a1a2e">{% if restaurant.allow_remote_orders %}How would you like to receive your order?{% else %}What would you like to do?{% endif %}</h5>
 
+    {% if restaurant.allow_remote_orders %}
     <form method="post">
         {% csrf_token %}
-        <div class="row g-3 mb-4">
+        <div class="row g-3 mb-3">
             <!-- Delivery -->
             <div class="col-12">
                 <button type="submit" name="order_type" value="delivery"
@@ -83,6 +84,25 @@
             </div>
         </div>
     </form>
+    {% endif %}
+
+    {% if restaurant.reservations_enabled %}
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <a href="{% url 'restaurant:book_table' restaurant.id %}"
+               class="order-type-card w-100 text-start d-flex align-items-center gap-3 text-decoration-none">
+                <div class="ot-icon" style="background:#e8f5e9; color:#2e7d32">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                <div>
+                    <div class="fw-bold fs-6" style="color:#2e7d32">Book a table</div>
+                    <div class="text-muted small">Reserve a table for dining in</div>
+                </div>
+                <i class="bi bi-chevron-right ms-auto text-muted"></i>
+            </a>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="text-center">
         <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-secondary btn-sm">

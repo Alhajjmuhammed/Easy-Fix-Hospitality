@@ -11,6 +11,8 @@ DEFAULT_ROLE_FEATURES = {
         'request_bill',
         # Delivery
         'view_delivery', 'manage_delivery',
+        # Reservations
+        'view_reservations', 'manage_reservations',
         # Payments
         'process_payments', 'void_payments', 'view_receipts',
         # Station
@@ -34,6 +36,7 @@ DEFAULT_ROLE_FEATURES = {
         'view_orders', 'place_orders', 'manage_orders', 'cancel_orders', 'transfer_orders',
         'request_bill', 'process_payments', 'view_receipts',
         'view_waste', 'log_waste', 'view_reports', 'view_attendance',
+        'view_reservations', 'manage_reservations',
     ],
     'kitchen': ['kitchen_dashboard'],
     'bar': ['bar_dashboard'],
@@ -44,6 +47,7 @@ DEFAULT_ROLE_FEATURES = {
         'request_bill', 'process_payments', 'void_payments', 'view_receipts',
         'view_waste', 'log_waste', 'view_reports', 'export_reports',
         'view_inventory',
+        'view_reservations', 'manage_reservations',
     ],
     'delivery_rider': ['view_delivery', 'manage_delivery'],
 }
@@ -61,6 +65,9 @@ ALL_FEATURES = [
     # Delivery
     ('view_delivery',     'View Delivery',            'View delivery orders and rider assignments', 'orders'),
     ('manage_delivery',   'Manage Delivery',          'Assign riders and manage delivery order lifecycle', 'orders'),
+    # Reservations
+    ('view_reservations',   'View Reservations',      'View table reservations (read-only)', 'orders'),
+    ('manage_reservations', 'Manage Reservations',    'Create, confirm, decline, assign tables and update reservations (includes view)', 'orders'),
     # Payments
     ('process_payments',  'Process Payments',         'Accept cash, card, digital and voucher payments', 'payments'),
     ('void_payments',     'Void Payments',            'Void and reverse processed payments with audit trail', 'payments'),

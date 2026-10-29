@@ -296,6 +296,35 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <hr>
+                            <h6 class="mb-3"><i class="fas fa-chair me-2"></i>Table Reservations</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="reservations_enabled"
+                                               name="reservations_enabled" {% if current_restaurant.reservations_enabled %}checked{% endif %}>
+                                        <label class="form-check-label" for="reservations_enabled">
+                                            <strong>Accept table reservations</strong>
+                                            <small class="d-block text-muted">Customers can book a table from the website and app.</small>
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="reservations_auto_confirm"
+                                               name="reservations_auto_confirm" {% if current_restaurant.reservations_auto_confirm %}checked{% endif %}>
+                                        <label class="form-check-label" for="reservations_auto_confirm">
+                                            <strong>Confirm bookings automatically</strong>
+                                            <small class="d-block text-muted">If off, staff accept or decline each booking.</small>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="reservation_duration_minutes" class="form-label">Booking length (minutes)</label>
+                                    <input type="number" class="form-control" id="reservation_duration_minutes" name="reservation_duration_minutes"
+                                           min="15" max="720" step="15" value="{{ current_restaurant.reservation_duration_minutes|default:120 }}">
+                                    <small class="text-muted">How long a booking holds its table. Used to warn about double-booking.</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

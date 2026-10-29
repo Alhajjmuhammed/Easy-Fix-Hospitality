@@ -55,7 +55,9 @@ def browse_restaurants(request):
         active_restaurant_name = request.session.get('selected_restaurant_name', 'your restaurant')
 
     search = request.GET.get('q', '').strip()
-    qs = RestaurantModel.objects.filter(allow_remote_orders=True, is_active=True).select_related('main_owner')
+    qs = RestaurantModel.objects.filter(
+        Q(allow_remote_orders=True) | Q(reservations_enabled=True), is_active=True,
+    ).select_related('main_owner')
     if search:
         qs = qs.filter(
             Q(name__icontains=search) |
@@ -92,14 +94,16 @@ def select_order_type(request, restaurant_id):
     """Choose Delivery or Pickup for a remote-order restaurant."""
     from restaurant.models_restaurant import Restaurant as RestaurantModel
     restaurant_obj = get_object_or_404(
-        RestaurantModel,
+        RestaurantModel.objects.filter(Q(allow_remote_orders=True) | Q(reservations_enabled=True)),
         id=restaurant_id,
-        allow_remote_orders=True,
         is_active=True,
     )
     owner = _remote_order_owner(restaurant_obj)
 
     if request.method == 'POST':
+        if not restaurant_obj.allow_remote_orders:  # booking-only restaurant: no delivery/pickup
+            messages.error(request, 'This restaurant is not taking delivery or pickup orders.')
+            return redirect('restaurant:select_order_type', restaurant_id=restaurant_obj.id)
         chosen_type = request.POST.get('order_type', 'pickup')
         if chosen_type == 'delivery':
             # order_type is only set once delivery_info has captured address + phone
