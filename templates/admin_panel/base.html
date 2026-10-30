@@ -736,7 +736,7 @@
 
                     <!-- Inventory -->
                     {% if 'manage_inventory' in feats %}
-                    <a class="nav-link {% if request.resolver_match.namespace == 'inventory' and request.resolver_match.url_name != 'suppliers' and 'po_' not in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:dashboard' %}" data-tooltip="Inventory">
+                    <a class="nav-link {% if request.resolver_match.namespace == 'inventory' and request.resolver_match.url_name != 'suppliers' and 'po_' not in request.resolver_match.url_name and 'recipe' not in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:dashboard' %}" data-tooltip="Inventory">
                         <i class="fas fa-boxes"></i>
                         <span>Inventory</span>
                     </a>
@@ -745,6 +745,10 @@
                     <a class="nav-link {% if request.resolver_match.namespace == 'inventory' and 'po_' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:po_list' %}" data-tooltip="Purchase Orders">
                         <i class="fas fa-file-invoice"></i>
                         <span>Purchase Orders</span>
+                    </a>
+                    <a class="nav-link {% if request.resolver_match.namespace == 'inventory' and 'recipe' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'inventory:recipes' %}" data-tooltip="Recipes">
+                        <i class="fas fa-utensils"></i>
+                        <span>Recipes</span>
                     </a>
                     <a class="nav-link {% if request.resolver_match.namespace == 'inventory' and request.resolver_match.url_name == 'suppliers' %}active{% endif %}" href="{% url 'inventory:suppliers' %}" data-tooltip="Suppliers">
                         <i class="fas fa-truck"></i>

@@ -1,0 +1,64 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Recipes{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-0"><i class="fas fa-utensils me-2"></i>Recipes &amp; Food Cost</h1>
+            <div class="small text-muted">{{ with_recipe }} of {{ total }} dishes have a recipe. Ingredients are taken from stock when the kitchen starts preparing an order.</div>
+        </div>
+        <div class="btn-group btn-group-sm">
+            <a class="btn btn-outline-secondary {% if not show %}active{% endif %}" href="?">All</a>
+            <a class="btn btn-outline-secondary {% if show == 'with' %}active{% endif %}" href="?show=with">With recipe</a>
+            <a class="btn btn-outline-secondary {% if show == 'missing' %}active{% endif %}" href="?show=missing">No recipe yet</a>
+        </div>
+    </div>
+    {% include 'inventory/_purchasing_nav.html' %}
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            {% if rows %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light"><tr>
+                        <th class="ps-3">Dish</th><th>Category</th><th class="text-center">Ingredients</th>
+                        <th class="text-end">Price</th><th class="text-end">Food cost</th><th class="text-end">Margin</th><th class="pe-3"></th>
+                    </tr></thead>
+                    <tbody>
+                        {% for r in rows %}
+                        <tr>
+                            <td class="ps-3">
+                                <div class="fw-semibold">{{ r.product.name }}</div>
+                                {% if r.out_of_stock %}<div class="small text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Out of stock: {{ r.out_of_stock|join:", " }}</div>{% endif %}
+                            </td>
+                            <td class="small text-muted">{{ r.product.main_category.name }}</td>
+                            <td class="text-center">{% if r.count %}{{ r.count }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                            <td class="text-end">{{ currency_symbol }}{{ r.product.price|floatformat:2 }}</td>
+                            <td class="text-end">
+                                {% if r.cost is not None %}{{ currency_symbol }}{{ r.cost|floatformat:2 }}{% if not r.complete %}<div class="small text-warning" title="Some ingredients have no cost price in inventory">prices missing</div>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                            <td class="text-end fw-semibold {% if r.margin is not None %}{% if r.margin < 30 %}text-danger{% elif r.margin < 60 %}text-warning{% else %}text-success{% endif %}{% endif %}">
+                                {% if r.margin is not None %}{{ r.margin }}%{% else %}<span class="text-muted fw-normal">—</span>{% endif %}
+                            </td>
+                            <td class="pe-3 text-end">
+                                <a class="btn btn-sm {% if r.count %}btn-outline-primary{% else %}btn-primary{% endif %}" href="{% url 'inventory:recipe_edit' r.product.pk %}">
+                                    {% if can_manage %}{% if r.count %}Edit{% else %}Add recipe{% endif %}{% else %}View{% endif %}
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-utensils fa-3x mb-3" style="opacity:.3"></i>
+                <p class="mb-0">{% if total %}No dishes match this filter.{% else %}No menu dishes yet.{% endif %}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

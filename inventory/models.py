@@ -140,6 +140,13 @@ class InventoryRecord(models.Model):
         null=True, blank=True,
         related_name='stock_records'
     )
+    # Set when the stock was taken out (or put back) for a customer order through a recipe
+    source_order = models.ForeignKey(
+        'orders.Order',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='stock_records'
+    )
 
     class Meta:
         ordering = ['-recorded_at']
@@ -319,3 +326,22 @@ class SupplierPayment(models.Model):
 
     def __str__(self):
         return f"{self.order.code} {self.amount}"
+
+
+# ---------------------------------------------------------------------------
+# Recipes
+# ---------------------------------------------------------------------------
+
+class RecipeIngredient(models.Model):
+    """How much of an inventory item one serving of a menu product uses."""
+    product = models.ForeignKey('restaurant.Product', on_delete=models.CASCADE, related_name='recipe_ingredients')
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='recipe_uses')
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))],
+                                   help_text='Per one serving, in the item\'s unit')
+
+    class Meta:
+        ordering = ['id']
+        unique_together = ['product', 'item']
+
+    def __str__(self):
+        return f"{self.product_id}: {self.item.name} × {self.quantity}"
