@@ -26,6 +26,12 @@ from .models_sms import SmsAccount, SmsLog
 logger = logging.getLogger(__name__)
 
 
+def sms_enabled():
+    """SMS costs money per message: it stays completely off until settings.SMS_ENABLED = True."""
+    from django.conf import settings
+    return bool(getattr(settings, 'SMS_ENABLED', False))
+
+
 def _lang(user):
     """The customer's chosen language (staff-entered bookings and walk-ins: English)."""
     return language_of(user) if user is not None and user.is_customer() else 'en'
@@ -110,6 +116,8 @@ def _restaurant_of(owner):
 def send(owner, event, phone, message, order=None, reservation_id=None, force=False, restaurant=None):
     """Create the log row and deliver it. Call from background jobs (or the settings test button).
     Returns the SmsLog, or None when not sent (switched off, no/foreign number, already sent, limit)."""
+    if not sms_enabled():
+        return None
     acc = account_for(owner)
     if acc is None or (not force and event not in (acc.events or [])):
         return None
@@ -176,7 +184,9 @@ def _deliver(log_id, acc=None):
 
 def retry_stuck(minutes=5):
     """For the scheduled job: texts left 'queued' (worker restarted mid-send) are tried once more."""
-    stuck = SmsLog.objects.filter(status='queued', created_at__lt=timezone.now() - timedelta(minutes=minutes),
+    if not sms_enabled():
+        return 0
+    stuck =SmsLog.objects.filter(status='queued', created_at__lt=timezone.now() - timedelta(minutes=minutes),
                                   created_at__gte=timezone.now() - timedelta(hours=6)).select_related('account')
     n = 0
     for log in stuck[:100]:
@@ -190,6 +200,8 @@ def retry_stuck(minutes=5):
 
 def _later(job, *args):
     """Run job(*args) after the current transaction commits, in a background thread. No queries here."""
+    if not sms_enabled():
+        return
     from .push import _in_background
 
     def run():

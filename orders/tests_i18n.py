@@ -2,7 +2,7 @@ import datetime
 from decimal import Decimal
 from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from accounts.models import Role, RestaurantSubscription, User
@@ -16,6 +16,7 @@ def role(name):
     return Role.objects.get_or_create(name=name)[0]
 
 
+@override_settings(SMS_ENABLED=True)
 class LanguageTests(TestCase):
     def setUp(self):
         self.push = mock.patch('orders.push.send_push')

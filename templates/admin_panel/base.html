@@ -689,10 +689,6 @@
                         <i class="fas fa-mobile-alt text-success"></i>
                         <span>Mobile Money</span>
                     </a>
-                    <a class="nav-link {% if request.resolver_match.namespace == 'orders' and request.resolver_match.url_name == 'sms_settings' %}active{% endif %}" href="{% url 'orders:sms_settings' %}" data-tooltip="SMS Messages">
-                        <i class="fas fa-sms text-info"></i>
-                        <span>SMS Messages</span>
-                    </a>
                     {% endif %}
                     {% if 'view_feedback' in feats %}{% if not user.is_administrator %}
                     <a class="nav-link {% if request.resolver_match.namespace == 'orders' and 'feedback' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'orders:feedback' %}" data-tooltip="Customer Feedback">

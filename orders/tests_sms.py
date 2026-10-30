@@ -4,7 +4,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import Role, RestaurantSubscription, User
@@ -23,6 +23,7 @@ def role(name):
     return Role.objects.get_or_create(name=name)[0]
 
 
+@override_settings(SMS_ENABLED=True)
 class SmsTests(TestCase):
     def setUp(self):
         self.sent = []
@@ -174,6 +175,17 @@ class SmsTests(TestCase):
                                        start=timezone.now() + datetime.timedelta(days=2), customer=self.cust,
                                        created_by=self.cust, source='web')
         self.assertEqual([to for to, _ in self.sent], ['+254712345678'])  # typed number is never texted
+
+    # ---------- switched off by default (SMS costs money) ----------
+    def test_everything_off_without_the_setting(self):
+        with override_settings(SMS_ENABLED=False):
+            self._status(self._order(), 'confirmed')
+            self.assertEqual(self.sent, [])
+            self.assertFalse(SmsLog.objects.exists())
+            self.assertIsNone(sms.send(self.main, 'test', '0712345678', 'hi', force=True))
+            self.client.force_login(self.main)
+            self.assertEqual(self.client.get('/orders/sms-settings/').status_code, 302)
+            self.assertNotIn('sms-settings', self.client.get('/admin-panel/profile/').content.decode())
 
     # ---------- settings ----------
     def test_settings_page(self):

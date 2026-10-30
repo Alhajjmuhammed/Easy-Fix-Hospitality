@@ -10,6 +10,9 @@ from . import sms as svc
 @login_required
 def sms_settings(request):
     user = request.user
+    if not svc.sms_enabled():
+        messages.info(request, 'SMS messages are not available yet.')
+        return redirect('restaurant:home')
     if not user.is_any_owner():
         messages.error(request, 'Only restaurant owners can set up SMS.')
         return redirect('restaurant:home')
