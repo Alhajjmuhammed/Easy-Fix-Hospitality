@@ -42,6 +42,7 @@ AT_URLS = {
 }
 SUCCESS_CODES = {100, 101, 102}   # processed / sent / queued
 COUNTRY_CODES = {'KES': '254', 'TZS': '255', 'UGX': '256', 'RWF': '250', 'GHS': '233', 'NGN': '234'}
+NATIONAL_DIGITS = {'234': 10}       # mobile number length after the country code (default 9)
 MAX_PER_NUMBER_PER_DAY = 6
 MAX_LEN = 160
 NAME_LEN = 30
@@ -93,13 +94,14 @@ def to_international(phone, currency):
         return ''
     if digits.startswith('00'):
         digits = digits[2:]
+    n = NATIONAL_DIGITS.get(cc, 9)
     if digits.startswith(cc + '0'):
         digits = cc + digits[len(cc) + 1:]         # "+255 0712…" typed with an extra 0
-    if digits.startswith(cc) and len(digits) == len(cc) + 9:
+    if digits.startswith(cc) and len(digits) == len(cc) + n:
         return '+' + digits
-    if digits.startswith('0') and len(digits) == 10:
+    if digits.startswith('0') and len(digits) == n + 1:
         return '+' + cc + digits[1:]
-    if len(digits) == 9:
+    if len(digits) == n and not digits.startswith('0'):
         return '+' + cc + digits
     return ''
 
@@ -186,12 +188,19 @@ def retry_stuck(minutes=5):
     """For the scheduled job: texts left 'queued' (worker restarted mid-send) are tried once more."""
     if not sms_enabled():
         return 0
-    stuck =SmsLog.objects.filter(status='queued', created_at__lt=timezone.now() - timedelta(minutes=minutes),
+    import time
+    stuck = SmsLog.objects.filter(status='queued', created_at__lt=timezone.now() - timedelta(minutes=minutes),
                                   created_at__gte=timezone.now() - timedelta(hours=6)).select_related('account')
-    n = 0
+    started, n = time.monotonic(), 0
     for log in stuck[:100]:
+        if time.monotonic() - started > 120:        # stop in time for the next scheduled run
+            break
         if not log.account.enabled:
             SmsLog.objects.filter(pk=log.pk).update(status='failed', error='SMS was switched off')
+            continue
+        # Claim it first: an overlapping run must never send the same text twice. If this run dies
+        # mid-send the text stays 'failed' rather than risk a duplicate.
+        if not SmsLog.objects.filter(pk=log.pk, status='queued').update(status='failed', error='Retrying'):
             continue
         _deliver(log.pk)
         n += 1

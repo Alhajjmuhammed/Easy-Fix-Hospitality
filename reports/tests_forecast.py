@@ -131,6 +131,15 @@ class ForecastTests(TestCase):
         self.assertEqual(data['trend_percent'], 0)
         self.assertEqual({f['revenue'] for f in data['forecast']}, {Decimal('10000')})
 
+    def test_trend_applies_to_old_restaurant_closed_on_one_day(self):
+        self._order(self.today - datetime.timedelta(days=200))              # open for months
+        for back in range(1, 57):
+            if back == 56:
+                continue                                                    # closed that one day
+            self._order(self.today - datetime.timedelta(days=back), total='20000' if back <= 28 else '10000')
+        data = svc.build(self.main)
+        self.assertEqual(data['trend_percent'], 25)                         # sales doubled → capped at +25%
+
     def test_owner_of_two_branches_not_double_counted(self):
         second = Restaurant.objects.create(name='Second', address='s', main_owner=self.main, branch_owner=self.main,
                                            is_main_restaurant=False, parent_restaurant=self.r, qr_code='QR2')

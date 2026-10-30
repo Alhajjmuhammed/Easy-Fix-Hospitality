@@ -689,7 +689,7 @@
                     <div class="toast-header">
                         <i class="fas fa-${type === 'success' ? 'check-circle text-success' : 'exclamation-triangle text-danger'} me-2"></i>
                         <strong class="me-auto">${type === 'success' ? "{{ t_success|escapejs }}" : "{{ t_error|escapejs }}"}</strong>
-                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{{ t_close }}"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{{ t_close|escapejs }}"></button>
                     </div>
                     <div class="toast-body">
                         ${message}

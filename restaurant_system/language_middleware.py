@@ -4,10 +4,22 @@ Deliberately NOT Django's LocaleMiddleware: that one follows the browser's langu
 suddenly switch existing users' pages. Here the language only changes when someone picks it
 (saved on their account, or in the session before they log in).
 """
+from django.contrib.auth.signals import user_logged_in
+from django.dispatch import receiver
 from django.utils import translation
 
 SUPPORTED = ('en', 'sw')
 SESSION_KEY = 'site_language'
+
+
+@receiver(user_logged_in, dispatch_uid='keep_language_chosen_before_login')
+def keep_language_chosen_before_login(sender, request, user, **kwargs):
+    """A language picked on the login page (kept in the session) carries over to the account."""
+    session = getattr(request, 'session', None)
+    lang = session.get(SESSION_KEY) if session is not None else None
+    if lang in SUPPORTED and getattr(user, 'language', lang) != lang:
+        user.language = lang
+        user.save(update_fields=['language'])
 
 
 def language_for(request):

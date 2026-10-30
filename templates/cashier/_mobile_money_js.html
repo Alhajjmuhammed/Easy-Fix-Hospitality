@@ -88,6 +88,12 @@ function mountMobileMoney(container, opts) {
                         .then(c => {
                             if (stopped) return;
                             if (c.status === 'pending') { timer = setTimeout(poll, 4000); return; }
+                            if (c.status === 'unknown') {
+                                // No answer from M-Pesa yet: its callback can still settle it, so keep watching
+                                show(c.status_display + '.', 'text-warning');
+                                timer = setTimeout(poll, 6000);
+                                return;
+                            }
                             btn.disabled = false;
                             if (c.status === 'successful') {
                                 if (c.needs_refund) {
@@ -96,8 +102,6 @@ function mountMobileMoney(container, opts) {
                                 }
                                 show(c.receipt ? "{{ t_mm_paid_receipt|escapejs }}".replace('{receipt}', () => c.receipt) : "{{ t_mm_paid|escapejs }}", 'text-success fw-semibold');
                                 if (opts.onPaid) opts.onPaid(c);
-                            } else if (c.status === 'unknown') {
-                                show(c.status_display + '.', 'text-warning');
                             } else {
                                 show(c.status_display + (c.message ? ': ' + c.message : '') + '. ' + "{{ t_mm_try_again|escapejs }}", 'text-danger');
                             }
@@ -123,8 +127,17 @@ function mountMobileMoney(container, opts) {
                     if (res.error) { show(res.error, 'text-danger'); btn.disabled = false; return; }
                     follow(res);
                 })
-                .catch(() => { show("{{ t_mm_conn_error|escapejs }}", 'text-danger'); btn.disabled = false; });
+                .catch(() => {
+                    show("{{ t_mm_conn_error|escapejs }}", 'text-danger'); btn.disabled = false;
+                    // The request may have gone out anyway: reload the box, which follows an open one
+                    timer = setTimeout(() => { if (!stopped) mountMobileMoney(container, opts); }, 3000);
+                });
             };
+            // A request is still open (sent earlier, or its reply was lost): follow it instead of a new one
+            if (info.open_charge) {
+                btn.disabled = true;
+                follow(info.open_charge);
+            }
         })
         .catch(() => { /* mobile money is optional */ });
 }

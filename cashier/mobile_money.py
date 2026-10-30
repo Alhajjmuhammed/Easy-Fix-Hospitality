@@ -31,7 +31,10 @@ logger = logging.getLogger(__name__)
 
 EAT = dt_timezone(timedelta(hours=3))  # Kenya time, no daylight saving
 TIMEOUT = 8                          # seconds per provider call: well inside the 30 s web worker limit
-CHECK_EVERY = timedelta(seconds=5)   # ask a provider about one charge at most this often
+CHECK_TIMEOUT = 5                    # status checks run inside screen polls: keep web workers free
+CHECK_EVERY = timedelta(seconds=10)  # ask a provider about one charge at most this often
+SWEEP_SECONDS = 120                  # one background run stops in time for the next (cron every 3 min)
+EXPIRED_RECHECK = timedelta(minutes=15)   # timed-out charges: look again now and then, for 24 h
 PENDING_LIMIT = {'mpesa_daraja': timedelta(minutes=5),     # the M-Pesa prompt dies after ~1-2 min
                  'flutterwave': timedelta(minutes=20)}     # approval pages can take longer
 GIVE_UP_AFTER = timedelta(hours=24)  # stop asking the provider about a charge after this
@@ -81,7 +84,7 @@ def local_phone(international, currency):
     return '0' + international[len(COUNTRY_CODES[currency]):]
 
 
-def _http(method, url, headers=None, body=None, form=None):
+def _http(method, url, headers=None, body=None, form=None, timeout=TIMEOUT):
     data = None
     headers = dict(headers or {})
     if body is not None:
@@ -101,7 +104,7 @@ def _http(method, url, headers=None, body=None, form=None):
         return parsed if isinstance(parsed, dict) else {}
 
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, _dict(resp.read())
     except urllib.error.HTTPError as e:
         try:
@@ -111,6 +114,11 @@ def _http(method, url, headers=None, body=None, form=None):
     except Exception as e:  # timeout, reset, DNS, TLS, incomplete read …
         # We don't know whether the provider received the request (it may have)
         raise ProviderError(f'No answer from the payment provider ({e.__class__.__name__}).', uncertain=True)
+
+
+def _start_answer_unclear(status, data):
+    """A server error or an unreadable answer to a payment request: it may still have gone out."""
+    return status >= 500 or not data
 
 
 def restaurant_currency(owner):
@@ -132,14 +140,14 @@ class Daraja:
         self.creds = account.credentials
         self.host = self.HOSTS[account.environment]
 
-    def _token(self):
+    def _token(self, timeout=TIMEOUT):
         key = f'daraja-token:{self.account.pk}:{self.account.updated_at.timestamp()}'
         token = cache.get(key)
         if token:
             return token
         basic = base64.b64encode(f"{self.creds['consumer_key']}:{self.creds['consumer_secret']}".encode()).decode()
         status, data = _http('GET', f'{self.host}/oauth/v1/generate?grant_type=client_credentials',
-                             headers={'Authorization': f'Basic {basic}'})
+                             headers={'Authorization': f'Basic {basic}'}, timeout=timeout)
         token = data.get('access_token')
         if status != 200 or not token:
             raise ProviderError('M-Pesa rejected the account keys. Check the Consumer Key and Secret.')
@@ -170,30 +178,48 @@ class Daraja:
             'AccountReference': charge.order.order_number[:12],
             'TransactionDesc': 'Order payment',
         }
+        try:
+            token = self._token()
+        except ProviderError as e:
+            # No login = nothing was sent to the phone: a plain failure the cashier can retry
+            raise ProviderError(str(e) if not e.uncertain else 'Could not reach M-Pesa. Please try again.')
         status, data = _http('POST', f'{self.host}/mpesa/stkpush/v1/processrequest',
-                             headers={'Authorization': f'Bearer {self._token()}'}, body=body)
+                             headers={'Authorization': f'Bearer {token}'}, body=body)
         if status == 200 and str(data.get('ResponseCode')) == '0' and data.get('CheckoutRequestID'):
             charge.provider_ref = data['CheckoutRequestID']
             return {}
+        if _start_answer_unclear(status, data):
+            raise ProviderError(f'M-Pesa gave no clear answer (HTTP {status}).', uncertain=True)
         raise ProviderError(data.get('errorMessage') or data.get('ResponseDescription')
                             or 'M-Pesa could not send the payment request.')
+
+    # Final answers of the status query. Anything else (e.g. 4999 "still under processing", or a
+    # code we don't know) keeps the charge waiting; it times out to 'expired', where a late
+    # confirmed payment still counts.
+    FAILED_CODES = {'1', '1001', '1025', '1026', '2001', '9999'}
+    CANCELLED_CODES = {'1032'}
+    EXPIRED_CODES = {'1037', '1019'}
 
     def check(self, charge):
         """→ (status, receipt, reason). Asks Safaricom directly; never trusts the callback body."""
         password, ts = self._password()
         status, data = _http('POST', f'{self.host}/mpesa/stkpushquery/v1/query',
-                             headers={'Authorization': f'Bearer {self._token()}'},
+                             headers={'Authorization': f'Bearer {self._token(timeout=CHECK_TIMEOUT)}'},
                              body={'BusinessShortCode': self.creds['shortcode'], 'Password': password,
-                                   'Timestamp': ts, 'CheckoutRequestID': charge.provider_ref})
-        code = str(data.get('ResultCode', ''))
+                                   'Timestamp': ts, 'CheckoutRequestID': charge.provider_ref},
+                             timeout=CHECK_TIMEOUT)
+        code = str(data.get('ResultCode', '')).strip()
         if code == '0':
             return 'successful', '', ''
-        if code in ('1032',):
+        if code in self.CANCELLED_CODES:
             return 'cancelled', '', data.get('ResultDesc', 'Cancelled by the customer')
-        if code in ('1037', '1019'):
+        if code in self.EXPIRED_CODES:
             return 'expired', '', data.get('ResultDesc', 'The customer did not answer')
-        if code:
+        if code in self.FAILED_CODES:
             return 'failed', '', data.get('ResultDesc', 'Payment failed')
+        if code:
+            logger.warning('M-Pesa status code %s for %s treated as still pending: %s',
+                           code, charge.reference, data.get('ResultDesc'))
         return 'pending', '', ''   # still being processed (e.g. errorCode 500.001.1001)
 
     @staticmethod
@@ -248,6 +274,9 @@ class Flutterwave:
         if charge.currency == 'GHS':
             body['country'] = 'GH'
         status, data = _http('POST', f'{self.BASE}/charges?type={ctype}', headers=self._headers(), body=body)
+        if data.get('status') != 'success' and _start_answer_unclear(status, data):
+            # e.g. a gateway 502/504 after the charge was created: it can still be found by tx_ref
+            raise ProviderError(f'Flutterwave gave no clear answer (HTTP {status}).', uncertain=True)
         if data.get('status') != 'success':
             raise ProviderError(data.get('message') or 'Flutterwave could not send the payment request.')
         info = data.get('data') or {}
@@ -262,7 +291,7 @@ class Flutterwave:
         if charge.provider_ref:
             return charge.provider_ref
         status, data = _http('GET', f'{self.BASE}/transactions?tx_ref={urllib.parse.quote(charge.reference)}',
-                             headers=self._headers())
+                             headers=self._headers(), timeout=CHECK_TIMEOUT)
         items = data.get('data') or []
         return str(items[0]['id']) if items and items[0].get('id') else ''
 
@@ -271,7 +300,8 @@ class Flutterwave:
         if not tx_id:
             return 'pending', '', ''
         charge.provider_ref = tx_id
-        status, data = _http('GET', f'{self.BASE}/transactions/{tx_id}/verify', headers=self._headers())
+        status, data = _http('GET', f'{self.BASE}/transactions/{tx_id}/verify', headers=self._headers(),
+                             timeout=CHECK_TIMEOUT)
         info = data.get('data') or {}
         state = info.get('status')
         if state == 'successful':
@@ -434,11 +464,13 @@ def _fail(charge, msg):
 
 def refresh_charge(charge, force=False, callback_receipt=''):
     """Ask the provider about a charge and settle it. Only one request per charge talks to the
-    provider every few seconds (claimed atomically); the others just return the saved state."""
-    if charge.status not in MobileMoneyCharge.LATE_SUCCESS_OK:
+    provider every few seconds (claimed atomically); the others just return the saved state.
+    force (provider callbacks, the sweeper) also re-asks about charges we closed as failed/cancelled:
+    if the provider now confirms the money arrived, it still counts."""
+    if charge.status == 'successful':
         return charge
     if charge.status != 'pending' and not force:
-        return charge                            # expired/unknown: only callbacks & the sweeper look again
+        return charge                            # only callbacks & the sweeper look again
     if not charge.provider_ref and charge.provider == 'mpesa_daraja':
         return charge                            # nothing to ask M-Pesa about yet
     now = timezone.now()
@@ -465,12 +497,16 @@ def refresh_charge(charge, force=False, callback_receipt=''):
 
 def settle_charge(charge_id, state, receipt='', reason='', provider_ref=''):
     """Final result of a charge. Paid → an ordinary Payment on the order (exactly once). A payment
-    the provider confirms after we stopped waiting (expired / unknown) still counts."""
+    the provider confirms after we stopped waiting, or after an earlier 'failed'/'cancelled'
+    answer, still counts: the money did arrive."""
     from cashier.models import Payment
     from orders.models import Order
     with transaction.atomic():
         charge = MobileMoneyCharge.objects.select_for_update().select_related('order', 'account').get(pk=charge_id)
-        allowed = MobileMoneyCharge.LATE_SUCCESS_OK if state == 'successful' else ('pending',)
+        if state == 'successful':
+            allowed = ('pending', 'expired', 'unknown', 'failed', 'cancelled')
+        else:
+            allowed = MobileMoneyCharge.LATE_SUCCESS_OK     # a final "no" also closes a timed-out charge
         if charge.status not in allowed:
             return charge                     # already settled (callback + poll both arrived)
         late = charge.status != 'pending'
@@ -483,7 +519,8 @@ def settle_charge(charge_id, state, receipt='', reason='', provider_ref=''):
             charge.provider_ref = provider_ref[:100]
         if state == 'successful':
             order = Order.objects.select_for_update(of=('self',)).get(pk=charge.order_id)
-            due = balance_due(order)
+            cancelled = order.status in NOT_PAYABLE_STATUSES
+            due = Decimal('0') if cancelled else balance_due(order)
             amount = min(charge.amount, due) if due > 0 else Decimal('0')
             if amount > 0:
                 staff = charge.initiated_by if charge.initiated_by and not charge.initiated_by.is_customer() \
@@ -498,7 +535,12 @@ def settle_charge(charge_id, state, receipt='', reason='', provider_ref=''):
                 if order.payment_status == 'paid':
                     order.release_table()
                 order.save(update_fields=['payment_status', 'updated_at'])
-            if amount < charge.amount:
+            if cancelled:
+                # Money arrived for an order that was cancelled meanwhile: not a sale, refund it all
+                charge.failure_reason = (f'Customer paid {charge.amount} but the order was cancelled — '
+                                         f'refund {charge.amount} to {charge.phone}.')
+                logger.error('Mobile money paid on cancelled order %s: %s', charge.order_id, charge.reference)
+            elif amount < charge.amount:
                 # Paid more than was still due (e.g. cash was taken meanwhile): the cashier must refund
                 charge.failure_reason = (f'Customer paid {charge.amount} but only {amount} was still due — '
                                          f'refund {charge.amount - amount} to {charge.phone}.')
@@ -514,9 +556,18 @@ def settle_charge(charge_id, state, receipt='', reason='', provider_ref=''):
 
 def add_receipt(charge, receipt):
     """M-Pesa sends its receipt number only in the callback; the status query (which decides) has
-    none. Fill it in afterwards on a charge Safaricom already confirmed."""
-    if not receipt or charge.status != 'successful' or charge.receipt:
+    none. Fill it in afterwards on a charge Safaricom already confirmed. If Safaricom still says
+    "processing", keep it on the charge: it becomes the payment's reference only once the status
+    query confirms the payment (settle_charge keeps a saved receipt)."""
+    if not receipt or charge.receipt:
         return
+    if charge.status != 'successful':
+        if MobileMoneyCharge.objects.filter(pk=charge.pk, receipt='').exclude(status='successful') \
+                .update(receipt=receipt[:100]):
+            return
+        charge.refresh_from_db()              # settled meanwhile by a poll: fill in the payment too
+        if charge.status != 'successful' or charge.receipt:
+            return
     from cashier.models import Payment
     MobileMoneyCharge.objects.filter(pk=charge.pk, receipt='').update(receipt=receipt[:100])
     if charge.payment_id:
@@ -541,14 +592,22 @@ def match_unknown_mpesa(account, checkout_id, phone, amount):
     return None
 
 
-def sweep(limit=200):
-    """For the scheduled job: look again at charges that are still open (closed screens, lost callbacks)."""
+def sweep(limit=200, seconds=SWEEP_SECONDS):
+    """For the scheduled job: look again at charges that are still open (closed screens, lost callbacks).
+    Least recently checked first, timed-out charges only every EXPIRED_RECHECK, and the run stops after
+    `seconds` so runs never pile up behind each other."""
+    import time
+    from django.db.models import F, Q
     now = timezone.now()
     open_charges = MobileMoneyCharge.objects.filter(
         status__in=('pending', 'unknown', 'expired'), created_at__gte=now - GIVE_UP_AFTER,
-    ).select_related('account').order_by('created_at')[:limit]
-    done = 0
+    ).filter(
+        ~Q(status='expired') | Q(last_checked_at__isnull=True) | Q(last_checked_at__lt=now - EXPIRED_RECHECK)
+    ).select_related('account').order_by(F('last_checked_at').asc(nulls_first=True), 'created_at')[:limit]
+    started, done = time.monotonic(), 0
     for charge in open_charges:
+        if time.monotonic() - started > seconds:
+            break
         refresh_charge(charge, force=charge.status != 'pending')
         done += 1
     return done

@@ -18,13 +18,16 @@ export default function MobileMoneyBox({ orderId, amount, onPaid, onMessage }) {
   const [network, setNetwork] = useState('');
   const [charge, setCharge] = useState(null);
   const [sending, setSending] = useState(false);
+  const [following, setFollowing] = useState(false);
   const timer = useRef(null);
   const alive = useRef(true);
+  const busy = useRef(false);        // blocks a second tap before the re-render disables the button
 
   useEffect(() => {
     alive.current = true;
     setInfo(null);
     setCharge(null);
+    setFollowing(false);
     if (!orderId) return undefined;
     NetInfo.fetch().then((net) => {
       if (!net.isConnected) return;
@@ -38,12 +41,10 @@ export default function MobileMoneyBox({ orderId, amount, onPaid, onMessage }) {
     return () => { alive.current = false; clearTimeout(timer.current); };
   }, [orderId]);
 
-  if (!info || !info.enabled) return null;
-
-  const poll = (id, startedAt = Date.now()) => {
+  const poll =(id, startedAt = Date.now()) => {
     timer.current = setTimeout(async () => {
       if (Date.now() - startedAt > 25 * 60 * 1000) {      // stop following; the server keeps checking
-        setCharge((prev) => ({ ...prev, status: 'unknown' }));
+        setFollowing(false);
         onMessage?.(t('Still not confirmed. It will be recorded automatically if the customer pays.'));
         return;
       }
@@ -51,18 +52,24 @@ export default function MobileMoneyBox({ orderId, amount, onPaid, onMessage }) {
         const c = await apiMobileMoneyStatus(id);
         if (!alive.current) return;
         setCharge((prev) => ({ ...prev, ...c }));
-        if (c.status === 'pending') { poll(id, startedAt); return; }
+        // 'unknown' = no answer from M-Pesa yet; its callback can still settle it, so keep watching
+        if (c.status === 'pending' || c.status === 'unknown') { poll(id, startedAt); return; }
+        setFollowing(false);
         if (c.status === 'successful' && c.needs_refund) onMessage?.(t('Paid, but more than was due: {message}', { message: c.message }));
         if (c.status === 'successful') onPaid?.(c);
         else onMessage?.(`${c.status_display}${c.message ? `: ${c.message}` : ''}`);
       } catch (err) {
         const code = err?.response?.status;
-        if (alive.current && !(code >= 400 && code < 500)) poll(id, startedAt);   // 4xx: stop
+        if (!alive.current) return;
+        if (!(code >= 400 && code < 500)) poll(id, startedAt);   // 4xx: stop
+        else setFollowing(false);
       }
     }, 4000);
   };
 
   const send = async () => {
+    if (busy.current) return;
+    busy.current = true;
     setSending(true);
     clearTimeout(timer.current);
     try {
@@ -72,15 +79,31 @@ export default function MobileMoneyBox({ orderId, amount, onPaid, onMessage }) {
       setCharge(c);
       if (c.warning) onMessage?.(c.warning);
       if (c.redirect_url) Linking.openURL(c.redirect_url).catch(() => {});
+      setFollowing(true);
       poll(c.id);
     } catch (err) {
       onMessage?.(err?.response?.data?.error || t('Could not send the payment request.'));
+      // The request may have gone out anyway (slow reply): pick it up if the server has it open
+      apiMobileMoneyInfo(orderId).then((d) => { if (alive.current) setInfo(d); }).catch(() => {});
     } finally {
+      busy.current = false;
       setSending(false);
     }
   };
 
-  const waiting = charge && (charge.status === 'pending' || charge.status === 'unknown');
+  // A request is still open (sent earlier, or its reply was lost): follow it instead of a new one
+  useEffect(() => {
+    const open = info && info.open_charge;
+    if (!open || !alive.current) return;
+    setCharge(open);
+    setFollowing(true);
+    clearTimeout(timer.current);
+    poll(open.id);
+  }, [info]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!info || !info.enabled) return null;
+
+  const waiting = following && charge && (charge.status === 'pending' || charge.status === 'unknown');
 
   return (
     <View style={styles.box}>

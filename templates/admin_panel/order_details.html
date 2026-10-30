@@ -12,7 +12,7 @@
                     <td><strong>{% translate "Status:" %}</strong></td>
                     <td>
                         <span class="badge bg-{% if order.status == 'pending' %}warning{% elif order.status == 'confirmed' %}info{% elif order.status == 'preparing' %}primary{% elif order.status == 'ready' %}success{% elif order.status == 'served' %}success{% elif order.status == 'cancelled' %}danger{% else %}secondary{% endif %}">
-                            {% translate order.status|title %}
+                            {% translate order.get_status_display %}
                         </span>
                     </td>
                 </tr>
@@ -43,7 +43,7 @@
                     <td><strong>{% translate "Payment Status:" %}</strong></td>
                     <td>
                         <span class="badge bg-{% if order.payment_status == 'paid' %}success{% elif order.payment_status == 'partial' %}warning{% else %}danger{% endif %}">
-                            {% translate order.payment_status|title %}
+                            {% translate order.get_payment_status_display %}
                         </span>
                     </td>
                 </tr>

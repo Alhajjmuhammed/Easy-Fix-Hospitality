@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, DecimalField, Q, Sum, Value
+from django.db.models import Count, DecimalField, Min, Q, Sum, Value
 from django.db.models.functions import Coalesce, ExtractHour, ExtractIsoWeekDay, TruncDate
 from django.utils import timezone
 
@@ -47,7 +47,11 @@ def build(owner, today=None):
     daily = {r['day']: (r['revenue'] or Decimal('0'), r['n']) for r in
              orders.order_by().annotate(day=TruncDate('created_at')).values('day')
              .annotate(revenue=Sum('total_amount'), n=Count('id', distinct=True))}
-    first_day = min(daily) if daily else None
+    # The restaurant's first sale ever (not just within the window): a quiet day 8 weeks ago must not
+    # make an old restaurant look new
+    first_sale = orders_for_owner(owner).filter(created_at__lt=_start_of(today)).order_by() \
+        .aggregate(m=Min('created_at'))['m'] if daily else None
+    first_day = timezone.localtime(first_sale).date() if first_sale else None
     days_of_history = (today - first_day).days if first_day else 0
 
     def total(a, b):   # revenue between days a (incl.) and b (excl.)

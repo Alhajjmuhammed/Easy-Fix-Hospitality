@@ -43,7 +43,7 @@
                         <tbody>
                         {% for f in forecast %}
                         <tr class="{% if f.is_today %}fc-today{% endif %}">
-                            <td style="width:5.5rem" class="small fw-semibold">{% if f.is_today %}{% translate "Today" %}{% else %}{{ f.weekday }} {{ f.date|date:"j M" }}{% endif %}</td>
+                            <td style="width:5.5rem" class="small fw-semibold">{% if f.is_today %}{% translate "Today" %}{% else %}{% translate f.weekday %} {{ f.date|date:"j M" }}{% endif %}</td>
                             <td><div class="fc-bar" style="width: {{ f.bar }}%"></div></td>
                             <td class="text-end small text-nowrap" style="width:9rem">
                                 <span class="fw-semibold">{{ currency_symbol }}{{ f.revenue|floatformat:0 }}</span>
@@ -81,14 +81,14 @@
             <div class="card shadow-sm border-0">
                 <div class="card-body">
                     <h6 class="fw-bold mb-1">{% translate "Busy hours" %} <span class="small text-muted fw-normal">{% translate "(average orders per hour)" %}</span></h6>
-                    {% if top_slots %}<div class="small text-muted mb-2">{% translate "Busiest:" %} {% for s in top_slots %}{{ s.weekday }} {{ s.hour }}:00 (~{{ s.avg }}){% if not forloop.last %}, {% endif %}{% endfor %} — {% translate "plan the roster around these." %}</div>{% endif %}
+                    {% if top_slots %}<div class="small text-muted mb-2">{% translate "Busiest:" %} {% for s in top_slots %}{% translate s.weekday %} {{ s.hour }}:00 (~{{ s.avg }}){% if not forloop.last %}, {% endif %}{% endfor %} — {% translate "plan the roster around these." %}</div>{% endif %}
                     {% if active_hours %}
                     <div class="table-responsive">
                         <table class="heat">
                             <thead><tr><th></th>{% for h in active_hours %}<th class="small fw-normal text-muted text-center">{{ h }}</th>{% endfor %}</tr></thead>
                             <tbody>
                             {% for row in heatmap %}
-                            <tr><th class="small pe-2">{{ row.weekday }}</th>{% for c in row.cells %}<td class="l{{ c.level }}" title="{% blocktranslate with day=row.weekday hour=c.hour avg=c.avg %}{{ day }} {{ hour }}:00 — about {{ avg }} orders{% endblocktranslate %}">{% if c.avg %}{{ c.avg|floatformat:"-1" }}{% endif %}</td>{% endfor %}</tr>
+                            {% translate row.weekday as t_wd %}<tr><th class="small pe-2">{{ t_wd }}</th>{% for c in row.cells %}<td class="l{{ c.level }}" title="{% blocktranslate with day=t_wd hour=c.hour avg=c.avg %}{{ day }} {{ hour }}:00 — about {{ avg }} orders{% endblocktranslate %}">{% if c.avg %}{{ c.avg|floatformat:"-1" }}{% endif %}</td>{% endfor %}</tr>
                             {% endfor %}
                             </tbody>
                         </table>

@@ -2,6 +2,8 @@
 import hmac
 import json
 import logging
+from datetime import timedelta
+from decimal import ROUND_DOWN
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -9,6 +11,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 from rest_framework import status
@@ -54,6 +57,13 @@ def mobile_money_settings(request):
             return redirect('cashier:mobile_money_settings')
         if account is None:
             account = MobileMoneyAccount(owner=user, provider=provider)
+        if account.pk and account.provider != provider and MobileMoneyCharge.objects.filter(
+                account=account, status__in=MobileMoneyCharge.LATE_SUCCESS_OK,
+                created_at__gte=timezone.now() - svc.GIVE_UP_AFTER).exists():
+            # Their answers are checked with the current keys: switching now could lose a payment
+            messages.error(request, 'Some payment requests are still open. Switch provider after they are '
+                                    'finished (at most 24 hours).')
+            return redirect('cashier:mobile_money_settings')
         if account.provider != provider:
             account.credentials = {}          # switching provider: old keys don't apply
             account.provider = provider
@@ -112,11 +122,28 @@ def _order_for_customer(user, order_id):
     return order
 
 
+CUSTOMER_REQUESTS_PER_HOUR = 5
+
+
+def _customer_amount(order):
+    """What a customer pays online: the balance due (whole shillings for M-Pesa, which takes no cents)."""
+    due = svc.balance_due(order)
+    account = svc.account_for_owner(svc._order_owner(order))
+    if account is not None and account.provider == 'mpesa_daraja':
+        due = due.to_integral_value(rounding=ROUND_DOWN)
+    return due
+
+
 def _start(request, order, data):
     if not isinstance(data, dict):
         data = {}
     amount = data.get('amount') or svc.balance_due(order)
     if request.user.is_customer():
+        amount = _customer_amount(order)            # customers always pay the balance, never a typed amount
+        if MobileMoneyCharge.objects.filter(initiated_by=request.user,
+                                            created_at__gte=timezone.now() - timedelta(hours=1)
+                                            ).count() >= CUSTOMER_REQUESTS_PER_HOUR:
+            raise ValidationError('Too many payment requests. Please try again later or pay at the counter.')
         # Customers can only prompt their own numbers (no PIN-prompt spam to strangers)
         currency = svc.restaurant_currency(svc.account_for_owner(svc._order_owner(order)).owner)
         own = set()
@@ -144,8 +171,9 @@ def _charge_for(user, charge_id, owner=None):
     return charge
 
 
-def availability(order):
-    """What the payment screens need to show the mobile money option."""
+def availability(order, user=None):
+    """What the payment screens need to show the mobile money option, plus a request that is still
+    open (so a screen that lost the answer, e.g. after a slow reply, can follow it again)."""
     from orders.push import _restaurant_owner
     owner = _restaurant_owner(order)
     account = svc.account_for_owner(owner) if owner else None
@@ -155,13 +183,19 @@ def availability(order):
     # Opening the pay screen also settles any request whose answer we may have missed
     for open_charge in MobileMoneyCharge.objects.filter(order=order, status='pending').select_related('account'):
         svc.refresh_charge(open_charge)
+    window = timezone.now() - max(svc.PENDING_LIMIT.get(account.provider, timedelta(minutes=5)),
+                                  timedelta(minutes=10))
+    still_open = MobileMoneyCharge.objects.filter(order=order, status__in=('pending', 'unknown'),
+                                                  created_at__gte=window).first()
+    is_customer = user is not None and user.is_customer()
     return {
         'enabled': currency in svc.PROVIDER_CURRENCIES[account.provider],
         'provider': account.get_provider_display(),
         'currency': currency,
         'networks': list(svc.FLW_NETWORKS.get(currency, ())) if account.provider == 'flutterwave' else [],
         'whole_amounts_only': account.provider == 'mpesa_daraja',
-        'balance_due': str(svc.balance_due(order)),
+        'balance_due': str(_customer_amount(order) if is_customer else svc.balance_due(order)),
+        'open_charge': svc.charge_to_dict(still_open) if still_open else None,
         'customer_phone': (order.delivery_phone or getattr(order.ordered_by, 'phone_number', '') or '')
         if order.ordered_by_id and order.ordered_by.is_customer() else (order.delivery_phone or ''),
     }
@@ -183,7 +217,7 @@ def start_web(request, order_id):
         else:
             order = _order_for_staff(request.user, order_id)
         if request.method == 'GET':
-            return JsonResponse(availability(order))
+            return JsonResponse(availability(order, request.user))
         return JsonResponse(_start(request, order, data))
     except PermissionDenied:
         return JsonResponse({'error': 'Access denied'}, status=403)
@@ -212,7 +246,7 @@ def start_api(request, order_id):
         else:
             order = _order_for_staff(request.user, order_id, owner=get_restaurant_owner(request))
         if request.method == 'GET':
-            return Response(availability(order))
+            return Response(availability(order, request.user))
         return Response(_start(request, order, request.data), status=status.HTTP_201_CREATED)
     except PermissionDenied:
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)

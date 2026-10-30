@@ -93,6 +93,7 @@ export const useAuthStore = create((set, get) => ({
           await SecureStore.setItemAsync('auth_user', JSON.stringify(freshUser));
           await SecureStore.setItemAsync('last_online_at', String(Date.now()));
           set({ user: freshUser });
+          require('./useLanguageStore').useLanguageStore.getState().syncToServer();
         }
       } catch (_) {
         // Offline or token expired — keep cached data, logout will handle expiry
@@ -122,6 +123,7 @@ export const useAuthStore = create((set, get) => ({
       const { useCartStore } = require('./useCartStore');
       useCartStore.getState().clearCart();
       set({ token, user, restaurantId, isLoading: false });
+      require('./useLanguageStore').useLanguageStore.getState().syncToServer();
       return { success: true, user };
     } catch (err) {
       let message;
@@ -147,6 +149,7 @@ export const useAuthStore = create((set, get) => ({
       if (restaurantId) await SecureStore.setItemAsync('restaurant_id', String(restaurantId));
       setClientAuth(token, restaurantId);
       set({ token, user, restaurantId, isLoading: false });
+      require('./useLanguageStore').useLanguageStore.getState().syncToServer();
       return { success: true };
     } catch (err) {
       const message = err.response?.data?.error || 'Registration failed. Please try again.';

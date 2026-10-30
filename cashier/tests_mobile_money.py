@@ -36,7 +36,7 @@ class FakeProvider:
         self.flw_verify = {'status': 'successful'}
         self.flw_start = {'status': 'success', 'message': 'Charge initiated', 'data': {'id': 777, 'status': 'pending'}}
 
-    def __call__(self, method, url, headers=None, body=None, form=None):
+    def __call__(self, method, url, headers=None, body=None, form=None, timeout=None):
         self.calls.append((method, url, headers or {}, body))
         if '/oauth/v1/generate' in url:
             return 200, {'access_token': 'tok123', 'expires_in': '3599'}
@@ -250,7 +250,7 @@ class MobileMoneyTests(TestCase):
     def _timeout_on(self, url_part):
         real = self.fake.__call__
 
-        def flaky(method, url, headers=None, body=None, form=None):
+        def flaky(method, url, headers=None, body=None, form=None, timeout=None):
             if url_part in url:
                 self.fake.calls.append((method, url, headers or {}, body))
                 raise svc.ProviderError('No answer', uncertain=True)
@@ -285,7 +285,7 @@ class MobileMoneyTests(TestCase):
             pass
         cid = MobileMoneyCharge.objects.get().id
 
-        def by_ref(method, url, headers=None, body=None, form=None):
+        def by_ref(method, url, headers=None, body=None, form=None, timeout=None):
             if '/transactions?tx_ref=' in url:
                 return 200, {'status': 'success', 'data': [{'id': 777}]}
             return self.fake(method, url, headers, body, form)
@@ -431,3 +431,120 @@ class MobileMoneyTests(TestCase):
         self.fake.stk_result = '0'
         self._daraja_callback()
         self.assertEqual(loyalty.balance(self.main, self.cust), 15)
+
+    # ---------- final deep-scan fixes ----------
+    def _poll(self, cid):
+        MobileMoneyCharge.objects.filter(pk=cid).update(last_checked_at=None)
+        return self.client.get(f'/cashier/mobile-money/charge/{cid}/').json()
+
+    def test_unknown_daraja_code_keeps_waiting_and_success_after_failed_still_counts(self):
+        o = self._order()
+        cid = self._start(o).json()['id']
+        self.fake.stk_result = '4999'                                 # "still under processing"
+        self.assertEqual(self._poll(cid)['status'], 'pending')
+        self.fake.stk_result = '1'                                    # insufficient balance: final
+        self.assertEqual(self._poll(cid)['status'], 'failed')
+        self.fake.stk_result = '0'                                    # … then the customer paid after all
+        self._daraja_callback(receipt='QAFTER1')
+        self.assertEqual(Payment.objects.get().reference_number, 'QAFTER1')
+        self.assertEqual(Order.objects.get(pk=o.pk).payment_status, 'paid')
+        self.assertEqual(MobileMoneyCharge.objects.get().status, 'successful')
+
+    def test_start_server_error_is_uncertain_not_failed(self):
+        def gateway(method, url, headers=None, body=None, form=None, timeout=None):
+            if url.endswith('processrequest'):
+                return 502, {}
+            return self.fake(method, url, headers, body, form)
+        o = self._order()
+        with mock.patch('cashier.mobile_money._http', side_effect=gateway):
+            r = self._start(o).json()
+        self.assertIn('warning', r)
+        self.assertEqual(MobileMoneyCharge.objects.get().status, 'unknown')
+
+        self._flutterwave('TZS')
+        o2 = self._order(total='15000')
+        def flw_gateway(method, url, headers=None, body=None, form=None, timeout=None):
+            if 'charges?type=' in url:
+                return 504, {}
+            return self.fake(method, url, headers, body, form)
+        with mock.patch('cashier.mobile_money._http', side_effect=flw_gateway):
+            self._start(o2, phone='0754111222')
+        self.assertEqual(MobileMoneyCharge.objects.get(order=o2).status, 'pending')
+
+    def test_mpesa_login_timeout_is_a_plain_failure(self):
+        o = self._order()
+        with self._timeout_on('/oauth/v1/generate'):
+            r = self._start(o)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(MobileMoneyCharge.objects.get().status, 'failed')
+        self.assertFalse([c for c in self.fake.calls if c[1].endswith('processrequest')])
+        self.assertEqual(self._start(o).status_code, 200)              # the cashier can retry at once
+
+    def test_money_on_cancelled_order_is_flagged_for_refund(self):
+        o = self._order()
+        cid = self._start(o).json()['id']
+        Order.objects.filter(pk=o.pk).update(status='cancelled')
+        self.fake.stk_result = '0'
+        c = self._poll(cid)
+        self.assertEqual((c['status'], c['needs_refund']), ('successful', True))
+        self.assertIn('cancelled', c['message'])
+        self.assertFalse(Payment.objects.exists())
+        self.assertEqual(Order.objects.get(pk=o.pk).payment_status, 'unpaid')
+
+    def test_cannot_switch_provider_while_a_request_is_open(self):
+        self._start(self._order())
+        self.client.force_login(self.main)
+        self.client.post('/cashier/mobile-money/settings/', {
+            'provider': 'flutterwave', 'secret_key': 'x', 'secret_hash': 'y', 'enabled': 'on'})
+        acc = MobileMoneyAccount.objects.get(owner=self.main)
+        self.assertEqual((acc.provider, acc.credentials['shortcode']), ('mpesa_daraja', '174379'))
+
+    def test_customer_pays_whole_shillings_and_is_rate_limited(self):
+        o = self._order(total='1500.50')
+        self.client.force_login(self.cust)
+        info = self.client.get(f'/orders/order/{o.id}/mobile-money/').json()
+        self.assertEqual(info['balance_due'], '1500')
+        r = self._start(o, user=self.cust, phone='0712345678', amount='9999')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(MobileMoneyCharge.objects.get().amount, Decimal('1500.00'))
+        MobileMoneyCharge.objects.update(status='failed')
+        for _ in range(4):
+            MobileMoneyCharge.objects.create(account=self.acc, provider='mpesa_daraja', order=o, amount=1,
+                                             currency='KES', phone='254712345678', status='failed',
+                                             reference=f'R{MobileMoneyCharge.objects.count()}', initiated_by=self.cust)
+        r = self._start(self._order(), user=self.cust, phone='0712345678')
+        self.assertEqual(r.status_code, 400)
+
+    def test_callback_receipt_kept_while_safaricom_still_processing(self):
+        o = self._order()
+        cid = self._start(o).json()['id']
+        self.fake.stk_result = None                                   # status query: still processing
+        self._daraja_callback(receipt='QEARLY1')
+        self.assertEqual(MobileMoneyCharge.objects.get().status, 'pending')
+        self.fake.stk_result = '0'
+        self._poll(cid)
+        self.assertEqual(Payment.objects.get().reference_number, 'QEARLY1')
+
+    def test_open_request_is_returned_so_screens_can_follow_it(self):
+        o = self._order()
+        cid = self._start(o).json()['id']
+        info = self.client.get(f'/cashier/mobile-money/order/{o.id}/').json()
+        self.assertEqual(info['open_charge']['id'], cid)
+        self.fake.stk_result = '1032'
+        self._poll(cid)
+        self.assertIsNone(self.client.get(f'/cashier/mobile-money/order/{o.id}/').json()['open_charge'])
+
+    def test_sweep_skips_recently_checked_timed_out_charges_and_closes_final_ones(self):
+        o = self._order()
+        cid = self._start(o).json()['id']
+        MobileMoneyCharge.objects.filter(pk=cid).update(status='expired', last_checked_at=timezone.now())
+        self.fake.calls.clear()
+        svc.sweep()
+        self.assertFalse([c for c in self.fake.calls if c[1].endswith('/query')])   # backed off
+        MobileMoneyCharge.objects.filter(pk=cid).update(last_checked_at=timezone.now() - datetime.timedelta(minutes=20))
+        self.fake.stk_result = '1032'
+        svc.sweep()
+        self.assertEqual(MobileMoneyCharge.objects.get().status, 'cancelled')       # final: no more asking
+        self.fake.calls.clear()
+        svc.sweep(seconds=0)
+        self.assertFalse([c for c in self.fake.calls if c[1].endswith('/query')])
