@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { ScrollView, View, StyleSheet, RefreshControl, FlatList, TouchableOpacity, Modal } from 'react-native';
 import {
   Text,
@@ -19,6 +19,7 @@ import client from '../../api/client';
 import { getOfflinePendingOrders, getSyncMeta, setSyncMeta, getLocalReportStats, getProducts } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useT } from '../../i18n';
 
 const PAYMENT_STATUS_COLOR = {
   unpaid:  '#C62828',
@@ -42,6 +43,7 @@ const PERIODS = [
 ];
 
 export default function CCReportsScreen() {
+  const t = useT();
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
   const [data,           setData]           = useState(null);
@@ -55,6 +57,11 @@ export default function CCReportsScreen() {
   const [showPicker,     setShowPicker]     = useState(false);
   const [products,       setProducts]       = useState([]);
   const { format } = useCurrency();
+  // Translated labels for the period buttons (values stay unchanged)
+  const periodButtons = useMemo(
+    () => PERIODS.map((p) => ({ ...p, label: t(p.label) })),
+    [t]
+  );
   // Ref so fetchReport can always read the latest pids without being a closure dep
   const selectedPidsRef = useRef([]);
   const setSelectedPidsSync = (pids) => { selectedPidsRef.current = pids; setSelectedPids(pids); };
@@ -176,7 +183,7 @@ export default function CCReportsScreen() {
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerSheet}>
             <View style={styles.pickerHeader}>
-              <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>Filter by Product</Text>
+              <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>{t('Filter by Product')}</Text>
               <TouchableOpacity onPress={() => setShowPicker(false)}>
                 <MaterialCommunityIcons name="close" size={22} color="#666" />
               </TouchableOpacity>
@@ -186,7 +193,7 @@ export default function CCReportsScreen() {
               keyExtractor={(item) => String(item.id)}
               style={{ maxHeight: 360 }}
               ListEmptyComponent={() => (
-                <Text style={{ textAlign: 'center', opacity: 0.5, padding: 20 }}>No products available</Text>
+                <Text style={{ textAlign: 'center', opacity: 0.5, padding: 20 }}>{t('No products available')}</Text>
               )}
               renderItem={({ item }) => {
                 const checked = tempPids.includes(item.id);
@@ -208,12 +215,12 @@ export default function CCReportsScreen() {
             />
             <Divider />
             <View style={styles.pickerActions}>
-              <Button mode="outlined" onPress={() => setTempPids([])} style={{ flex: 1 }}>Clear</Button>
+              <Button mode="outlined" onPress={() => setTempPids([])} style={{ flex: 1 }}>{t('Clear')}</Button>
               <Button mode="contained" onPress={() => {
                 setSelectedPidsSync(tempPids);
                 setShowPicker(false);
                 fetchReport(false, tempPids);
-              }} style={{ flex: 1 }}>Apply</Button>
+              }} style={{ flex: 1 }}>{t('Apply')}</Button>
             </View>
           </View>
         </View>
@@ -228,16 +235,16 @@ export default function CCReportsScreen() {
       >
         {isOffline
           ? cacheTimestamp
-            ? `Offline – cached report from ${new Date(cacheTimestamp).toLocaleTimeString()}. Pull to refresh when connected.`
-            : `Offline – showing data from local device. Connect for the full server report.`
-          : `${pendingOrders.length} queued for sync · ${errorOrders.length} failed – check below.`}
+            ? t('Offline – cached report from {time}. Pull to refresh when connected.', { time: new Date(cacheTimestamp).toLocaleTimeString() })
+            : t('Offline – showing data from local device. Connect for the full server report.')
+          : t('{queued} queued for sync · {failed} failed – check below.', { queued: pendingOrders.length, failed: errorOrders.length })}
       </Banner>
 
       {/* Sync-failed orders */}
       {errorOrders.length > 0 && (
         <>
           <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#C62828' }]}>
-            Failed to Sync – Re-take Manually
+            {t('Failed to Sync – Re-take Manually')}
           </Text>
           {errorOrders.map((o) => (
             <Card key={o.offline_id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#C62828' }]}>
@@ -245,15 +252,17 @@ export default function CCReportsScreen() {
                 <View style={styles.row}>
                   <Chip icon="alert-circle" mode="flat" compact
                     style={{ backgroundColor: '#FFEBEE' }} textStyle={{ fontSize: 10, color: '#C62828' }}>
-                    SYNC FAILED
+                    {t('SYNC FAILED')}
                   </Chip>
                   <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
                     {format(o.total_amount || 0)}
                   </Text>
                 </View>
                 <Text variant="bodySmall" style={{ opacity: 0.65 }}>
-                  {o.order_type === 'delivery' ? '🚴 Delivery' : `Table ${o.table_number}`}
-                  {' · '}{o.items_count} item{o.items_count !== 1 ? 's' : ''}
+                  {o.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: o.table_number })}
+                  {' · '}{o.items_count !== 1
+                    ? t('{n} items', { n: o.items_count })
+                    : t('{n} item', { n: o.items_count })}
                   {' · '}{new Date(o.created_at).toLocaleTimeString()}
                 </Text>
                 {!!o.error_message && (
@@ -272,7 +281,7 @@ export default function CCReportsScreen() {
       {pendingOrders.length > 0 && (
         <>
           <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#E65100' }]}>
-            Queued Orders (Pending Sync)
+            {t('Queued Orders (Pending Sync)')}
           </Text>
           <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#E65100' }]}>
             <Card.Content>
@@ -281,13 +290,13 @@ export default function CCReportsScreen() {
                   <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
                     {pendingOrders.length}
                   </Text>
-                  <Text style={styles.statLabel}>Queued Orders</Text>
+                  <Text style={styles.statLabel}>{t('Queued Orders')}</Text>
                 </View>
                 <View style={{ alignItems: 'center', flex: 1 }}>
                   <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
                     {format(offlineTotal)}
                   </Text>
-                  <Text style={styles.statLabel}>Queued Total</Text>
+                  <Text style={styles.statLabel}>{t('Queued Total')}</Text>
                 </View>
               </View>
             </Card.Content>
@@ -298,15 +307,17 @@ export default function CCReportsScreen() {
                 <View style={styles.row}>
                   <Chip icon="cloud-upload" mode="flat" compact
                     style={{ backgroundColor: '#FFF3E0' }} textStyle={{ fontSize: 10, color: '#E65100' }}>
-                    PENDING SYNC
+                    {t('PENDING SYNC')}
                   </Chip>
                   <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
                     {format(o.total_amount || 0)}
                   </Text>
                 </View>
                 <Text variant="bodySmall" style={{ opacity: 0.65 }}>
-                  {o.order_type === 'delivery' ? '🚴 Delivery' : `Table ${o.table_number}`}
-                  {' · '}{o.items_count} item{o.items_count !== 1 ? 's' : ''}
+                  {o.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: o.table_number })}
+                  {' · '}{o.items_count !== 1
+                    ? t('{n} items', { n: o.items_count })
+                    : t('{n} item', { n: o.items_count })}
                   {' · '}{new Date(o.created_at).toLocaleTimeString()}
                 </Text>
               </Card.Content>
@@ -322,7 +333,7 @@ export default function CCReportsScreen() {
           <Card.Content style={styles.emptyContent}>
             <MaterialCommunityIcons name="wifi-off" size={40} color="#ccc" />
             <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8, textAlign: 'center' }}>
-              Connect to internet to load the report
+              {t('Connect to internet to load the report')}
             </Text>
           </Card.Content>
         </Card>
@@ -332,7 +343,7 @@ export default function CCReportsScreen() {
           <SegmentedButtons
             value={period}
             onValueChange={setPeriod}
-            buttons={PERIODS}
+            buttons={periodButtons}
             style={styles.periods}
           />
 
@@ -348,8 +359,10 @@ export default function CCReportsScreen() {
               textStyle={selectedPids.length > 0 ? { color: '#1565C0' } : {}}
             >
               {selectedPids.length === 0
-                ? 'All Products'
-                : `${selectedPids.length} Product${selectedPids.length > 1 ? 's' : ''} Selected`}
+                ? t('All Products')
+                : selectedPids.length > 1
+                  ? t('{n} Products Selected', { n: selectedPids.length })
+                  : t('{n} Product Selected', { n: selectedPids.length })}
             </Chip>
             {selectedPids.length > 0 && (
               <TouchableOpacity onPress={() => { setSelectedPidsSync([]); fetchReport(false, []); }} style={{ marginLeft: 6 }}>
@@ -360,20 +373,20 @@ export default function CCReportsScreen() {
 
           {/* Stats cards */}
           <View style={styles.statsRow}>
-            <StatCard label="Orders"    value={stats.total_orders}               color="#2c3e50" icon="clipboard-list-outline" />
-            <StatCard label="Revenue"   value={format(stats.total_revenue ?? 0)} color="#2E7D32" icon="cash-multiple" />
-            <StatCard label="Items"     value={stats.total_items}                color="#6A1B9A" icon="food-outline" />
-            <StatCard label="Avg Order" value={format(stats.avg_order_value ?? 0)} color="#FF8F00" icon="chart-line" />
+            <StatCard label={t('Orders')}    value={stats.total_orders}               color="#2c3e50" icon="clipboard-list-outline" />
+            <StatCard label={t('Revenue')}   value={format(stats.total_revenue ?? 0)} color="#2E7D32" icon="cash-multiple" />
+            <StatCard label={t('Items')}     value={stats.total_items}                color="#6A1B9A" icon="food-outline" />
+            <StatCard label={t('Avg Order')} value={format(stats.avg_order_value ?? 0)} color="#FF8F00" icon="chart-line" />
           </View>
 
           {/* Payment breakdown */}
           <Card style={styles.card}>
             <Card.Content>
-              <Text variant="titleSmall" style={styles.cardTitle}>Payment Breakdown</Text>
+              <Text variant="titleSmall" style={styles.cardTitle}>{t('Payment Breakdown')}</Text>
               <View style={styles.breakdownRow}>
-                <BreakdownChip label="Paid"    value={stats.paid_orders}    color="#2E7D32" />
-                <BreakdownChip label="Partial" value={stats.partial_orders} color="#FF8F00" />
-                <BreakdownChip label="Unpaid"  value={stats.unpaid_orders}  color="#C62828" />
+                <BreakdownChip label={t('Paid')}    value={stats.paid_orders}    color="#2E7D32" />
+                <BreakdownChip label={t('Partial')} value={stats.partial_orders} color="#FF8F00" />
+                <BreakdownChip label={t('Unpaid')}  value={stats.unpaid_orders}  color="#C62828" />
               </View>
             </Card.Content>
           </Card>
@@ -382,13 +395,13 @@ export default function CCReportsScreen() {
 
           {/* Orders list */}
           <Text variant="titleSmall" style={styles.sectionTitle}>
-            Orders ({orders.length})
+            {t('Orders ({n})', { n: orders.length })}
           </Text>
 
           {orders.length === 0 ? (
             <Card style={styles.card}>
               <Card.Content style={styles.emptyContent}>
-                <Text variant="bodyMedium" style={{ opacity: 0.5 }}>No orders for this period</Text>
+                <Text variant="bodyMedium" style={{ opacity: 0.5 }}>{t('No orders for this period')}</Text>
               </Card.Content>
             </Card>
           ) : (
@@ -411,7 +424,9 @@ export default function CCReportsScreen() {
 
                   <View style={styles.row}>
                     <Text variant="bodySmall" style={{ opacity: 0.65 }}>
-                      Table {order.table_number} · {order.items_count} item{order.items_count !== 1 ? 's' : ''}
+                      {t('Table {n}', { n: order.table_number })} · {order.items_count !== 1
+                        ? t('{n} items', { n: order.items_count })
+                        : t('{n} item', { n: order.items_count })}
                     </Text>
                     <Chip
                       mode="flat"
@@ -440,7 +455,7 @@ export default function CCReportsScreen() {
 
     </ScrollView>
     <Portal>
-      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{snack}</Snackbar>
+      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{t(snack)}</Snackbar>
     </Portal>
     </View>
   );

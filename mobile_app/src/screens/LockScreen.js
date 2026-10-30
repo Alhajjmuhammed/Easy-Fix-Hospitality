@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useT } from '../i18n';
 
 const PAD = [
   ['1', '2', '3'],
@@ -17,6 +18,7 @@ const PAD = [
 ];
 
 export default function LockScreen({ onUnlock }) {
+  const t = useT();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -63,9 +65,11 @@ export default function LockScreen({ onUnlock }) {
           Vibration.vibrate(400);
           if (result.lockedOutUntil) {
             setLockedOutUntil(result.lockedOutUntil);
-            setError('Too many attempts — locked out');
+            setError(t('Too many attempts — locked out'));
           } else {
-            setError(`Wrong PIN — ${result.attemptsLeft} attempt${result.attemptsLeft !== 1 ? 's' : ''} left`);
+            setError(result.attemptsLeft !== 1
+              ? t('Wrong PIN — {n} attempts left', { n: result.attemptsLeft })
+              : t('Wrong PIN — {n} attempt left', { n: result.attemptsLeft }));
           }
           wrongPinTimeoutRef.current = setTimeout(() => {
             setPin('');
@@ -75,7 +79,7 @@ export default function LockScreen({ onUnlock }) {
         // If success, parent unmounts this screen — no need to reset checking
       } catch (_) {
         // SecureStore / Keystore hardware error — reset so the keypad stays usable
-        setError('Could not verify PIN. Try again.');
+        setError(t('Could not verify PIN. Try again.'));
         setPin('');
         setChecking(false);
       }
@@ -91,8 +95,8 @@ export default function LockScreen({ onUnlock }) {
   return (
     <SafeAreaView style={styles.container}>
       <Ionicons name="lock-closed" size={52} color="#2c3e50" style={styles.lockIcon} />
-      <Text style={styles.title}>Screen Locked</Text>
-      <Text style={styles.subtitle}>{isLockedOut ? `Try again in ${secondsLeft}s` : 'Enter your 4-digit PIN'}</Text>
+      <Text style={styles.title}>{t('Screen Locked')}</Text>
+      <Text style={styles.subtitle}>{isLockedOut ? t('Try again in {n}s', { n: secondsLeft }) : t('Enter your 4-digit PIN')}</Text>
 
       {/* PIN dots */}
       <View style={styles.dotsRow}>

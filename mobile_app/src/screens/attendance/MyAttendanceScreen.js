@@ -8,6 +8,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiAttendanceMy, apiAttendanceStatus, apiMyRoster } from '../../api/attendance';
+import { useT } from '../../i18n';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -34,6 +35,7 @@ function fmtDate(dateStr) {
 
 // ─── Today status card ────────────────────────────────────────────────────────
 function TodayStatusCard({ status, loading }) {
+  const t = useT();
   if (loading) {
     return (
       <Card style={styles.todayCard}>
@@ -59,9 +61,9 @@ function TodayStatusCard({ status, loading }) {
       <Card.Content>
         <View style={styles.todayHeader}>
           <MaterialCommunityIcons name={iconName} size={22} color={statusColor} />
-          <Text style={[styles.todayTitle, { color: statusColor }]}>Today's Status</Text>
+          <Text style={[styles.todayTitle, { color: statusColor }]}>{t("Today's Status")}</Text>
         </View>
-        <Text style={styles.todayStatus}>{statusText}</Text>
+        <Text style={styles.todayStatus}>{t(statusText)}</Text>
         {record ? (
           <View style={styles.todayTimes}>
             {record.check_in ? (
@@ -100,6 +102,7 @@ function fmtRosterDate(dateStr) {
 }
 
 function UpcomingShiftsCard({ entries }) {
+  const t = useT();
   if (!entries || entries.length === 0) return null;
   const today = localIso(new Date());
   return (
@@ -107,14 +110,14 @@ function UpcomingShiftsCard({ entries }) {
       <Card.Content>
         <View style={styles.todayHeader}>
           <MaterialCommunityIcons name="calendar-week" size={22} color="#1565C0" />
-          <Text style={[styles.todayTitle, { color: '#1565C0' }]}>My Upcoming Shifts</Text>
+          <Text style={[styles.todayTitle, { color: '#1565C0' }]}>{t('My Upcoming Shifts')}</Text>
         </View>
         {entries.map((e) => (
           <View key={e.date} style={[styles.shiftRow, e.date === today && styles.shiftRowToday]}>
-            <Text style={styles.shiftDate}>{e.date === today ? 'Today' : fmtRosterDate(e.date)}</Text>
+            <Text style={styles.shiftDate}>{e.date === today ? t('Today') : fmtRosterDate(e.date)}</Text>
             {e.kind === 'shift' ? (
               <Text style={styles.shiftTime}>
-                {e.start_time ? `${e.start_time}–${e.end_time}` : 'Shift to be confirmed'}
+                {e.start_time ? `${e.start_time}–${e.end_time}` : t('Shift to be confirmed')}
                 {e.shift_name ? <Text style={styles.shiftName}>  {e.shift_name}</Text> : null}
               </Text>
             ) : (
@@ -129,6 +132,7 @@ function UpcomingShiftsCard({ entries }) {
 
 // ─── Summary row ─────────────────────────────────────────────────────────────
 function SummaryRow({ records }) {
+  const t = useT();
   const totalDays   = records.length;
   const lateCount   = records.filter((r) => r.is_late).length;
   const overtimeCount = records.filter((r) => r.is_overtime).length;
@@ -137,21 +141,21 @@ function SummaryRow({ records }) {
     <View style={styles.summaryRow}>
       <View style={styles.summaryItem}>
         <Text style={styles.summaryNumber}>{totalDays}</Text>
-        <Text style={styles.summaryLabel}>Days</Text>
+        <Text style={styles.summaryLabel}>{t('Days')}</Text>
       </View>
       <View style={styles.summaryDivider} />
       <View style={styles.summaryItem}>
         <Text style={[styles.summaryNumber, lateCount > 0 && { color: '#E53935' }]}>
           {lateCount}
         </Text>
-        <Text style={styles.summaryLabel}>Late</Text>
+        <Text style={styles.summaryLabel}>{t('Late')}</Text>
       </View>
       <View style={styles.summaryDivider} />
       <View style={styles.summaryItem}>
         <Text style={[styles.summaryNumber, overtimeCount > 0 && { color: '#6A1B9A' }]}>
           {overtimeCount}
         </Text>
-        <Text style={styles.summaryLabel}>Overtime</Text>
+        <Text style={styles.summaryLabel}>{t('Overtime')}</Text>
       </View>
     </View>
   );
@@ -159,6 +163,7 @@ function SummaryRow({ records }) {
 
 // ─── Record row ───────────────────────────────────────────────────────────────
 function RecordRow({ item }) {
+  const t = useT();
   return (
     <View style={styles.recordRow}>
       {/* Date + Shift */}
@@ -188,14 +193,14 @@ function RecordRow({ item }) {
           {item.is_late ? (
             <View style={styles.badgeLate}>
               <Text style={styles.badgeText}>
-                Late{item.late_minutes ? ` ${item.late_minutes}m` : ''}
+                {t('Late')}{item.late_minutes ? ` ${item.late_minutes}m` : ''}
               </Text>
             </View>
           ) : null}
           {item.is_overtime ? (
             <View style={styles.badgeOvertime}>
               <Text style={styles.badgeText}>
-                OT{item.overtime_minutes ? ` ${item.overtime_minutes}m` : ''}
+                {t('OT')}{item.overtime_minutes ? ` ${item.overtime_minutes}m` : ''}
               </Text>
             </View>
           ) : null}
@@ -208,6 +213,7 @@ function RecordRow({ item }) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function MyAttendanceScreen() {
   const theme = useTheme();
+  const t = useT();
   const mountedRef = useRef(true);
 
   const now = new Date();
@@ -330,7 +336,7 @@ export default function MyAttendanceScreen() {
             {''}
           </Button>
           <Text style={styles.monthLabel}>
-            {MONTHS[month - 1]} {year}
+            {t(MONTHS[month - 1])} {year}
           </Text>
           <Button
             compact
@@ -357,9 +363,9 @@ export default function MyAttendanceScreen() {
       {/* Table header */}
       {records.length > 0 && (
         <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Date</Text>
-          <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>In / Out</Text>
-          <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>Hours</Text>
+          <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>{t('Date')}</Text>
+          <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>{t('In / Out')}</Text>
+          <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>{t('Hours')}</Text>
         </View>
       )}
     </View>
@@ -369,8 +375,8 @@ export default function MyAttendanceScreen() {
   const ListEmpty = () => (
     <View style={styles.emptyContainer}>
       <MaterialCommunityIcons name="calendar-blank-outline" size={56} color="#B0BEC5" />
-      <Text style={styles.emptyTitle}>No records for {MONTHS[month - 1]}</Text>
-      <Text style={styles.emptyBody}>Your attendance for this month will appear here.</Text>
+      <Text style={styles.emptyTitle}>{t('No records for {month}', { month: t(MONTHS[month - 1]) })}</Text>
+      <Text style={styles.emptyBody}>{t('Your attendance for this month will appear here.')}</Text>
     </View>
   );
 
@@ -386,9 +392,9 @@ export default function MyAttendanceScreen() {
           onPress={() => fetchRecords(page - 1)}
           icon="chevron-left"
         >
-          Prev
+          {t('Prev')}
         </Button>
-        <Text style={styles.pageText}>Page {page} / {totalPages}</Text>
+        <Text style={styles.pageText}>{t('Page {page} / {total}', { page, total: totalPages })}</Text>
         <Button
           compact
           mode="outlined"
@@ -397,7 +403,7 @@ export default function MyAttendanceScreen() {
           icon="chevron-right"
           contentStyle={{ flexDirection: 'row-reverse' }}
         >
-          Next
+          {t('Next')}
         </Button>
       </View>
     );

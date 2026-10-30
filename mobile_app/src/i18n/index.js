@@ -11,9 +11,11 @@ import common from './sw/common';
 import customerOrdering from './sw/customer_ordering';
 import customerAccount from './sw/customer_account';
 import customerShared from './sw/customer_shared';
-import staff from './sw/staff';
+import staffCashier from './sw/staff_cashier';
+import staffCare from './sw/staff_care';
+import staffOps from './sw/staff_ops';
 
-const SW = { ...common, ...customerShared, ...customerOrdering, ...customerAccount, ...staff };
+const SW = { ...common, ...customerShared, ...customerOrdering, ...customerAccount, ...staffCashier, ...staffCare, ...staffOps };
 
 function fill(text, params) {
   if (!params) return text;

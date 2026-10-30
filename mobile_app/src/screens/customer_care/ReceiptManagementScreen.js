@@ -15,10 +15,12 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import { apiPayments } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useT } from '../../i18n';
 
 const METHOD_LABEL = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
 
 export default function ReceiptManagementScreen({ navigation }) {
+  const t = useT();
   const theme = useTheme();
   const { format } = useCurrency();
   const [payments, setPayments] = useState([]);
@@ -80,7 +82,7 @@ export default function ReceiptManagementScreen({ navigation }) {
         </View>
         <View style={styles.rowBetween}>
           <Chip compact style={{ height: 22 }}>
-            {METHOD_LABEL[item.payment_method] || item.payment_method}
+            {METHOD_LABEL[item.payment_method] ? t(METHOD_LABEL[item.payment_method]) : item.payment_method}
           </Chip>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
             {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
@@ -88,12 +90,12 @@ export default function ReceiptManagementScreen({ navigation }) {
         </View>
         {item.processed_by_name ? (
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
-            By: {item.processed_by_name}
+            {t('By: {name}', { name: item.processed_by_name })}
           </Text>
         ) : null}
       </Card.Content>
     </Card>
-  ), [format, navigation, theme]);
+  ), [format, navigation, theme, t]);
 
   return (
     <View style={styles.container}>
@@ -103,12 +105,12 @@ export default function ReceiptManagementScreen({ navigation }) {
         actions={[]}
         style={{ backgroundColor: '#FFF8E1' }}
       >
-        Offline – receipts are not available without internet. Connect to search receipts.
+        {t('Offline – receipts are not available without internet. Connect to search receipts.')}
       </Banner>
       {/* Filters */}
       <View style={styles.filterRow}>
         <TextInput
-          label="Search order #"
+          label={t('Search order #')}
           value={search}
           onChangeText={(v) => { setSearch(v); searchRef.current = v; }}
           mode="outlined"
@@ -117,12 +119,12 @@ export default function ReceiptManagementScreen({ navigation }) {
           right={<TextInput.Icon icon="magnify" />}
         />
         <Button mode="contained" compact onPress={fetchPayments} style={styles.searchBtn}>
-          Go
+          {t('Go')}
         </Button>
       </View>
       <View style={styles.filterRow}>
         <TextInput
-          label="From (YYYY-MM-DD)"
+          label={t('From (YYYY-MM-DD)')}
           value={dateFrom}
           onChangeText={(v) => { setDateFrom(v); dateFromRef.current = v; }}
           mode="outlined"
@@ -130,7 +132,7 @@ export default function ReceiptManagementScreen({ navigation }) {
           style={styles.dateInput}
         />
         <TextInput
-          label="To (YYYY-MM-DD)"
+          label={t('To (YYYY-MM-DD)')}
           value={dateTo}
           onChangeText={(v) => { setDateTo(v); dateToRef.current = v; }}
           mode="outlined"
@@ -150,7 +152,7 @@ export default function ReceiptManagementScreen({ navigation }) {
           renderItem={renderItem}
           ListEmptyComponent={
             <Text style={{ textAlign: 'center', marginTop: 32, color: theme.colors.onSurfaceVariant }}>
-              No receipts found
+              {t('No receipts found')}
             </Text>
           }
           contentContainerStyle={{ paddingBottom: 32 }}
@@ -158,7 +160,7 @@ export default function ReceiptManagementScreen({ navigation }) {
       )}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );

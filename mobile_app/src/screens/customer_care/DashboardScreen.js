@@ -27,6 +27,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
+import { useT } from '../../i18n';
 
 function stringToColor(str = '') {
   const PALETTE = ['#2c3e50', '#AD1457', '#6A1B9A', '#00838F', '#2E7D32', '#E65100', '#4527A0', '#37474F'];
@@ -47,10 +48,11 @@ function getGreeting() {
 }
 
 function RestaurantBanner() {
+  const t = useT();
   const { user } = useAuthStore();
   const restaurantName = user?.restaurant_name || 'Restaurant';
   const logoUrl = user?.restaurant_logo_url || null;
-  const staffFirstName = user?.first_name || user?.username || 'there';
+  const staffFirstName = user?.first_name || user?.username || t('there');
   const color = stringToColor(restaurantName);
   const initials = nameInitials(restaurantName);
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -72,7 +74,7 @@ function RestaurantBanner() {
 
       {/* Text */}
       <Text style={bannerStyles.restaurantName} numberOfLines={1}>{restaurantName}</Text>
-      <Text style={bannerStyles.greeting}>{getGreeting()}, {staffFirstName}!</Text>
+      <Text style={bannerStyles.greeting}>{t(getGreeting())}, {staffFirstName}!</Text>
       <Text style={bannerStyles.date}>{today}</Text>
     </View>
   );
@@ -128,6 +130,7 @@ const bannerStyles = StyleSheet.create({
 });
 
 export default function CCDashboardScreen({ navigation }) {
+  const t = useT();
   const theme = useTheme();
   const { format } = useCurrency();
   const { pendingCount, lastSyncTime } = useSyncStore();
@@ -238,15 +241,15 @@ export default function CCDashboardScreen({ navigation }) {
   const handleComplete = async (id) => {
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to complete a bill request'); return; }
+    if (!net.isConnected) { setSnack(t('No internet — connect to complete a bill request')); return; }
     setCompleting(id);
     try {
       await apiCompleteBillRequest(id);
       if (!mountedRef.current) return;
       setBillRequests((prev) => prev.filter((r) => r.id !== id));
-      setSnack('Bill request marked as complete');
+      setSnack(t('Bill request marked as complete'));
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Could not complete request');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Could not complete request'));
     } finally {
       if (mountedRef.current) setCompleting(null);
     }
@@ -264,9 +267,9 @@ export default function CCDashboardScreen({ navigation }) {
         currencySymbol: user?.currency_symbol || '',
         staffName,
       });
-      if (ok && mountedRef.current) setSnack('Bill sent to printer');
+      if (ok && mountedRef.current) setSnack(t('Bill sent to printer'));
     } catch (err) {
-      if (mountedRef.current) setSnack('Print failed: ' + (err.message || 'unknown error'));
+      if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('Unknown error') }));
     } finally {
       if (mountedRef.current) setPrintBillId(null);
     }
@@ -288,16 +291,16 @@ export default function CCDashboardScreen({ navigation }) {
     if (!cancelDialog) return;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
+    if (!net.isConnected) { setSnack(t('No internet — connect to cancel an order')); setCancelDialog(null); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(cancelDialog.id, cancelReason.trim());
       if (!mountedRef.current) return;
       setCancelDialog(null);
-      setSnack('Order cancelled');
+      setSnack(t('Order cancelled'));
       fetchAll(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Cancel failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Cancel failed'));
     } finally {
       if (mountedRef.current) setCancelling(false);
     }
@@ -310,9 +313,9 @@ export default function CCDashboardScreen({ navigation }) {
     setTableMenuVisible(false);
     const currentTblNum = String(order.table_number ?? '');
     try {
-      const t = await apiTables();
+      const list = await apiTables();
       if (!mountedRef.current) return;
-      setTables((t || []).filter((tb) =>
+      setTables((list || []).filter((tb) =>
         tb.is_available === true &&
         String(tb.table_number ?? tb.tbl_no) !== currentTblNum,
       ));
@@ -325,16 +328,16 @@ export default function CCDashboardScreen({ navigation }) {
     if (!transferDialog || !targetTable) return;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
+    if (!net.isConnected) { setSnack(t('No internet — connect to transfer table')); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       await apiTransferTable(transferDialog.id, targetTable.id);
       if (!mountedRef.current) return;
       setTransferDialog(null);
-      setSnack('Table transferred');
+      setSnack(t('Table transferred'));
       fetchAll(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Transfer failed');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Transfer failed'));
     } finally {
       if (mountedRef.current) setTransferring(false);
     }
@@ -363,34 +366,36 @@ export default function CCDashboardScreen({ navigation }) {
         style={{ backgroundColor: isOffline ? '#FFF8E1' : '#E8F5E9', marginHorizontal: -16, marginTop: -16, marginBottom: 8 }}
       >
         {isOffline
-          ? `Offline – showing cached orders.${pendingCount > 0 ? ` ${pendingCount} queued for sync.` : ' Connect to sync latest data.'}`
-          : `${pendingCount} order(s) queued – will sync automatically when internet is available.`}
+          ? (pendingCount > 0
+            ? t('Offline – showing cached orders. {n} queued for sync.', { n: pendingCount })
+            : t('Offline – showing cached orders. Connect to sync latest data.'))
+          : t('{n} order(s) queued – will sync automatically when internet is available.', { n: pendingCount })}
       </Banner>
 
       {/* Restaurant Banner */}
       <RestaurantBanner />
 
       {/* Stats Cards */}
-      <Text variant="titleMedium" style={styles.sectionTitle}>Today's Summary</Text>
+      <Text variant="titleMedium" style={styles.sectionTitle}>{t("Today's Summary")}</Text>
       <View style={styles.statsRow}>
-        <StatCard label="Total"     value={stats.total}     color="#2c3e50" icon="clipboard-list-outline" />
-        <StatCard label="Pending"   value={stats.pending}   color="#FF8F00" icon="clock-outline" />
-        <StatCard label="Done"      value={stats.completed} color="#2E7D32" icon="check-circle-outline" />
-        <StatCard label="Cancelled" value={stats.cancelled} color="#C62828" icon="close-circle-outline" />
+        <StatCard label={t('Total')}     value={stats.total}     color="#2c3e50" icon="clipboard-list-outline" />
+        <StatCard label={t('Pending')}   value={stats.pending}   color="#FF8F00" icon="clock-outline" />
+        <StatCard label={t('Done')}      value={stats.completed} color="#2E7D32" icon="check-circle-outline" />
+        <StatCard label={t('Cancelled')} value={stats.cancelled} color="#C62828" icon="close-circle-outline" />
       </View>
 
       {/* Pending Bill Requests */}
       <View style={styles.sectionHeader}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>Bill Requests</Text>
+        <Text variant="titleMedium" style={styles.sectionTitle}>{t('Bill Requests')}</Text>
         <Chip icon="bell" mode="outlined" compact>
-          {billRequests.length} pending
+          {t('{n} pending', { n: billRequests.length })}
         </Chip>
       </View>
 
       {billRequests.length === 0 ? (
         <Card style={styles.emptyCard}>
           <Card.Content style={styles.emptyContent}>
-            <Text variant="bodyMedium" style={{ opacity: 0.5 }}>No pending bill requests</Text>
+            <Text variant="bodyMedium" style={{ opacity: 0.5 }}>{t('No pending bill requests')}</Text>
           </Card.Content>
         </Card>
       ) : (
@@ -399,7 +404,7 @@ export default function CCDashboardScreen({ navigation }) {
             <Card.Content>
               <View style={styles.row}>
                 <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>
-                  Table {req.table_number}
+                  {t('Table {n}', { n: req.table_number })}
                 </Text>
                 <Chip
                   mode="flat"
@@ -407,19 +412,19 @@ export default function CCDashboardScreen({ navigation }) {
                   style={{ backgroundColor: '#FFF9C4' }}
                   textStyle={{ fontSize: 11 }}
                 >
-                  PENDING
+                  {t('PENDING')}
                 </Chip>
               </View>
               <Text variant="bodySmall" style={styles.meta}>
-                Requested at {new Date(req.created_at).toLocaleTimeString()}
+                {t('Requested at {time}', { time: new Date(req.created_at).toLocaleTimeString() })}
               </Text>
               {req.requested_by_name ? (
-                <Text variant="bodySmall" style={styles.meta}>By: {req.requested_by_name}</Text>
+                <Text variant="bodySmall" style={styles.meta}>{t('By: {name}', { name: req.requested_by_name })}</Text>
               ) : null}
             </Card.Content>
             <Card.Actions>
               <Button mode="outlined" onPress={() => navigation.navigate('Payments')}>
-                Process Payment
+                {t('Process Payment')}
               </Button>
               <Button
                 mode="contained"
@@ -427,7 +432,7 @@ export default function CCDashboardScreen({ navigation }) {
                 disabled={completing === req.id}
                 onPress={() => handleComplete(req.id)}
               >
-                Complete
+                {t('Complete')}
               </Button>
             </Card.Actions>
           </Card>
@@ -438,16 +443,16 @@ export default function CCDashboardScreen({ navigation }) {
 
       {/* Recent Orders */}
       <View style={styles.sectionHeader}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>My Recent Orders</Text>
+        <Text variant="titleMedium" style={styles.sectionTitle}>{t('My Recent Orders')}</Text>
         <Button compact mode="text" onPress={() => navigation.navigate('Payments')}>
-          View All
+          {t('View All')}
         </Button>
       </View>
 
       {recentOrders.length === 0 ? (
         <Card style={styles.emptyCard}>
           <Card.Content style={styles.emptyContent}>
-            <Text variant="bodyMedium" style={{ opacity: 0.5 }}>No orders today</Text>
+            <Text variant="bodyMedium" style={{ opacity: 0.5 }}>{t('No orders today')}</Text>
           </Card.Content>
         </Card>
       ) : (
@@ -478,10 +483,10 @@ export default function CCDashboardScreen({ navigation }) {
                         <Button compact icon="dots-vertical" onPress={() => setMenuOpenId(isMenuOpen ? null : orderId)} />
                       }
                     >
-                      <Menu.Item leadingIcon="printer" title="Print Bill" disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
-                      <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled'} />
+                      <Menu.Item leadingIcon="printer" title={t('Print Bill')} disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
+                      <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled'} />
                       <Divider />
-                      <Menu.Item leadingIcon="close-circle-outline" title="Cancel Order" titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpenId(null); openCancel(order); }} disabled={order.status === 'cancelled' || isPaid} />
+                      <Menu.Item leadingIcon="close-circle-outline" title={t('Cancel Order')} titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpenId(null); openCancel(order); }} disabled={order.status === 'cancelled' || isPaid} />
                     </Menu>
                   </View>
                 </View>
@@ -494,7 +499,7 @@ export default function CCDashboardScreen({ navigation }) {
                       style={{ backgroundColor: '#FFEBEE', alignSelf: 'flex-start', marginBottom: 4 }}
                       textStyle={{ fontSize: 10, color: '#C62828' }}
                     >
-                      Sync Failed – re-take manually
+                      {t('Sync Failed – re-take manually')}
                     </Chip>
                     {!!order.error_message && (
                       <Text variant="bodySmall" style={{ color: '#C62828', fontSize: 10, opacity: 0.8, marginBottom: 4 }}>
@@ -511,14 +516,16 @@ export default function CCDashboardScreen({ navigation }) {
                     style={{ backgroundColor: '#FFF3E0', alignSelf: 'flex-start', marginBottom: 4 }}
                     textStyle={{ fontSize: 10, color: '#E65100' }}
                   >
-                    Queued – syncs when online
+                    {t('Queued – syncs when online')}
                   </Chip>
                 )}
                 <Text variant="bodySmall" style={styles.meta}>
-                  {order.order_type === 'delivery' ? '🚴 Delivery' : `Table ${order.table_number ?? '?'}`} · {order.items_count} item{order.items_count !== 1 ? 's' : ''}
+                  {order.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: order.table_number ?? '?' })} · {order.items_count !== 1
+                    ? t('{n} items', { n: order.items_count })
+                    : t('{n} item', { n: order.items_count })}
                 </Text>
                 <View style={styles.row}>
-                  <Text variant="bodySmall">Total: {format(order.total)}</Text>
+                  <Text variant="bodySmall">{t('Total')}: {format(order.total)}</Text>
                   <Text
                     variant="bodySmall"
                     style={{ color: isPaid ? '#2E7D32' : '#C62828', fontFamily: 'Poppins_700Bold' }}
@@ -529,8 +536,8 @@ export default function CCDashboardScreen({ navigation }) {
               </Card.Content>
               {order._is_offline_pending && !order._is_sync_error && (
                 <Card.Actions>
-                  <Button compact mode="outlined" icon="printer" disabled={printBillId === order.id} loading={printBillId === order.id} onPress={() => handlePrintBill(order)}>Print</Button>
-                  <Button compact mode="text" onPress={() => navigation.navigate('Payments')}>Pay / Manage</Button>
+                  <Button compact mode="outlined" icon="printer" disabled={printBillId === order.id} loading={printBillId === order.id} onPress={() => handlePrintBill(order)}>{t('Print')}</Button>
+                  <Button compact mode="text" onPress={() => navigation.navigate('Payments')}>{t('Pay / Manage')}</Button>
                 </Card.Actions>
               )}
               {order._is_sync_error && (
@@ -541,7 +548,7 @@ export default function CCDashboardScreen({ navigation }) {
                     textColor="#C62828"
                     onPress={() => handleDismissError(order.offline_id)}
                   >
-                    Dismiss
+                    {t('Dismiss')}
                   </Button>
                 </Card.Actions>
               )}
@@ -553,26 +560,26 @@ export default function CCDashboardScreen({ navigation }) {
       <Portal>
         {/* Cancel Order Dialog */}
         <Dialog visible={!!cancelDialog} onDismiss={() => setCancelDialog(null)}>
-          <Dialog.Title>Cancel Order</Dialog.Title>
+          <Dialog.Title>{t('Cancel Order')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
-              Order #{cancelDialog?.order_number || cancelDialog?.id} · Table {cancelDialog?.table_number}
+              {t('Order #{number}', { number: cancelDialog?.order_number || cancelDialog?.id })} · {t('Table {n}', { n: cancelDialog?.table_number })}
             </Text>
-            <TextInput label="Reason (optional)" value={cancelReason}
+            <TextInput label={t('Reason (optional)')} value={cancelReason}
               onChangeText={setCancelReason} mode="outlined" multiline numberOfLines={2} />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setCancelDialog(null)}>Back</Button>
-            <Button mode="contained" buttonColor="#E53935" loading={cancelling} disabled={cancelling} onPress={handleCancel}>Cancel Order</Button>
+            <Button onPress={() => setCancelDialog(null)}>{t('Back')}</Button>
+            <Button mode="contained" buttonColor="#E53935" loading={cancelling} disabled={cancelling} onPress={handleCancel}>{t('Cancel Order')}</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* Transfer Table Dialog */}
         <Dialog visible={!!transferDialog} onDismiss={() => setTransferDialog(null)}>
-          <Dialog.Title>Transfer Table</Dialog.Title>
+          <Dialog.Title>{t('Transfer Table')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
-              Move order #{transferDialog?.order_number || transferDialog?.id} from Table {transferDialog?.table_number}
+              {t('Move order #{number} from Table {table}', { number: transferDialog?.order_number || transferDialog?.id, table: transferDialog?.table_number })}
             </Text>
             <Menu
               visible={tableMenuVisible}
@@ -580,26 +587,26 @@ export default function CCDashboardScreen({ navigation }) {
               anchor={
                 <Button mode="outlined" onPress={() => setTableMenuVisible(true)}
                   icon="table-chair" style={{ marginBottom: 4 }}>
-                  {targetTable ? `Table ${targetTable.table_number ?? targetTable.tbl_no}` : 'Select available table'}
+                  {targetTable ? t('Table {n}', { n: targetTable.table_number ?? targetTable.tbl_no }) : t('Select available table')}
                 </Button>
               }
             >
-              {tables.map((t) => (
-                <Menu.Item key={t.id} title={`Table ${t.table_number ?? t.tbl_no}`}
-                  onPress={() => { setTargetTable(t); setTableMenuVisible(false); }} />
+              {tables.map((tb) => (
+                <Menu.Item key={tb.id} title={t('Table {n}', { n: tb.table_number ?? tb.tbl_no })}
+                  onPress={() => { setTargetTable(tb); setTableMenuVisible(false); }} />
               ))}
-              {tables.length === 0 && <Menu.Item title="No available tables" disabled />}
+              {tables.length === 0 && <Menu.Item title={t('No available tables')} disabled />}
             </Menu>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setTransferDialog(null)}>Cancel</Button>
-            <Button mode="contained" loading={transferring} disabled={transferring || !targetTable} onPress={handleTransfer}>Transfer</Button>
+            <Button onPress={() => setTransferDialog(null)}>{t('Cancel')}</Button>
+            <Button mode="contained" loading={transferring} disabled={transferring || !targetTable} onPress={handleTransfer}>{t('Transfer')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
+        {t(snack)}
       </Snackbar>
     </ScrollView>
   );

@@ -21,6 +21,7 @@ import { usePrinterStore } from '../../store/usePrinterStore';
 import { printOrderTicket } from '../../utils/printer';
 import RestaurantHeader from '../../components/RestaurantHeader';
 import { STATUS_COLORS } from '../../constants/statusColors';
+import { useT } from '../../i18n';
 
 const STATION_ICONS = {
   kitchen: 'chef-hat',
@@ -34,6 +35,14 @@ const STATION_LABELS = {
   bar:     'Bar',
   buffet:  'Buffet',
   service: 'Service',
+};
+
+// Display labels only (status codes stay as they are)
+const STATUS_LABELS = {
+  pending:   'Pending',
+  confirmed: 'Confirmed',
+  preparing: 'Preparing',
+  ready:     'Ready',
 };
 
 const ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing', 'ready'];
@@ -54,19 +63,21 @@ function filterForStation(orders, stationName) {
 }
 
 function StatusChip({ status }) {
+  const t = useT();
   const color = STATUS_COLORS[status] || '#9E9E9E';
   return (
     <Chip
       style={[styles.statusChip, { backgroundColor: color }]}
       textStyle={styles.statusChipText}
     >
-      {(status || '').replace(/_/g, ' ').toUpperCase()}
+      {(STATUS_LABELS[status] ? t(STATUS_LABELS[status]) : (status || '').replace(/_/g, ' ')).toUpperCase()}
     </Chip>
   );
 }
 
 const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMarkReady, onPrint, updatingId, printingId }) {
   const { format } = useCurrency();
+  const t = useT();
   const isUpdating = updatingId === order.id;
   const isPrinting = printingId === order.id;
   const status = order.status;
@@ -74,10 +85,10 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
   const canReady   = status === 'preparing';
 
   const tableLabel = order.table_number
-    ? `Table ${order.table_number}`
+    ? t('Table {n}', { n: order.table_number })
     : order.order_type === 'delivery'
-    ? 'Delivery'
-    : 'Takeaway';
+    ? t('Delivery')
+    : t('Takeaway');
 
   return (
     <Card style={styles.card} elevation={2}>
@@ -86,7 +97,7 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <Text variant="titleMedium" style={styles.orderNumber}>
-              Order #{order.order_number || order.id}
+              {t('Order #{number}', { number: order.order_number || order.id })}
             </Text>
             <Text variant="bodySmall" style={styles.tableLabel}>
               {tableLabel}
@@ -104,11 +115,11 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
               x{item.quantity}
             </Text>
             <Text variant="bodyMedium" style={styles.itemName} numberOfLines={2}>
-              {item.product_name || item.name || 'Item'}
+              {item.product_name || item.name || t('Item')}
             </Text>
             {(item.special_notes || item.notes) ? (
               <Text variant="bodySmall" style={styles.itemNotes}>
-                Note: {item.special_notes || item.notes}
+                {t('Note:')} {item.special_notes || item.notes}
               </Text>
             ) : null}
           </View>
@@ -126,7 +137,7 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
           style={styles.printBtn}
           compact
         >
-          Print
+          {t('Print')}
         </Button>
         {canPrepare && (
           <Button
@@ -138,7 +149,7 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
             style={styles.actionBtn}
             compact
           >
-            Preparing
+            {t('Preparing')}
           </Button>
         )}
         {canReady && (
@@ -151,7 +162,7 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
             style={styles.actionBtn}
             compact
           >
-            Ready
+            {t('Ready')}
           </Button>
         )}
       </Card.Actions>
@@ -161,10 +172,11 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
 
 export default function StationDashboardScreen() {
   const theme    = useTheme();
+  const t        = useT();
   const { user } = useAuthStore();
   const { localKotBot } = usePrinterStore();
   const stationName = (user?.role_name || 'kitchen').toLowerCase();
-  const stationLabel = STATION_LABELS[stationName] || stationName;
+  const stationLabel = STATION_LABELS[stationName] ? t(STATION_LABELS[stationName]) : stationName;
   const stationIcon  = STATION_ICONS[stationName]  || 'chef-hat';
 
   const mountedRef = useRef(true);
@@ -334,7 +346,7 @@ export default function StationDashboardScreen() {
     return (
       <View style={[styles.centered, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Loading {stationLabel} orders…</Text>
+        <Text style={styles.loadingText}>{t('Loading {station} orders…', { station: stationLabel })}</Text>
       </View>
     );
   }
@@ -351,7 +363,7 @@ export default function StationDashboardScreen() {
           )}
           style={styles.banner}
         >
-          You are offline — showing cached orders.
+          {t('You are offline — showing cached orders.')}
         </Banner>
       )}
 
@@ -364,10 +376,10 @@ export default function StationDashboardScreen() {
           style={styles.stationIcon}
         />
         <Text variant="titleLarge" style={styles.stationTitle}>
-          {stationLabel} Station
+          {t('{station} Station', { station: stationLabel })}
         </Text>
         <Text variant="bodySmall" style={styles.orderCount}>
-          {orders.length} active {orders.length === 1 ? 'order' : 'orders'}
+          {t(orders.length === 1 ? '{n} active order' : '{n} active orders', { n: orders.length })}
         </Text>
       </View>
 
@@ -396,10 +408,10 @@ export default function StationDashboardScreen() {
               color={theme.colors.outlineVariant || '#BDBDBD'}
             />
             <Text variant="titleMedium" style={styles.emptyTitle}>
-              No active orders
+              {t('No active orders')}
             </Text>
             <Text variant="bodyMedium" style={styles.emptySubtitle}>
-              No pending items for {stationLabel} right now.
+              {t('No pending items for {station} right now.', { station: stationLabel })}
             </Text>
           </View>
         }
@@ -411,7 +423,7 @@ export default function StationDashboardScreen() {
         duration={3000}
         style={styles.snackbar}
       >
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );

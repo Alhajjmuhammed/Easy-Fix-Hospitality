@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { apiAttendanceScan, apiAttendanceConfirm } from '../../api/attendance';
+import { useT } from '../../i18n';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function fmtTime(str) {
@@ -72,6 +73,7 @@ function ScanFrame() {
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function AttendanceScreen({ navigation }) {
+  const t = useT();
   const mountedRef  = useRef(true);
   const scanningRef = useRef(false); // debounce: only one scan processed at a time
 
@@ -169,9 +171,9 @@ export default function AttendanceScreen({ navigation }) {
     return (
       <View style={styles.permissionContainer}>
         <MaterialCommunityIcons name="camera-off" size={64} color="#9E9E9E" />
-        <Text style={styles.permissionTitle}>Camera Access Required</Text>
+        <Text style={styles.permissionTitle}>{t('Camera Access Required')}</Text>
         <Text style={styles.permissionBody}>
-          The camera is needed to scan the restaurant QR code for attendance.
+          {t('The camera is needed to scan the restaurant QR code for attendance.')}
         </Text>
         <Button
           mode="contained"
@@ -179,7 +181,7 @@ export default function AttendanceScreen({ navigation }) {
           style={styles.permissionBtn}
           contentStyle={{ paddingVertical: 6 }}
         >
-          Grant Camera Access
+          {t('Grant Camera Access')}
         </Button>
       </View>
     );
@@ -210,7 +212,7 @@ export default function AttendanceScreen({ navigation }) {
       {/* Dark overlay — bottom */}
       <View style={styles.overlayBottom}>
         <Text style={styles.instructionText}>
-          Point your camera at the restaurant QR code
+          {t('Point your camera at the restaurant QR code')}
         </Text>
 
         <Surface style={styles.historyBtnSurface} elevation={3}>
@@ -221,7 +223,7 @@ export default function AttendanceScreen({ navigation }) {
             style={styles.historyBtn}
             labelStyle={{ fontFamily: 'Poppins_600SemiBold', fontSize: 14 }}
           >
-            My Attendance History
+            {t('My Attendance History')}
           </Button>
         </Surface>
       </View>
@@ -235,7 +237,7 @@ export default function AttendanceScreen({ navigation }) {
               size={22}
               color={actionColor(scanResult?.action)}
             />
-            {'  '}Confirm {actionLabel(scanResult?.action)}
+            {'  '}{scanResult?.action === 'check_out' ? t('Confirm Check Out') : scanResult?.action === 'check_in' ? t('Confirm Check In') : `${t('Confirm')} ${actionLabel(scanResult?.action) || ''}`}
           </Dialog.Title>
 
           <Dialog.Content>
@@ -244,28 +246,28 @@ export default function AttendanceScreen({ navigation }) {
                 {/* Restaurant */}
                 <View style={styles.infoRow}>
                   <MaterialCommunityIcons name="store-outline" size={18} color="#555" />
-                  <Text style={styles.infoLabel}>Restaurant</Text>
+                  <Text style={styles.infoLabel}>{t('Restaurant')}</Text>
                   <Text style={styles.infoValue}>{scanResult.restaurant_name || '—'}</Text>
                 </View>
 
                 {/* Action badge */}
                 <View style={styles.infoRow}>
                   <MaterialCommunityIcons name="badge-account-outline" size={18} color="#555" />
-                  <Text style={styles.infoLabel}>Action</Text>
+                  <Text style={styles.infoLabel}>{t('Action')}</Text>
                   <View
                     style={[
                       styles.actionBadge,
                       { backgroundColor: actionColor(scanResult.action) },
                     ]}
                   >
-                    <Text style={styles.actionBadgeText}>{actionLabel(scanResult.action)}</Text>
+                    <Text style={styles.actionBadgeText}>{t(actionLabel(scanResult.action))}</Text>
                   </View>
                 </View>
 
                 {/* Current time */}
                 <View style={styles.infoRow}>
                   <MaterialCommunityIcons name="clock-outline" size={18} color="#555" />
-                  <Text style={styles.infoLabel}>Time</Text>
+                  <Text style={styles.infoLabel}>{t('Time')}</Text>
                   <Text style={styles.infoValue}>{scanResult.current_time || '—'}</Text>
                 </View>
 
@@ -274,7 +276,7 @@ export default function AttendanceScreen({ navigation }) {
                   <View style={[styles.shiftCard]}>
                     <Text style={styles.shiftTitle}>
                       <MaterialCommunityIcons name="timetable" size={14} color="#1565C0" />
-                      {'  '}Shift: {scanResult.shift.name}
+                      {'  '}{t('Shift:')} {scanResult.shift.name}
                     </Text>
                     <Text style={styles.shiftTime}>
                       {fmtTime(scanResult.shift.start_time)} – {fmtTime(scanResult.shift.end_time)}
@@ -289,7 +291,7 @@ export default function AttendanceScreen({ navigation }) {
 
           <Dialog.Actions>
             <Button onPress={handleCancel} disabled={confirming} textColor="#888">
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button
               mode="contained"
@@ -299,30 +301,30 @@ export default function AttendanceScreen({ navigation }) {
               buttonColor={actionColor(scanResult?.action)}
               labelStyle={{ fontFamily: 'Poppins_600SemiBold' }}
             >
-              Confirm
+              {t('Confirm')}
             </Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* ── Already done dialog ───────────────────────────────────────── */}
         <Dialog visible={alreadyDoneVisible} onDismiss={handleCancel} style={styles.dialog}>
-          <Dialog.Title style={styles.dialogTitle}>Attendance Already Recorded</Dialog.Title>
+          <Dialog.Title style={styles.dialogTitle}>{t('Attendance Already Recorded')}</Dialog.Title>
           <Dialog.Content>
             <View style={styles.alreadyDoneContent}>
               <MaterialCommunityIcons name="check-circle" size={48} color="#2E7D32" />
               <Text style={styles.alreadyDoneText}>
-                You have already completed attendance for today.
+                {t('You have already completed attendance for today.')}
               </Text>
               {scanResult?.today_record ? (
                 <View style={styles.todayRecord}>
                   {scanResult.today_record.check_in ? (
                     <Text style={styles.recordLine}>
-                      Check-in: {fmtTime(scanResult.today_record.check_in)}
+                      {t('Check-in:')} {fmtTime(scanResult.today_record.check_in)}
                     </Text>
                   ) : null}
                   {scanResult.today_record.check_out ? (
                     <Text style={styles.recordLine}>
-                      Check-out: {fmtTime(scanResult.today_record.check_out)}
+                      {t('Check-out:')} {fmtTime(scanResult.today_record.check_out)}
                     </Text>
                   ) : null}
                 </View>
@@ -330,7 +332,7 @@ export default function AttendanceScreen({ navigation }) {
             </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={handleCancel}>OK</Button>
+            <Button onPress={handleCancel}>{t('OK')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -342,7 +344,7 @@ export default function AttendanceScreen({ navigation }) {
         duration={3000}
         style={{ backgroundColor: snackColor, marginBottom: 80 }}
       >
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );

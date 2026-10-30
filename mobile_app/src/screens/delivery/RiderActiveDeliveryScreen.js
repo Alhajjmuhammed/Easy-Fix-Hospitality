@@ -12,6 +12,7 @@ import {
   apiMarkPickedUp,
   apiMarkDelivered,
 } from '../../api/delivery';
+import { useT } from '../../i18n';
 
 // Build the Leaflet HTML — shows rider position + destination pin
 function buildMapHtml({ riderLat, riderLng, destLat, destLng, destAddress }) {
@@ -102,6 +103,7 @@ window.addEventListener('message', function(e) {
 export default function RiderActiveDeliveryScreen({ route }) {
   const { assignmentOrderId } = route.params;
   const navigation = useNavigation();
+  const t          = useT();
   const { token }  = useAuthStore();
 
   const [assignment, setAssignment] = useState(null);
@@ -263,12 +265,12 @@ export default function RiderActiveDeliveryScreen({ route }) {
     const net = await NetInfo.fetch();
     if (!net.isConnected) { setSnack('No internet — connect to mark as delivered'); return; }
     Alert.alert(
-      'Confirm Delivery',
-      'Mark this order as delivered?',
+      t('Confirm Delivery'),
+      t('Mark this order as delivered?'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('Cancel'), style: 'cancel' },
         {
-          text: 'Delivered',
+          text: t('Delivered'),
           style: 'default',
           onPress: async () => {
             setActioning(true);
@@ -297,10 +299,10 @@ export default function RiderActiveDeliveryScreen({ route }) {
     return (
       <View style={styles.center}>
         <Text style={{ fontFamily: 'Poppins_400Regular', color: '#757575', marginBottom: 16 }}>
-          Could not load delivery details
+          {t('Could not load delivery details')}
         </Text>
         <Button mode="outlined" icon="refresh" onPress={loadAssignment}>
-          Retry
+          {t('Retry')}
         </Button>
       </View>
     );
@@ -317,14 +319,14 @@ export default function RiderActiveDeliveryScreen({ route }) {
       <Card style={styles.infoCard}>
         <Card.Content>
           <View style={styles.row}>
-            <Text variant="titleMedium" style={styles.bold}>Order #{a?.order_number}</Text>
+            <Text variant="titleMedium" style={styles.bold}>{t('Order #{number}', { number: a?.order_number })}</Text>
             <Chip compact style={{ backgroundColor: col + '22' }} textStyle={{ color: col, fontFamily: 'Poppins_600SemiBold', fontSize: 11 }}>
               {a?.status_display}
             </Chip>
           </View>
-          <Text variant="bodySmall" style={styles.addrText}>📍 {a?.delivery_address || 'No address'}</Text>
-          <Text variant="bodySmall" style={styles.meta}>Customer: {a?.customer_name}</Text>
-          <Text variant="bodySmall" style={styles.meta}>Phone: {a?.delivery_phone || 'N/A'}</Text>
+          <Text variant="bodySmall" style={styles.addrText}>📍 {a?.delivery_address || t('No address')}</Text>
+          <Text variant="bodySmall" style={styles.meta}>{t('Customer:')} {a?.customer_name}</Text>
+          <Text variant="bodySmall" style={styles.meta}>{t('Phone:')} {a?.delivery_phone || t('N/A')}</Text>
         </Card.Content>
       </Card>
 
@@ -349,7 +351,7 @@ export default function RiderActiveDeliveryScreen({ route }) {
             icon="package-up"
             onPress={handlePickedUp}
           >
-            Picked Up from Restaurant
+            {t('Picked Up from Restaurant')}
           </Button>
         )}
         {a?.status === 'picked_up' && (
@@ -362,7 +364,7 @@ export default function RiderActiveDeliveryScreen({ route }) {
             icon="check-circle"
             onPress={handleDelivered}
           >
-            Mark as Delivered
+            {t('Mark as Delivered')}
           </Button>
         )}
         {a?.status === 'delivered' && (
@@ -373,12 +375,12 @@ export default function RiderActiveDeliveryScreen({ route }) {
             icon="arrow-left"
             onPress={() => navigation.goBack()}
           >
-            Back to Dashboard
+            {t('Back to Dashboard')}
           </Button>
         )}
       </View>
 
-      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{snack}</Snackbar>
+      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{t(snack)}</Snackbar>
     </View>
   );
 }

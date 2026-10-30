@@ -19,6 +19,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
+import { useT } from '../../i18n';
 import LoyaltyPayBox from '../../components/LoyaltyPayBox';
 import MobileMoneyBox from '../../components/MobileMoneyBox';
 
@@ -38,6 +39,7 @@ const STATUS_NEXT = {
 
 export default function CashierMyOrdersScreen({ navigation }) {
   const theme = useTheme();
+  const t = useT();
   const { format } = useCurrency();
   const { pendingCount, lastSyncTime } = useSyncStore();
   const { user } = useAuthStore();
@@ -403,7 +405,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
       });
       if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
-      if (mountedRef.current) setSnack('Print failed: ' + (err.message || 'unknown error'));
+      if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('unknown error') }));
     } finally {
       if (mountedRef.current) setPrintBillId(null);
     }
@@ -433,8 +435,8 @@ export default function CashierMyOrdersScreen({ navigation }) {
       if (!mountedRef.current) return;
       setAssignDialog(null);
       const label = res.is_cross_restaurant
-        ? `Assigned to ${res.rider_name} (${res.rider_restaurant}) from global pool`
-        : `Assigned to ${res.rider_name}`;
+        ? t('Assigned to {name} ({restaurant}) from global pool', { name: res.rider_name, restaurant: res.rider_restaurant })
+        : t('Assigned to {name}', { name: res.rider_name });
       setSnack(label);
       fetchOrders(true);
     } catch (err) {
@@ -475,14 +477,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
         actions={[]}
         style={{ backgroundColor: '#FFF8E1' }}
       >
-        Offline – showing cached orders. Connect to see your personal order history.
+        {t('Offline – showing cached orders. Connect to see your personal order history.')}
       </Banner>
       <SegmentedButtons
         value={period}
         onValueChange={setPeriod}
         buttons={[
-          { value: 'today', label: 'Today' },
-          { value: 'week',  label: 'This Week' },
+          { value: 'today', label: t('Today') },
+          { value: 'week',  label: t('This Week') },
         ]}
         style={styles.filterBtns}
       />
@@ -497,7 +499,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
         ListEmptyComponent={() => (
           <View style={styles.center}>
             <MaterialCommunityIcons name="account-clock-outline" size={48} color="#ccc" />
-            <Text variant="bodyLarge" style={{ opacity: 0.4, marginTop: 8 }}>No orders placed by you</Text>
+            <Text variant="bodyLarge" style={{ opacity: 0.4, marginTop: 8 }}>{t('No orders placed by you')}</Text>
           </View>
         )}
         renderItem={({ item: order }) => {
@@ -523,7 +525,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                   </Text>
                   <View style={styles.row}>
                     <Chip mode="flat" style={{ backgroundColor: statusColor + '22' }} textStyle={{ color: statusColor, fontSize: 11 }}>
-                      {order.status?.toUpperCase()}
+                      {t(order.status)?.toUpperCase()}
                     </Chip>
                     <Menu
                       visible={isMenuOpen}
@@ -534,7 +536,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                     >
                       <Menu.Item
                         leadingIcon="eye"
-                        title="View Order"
+                        title={t('View Order')}
                         onPress={() => {
                           setMenuOpenId(null);
                           if (order._is_offline_pending) {
@@ -545,16 +547,16 @@ export default function CashierMyOrdersScreen({ navigation }) {
                         }}
                       />
                       <Divider />
-                      <Menu.Item leadingIcon="printer" title="Print Bill" disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
-                      <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled' || order._is_offline_pending} />
+                      <Menu.Item leadingIcon="printer" title={t('Print Bill')} disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
+                      <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled' || order._is_offline_pending} />
                       {hasPayment && !order._is_offline_pending && (
-                        <Menu.Item leadingIcon="cancel" title="Void Payment" onPress={() => { setMenuOpenId(null); openVoid(order); }} />
+                        <Menu.Item leadingIcon="cancel" title={t('Void Payment')} onPress={() => { setMenuOpenId(null); openVoid(order); }} />
                       )}
                       <Divider />
                       {order._is_sync_error && (
                         <Menu.Item
                           leadingIcon="refresh"
-                          title="Retry Sync"
+                          title={t('Retry Sync')}
                           onPress={() => {
                             setMenuOpenId(null);
                             resetErrors()
@@ -566,18 +568,18 @@ export default function CashierMyOrdersScreen({ navigation }) {
                       )}
                       <Menu.Item
                         leadingIcon="close-circle-outline"
-                        title={order._is_offline_pending ? 'Delete Queued Order' : 'Cancel Order'}
+                        title={order._is_offline_pending ? t('Delete Queued Order') : t('Cancel Order')}
                         titleStyle={{ color: '#E53935' }}
                         onPress={() => {
                           setMenuOpenId(null);
                           if (order._is_offline_pending) {
                             Alert.alert(
-                              'Delete Queued Order',
-                              'This order has not been synced yet. Delete it permanently?',
+                              t('Delete Queued Order'),
+                              t('This order has not been synced yet. Delete it permanently?'),
                               [
-                                { text: 'Cancel', style: 'cancel' },
+                                { text: t('Cancel'), style: 'cancel' },
                                 {
-                                  text: 'Delete',
+                                  text: t('Delete'),
                                   style: 'destructive',
                                   onPress: () => deleteOfflineOrder(order.offline_id)
                                     .then(() => fetchOrders(true))
@@ -599,7 +601,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                     <Chip icon="alert-circle" mode="flat" compact
                       style={{ backgroundColor: '#FFEBEE', alignSelf: 'flex-start', marginBottom: 4 }}
                       textStyle={{ fontSize: 10, color: '#C62828' }}>
-                      Sync Failed – tap ··· to delete
+                      {t('Sync Failed – tap ··· to delete')}
                     </Chip>
                     {!!order.error_message && (
                       <Text variant="bodySmall" style={{ color: '#C62828', fontSize: 10, opacity: 0.8, marginBottom: 4 }}>
@@ -612,48 +614,48 @@ export default function CashierMyOrdersScreen({ navigation }) {
                   <Chip icon="cloud-upload" mode="flat" compact
                     style={{ backgroundColor: '#FFF3E0', alignSelf: 'flex-start', marginBottom: 4 }}
                     textStyle={{ fontSize: 10, color: '#E65100' }}>
-                    Queued – syncs when online
+                    {t('Queued – syncs when online')}
                   </Chip>
                 )}
                 <Text variant="bodySmall" style={styles.meta}>
-                  {isDelivery ? '🚴 Delivery' : `Table ${order.table_number}`} · {order.items_count ?? order.items?.length ?? '?'} item{(order.items_count ?? order.items?.length ?? 0) !== 1 ? 's' : ''} · Total: {format(order.total)}
+                  {isDelivery ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: order.table_number ?? '' })} · {(order.items_count ?? order.items?.length ?? 0) !== 1 ? t('{n} items', { n: order.items_count ?? order.items?.length ?? '?' }) : t('{n} item', { n: order.items_count ?? order.items?.length ?? '?' })} · {t('Total')}: {format(order.total)}
                 </Text>
                 {order.balance_due > 0 && (
                   <Text variant="bodySmall" style={{ color: theme.colors.error, fontFamily: 'Poppins_600SemiBold' }}>
-                    Due: {format(order.balance_due)}
+                    {t('Due: {amount}', { amount: format(order.balance_due) })}
                   </Text>
                 )}
                 {isPaid && (
-                  <Text variant="bodySmall" style={{ color: '#2E7D32', fontFamily: 'Poppins_600SemiBold' }}>✓ Fully Paid</Text>
+                  <Text variant="bodySmall" style={{ color: '#2E7D32', fontFamily: 'Poppins_600SemiBold' }}>✓ {t('Fully Paid')}</Text>
                 )}
                 {isExpanded && order._is_offline_pending && (
                   <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 8 }}>
                     {(order.items || []).map((item, i) => (
                       <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                        <Text variant="bodySmall" style={{ flex: 1 }}>{item.quantity}× {item.name || `Item #${item.product_id}`}</Text>
+                        <Text variant="bodySmall" style={{ flex: 1 }}>{item.quantity}× {item.name || t('Item #{id}', { id: item.product_id })}</Text>
                         <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold' }}>{format((parseFloat(item.price) || 0) * (item.quantity || 0))}</Text>
                       </View>
                     ))}
                     {order.subtotal > 0 && (
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#eee' }}>
-                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>Subtotal</Text>
+                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>{t('Subtotal')}</Text>
                         <Text variant="bodySmall">{format(order.subtotal)}</Text>
                       </View>
                     )}
                     {order.tax_amount > 0 && (
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>Tax</Text>
+                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>{t('Tax')}</Text>
                         <Text variant="bodySmall">{format(order.tax_amount)}</Text>
                       </View>
                     )}
                     {order.delivery_fee > 0 && (
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>Delivery fee</Text>
+                        <Text variant="bodySmall" style={{ opacity: 0.6 }}>{t('Delivery fee')}</Text>
                         <Text variant="bodySmall">{format(order.delivery_fee)}</Text>
                       </View>
                     )}
                     {!!order.special_instructions && (
-                      <Text variant="bodySmall" style={{ opacity: 0.6, marginTop: 4 }}>Note: {order.special_instructions}</Text>
+                      <Text variant="bodySmall" style={{ opacity: 0.6, marginTop: 4 }}>{t('Note:')} {order.special_instructions}</Text>
                     )}
                   </View>
                 )}
@@ -663,14 +665,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
                   <>
                     {effectiveNext && (
                       <Button mode="outlined" compact onPress={() => handleStatusAdvance(order)}>
-                        → {effectiveNext}
+                        → {t(effectiveNext)}
                       </Button>
                     )}
                     {!isPaid && (
-                      <Button mode="contained" compact onPress={() => openPayment(order)}>Pay</Button>
+                      <Button mode="contained" compact onPress={() => openPayment(order)}>{t('Pay')}</Button>
                     )}
                     {isPaid && (
-                      <Text variant="bodySmall" style={{ color: '#2E7D32', paddingHorizontal: 8 }}>✓ Paid (queued)</Text>
+                      <Text variant="bodySmall" style={{ color: '#2E7D32', paddingHorizontal: 8 }}>✓ {t('Paid (queued)')}</Text>
                     )}
                   </>
                 ) : (
@@ -678,16 +680,16 @@ export default function CashierMyOrdersScreen({ navigation }) {
                     {effectiveNext && (
                       <Button mode="outlined" compact loading={updatingStatus === order.id}
                         disabled={updatingStatus === order.id} onPress={() => handleStatusAdvance(order)}>
-                        → {effectiveNext}
+                        → {t(effectiveNext)}
                       </Button>
                     )}
                     {showAssign && (
                       <Button mode="outlined" compact icon="moped" onPress={() => openAssignRider(order)}>
-                        Assign Rider
+                        {t('Assign Rider')}
                       </Button>
                     )}
                     {hasPay && !isPaid && order.status !== 'cancelled' && (
-                      <Button mode="contained" compact onPress={() => openPayment(order)}>Pay</Button>
+                      <Button mode="contained" compact onPress={() => openPayment(order)}>{t('Pay')}</Button>
                     )}
                   </>
                 )}
@@ -700,15 +702,15 @@ export default function CashierMyOrdersScreen({ navigation }) {
       {/* ── Pay Dialog ─────────────────────────────────────────────────── */}
       <Portal>
         <Dialog visible={!!payDialog} onDismiss={() => setPayDialog(null)}>
-          <Dialog.Title>Process Payment</Dialog.Title>
+          <Dialog.Title>{t('Process Payment')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 8, opacity: 0.7 }}>
-              Order #{payDialog?.order_number || payDialog?.id} · Table {payDialog?.table_number}
+              {t('Order #{number}', { number: payDialog?.order_number || payDialog?.id || '' })} · {t('Table {n}', { n: payDialog?.table_number ?? '' })}
             </Text>
             <Text variant="bodyMedium" style={{ marginBottom: 12, fontFamily: 'Poppins_700Bold' }}>
-              Balance Due: {format(payDialog?.balance_due ?? payDialog?.total ?? 0)}
+              {t('Balance Due')}: {format(payDialog?.balance_due ?? payDialog?.total ?? 0)}
             </Text>
-            <TextInput label="Amount" value={amount} onChangeText={setAmount}
+            <TextInput label={t('Amount')} value={amount} onChangeText={setAmount}
               keyboardType="decimal-pad" mode="outlined" style={{ marginBottom: 12 }} />
             {!payDialog?._is_offline_pending && (
               <MobileMoneyBox orderId={payDialog?.id} amount={amount} onMessage={setSnack}
@@ -717,28 +719,28 @@ export default function CashierMyOrdersScreen({ navigation }) {
             <LoyaltyPayBox order={payDialog} balanceDue={payDialog?.balance_due ?? payDialog?.total ?? 0} format={format}
               onMessage={setSnack} onCode={setLoyaltyCode} onUsePoints={(amt, code) => { setAmount(amt); setLoyaltyCode(code); setMethod('loyalty'); }} />
             {method === 'loyalty' && (
-              <Text variant="bodySmall" style={{ marginBottom: 8, color: '#C2185B' }}>Paying with loyalty points. Choose another method below to change.</Text>
+              <Text variant="bodySmall" style={{ marginBottom: 8, color: '#C2185B' }}>{t('Paying with loyalty points. Choose another method below to change.')}</Text>
             )}
-            <Text variant="labelMedium" style={{ marginBottom: 6 }}>Payment Method</Text>
+            <Text variant="labelMedium" style={{ marginBottom: 6 }}>{t('Payment Method')}</Text>
             <SegmentedButtons value={method} onValueChange={setMethod}
-              buttons={PAYMENT_METHODS} style={{ marginBottom: 12 }} />
+              buttons={PAYMENT_METHODS.map((m) => ({ ...m, label: t(m.label) }))} style={{ marginBottom: 12 }} />
             {method !== 'cash' && (
-              <TextInput label="Reference / Approval Code" value={reference}
+              <TextInput label={t('Reference / Approval Code')} value={reference}
                 onChangeText={setReference} mode="outlined" />
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setPayDialog(null)}>Cancel</Button>
-            <Button mode="contained" loading={paying} disabled={paying} onPress={handlePayment}>Confirm</Button>
+            <Button onPress={() => setPayDialog(null)}>{t('Cancel')}</Button>
+            <Button mode="contained" loading={paying} disabled={paying} onPress={handlePayment}>{t('Confirm')}</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* ── Payment Picker (multiple payments) ──────────────────────── */}
         <Dialog visible={!!paymentPickerDialog} onDismiss={() => setPaymentPickerDialog(null)}>
-          <Dialog.Title>Select Payment to Void</Dialog.Title>
+          <Dialog.Title>{t('Select Payment to Void')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
-              Order #{paymentPickerDialog?.order_number || paymentPickerDialog?.id} has multiple payments. Choose one to void.
+              {t('Order #{number} has multiple payments. Choose one to void.', { number: paymentPickerDialog?.order_number || paymentPickerDialog?.id || '' })}
             </Text>
             <FlatList
               data={paymentPickerDialog?.payments || []}
@@ -759,52 +761,52 @@ export default function CashierMyOrdersScreen({ navigation }) {
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setPaymentPickerDialog(null)}>Cancel</Button>
+            <Button onPress={() => setPaymentPickerDialog(null)}>{t('Cancel')}</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* ── Void Dialog ─────────────────────────────────────────────── */}
         <Dialog visible={!!voidDialog} onDismiss={() => setVoidDialog(null)}>
-          <Dialog.Title>Void Payment</Dialog.Title>
+          <Dialog.Title>{t('Void Payment')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
-              Order #{voidDialog?.order?.order_number || voidDialog?.order?.id}
+              {t('Order #{number}', { number: voidDialog?.order?.order_number || voidDialog?.order?.id || '' })}
             </Text>
-            <TextInput label="Void Reason (optional)" value={voidReason}
+            <TextInput label={t('Void Reason (optional)')} value={voidReason}
               onChangeText={setVoidReason} mode="outlined" multiline numberOfLines={2} />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setVoidDialog(null)}>Cancel</Button>
-            <Button mode="contained" buttonColor="#E53935" loading={voiding} disabled={voiding} onPress={handleVoid}>Void</Button>
+            <Button onPress={() => setVoidDialog(null)}>{t('Cancel')}</Button>
+            <Button mode="contained" buttonColor="#E53935" loading={voiding} disabled={voiding} onPress={handleVoid}>{t('Void')}</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* ── Cancel Dialog ───────────────────────────────────────────── */}
         <Dialog visible={!!cancelDialog} onDismiss={() => setCancelDialog(null)}>
-          <Dialog.Title>Cancel Order</Dialog.Title>
+          <Dialog.Title>{t('Cancel Order')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
-              Order #{cancelDialog?.order_number || cancelDialog?.id} · Table {cancelDialog?.table_number}
+              {t('Order #{number}', { number: cancelDialog?.order_number || cancelDialog?.id || '' })} · {t('Table {n}', { n: cancelDialog?.table_number ?? '' })}
             </Text>
-            <TextInput label="Reason (required)" value={cancelReason}
+            <TextInput label={t('Reason (required)')} value={cancelReason}
               onChangeText={(v) => { setCancelReason(v); if (cancelError) setCancelError(''); }}
               mode="outlined" multiline numberOfLines={2} error={!!cancelError} />
             {!!cancelError && (
-              <Text variant="bodySmall" style={{ color: '#E53935', marginTop: 4 }}>{cancelError}</Text>
+              <Text variant="bodySmall" style={{ color: '#E53935', marginTop: 4 }}>{t(cancelError)}</Text>
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setCancelDialog(null)}>Back</Button>
-            <Button mode="contained" buttonColor="#E53935" loading={cancelling} disabled={cancelling} onPress={handleCancel}>Cancel Order</Button>
+            <Button onPress={() => setCancelDialog(null)}>{t('Back')}</Button>
+            <Button mode="contained" buttonColor="#E53935" loading={cancelling} disabled={cancelling} onPress={handleCancel}>{t('Cancel Order')}</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* ── Transfer Dialog ─────────────────────────────────────────── */}
         <Dialog visible={!!transferDialog} onDismiss={() => setTransferDialog(null)}>
-          <Dialog.Title>Transfer Table</Dialog.Title>
+          <Dialog.Title>{t('Transfer Table')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
-              Move order #{transferDialog?.order_number || transferDialog?.id} from Table {transferDialog?.table_number}
+              {t('Move order #{number} from Table {table}', { number: transferDialog?.order_number || transferDialog?.id || '', table: transferDialog?.table_number ?? '' })}
             </Text>
             <Menu
               visible={tableMenuVisible}
@@ -812,29 +814,29 @@ export default function CashierMyOrdersScreen({ navigation }) {
               anchor={
                 <Button mode="outlined" onPress={() => setTableMenuVisible(true)}
                   icon="table-chair" style={{ marginBottom: 4 }}>
-                  {targetTable ? `Table ${targetTable.table_number ?? targetTable.tbl_no}` : 'Select available table'}
+                  {targetTable ? t('Table {n}', { n: targetTable.table_number ?? targetTable.tbl_no ?? '' }) : t('Select available table')}
                 </Button>
               }
             >
-              {tables.length === 0 && <Menu.Item title="No available tables" disabled />}
-              {tables.map((t) => (
-                <Menu.Item key={t.id} title={`Table ${t.table_number ?? t.tbl_no}`}
-                  onPress={() => { setTargetTable(t); setTableMenuVisible(false); }} />
+              {tables.length === 0 && <Menu.Item title={t('No available tables')} disabled />}
+              {tables.map((tb) => (
+                <Menu.Item key={tb.id} title={t('Table {n}', { n: tb.table_number ?? tb.tbl_no ?? '' })}
+                  onPress={() => { setTargetTable(tb); setTableMenuVisible(false); }} />
               ))}
             </Menu>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setTransferDialog(null)}>Cancel</Button>
-            <Button mode="contained" loading={transferring} disabled={!targetTable || transferring} onPress={handleTransfer}>Transfer</Button>
+            <Button onPress={() => setTransferDialog(null)}>{t('Cancel')}</Button>
+            <Button mode="contained" loading={transferring} disabled={!targetTable || transferring} onPress={handleTransfer}>{t('Transfer')}</Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* ── Assign Rider Dialog ─────────────────────────────────────────── */}
         <Dialog visible={!!assignDialog} onDismiss={() => setAssignDialog(null)}>
-          <Dialog.Title>Assign Delivery Rider</Dialog.Title>
+          <Dialog.Title>{t('Assign Delivery Rider')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 10, opacity: 0.7 }}>
-              Order #{assignDialog?.order_number || assignDialog?.id}
+              {t('Order #{number}', { number: assignDialog?.order_number || assignDialog?.id || '' })}
             </Text>
 
             <Button
@@ -846,16 +848,16 @@ export default function CashierMyOrdersScreen({ navigation }) {
               style={{ marginBottom: 12, borderRadius: 8 }}
               buttonColor="#1565C0"
             >
-              Auto-Assign Best Available
+              {t('Auto-Assign Best Available')}
             </Button>
 
             <Text variant="labelSmall" style={{ textAlign: 'center', color: '#9E9E9E', marginBottom: 8 }}>
-              — or choose manually —
+              {t('— or choose manually —')}
             </Text>
 
             {riderOptions.length === 0 ? (
               <Text variant="bodyMedium" style={{ color: '#757575', marginVertical: 4 }}>
-                No available riders right now.
+                {t('No available riders right now.')}
               </Text>
             ) : (
               <ScrollView style={{ maxHeight: 220 }}>
@@ -869,14 +871,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
                       title={r.name}
                       description={
                         r.is_local
-                          ? `${r.vehicle_display} · ${r.phone || 'No phone'}`
+                          ? `${r.vehicle_display} · ${r.phone || t('No phone')}`
                           : `${r.vehicle_display} · ${r.restaurant}`
                       }
                       left={() => <RadioButton value={String(r.id)} />}
                       right={() =>
                         !r.is_local ? (
                           <Text style={{ fontSize: 10, color: '#1565C0', alignSelf: 'center', marginRight: 4 }}>
-                            🌐 Global
+                            🌐 {t('Global')}
                           </Text>
                         ) : null
                       }
@@ -889,20 +891,20 @@ export default function CashierMyOrdersScreen({ navigation }) {
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setAssignDialog(null)}>Cancel</Button>
+            <Button onPress={() => setAssignDialog(null)}>{t('Cancel')}</Button>
             <Button
               mode="outlined"
               loading={assigning}
               disabled={assigning || autoAssigning || !selectedRider}
               onPress={handleAssignRider}
             >
-              Assign Selected
+              {t('Assign Selected')}
             </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
-      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{snack}</Snackbar>
+      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{t(snack)}</Snackbar>
       <FAB icon="refresh" style={styles.fab} size="small" onPress={() => fetchOrders(true)} />
     </View>
   );

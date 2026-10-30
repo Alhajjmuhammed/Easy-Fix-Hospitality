@@ -31,6 +31,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { usePrinterStore }      from '../../store/usePrinterStore';
 import { useAuthStore }         from '../../store/useAuthStore';
 import { useLockStore }         from '../../store/useLockStore';
+import { useT }                 from '../../i18n';
+import LanguageSwitch           from '../../components/LanguageSwitch';
 
 // ─── Shared banner helpers (same as DashboardScreen) ─────────────────────────
 function stringToColor(str = '') {
@@ -49,6 +51,7 @@ function getGreeting() {
   return 'Good evening';
 }
 function RestaurantBanner({ user }) {
+  const t = useT();
   const restaurantName = user?.restaurant_name || 'Restaurant';
   const logoUrl        = user?.restaurant_logo_url || null;
   const staffFirstName = user?.first_name || user?.username || 'there';
@@ -67,7 +70,7 @@ function RestaurantBanner({ user }) {
         </View>
       )}
       <Text style={bannerStyles.restaurantName} numberOfLines={1}>{restaurantName}</Text>
-      <Text style={bannerStyles.greeting}>{getGreeting()}, {staffFirstName}!</Text>
+      <Text style={bannerStyles.greeting}>{t(getGreeting())}, {staffFirstName}!</Text>
       <Text style={bannerStyles.date}>{today}</Text>
     </View>
   );
@@ -139,6 +142,7 @@ const MODES = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PrinterSettingsScreen() {
+  const t = useT();
   const { mode, bluetoothDevice, autoPrintAfterPayment, localKotBot, saveSettings } = usePrinterStore();
   const user = useAuthStore((s) => s.user);
   const restaurantName = user?.restaurant_name || '';
@@ -171,26 +175,26 @@ export default function PrinterSettingsScreen() {
     setNewPin('');
     setConfirmPin('');
     setPinError('');
-    Alert.alert('PIN Set', 'Screen lock is now active. The app will lock after 30 minutes of inactivity.');
-  }, [newPin, confirmPin, setPin]);
+    Alert.alert(t('PIN Set'), t('Screen lock is now active. The app will lock after 30 minutes of inactivity.'));
+  }, [newPin, confirmPin, setPin, t]);
 
   const handleRemovePin = useCallback(() => {
     Alert.alert(
-      'Remove PIN',
-      'This will disable the screen lock. Are you sure?',
+      t('Remove PIN'),
+      t('This will disable the screen lock. Are you sure?'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('Cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('Remove'),
           style: 'destructive',
           onPress: async () => {
             await removePin();
-            Alert.alert('PIN Removed', 'Screen lock has been disabled.');
+            Alert.alert(t('PIN Removed'), t('Screen lock has been disabled.'));
           },
         },
       ],
     );
-  }, [removePin]);
+  }, [removePin, t]);
 
   useEffect(() => {
     setBtAvailable(isBtClassicAvailable());
@@ -201,7 +205,7 @@ export default function PrinterSettingsScreen() {
   const handleScan = useCallback(async () => {
     if (!btAvailable) {
       Alert.alert(
-        'Custom Build Required',
+        t('Custom Build Required'),
         'Silent Bluetooth printing requires a custom app build.\n\n' +
         'Run the following commands in your mobile_app/ folder:\n\n' +
         '  npx expo prebuild\n' +
@@ -216,14 +220,14 @@ export default function PrinterSettingsScreen() {
       const devices = await scanBluetoothDevices();
       setBtDevices(devices);
       if (devices.length === 0) {
-        Alert.alert('No Devices Found', 'Make sure your printer is on and paired in Android Bluetooth settings.');
+        Alert.alert(t('No Devices Found'), t('Make sure your printer is on and paired in Android Bluetooth settings.'));
       }
     } catch (err) {
-      Alert.alert('Scan Failed', err?.message || 'Unknown error');
+      Alert.alert(t('Scan Failed'), err?.message || t('Unknown error'));
     } finally {
       setScanning(false);
     }
-  }, [btAvailable]);
+  }, [btAvailable, t]);
 
   // ── Connect to a device ───────────────────────────────────────────────────
 
@@ -232,13 +236,13 @@ export default function PrinterSettingsScreen() {
       setConnecting(device.address);
       await connectBluetoothPrinter(device.address);
       await saveSettings({ bluetoothDevice: device });
-      Alert.alert('Connected', `Printer "${device.name}" is ready.`);
+      Alert.alert(t('Connected'), t('Printer "{name}" is ready.', { name: device.name }));
     } catch (err) {
-      Alert.alert('Connection Failed', err?.message || 'Could not connect to printer.');
+      Alert.alert(t('Connection Failed'), err?.message || t('Could not connect to printer.'));
     } finally {
       setConnecting(null);
     }
-  }, [saveSettings]);
+  }, [saveSettings, t]);
 
   // ── Test print ────────────────────────────────────────────────────────────
 
@@ -265,11 +269,11 @@ export default function PrinterSettingsScreen() {
         currencySymbol: currencySymbol || '$',
       });
     } catch (err) {
-      Alert.alert('Test Print Failed', err?.message || 'Could not print.');
+      Alert.alert(t('Test Print Failed'), err?.message || t('Could not print.'));
     } finally {
       setTestPrinting(false);
     }
-  }, [restaurantName, currencySymbol]);
+  }, [restaurantName, currencySymbol, t]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -280,8 +284,13 @@ export default function PrinterSettingsScreen() {
         {/* Banner — same as Dashboard */}
         <RestaurantBanner user={user} />
 
+        {/* ── Language ── */}
+        <View style={styles.pinCard}>
+          <LanguageSwitch />
+        </View>
+
         {/* ── Mode Selector ── */}
-        <Text style={styles.sectionLabel}>PRINT MODE</Text>
+        <Text style={styles.sectionLabel}>{t('PRINT MODE')}</Text>
         {MODES.map((m) => {
           const active = mode === m.key;
           return (
@@ -300,10 +309,10 @@ export default function PrinterSettingsScreen() {
                 />
                 <View style={styles.modeText}>
                   <Text style={[styles.modeLabel, active && styles.modeLabelActive]}>
-                    {m.label}
+                    {t(m.label)}
                   </Text>
                   <Text style={[styles.modeDesc, active && styles.modeDescActive]}>
-                    {m.desc}
+                    {t(m.desc)}
                   </Text>
                 </View>
                 {active && (
@@ -317,7 +326,7 @@ export default function PrinterSettingsScreen() {
         {/* ── Bluetooth Device (only relevant for bluetooth / auto modes) ── */}
         {(mode === 'bluetooth' || mode === 'auto') && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>BLUETOOTH PRINTER</Text>
+            <Text style={styles.sectionLabel}>{t('BLUETOOTH PRINTER')}</Text>
 
             {bluetoothDevice ? (
               <View style={styles.connectedDevice}>
@@ -331,7 +340,7 @@ export default function PrinterSettingsScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text style={styles.noDevice}>No printer selected</Text>
+              <Text style={styles.noDevice}>{t('No printer selected')}</Text>
             )}
 
             {!btAvailable && (
@@ -358,7 +367,7 @@ export default function PrinterSettingsScreen() {
               ) : (
                 <>
                   <Ionicons name="search" size={16} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={styles.btnText}>Scan for Printers</Text>
+                  <Text style={styles.btnText}>{t('Scan for Printers')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -390,9 +399,9 @@ export default function PrinterSettingsScreen() {
                       {isConnecting ? (
                         <ActivityIndicator size="small" color="#4CAF50" />
                       ) : isSelected ? (
-                        <Text style={styles.selectedTag}>Active</Text>
+                        <Text style={styles.selectedTag}>{t('Active')}</Text>
                       ) : (
-                        <Text style={styles.connectTag}>Connect</Text>
+                        <Text style={styles.connectTag}>{t('Connect')}</Text>
                       )}
                     </TouchableOpacity>
                   );
@@ -403,16 +412,16 @@ export default function PrinterSettingsScreen() {
         )}
 
         {/* ── Auto-Print Toggle ── */}
-        <Text style={styles.sectionLabel}>OPTIONS</Text>
+        <Text style={styles.sectionLabel}>{t('OPTIONS')}</Text>
         <TouchableOpacity
           style={styles.toggleRow}
           onPress={() => saveSettings({ autoPrintAfterPayment: !autoPrintAfterPayment })}
           activeOpacity={0.7}
         >
           <View style={{ flex: 1 }}>
-            <Text style={styles.toggleLabel}>Auto-print after payment</Text>
+            <Text style={styles.toggleLabel}>{t('Auto-print after payment')}</Text>
             <Text style={styles.toggleDesc}>
-              Automatically print receipt when a payment is completed (no tap needed).
+              {t('Automatically print receipt when a payment is completed (no tap needed).')}
             </Text>
           </View>
           <View style={[styles.toggle, autoPrintAfterPayment && styles.toggleOn]}>
@@ -427,11 +436,9 @@ export default function PrinterSettingsScreen() {
           activeOpacity={0.7}
         >
           <View style={{ flex: 1 }}>
-            <Text style={styles.toggleLabel}>Print KOT / BOT from phone</Text>
+            <Text style={styles.toggleLabel}>{t('Print KOT / BOT from phone')}</Text>
             <Text style={styles.toggleDesc}>
-              Print kitchen & bar order tickets directly from this device (via Bluetooth or
-              system dialog) when an order is placed. Turn off to use the Windows Print Client
-              queue instead.
+              {t('Print kitchen & bar order tickets directly from this device (via Bluetooth or system dialog) when an order is placed. Turn off to use the Windows Print Client queue instead.')}
             </Text>
           </View>
           <View style={[styles.toggle, localKotBot && styles.toggleOn]}>
@@ -440,7 +447,7 @@ export default function PrinterSettingsScreen() {
         </TouchableOpacity>
 
         {/* ── Test Print ── */}
-        <Text style={styles.sectionLabel}>TEST</Text>
+        <Text style={styles.sectionLabel}>{t('TEST')}</Text>
         <TouchableOpacity
           style={[styles.testBtn, testPrinting && styles.btnDisabled]}
           onPress={handleTestPrint}
@@ -451,17 +458,16 @@ export default function PrinterSettingsScreen() {
           ) : (
             <>
               <Ionicons name="print" size={18} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.btnText}>Print Test Receipt</Text>
+              <Text style={styles.btnText}>{t('Print Test Receipt')}</Text>
             </>
           )}
         </TouchableOpacity>
         <Text style={styles.testNote}>
-          Uses the currently selected mode. If Bluetooth or Network fails, it will open
-          the system print dialog instead.
+          {t('Uses the currently selected mode. If Bluetooth or Network fails, it will open the system print dialog instead.')}
         </Text>
 
         {/* ── Screen Lock / PIN ── */}
-        <Text style={styles.sectionLabel}>SCREEN LOCK</Text>
+        <Text style={styles.sectionLabel}>{t('SCREEN LOCK')}</Text>
         <View style={styles.pinCard}>
           <View style={styles.pinRow}>
             <Ionicons
@@ -472,12 +478,12 @@ export default function PrinterSettingsScreen() {
             />
             <View style={{ flex: 1 }}>
               <Text style={styles.pinLabel}>
-                {hasPin ? 'PIN Lock Enabled' : 'PIN Lock Disabled'}
+                {hasPin ? t('PIN Lock Enabled') : t('PIN Lock Disabled')}
               </Text>
               <Text style={styles.pinDesc}>
                 {hasPin
-                  ? 'App locks after 30 min of inactivity.'
-                  : 'Set a 4-digit PIN to lock the app when idle.'}
+                  ? t('App locks after 30 min of inactivity.')
+                  : t('Set a 4-digit PIN to lock the app when idle.')}
               </Text>
             </View>
           </View>
@@ -488,11 +494,11 @@ export default function PrinterSettingsScreen() {
                 style={styles.pinBtn}
                 onPress={() => { setShowPinForm(true); setPinError(''); setNewPin(''); setConfirmPin(''); }}
               >
-                <Text style={styles.pinBtnText}>{hasPin ? 'Change PIN' : 'Set PIN'}</Text>
+                <Text style={styles.pinBtnText}>{hasPin ? t('Change PIN') : t('Set PIN')}</Text>
               </TouchableOpacity>
               {hasPin && (
                 <TouchableOpacity style={[styles.pinBtn, styles.pinBtnDanger]} onPress={handleRemovePin}>
-                  <Text style={[styles.pinBtnText, { color: '#e53935' }]}>Remove PIN</Text>
+                  <Text style={[styles.pinBtnText, { color: '#e53935' }]}>{t('Remove PIN')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -500,7 +506,7 @@ export default function PrinterSettingsScreen() {
             <View style={styles.pinForm}>
               <TextInput
                 style={styles.pinInput}
-                placeholder="New 4-digit PIN"
+                placeholder={t('New 4-digit PIN')}
                 keyboardType="numeric"
                 maxLength={4}
                 secureTextEntry
@@ -509,23 +515,23 @@ export default function PrinterSettingsScreen() {
               />
               <TextInput
                 style={styles.pinInput}
-                placeholder="Confirm PIN"
+                placeholder={t('Confirm PIN')}
                 keyboardType="numeric"
                 maxLength={4}
                 secureTextEntry
                 value={confirmPin}
                 onChangeText={(t) => { setConfirmPin(t.replace(/\D/g, '')); setPinError(''); }}
               />
-              {!!pinError && <Text style={styles.pinErrorText}>{pinError}</Text>}
+              {!!pinError && <Text style={styles.pinErrorText}>{t(pinError)}</Text>}
               <View style={styles.pinActions}>
                 <TouchableOpacity style={styles.pinBtn} onPress={handleSavePin}>
-                  <Text style={styles.pinBtnText}>Save PIN</Text>
+                  <Text style={styles.pinBtnText}>{t('Save PIN')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.pinBtn, { backgroundColor: '#f5f5f5' }]}
                   onPress={() => { setShowPinForm(false); setPinError(''); }}
                 >
-                  <Text style={[styles.pinBtnText, { color: '#555' }]}>Cancel</Text>
+                  <Text style={[styles.pinBtnText, { color: '#555' }]}>{t('Cancel')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
+import { useT } from '../i18n';
 import StationDashboardScreen from '../screens/station/StationDashboardScreen';
 
 import CCDashboardScreen         from '../screens/customer_care/DashboardScreen';
@@ -40,6 +41,7 @@ const AttendanceStack       = createNativeStackNavigator();
 const STATION_ROLES = ['kitchen', 'bar', 'buffet', 'service'];
 
 function CashierDashboardStackNavigator() {
+  const t = useT();
   return (
     <CashierDashboardStack.Navigator
       screenOptions={({ navigation }) => ({
@@ -58,7 +60,7 @@ function CashierDashboardStackNavigator() {
           header: () => (
             <RestaurantHeader
               extraMenuItems={[
-                { icon: 'calendar-check', label: 'Reservations', onPress: () => navigation.navigate('Reservations') },
+                { icon: 'calendar-check', label: t('Reservations'), onPress: () => navigation.navigate('Reservations') },
               ]}
             />
           ),
@@ -128,6 +130,7 @@ function CCOrderStackNavigator() {
 }
 
 function CCPaymentStackNavigator() {
+  const t = useT();
   return (
     <CCPaymentStack.Navigator
       screenOptions={({ navigation }) => ({
@@ -148,12 +151,12 @@ function CCPaymentStackNavigator() {
               extraMenuItems={[
                 {
                   icon: 'receipt-text-check',
-                  label: 'Receipt Management',
+                  label: t('Receipt Management'),
                   onPress: () => navigation.navigate('ReceiptManagement'),
                 },
                 {
                   icon: 'calendar-check',
-                  label: 'Reservations',
+                  label: t('Reservations'),
                   onPress: () => navigation.navigate('Reservations'),
                 },
               ]}
@@ -209,6 +212,7 @@ const tabScreenOptions = ({ navigation }) => ({
 });
 
 export default function StaffNavigator() {
+  const t = useT();
   const { user } = useAuthStore();
   const isCashier  = user?.role_name === 'cashier';
   const isStation  = STATION_ROLES.includes(user?.role_name);
@@ -238,17 +242,17 @@ export default function StaffNavigator() {
         <StationTab.Screen
           name="Dashboard"
           component={StationDashboardScreen}
-          options={{ title: 'Orders', headerShown: false }}
+          options={{ title: t('Orders'), headerShown: false }}
         />
         <StationTab.Screen
           name="Settings"
           component={PrinterSettingsScreen}
-          options={{ title: 'Printer', headerShown: false }}
+          options={{ title: t('Printer'), headerShown: false }}
         />
         <StationTab.Screen
           name="Attendance"
           component={AttendanceStackNavigator}
-          options={{ title: 'Attendance', headerShown: false }}
+          options={{ title: t('Attendance'), headerShown: false }}
         />
       </StationTab.Navigator>
     );
@@ -258,7 +262,7 @@ export default function StaffNavigator() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ fontSize: 16, textAlign: 'center', margin: 24 }}>
-          Your account role is not recognized. Please contact your administrator.
+          {t('Your account role is not recognized. Please contact your administrator.')}
         </Text>
       </View>
     );
@@ -284,42 +288,42 @@ export default function StaffNavigator() {
           <Tab.Screen
             name="Order"
             component={CCOrderStackNavigator}
-            options={{ title: 'Menu', headerShown: false }}
+            options={{ title: t('Menu'), headerShown: false }}
           />
           <Tab.Screen
             name="Dashboard"
             component={CashierDashboardStackNavigator}
-            options={{ title: 'Dashboard', headerShown: false }}
+            options={{ title: t('Dashboard'), headerShown: false }}
           />
           <Tab.Screen
             name="Receipts"
             component={CashierReceiptsScreen}
-            options={{ headerShown: true, header: () => <RestaurantHeader /> }}
+            options={{ title: t('Receipts'), headerShown: true, header: () => <RestaurantHeader /> }}
           />
           <Tab.Screen
             name="MyOrders"
             component={CashierMyOrdersStackNavigator}
-            options={{ title: 'My Orders', headerShown: false }}
+            options={{ title: t('My Orders'), headerShown: false }}
           />
           <Tab.Screen
             name="Reports"
             component={CashierReportsScreen}
-            options={{ headerShown: true, header: () => <RestaurantHeader /> }}
+            options={{ title: t('Reports'), headerShown: true, header: () => <RestaurantHeader /> }}
           />
           <Tab.Screen
             name="Waste"
             component={CashierWasteScreen}
-            options={{ title: 'Record Waste', headerShown: true, header: () => <RestaurantHeader /> }}
+            options={{ title: t('Record Waste'), headerShown: true, header: () => <RestaurantHeader /> }}
           />
           <Tab.Screen
             name="Settings"
             component={PrinterSettingsScreen}
-            options={{ title: 'Printer', headerShown: false }}
+            options={{ title: t('Printer'), headerShown: false }}
           />
           <Tab.Screen
             name="Attendance"
             component={AttendanceStackNavigator}
-            options={{ title: 'Attendance', headerShown: false }}
+            options={{ title: t('Attendance'), headerShown: false }}
           />
         </>
       ) : (
@@ -328,6 +332,7 @@ export default function StaffNavigator() {
             name="Dashboard"
             component={CCDashboardScreen}
             options={{
+              title: t('Dashboard'),
               headerShown: true,
               header: () => <RestaurantHeader />,
             }}
@@ -335,17 +340,18 @@ export default function StaffNavigator() {
           <Tab.Screen
             name="Order"
             component={CCOrderStackNavigator}
-            options={{ title: 'Menu' }}
+            options={{ title: t('Menu') }}
           />
           <Tab.Screen
             name="Payments"
             component={CCPaymentStackNavigator}
-            options={{ title: 'Payments', headerShown: false }}
+            options={{ title: t('Payments'), headerShown: false }}
           />
           <Tab.Screen
             name="Reports"
             component={CCReportsScreen}
             options={{
+              title: t('Reports'),
               headerShown: true,
               header: () => <RestaurantHeader />,
             }}
@@ -353,12 +359,12 @@ export default function StaffNavigator() {
           <Tab.Screen
             name="Settings"
             component={PrinterSettingsScreen}
-            options={{ title: 'Printer', headerShown: false }}
+            options={{ title: t('Printer'), headerShown: false }}
           />
           <Tab.Screen
             name="Attendance"
             component={AttendanceStackNavigator}
-            options={{ title: 'Attendance', headerShown: false }}
+            options={{ title: t('Attendance'), headerShown: false }}
           />
         </>
       )}

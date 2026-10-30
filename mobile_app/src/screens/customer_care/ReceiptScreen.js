@@ -17,9 +17,11 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { buildReceiptText, shareOnWhatsApp } from '../../utils/shareReceipt';
 import { printReceipt }     from '../../utils/printer';
 import { useAuthStore }     from '../../store/useAuthStore';
+import { useT } from '../../i18n';
 const METHOD_LABEL = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
 
 export default function ReceiptScreen({ route }) {
+  const t = useT();
   const { paymentId } = route.params;
   const theme = useTheme();
   const { format } = useCurrency();
@@ -84,7 +86,7 @@ export default function ReceiptScreen({ route }) {
       });
       if (mountedRef.current) setSnack('Receipt sent to printer');
     } catch (err) {
-      if (mountedRef.current) setSnack('Print failed: ' + (err?.message || 'Unknown error'));
+      if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err?.message || t('Unknown error') }));
     } finally {
       if (mountedRef.current) setPrinting(false);
     }
@@ -97,13 +99,13 @@ export default function ReceiptScreen({ route }) {
     return (
       <View style={styles.center}>
         <Banner visible icon="wifi-off" actions={[]} style={{ backgroundColor: '#FFF8E1', width: '100%' }}>
-          Offline – connect to internet to view this receipt.
+          {t('Offline – connect to internet to view this receipt.')}
         </Banner>
       </View>
     );
   }
   if (!data) {
-    return <View style={styles.center}><Text>Receipt not found</Text></View>;
+    return <View style={styles.center}><Text>{t('Receipt not found')}</Text></View>;
   }
 
   const { payment, order, change_amount, remaining_balance } = data;
@@ -111,7 +113,7 @@ export default function ReceiptScreen({ route }) {
   if (!payment || !order) {
     return (
       <View style={styles.center}>
-        <Text style={{ fontFamily: 'Poppins_400Regular' }}>Receipt data incomplete</Text>
+        <Text style={{ fontFamily: 'Poppins_400Regular' }}>{t('Receipt data incomplete')}</Text>
       </View>
     );
   }
@@ -121,7 +123,7 @@ export default function ReceiptScreen({ route }) {
       {/* Header */}
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="headlineMedium" style={styles.center}>Receipt</Text>
+          <Text variant="headlineMedium" style={styles.center}>{t('Receipt')}</Text>
           <Text variant="bodySmall" style={[styles.centerText, { color: theme.colors.onSurfaceVariant }]}>
             #{String(payment.id).padStart(6, '0')}
           </Text>
@@ -129,24 +131,24 @@ export default function ReceiptScreen({ route }) {
             {new Date(payment.created_at).toLocaleString()}
           </Text>
           <View style={styles.rowBetween}>
-            <Text variant="bodyMedium">Order</Text>
+            <Text variant="bodyMedium">{t('Order Number')}</Text>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_700Bold' }}>
               #{order.order_number}
             </Text>
           </View>
           <View style={styles.rowBetween}>
-            <Text variant="bodyMedium">Table</Text>
+            <Text variant="bodyMedium">{t('Table')}</Text>
             <Text variant="bodyMedium">{order.table_number}</Text>
           </View>
           <View style={styles.rowBetween}>
-            <Text variant="bodyMedium">Payment Method</Text>
+            <Text variant="bodyMedium">{t('Payment Method')}</Text>
             <Chip compact style={{ height: 24 }}>
-              {METHOD_LABEL[payment.payment_method] || payment.payment_method}
+              {METHOD_LABEL[payment.payment_method] ? t(METHOD_LABEL[payment.payment_method]) : payment.payment_method}
             </Chip>
           </View>
           {payment.reference_number ? (
             <View style={styles.rowBetween}>
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Ref</Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{t('Reference')}</Text>
               <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                 {payment.reference_number}
               </Text>
@@ -157,7 +159,7 @@ export default function ReceiptScreen({ route }) {
 
       {/* Items */}
       <Card style={styles.card}>
-        <Card.Title title="Items" />
+        <Card.Title title={t('Items')} />
         <Card.Content>
           {order.items?.map((item, idx) => (
             <View key={item.id}>
@@ -180,26 +182,26 @@ export default function ReceiptScreen({ route }) {
       <Card style={styles.card}>
         <Card.Content>
           <View style={styles.rowBetween}>
-            <Text variant="bodyMedium">Order Total</Text>
+            <Text variant="bodyMedium">{t('Order Total')}</Text>
             <Text variant="bodyMedium">{format(order.total ?? order.total_amount)}</Text>
           </View>
           <Divider style={styles.divider} />
           <View style={styles.rowBetween}>
-            <Text variant="titleMedium">Amount Paid</Text>
+            <Text variant="titleMedium">{t('Amount Paid')}</Text>
             <Text variant="titleMedium" style={{ color: '#2E7D32', fontFamily: 'Poppins_700Bold' }}>
               {format(payment.amount)}
             </Text>
           </View>
           {change_amount > 0 && (
             <View style={styles.rowBetween}>
-              <Text variant="bodyMedium">Change</Text>
+              <Text variant="bodyMedium">{t('Change')}</Text>
               <Text variant="bodyMedium">{format(change_amount)}</Text>
             </View>
           )}
           {remaining_balance > 0 && (
             <View style={styles.rowBetween}>
               <Text variant="bodyMedium" style={{ color: '#E65100', fontFamily: 'Poppins_700Bold' }}>
-                Remaining Balance
+                {t('Remaining Balance')}
               </Text>
               <Text variant="bodyMedium" style={{ color: '#E65100', fontFamily: 'Poppins_700Bold' }}>
                 {format(remaining_balance)}
@@ -208,7 +210,7 @@ export default function ReceiptScreen({ route }) {
           )}
           {payment.processed_by_name ? (
             <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
-              Processed by: {payment.processed_by_name}
+              {t('Processed by')}: {payment.processed_by_name}
             </Text>
           ) : null}
         </Card.Content>
@@ -223,7 +225,7 @@ export default function ReceiptScreen({ route }) {
         disabled={reprinting || printing}
         style={styles.reprintBtn}
       >
-        Reprint (Send to Printer)
+        {t('Reprint (Send to Printer)')}
       </Button>
 
       <Button
@@ -234,7 +236,7 @@ export default function ReceiptScreen({ route }) {
         disabled={reprinting || printing}
         style={[styles.reprintBtn, { marginTop: 8 }]}
       >
-        Smart Print (Uses Settings)
+        {t('Smart Print (Uses Settings)')}
       </Button>
 
       {data?.order && (
@@ -247,12 +249,12 @@ export default function ReceiptScreen({ route }) {
           ).catch(() => setSnack('WhatsApp is not available on this device'))}
           style={[styles.reprintBtn, { marginTop: 8 }]}
         >
-          Share on WhatsApp
+          {t('Share on WhatsApp')}
         </Button>
       )}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
+        {t(snack)}
       </Snackbar>
     </ScrollView>
   );

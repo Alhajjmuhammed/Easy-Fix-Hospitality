@@ -9,6 +9,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiMenu } from '../../api/menu';
 import { apiRecordWaste } from '../../api/waste';
 import { getCategories } from '../../database/operations';
+import { useT } from '../../i18n';
 
 // ── Constants mirroring backend FoodWasteLog choices ───────────────────────
 const WASTE_REASONS = [
@@ -37,6 +38,7 @@ const DISPOSAL_METHODS = [
 
 // ── Simple chip-style picker used for both reason and disposal ─────────────
 function ChipPicker({ items, selected, onSelect }) {
+  const t = useT();
   return (
     <View style={styles.chipGrid}>
       {items.map((item) => (
@@ -48,7 +50,7 @@ function ChipPicker({ items, selected, onSelect }) {
           style={[styles.chip, selected === item.value && styles.chipSelected]}
           labelStyle={styles.chipLabel}
         >
-          {item.label}
+          {t(item.label)}
         </Button>
       ))}
     </View>
@@ -57,6 +59,7 @@ function ChipPicker({ items, selected, onSelect }) {
 
 export default function CashierWasteScreen() {
   const theme = useTheme();
+  const t = useT();
 
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
@@ -197,20 +200,20 @@ export default function CashierWasteScreen() {
         actions={[]}
         style={{ backgroundColor: '#FFF8E1', marginHorizontal: -12, marginTop: -12, marginBottom: 12 }}
       >
-        Offline – showing cached menu. Connect to internet to submit a waste record.
+        {t('Offline – showing cached menu. Connect to internet to submit a waste record.')}
       </Banner>
 
       {/* ── Product Selector ─────────────────────────────────────────── */}
       <Card style={styles.card}>
         <Card.Title
-          title="Product"
+          title={t('Product')}
           left={() => <MaterialCommunityIcons name="food" size={22} color={theme.colors.primary} />}
         />
         <Card.Content>
           <TextInput
-            label="Search product…"
+            label={t('Search product…')}
             value={productSearch}
-            onChangeText={(t) => { setProductSearch(t); setProductMenuOpen(true); setSelectedProduct(null); }}
+            onChangeText={(v) => { setProductSearch(v); setProductMenuOpen(true); setSelectedProduct(null); }}
             mode="outlined"
             left={<TextInput.Icon icon="magnify" />}
             style={{ marginBottom: 8 }}
@@ -223,7 +226,7 @@ export default function CashierWasteScreen() {
                 {selectedProduct.name}
               </Text>
               <Button compact onPress={() => { setSelectedProduct(null); setProductSearch(''); }}>
-                Change
+                {t('Change')}
               </Button>
             </View>
           ) : productMenuOpen && filteredProducts.length > 0 ? (
@@ -247,12 +250,12 @@ export default function CashierWasteScreen() {
       {/* ── Quantity ──────────────────────────────────────────────────── */}
       <Card style={styles.card}>
         <Card.Title
-          title="Quantity Wasted"
+          title={t('Quantity Wasted')}
           left={() => <MaterialCommunityIcons name="counter" size={22} color={theme.colors.primary} />}
         />
         <Card.Content>
           <TextInput
-            label="Quantity"
+            label={t('Quantity')}
             value={quantity}
             onChangeText={setQuantity}
             keyboardType="number-pad"
@@ -264,7 +267,7 @@ export default function CashierWasteScreen() {
       {/* ── Waste Reason ─────────────────────────────────────────────── */}
       <Card style={styles.card}>
         <Card.Title
-          title="Waste Reason"
+          title={t('Waste Reason')}
           left={() => <MaterialCommunityIcons name="alert-circle-outline" size={22} color={theme.colors.primary} />}
         />
         <Card.Content>
@@ -275,7 +278,7 @@ export default function CashierWasteScreen() {
       {/* ── Disposal Method ──────────────────────────────────────────── */}
       <Card style={styles.card}>
         <Card.Title
-          title="Disposal Method"
+          title={t('Disposal Method')}
           left={() => <MaterialCommunityIcons name="trash-can-outline" size={22} color={theme.colors.primary} />}
         />
         <Card.Content>
@@ -286,12 +289,12 @@ export default function CashierWasteScreen() {
       {/* ── Notes ─────────────────────────────────────────────────────── */}
       <Card style={styles.card}>
         <Card.Title
-          title="Notes (optional)"
+          title={t('Notes (optional)')}
           left={() => <MaterialCommunityIcons name="note-text-outline" size={22} color={theme.colors.primary} />}
         />
         <Card.Content>
           <TextInput
-            label="Additional notes…"
+            label={t('Additional notes…')}
             value={notes}
             onChangeText={setNotes}
             mode="outlined"
@@ -312,7 +315,7 @@ export default function CashierWasteScreen() {
         style={styles.submitBtn}
         contentStyle={{ paddingVertical: 6 }}
       >
-        {isOffline ? 'Connect to Submit' : 'Record Waste'}
+        {isOffline ? t('Connect to Submit') : t('Record Waste')}
       </Button>
 
       <Snackbar
@@ -321,7 +324,7 @@ export default function CashierWasteScreen() {
         duration={3000}
         style={{ backgroundColor: snackColor }}
       >
-        {snack}
+        {t(snack)}
       </Snackbar>
     </ScrollView>
   );

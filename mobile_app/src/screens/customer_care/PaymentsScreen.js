@@ -35,6 +35,7 @@ import { useSyncStore } from '../../store/useSyncStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
+import { useT } from '../../i18n';
 
 const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
@@ -66,6 +67,7 @@ const ORDER_STATUS_COLOR = {
 };
 
 export default function CCPaymentsScreen({ navigation }) {
+  const t = useT();
   const theme = useTheme();
   const { format } = useCurrency();
   const { user } = useAuthStore();
@@ -104,6 +106,12 @@ export default function CCPaymentsScreen({ navigation }) {
 
   const [snack, setSnack] = useState('');
   const [isOffline, setIsOffline] = useState(false);
+
+  // Translated labels for the payment-method buttons (values stay unchanged)
+  const paymentMethodButtons = useMemo(
+    () => PAYMENT_METHODS.map((m) => ({ ...m, label: t(m.label) })),
+    [t]
+  );
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -191,7 +199,7 @@ export default function CCPaymentsScreen({ navigation }) {
   const handlePayment = async () => {
     if (!payDialog || !amount) return;
     const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) { setSnack('Enter a valid amount'); return; }
+    if (isNaN(parsedAmount) || parsedAmount <= 0) { setSnack(t('Enter a valid amount')); return; }
     setPaying(true);
     try {
       // Offline-pending order: queue payment linked to the offline order
@@ -220,7 +228,7 @@ export default function CCPaymentsScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
-        setSnack('Payment queued – will sync when online');
+        setSnack(t('Payment queued – will sync when online'));
         if (usePrinterStore.getState().autoPrintAfterPayment) {
           printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
@@ -256,7 +264,7 @@ export default function CCPaymentsScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
-        setSnack('No internet — payment saved offline and will sync automatically');
+        setSnack(t('No internet — payment saved offline and will sync automatically'));
         if (usePrinterStore.getState().autoPrintAfterPayment) {
           printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
@@ -274,7 +282,7 @@ export default function CCPaymentsScreen({ navigation }) {
       const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: payRes?.payment?.id ?? null };
       const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       setPayDialog(null);
-      setSnack('Payment recorded successfully');
+      setSnack(t('Payment recorded successfully'));
       if (usePrinterStore.getState().autoPrintAfterPayment) {
         printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
       }
@@ -284,7 +292,7 @@ export default function CCPaymentsScreen({ navigation }) {
         err.response?.data?.error ||
         err.response?.data?.detail ||
         err.response?.data?.amount?.[0] ||
-        'Payment failed'
+        t('Payment failed')
       );
     } finally {
       if (mountedRef.current) setPaying(false);
@@ -305,7 +313,7 @@ export default function CCPaymentsScreen({ navigation }) {
       });
       if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
-      if (mountedRef.current) setSnack('Print failed: ' + (err.message || 'unknown error'));
+      if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('Unknown error') }));
     } finally {
       if (mountedRef.current) setPrintBillId(null);
     }
@@ -320,24 +328,24 @@ export default function CCPaymentsScreen({ navigation }) {
       const data = await apiTables();
       setTables(Array.isArray(data) ? data : []);
     } catch {
-      setSnack('Could not load tables — connect to internet to transfer');
+      setSnack(t('Could not load tables — connect to internet to transfer'));
     }
   };
 
   const handleTransfer = async () => {
-    if (!selectedTableId) { setSnack('Please select a destination table'); return; }
+    if (!selectedTableId) { setSnack(t('Please select a destination table')); return; }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
+    if (!net.isConnected) { setSnack(t('No internet — connect to transfer table')); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       const res = await apiTransferTable(transferDialog.id, parseInt(selectedTableId));
       if (!mountedRef.current) return;
       setTransferDialog(null);
-      setSnack(res.message || 'Order transferred');
+      setSnack(res.message || t('Order transferred'));
       fetchOrders(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.error || 'Transfer failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || t('Transfer failed'));
     } finally {
       if (mountedRef.current) setTransferring(false);
     }
@@ -364,7 +372,7 @@ export default function CCPaymentsScreen({ navigation }) {
         actions={[]}
         style={{ backgroundColor: '#FFF8E1', marginHorizontal: -16, marginTop: -16, marginBottom: 8 }}
       >
-        Offline – showing cached orders. Payments saved offline will sync when connected.
+        {t('Offline – showing cached orders. Payments saved offline will sync when connected.')}
       </Banner>
       {/* Filters */}
       <View style={styles.filterBox}>
@@ -389,7 +397,7 @@ export default function CCPaymentsScreen({ navigation }) {
                   variant="bodyMedium"
                   style={[styles.dropdownLabel, tableFilter && { color: '#2c3e50', fontFamily: 'Poppins_600SemiBold' }]}
                 >
-                  {tableFilter ? `Table ${tableFilter}` : 'All Tables'}
+                  {tableFilter ? t('Table {n}', { n: tableFilter }) : t('All Tables')}
                 </Text>
                 <View style={{ flex: 1 }} />
                 {tableFilter ? (
@@ -407,23 +415,23 @@ export default function CCPaymentsScreen({ navigation }) {
           }
         >
           <Menu.Item
-            title="All Tables"
+            title={t('All Tables')}
             leadingIcon={!tableFilter ? 'check' : 'table-furniture'}
             onPress={() => { setTableFilter(''); setTableMenuOpen(false); }}
             titleStyle={!tableFilter ? { color: '#2c3e50', fontFamily: 'Poppins_700Bold' } : undefined}
           />
           <Divider />
-          {allTables.map((t) => {
-            const active = String(tableFilter) === String(t.table_number ?? t.tbl_no);
+          {allTables.map((tb) => {
+            const active = String(tableFilter) === String(tb.table_number ?? tb.tbl_no);
             return (
               <Menu.Item
-                key={t.id}
-                title={`Table ${t.table_number ?? t.tbl_no}`}
-                leadingIcon={active ? 'check' : (t.is_available ? 'circle-outline' : 'circle')}
-                onPress={() => { setTableFilter(String(t.table_number ?? t.tbl_no)); setTableMenuOpen(false); }}
+                key={tb.id}
+                title={t('Table {n}', { n: tb.table_number ?? tb.tbl_no })}
+                leadingIcon={active ? 'check' : (tb.is_available ? 'circle-outline' : 'circle')}
+                onPress={() => { setTableFilter(String(tb.table_number ?? tb.tbl_no)); setTableMenuOpen(false); }}
                 titleStyle={[
                   active && { color: '#2c3e50', fontFamily: 'Poppins_700Bold' },
-                  !t.is_available && !active && { color: '#FF8F00' },
+                  !tb.is_available && !active && { color: '#FF8F00' },
                 ]}
               />
             );
@@ -439,12 +447,14 @@ export default function CCPaymentsScreen({ navigation }) {
               compact
               style={styles.filterChip}
             >
-              {opt.label}
+              {t(opt.label)}
             </Chip>
           ))}
         </View>
         <Text variant="bodySmall" style={styles.countLabel}>
-          {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+          {filteredOrders.length !== 1
+            ? t('{n} orders', { n: filteredOrders.length })
+            : t('{n} order', { n: filteredOrders.length })}
         </Text>
       </View>
 
@@ -465,7 +475,7 @@ export default function CCPaymentsScreen({ navigation }) {
         }
         ListEmptyComponent={() => (
           <View style={styles.empty}>
-            <Text variant="bodyLarge" style={{ opacity: 0.5 }}>No orders found</Text>
+            <Text variant="bodyLarge" style={{ opacity: 0.5 }}>{t('No orders found')}</Text>
           </View>
         )}
         renderItem={({ item: order }) => {
@@ -504,18 +514,18 @@ export default function CCPaymentsScreen({ navigation }) {
                     }
                   >
                     {order._is_offline_pending && (
-                      <Menu.Item leadingIcon="eye" title="View Items" onPress={() => { setMenuOpenId(null); setExpandedId(expandedId === order.id ? null : order.id); }} />
+                      <Menu.Item leadingIcon="eye" title={t('View Items')} onPress={() => { setMenuOpenId(null); setExpandedId(expandedId === order.id ? null : order.id); }} />
                     )}
                     {!isCancelled && !isPaid && (
-                      <Menu.Item leadingIcon="cash" title="Pay" onPress={() => { setMenuOpenId(null); openPayment(order); }} />
+                      <Menu.Item leadingIcon="cash" title={t('Pay')} onPress={() => { setMenuOpenId(null); openPayment(order); }} />
                     )}
-                    <Menu.Item leadingIcon="printer" title="Print Bill" disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
+                    <Menu.Item leadingIcon="printer" title={t('Print Bill')} disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
                     {!isCancelled && !isPaid && !order._is_offline_pending && (
-                      <Menu.Item leadingIcon="swap-horizontal" title="Transfer Table" onPress={() => { setMenuOpenId(null); openTransfer(order); }} />
+                      <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} />
                     )}
                     {order._is_offline_pending && (
-                      <Menu.Item leadingIcon="delete-outline" title="Delete Queued Order" titleStyle={{ color: '#E53935' }}
-                        onPress={() => { setMenuOpenId(null); deleteOfflineOrder(order.offline_id).then(() => fetchOrders(true)).catch(() => setSnack('Could not delete queued order')); }} />
+                      <Menu.Item leadingIcon="delete-outline" title={t('Delete Queued Order')} titleStyle={{ color: '#E53935' }}
+                        onPress={() => { setMenuOpenId(null); deleteOfflineOrder(order.offline_id).then(() => fetchOrders(true)).catch(() => setSnack(t('Could not delete queued order'))); }} />
                     )}
                   </Menu>
                 </View>
@@ -523,15 +533,17 @@ export default function CCPaymentsScreen({ navigation }) {
 
               {/* Table Â· items */}
               <Text variant="bodySmall" style={styles.meta}>
-                Table {order.table_number} Â· {order.items_count} item{order.items_count !== 1 ? 's' : ''}
+                {t('Table {n}', { n: order.table_number })} · {order.items_count !== 1
+                  ? t('{n} items', { n: order.items_count })
+                  : t('{n} item', { n: order.items_count })}
                 {order.created_at ? `  Â·  ${new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
               </Text>
 
               {/* Amounts */}
               <View style={styles.amountRow}>
-                <Text variant="bodySmall">Total: <Text style={{ fontFamily: 'Poppins_700Bold' }}>{format(order.total)}</Text></Text>
-                <Text variant="bodySmall">Paid: <Text style={{ color: '#2E7D32', fontFamily: 'Poppins_700Bold' }}>{format(order.total_paid ?? 0)}</Text></Text>
-                <Text variant="bodySmall">Due: <Text style={{ color: '#C62828', fontFamily: 'Poppins_700Bold' }}>{format(order.balance_due ?? order.total ?? 0)}</Text></Text>
+                <Text variant="bodySmall">{t('Total')}: <Text style={{ fontFamily: 'Poppins_700Bold' }}>{format(order.total)}</Text></Text>
+                <Text variant="bodySmall">{t('Paid')}: <Text style={{ color: '#2E7D32', fontFamily: 'Poppins_700Bold' }}>{format(order.total_paid ?? 0)}</Text></Text>
+                <Text variant="bodySmall">{t('Due')}: <Text style={{ color: '#C62828', fontFamily: 'Poppins_700Bold' }}>{format(order.balance_due ?? order.total ?? 0)}</Text></Text>
               </View>
             </Card.Content>
 
@@ -540,7 +552,7 @@ export default function CCPaymentsScreen({ navigation }) {
               <View style={{ paddingHorizontal: 16, paddingBottom: 8, borderTopWidth: 1, borderTopColor: '#eee' }}>
                 {(order.items || []).map((item, i) => (
                   <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                    <Text variant="bodySmall" style={{ flex: 1 }}>{item.quantity}× {item.name || `Item #${item.product_id}`}</Text>
+                    <Text variant="bodySmall" style={{ flex: 1 }}>{item.quantity}× {item.name || t('Item #{id}', { id: item.product_id })}</Text>
                     <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold' }}>{format(item.price * item.quantity)}</Text>
                   </View>
                 ))}
@@ -551,16 +563,16 @@ export default function CCPaymentsScreen({ navigation }) {
               {order._is_offline_pending ? (
                 <>
                   {!isPaid && (
-                    <Button compact mode="contained" onPress={() => openPayment(order)}>Pay</Button>
+                    <Button compact mode="contained" onPress={() => openPayment(order)}>{t('Pay')}</Button>
                   )}
-                  <Button compact mode="outlined" icon="printer" disabled={printBillId === order.id} loading={printBillId === order.id} onPress={() => handlePrintBill(order)}>Print</Button>
+                  <Button compact mode="outlined" icon="printer" disabled={printBillId === order.id} loading={printBillId === order.id} onPress={() => handlePrintBill(order)}>{t('Print')}</Button>
                   {isPaid && (
-                    <Text variant="bodySmall" style={{ color: '#2E7D32', paddingHorizontal: 8 }}>✓ Paid (queued)</Text>
+                    <Text variant="bodySmall" style={{ color: '#2E7D32', paddingHorizontal: 8 }}>{t('✓ Paid (queued)')}</Text>
                   )}
                 </>
               ) : (
                 <Button compact mode="outlined" icon="eye" onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}>
-                  View
+                  {t('View')}
                 </Button>
               )}
             </Card.Actions>
@@ -572,91 +584,91 @@ export default function CCPaymentsScreen({ navigation }) {
       <Portal>
         {/* â”€â”€ Payment Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <Dialog visible={!!payDialog} onDismiss={() => !paying && setPayDialog(null)}>
-          <Dialog.Title>Process Payment</Dialog.Title>
+          <Dialog.Title>{t('Process Payment')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={styles.dialogMeta}>
-              {payDialog?.order_number} Â· Table {payDialog?.table_number}
+              {payDialog?.order_number} · {t('Table {n}', { n: payDialog?.table_number })}
             </Text>
             <Text variant="bodySmall" style={[styles.dialogMeta, { marginBottom: 12 }]}>
-              Balance due:{' '}
+              {t('Balance Due')}:{' '}
               <Text style={{ fontFamily: 'Poppins_700Bold', color: '#C62828' }}>
                 {format(payDialog?.balance_due)}
               </Text>
             </Text>
-            <TextInput label="Amount" value={amount} onChangeText={setAmount}
+            <TextInput label={t('Amount')} value={amount} onChangeText={setAmount}
               keyboardType="decimal-pad" mode="outlined" style={styles.dialogInput} />
-            <Text variant="labelMedium" style={styles.methodLabel}>Payment method</Text>
+            <Text variant="labelMedium" style={styles.methodLabel}>{t('Payment method')}</Text>
             <SegmentedButtons value={method} onValueChange={setMethod}
-              buttons={PAYMENT_METHODS} style={styles.segmented} />
+              buttons={paymentMethodButtons} style={styles.segmented} />
             {method !== 'cash' && (
-              <TextInput label="Reference / Approval code" value={reference}
+              <TextInput label={t('Reference / Approval code')} value={reference}
                 onChangeText={setReference} mode="outlined" style={styles.dialogInput} />
             )}
-            <TextInput label="Notes (optional)" value={notes} onChangeText={setNotes}
+            <TextInput label={t('Notes (optional)')} value={notes} onChangeText={setNotes}
               mode="outlined" multiline numberOfLines={2} style={styles.dialogInput} />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setPayDialog(null)} disabled={paying}>Cancel</Button>
+            <Button onPress={() => setPayDialog(null)} disabled={paying}>{t('Cancel')}</Button>
             <Button mode="contained" onPress={handlePayment} loading={paying} disabled={paying}>
-              Confirm Payment
+              {t('Confirm Payment')}
             </Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* â”€â”€ Transfer Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <Dialog visible={!!transferDialog} onDismiss={() => !transferring && setTransferDialog(null)}>
-          <Dialog.Title>Transfer to Another Table</Dialog.Title>
+          <Dialog.Title>{t('Transfer to Another Table')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={[styles.dialogMeta, { marginBottom: 12 }]}>
-              Moving {transferDialog?.order_number} from Table {transferDialog?.table_number}
+              {t('Moving {number} from Table {table}', { number: transferDialog?.order_number, table: transferDialog?.table_number })}
             </Text>
             {tables.length === 0 ? (
               <Text variant="bodyMedium" style={{ color: '#757575', marginVertical: 8 }}>
-                No tables available — connect to internet to load tables.
+                {t('No tables available — connect to internet to load tables.')}
               </Text>
             ) : (
               <>
-                <Text variant="labelMedium" style={styles.methodLabel}>Select destination table:</Text>
+                <Text variant="labelMedium" style={styles.methodLabel}>{t('Select destination table:')}</Text>
                 <View style={styles.tableGrid}>
                   {tables
-                    .filter((t) => String(t.table_number ?? t.tbl_no) !== String(transferDialog?.table_number))
-                    .map((t) => (
+                    .filter((tb) => String(tb.table_number ?? tb.tbl_no) !== String(transferDialog?.table_number))
+                    .map((tb) => (
                       <Chip
-                        key={t.id}
-                        mode={selectedTableId === String(t.id) ? 'flat' : 'outlined'}
-                        selected={selectedTableId === String(t.id)}
-                        onPress={() => setSelectedTableId(String(t.id))}
+                        key={tb.id}
+                        mode={selectedTableId === String(tb.id) ? 'flat' : 'outlined'}
+                        selected={selectedTableId === String(tb.id)}
+                        onPress={() => setSelectedTableId(String(tb.id))}
                         style={[
                           styles.tableChip,
-                          !t.is_available && { borderColor: '#FF8F00' },
+                          !tb.is_available && { borderColor: '#FF8F00' },
                         ]}
-                        textStyle={!t.is_available ? { color: '#FF8F00' } : undefined}
+                        textStyle={!tb.is_available ? { color: '#FF8F00' } : undefined}
                       >
-                        {`Table ${t.table_number ?? t.tbl_no}`}
-                        {!t.is_available ? ' ●' : ''}
+                        {t('Table {n}', { n: tb.table_number ?? tb.tbl_no })}
+                        {!tb.is_available ? ' ●' : ''}
                       </Chip>
                     ))}
                 </View>
-                {selectedTableId && !tables.find((t) => String(t.id) === selectedTableId)?.is_available && (
+                {selectedTableId && !tables.find((tb) => String(tb.id) === selectedTableId)?.is_available && (
                   <Text variant="bodySmall" style={{ color: '#FF8F00', marginTop: 8 }}>
-                    ⚠ This table is occupied. Order will still be transferred.
+                    {t('⚠ This table is occupied. Order will still be transferred.')}
                   </Text>
                 )}
               </>
             )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setTransferDialog(null)} disabled={transferring}>Cancel</Button>
+            <Button onPress={() => setTransferDialog(null)} disabled={transferring}>{t('Cancel')}</Button>
             <Button mode="contained" onPress={handleTransfer} loading={transferring}
               disabled={transferring || !selectedTableId} buttonColor="#FF8F00">
-              Transfer
+              {t('Transfer')}
             </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );

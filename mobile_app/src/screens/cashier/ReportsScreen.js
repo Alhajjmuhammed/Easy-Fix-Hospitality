@@ -9,6 +9,7 @@ import NetInfo from '@react-native-community/netinfo';
 import client from '../../api/client';
 import { getOfflinePendingOrders, getSyncMeta, setSyncMeta, getLocalReportStats, getProducts } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useT, t as tNow } from '../../i18n';
 
 const PAYMENT_STATUS_COLOR = {
   unpaid:  '#C62828',
@@ -31,8 +32,11 @@ const PERIODS = [
   { value: 'monthly', label: 'This Month' },
 ];
 
+const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
+
 export default function CashierReportsScreen() {
   const { format }                      = useCurrency();
+  const t = useT();
   const [loading,           setLoading]           = useState(true);
   const [refreshing,        setRefreshing]         = useState(false);
   const [data,              setData]               = useState(null);
@@ -75,7 +79,7 @@ export default function CashierReportsScreen() {
             setCacheTimestamp(cachedTs || null);
             // Warn when the cached period doesn't match what the user selected
             if (cachedPeriod && cachedPeriod !== period) {
-              setSnack(`Offline – showing cached "${cachedPeriod}" data (not "${period}")`);
+              setSnack(tNow('Offline – showing cached "{cached}" data (not "{current}")', { cached: cachedPeriod, current: period }));
             }
           } catch (_) {
             // Corrupted cache — fall back to local computation and drop the bad entry
@@ -183,16 +187,16 @@ export default function CashierReportsScreen() {
       >
         {isOffline
           ? cacheTimestamp
-            ? `Offline – cached report from ${new Date(cacheTimestamp).toLocaleTimeString()}. Pull to refresh when connected.`
-            : `Offline – showing data from local device. Connect for the full server report.`
-          : `${pendingOrders.length} queued for sync · ${errorOrders.length} failed – check below.`}
+            ? t('Offline – cached report from {time}. Pull to refresh when connected.', { time: new Date(cacheTimestamp).toLocaleTimeString() })
+            : t('Offline – showing data from local device. Connect for the full server report.')
+          : t('{queued} queued for sync · {failed} failed – check below.', { queued: pendingOrders.length, failed: errorOrders.length })}
       </Banner>
 
       {/* Sync-failed orders — always visible, requires staff action */}
       {errorOrders.length > 0 && (
         <>
           <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#C62828' }]}>
-            Failed to Sync – Re-take Manually
+            {t('Failed to Sync – Re-take Manually')}
           </Text>
           {errorOrders.map((o) => (
             <Card key={o.offline_id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#C62828' }]}>
@@ -200,15 +204,15 @@ export default function CashierReportsScreen() {
                 <View style={styles.row}>
                   <Chip icon="alert-circle" mode="flat" compact
                     style={{ backgroundColor: '#FFEBEE' }} textStyle={{ fontSize: 10, color: '#C62828' }}>
-                    SYNC FAILED
+                    {t('SYNC FAILED')}
                   </Chip>
                   <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
                     {format(o.total_amount || 0)}
                   </Text>
                 </View>
                 <Text variant="bodySmall" style={styles.meta}>
-                  {o.order_type === 'delivery' ? '🚴 Delivery' : `Table ${o.table_number}`}
-                  {' · '}{o.items_count} item{o.items_count !== 1 ? 's' : ''}
+                  {o.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: o.table_number ?? '' })}
+                  {' · '}{o.items_count !== 1 ? t('{n} items', { n: o.items_count ?? '' }) : t('{n} item', { n: o.items_count })}
                   {' · '}{new Date(o.created_at).toLocaleTimeString()}
                 </Text>
                 {!!o.error_message && (
@@ -227,7 +231,7 @@ export default function CashierReportsScreen() {
       {pendingOrders.length > 0 && (
         <>
           <Text variant="labelLarge" style={[styles.sectionTitle, { color: '#E65100' }]}>
-            Queued Orders (Pending Sync)
+            {t('Queued Orders (Pending Sync)')}
           </Text>
           <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#E65100' }]}>
             <Card.Content>
@@ -236,13 +240,13 @@ export default function CashierReportsScreen() {
                   <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
                     {pendingOrders.length}
                   </Text>
-                  <Text style={styles.statLabel}>Queued Orders</Text>
+                  <Text style={styles.statLabel}>{t('Queued Orders')}</Text>
                 </View>
                 <View style={{ alignItems: 'center', flex: 1 }}>
                   <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 22, color: '#E65100' }}>
                     {format(offlineTotal)}
                   </Text>
-                  <Text style={styles.statLabel}>Queued Total</Text>
+                  <Text style={styles.statLabel}>{t('Queued Total')}</Text>
                 </View>
               </View>
             </Card.Content>
@@ -253,15 +257,15 @@ export default function CashierReportsScreen() {
                 <View style={styles.row}>
                   <Chip icon="cloud-upload" mode="flat" compact
                     style={{ backgroundColor: '#FFF3E0' }} textStyle={{ fontSize: 10, color: '#E65100' }}>
-                    PENDING SYNC
+                    {t('PENDING SYNC')}
                   </Chip>
                   <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
                     {format(o.total_amount || 0)}
                   </Text>
                 </View>
                 <Text variant="bodySmall" style={styles.meta}>
-                  {o.order_type === 'delivery' ? '🚴 Delivery' : `Table ${o.table_number}`}
-                  {' · '}{o.items_count} item{o.items_count !== 1 ? 's' : ''}
+                  {o.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: o.table_number ?? '' })}
+                  {' · '}{o.items_count !== 1 ? t('{n} items', { n: o.items_count ?? '' }) : t('{n} item', { n: o.items_count })}
                   {' · '}{new Date(o.created_at).toLocaleTimeString()}
                 </Text>
               </Card.Content>
@@ -276,7 +280,7 @@ export default function CashierReportsScreen() {
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerSheet}>
             <View style={styles.pickerHeader}>
-              <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>Filter by Product</Text>
+              <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>{t('Filter by Product')}</Text>
               <TouchableOpacity onPress={() => setShowPicker(false)}>
                 <MaterialCommunityIcons name="close" size={22} color="#666" />
               </TouchableOpacity>
@@ -286,7 +290,7 @@ export default function CashierReportsScreen() {
               keyExtractor={(item) => String(item.id)}
               style={{ maxHeight: 360 }}
               ListEmptyComponent={() => (
-                <Text style={{ textAlign: 'center', opacity: 0.5, padding: 20 }}>No products available</Text>
+                <Text style={{ textAlign: 'center', opacity: 0.5, padding: 20 }}>{t('No products available')}</Text>
               )}
               renderItem={({ item }) => {
                 const checked = tempPids.includes(item.id);
@@ -308,12 +312,12 @@ export default function CashierReportsScreen() {
             />
             <Divider />
             <View style={styles.pickerActions}>
-              <Button mode="outlined" onPress={() => setTempPids([])} style={{ flex: 1 }}>Clear</Button>
+              <Button mode="outlined" onPress={() => setTempPids([])} style={{ flex: 1 }}>{t('Clear')}</Button>
               <Button mode="contained" onPress={() => {
                 setSelectedPidsSync(tempPids);
                 setShowPicker(false);
                 fetchReport(false, tempPids);
-              }} style={{ flex: 1 }}>Apply</Button>
+              }} style={{ flex: 1 }}>{t('Apply')}</Button>
             </View>
           </View>
         </View>
@@ -327,7 +331,7 @@ export default function CashierReportsScreen() {
       <SegmentedButtons
         value={period}
         onValueChange={setPeriod}
-        buttons={PERIODS}
+        buttons={PERIODS.map((p) => ({ ...p, label: t(p.label) }))}
         style={styles.periods}
       />
 
@@ -343,8 +347,10 @@ export default function CashierReportsScreen() {
           textStyle={selectedPids.length > 0 ? { color: '#1565C0' } : {}}
         >
           {selectedPids.length === 0
-            ? 'All Products'
-            : `${selectedPids.length} Product${selectedPids.length > 1 ? 's' : ''} Selected`}
+            ? t('All Products')
+            : selectedPids.length > 1
+              ? t('{n} Products Selected', { n: selectedPids.length })
+              : t('{n} Product Selected', { n: selectedPids.length })}
         </Chip>
         {selectedPids.length > 0 && (
           <TouchableOpacity onPress={() => { setSelectedPidsSync([]); fetchReport(false, []); }} style={{ marginLeft: 6 }}>
@@ -354,7 +360,7 @@ export default function CashierReportsScreen() {
       </TouchableOpacity>
 
       {/* Restaurant-wide stats */}
-      <Text variant="labelLarge" style={styles.sectionTitle}>Restaurant Overview</Text>
+      <Text variant="labelLarge" style={styles.sectionTitle}>{t('Restaurant Overview')}</Text>
       <View style={styles.statsRow}>
         <StatCard label="Orders"  value={stats.total_orders}                color="#2c3e50" icon="clipboard-list-outline" />
         <StatCard label="Revenue" value={format(stats.total_revenue ?? 0)}  color="#2E7D32" icon="cash-multiple" />
@@ -365,7 +371,7 @@ export default function CashierReportsScreen() {
       {/* Payment breakdown */}
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="titleSmall" style={styles.cardTitle}>Payment Breakdown</Text>
+          <Text variant="titleSmall" style={styles.cardTitle}>{t('Payment Breakdown')}</Text>
           <View style={styles.breakdownRow}>
             <BreakdownChip label="Paid"    value={stats.paid_orders}    color="#2E7D32" />
             <BreakdownChip label="Partial" value={stats.partial_orders} color="#FF8F00" />
@@ -375,30 +381,30 @@ export default function CashierReportsScreen() {
       </Card>
 
       {/* My Collections */}
-      <Text variant="labelLarge" style={styles.sectionTitle}>My Collections</Text>
+      <Text variant="labelLarge" style={styles.sectionTitle}>{t('My Collections')}</Text>
       <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#1565C0' }]}>
         <Card.Content>
           <View style={styles.row}>
             <View style={styles.myCollectStat}>
               <MaterialCommunityIcons name="cash-register" size={28} color="#1565C0" />
               <Text style={styles.bigValue}>{format(stats.my_total_collected ?? 0)}</Text>
-              <Text style={styles.bigLabel}>Total Collected</Text>
+              <Text style={styles.bigLabel}>{t('Total Collected')}</Text>
             </View>
             <View style={styles.myCollectStat}>
               <MaterialCommunityIcons name="receipt" size={28} color="#6A1B9A" />
               <Text style={[styles.bigValue, { color: '#6A1B9A' }]}>{stats.my_payment_count ?? 0}</Text>
-              <Text style={styles.bigLabel}>Payments Processed</Text>
+              <Text style={styles.bigLabel}>{t('Payments Processed')}</Text>
             </View>
           </View>
 
           {myMethods.length > 0 && (
             <>
               <Divider style={{ marginVertical: 10 }} />
-              <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold', marginBottom: 6 }}>By Method</Text>
+              <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold', marginBottom: 6 }}>{t('By Method')}</Text>
               {myMethods.map((m) => (
                 <View key={m.method} style={styles.methodRow}>
                   <Text variant="bodySmall" style={{ textTransform: 'capitalize', fontFamily: 'Poppins_400Regular' }}>
-                    {m.method}
+                    {METHOD_LABELS[m.method] ? t(METHOD_LABELS[m.method]) : m.method}
                   </Text>
                   <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
                     {format(m.total)} ({m.count})
@@ -413,7 +419,7 @@ export default function CashierReportsScreen() {
       {/* Top products */}
       {topProducts.length > 0 && (
         <>
-          <Text variant="labelLarge" style={styles.sectionTitle}>Top Products</Text>
+          <Text variant="labelLarge" style={styles.sectionTitle}>{t('Top Products')}</Text>
           <Card style={styles.card}>
             <Card.Content>
               {topProducts.map((p, i) => (
@@ -422,7 +428,7 @@ export default function CashierReportsScreen() {
                     {i + 1}. {p.name}
                   </Text>
                   <Chip compact mode="flat" style={{ backgroundColor: '#2c3e5015' }}>
-                    {p.qty} sold
+                    {t('{n} sold', { n: p.qty })}
                   </Chip>
                 </View>
               ))}
@@ -434,13 +440,13 @@ export default function CashierReportsScreen() {
       <Divider style={styles.divider} />
 
       {/* Orders list */}
-      <Text variant="labelLarge" style={styles.sectionTitle}>All Orders ({orders.length})</Text>
+      <Text variant="labelLarge" style={styles.sectionTitle}>{t('All Orders ({n})', { n: orders.length })}</Text>
 
       {orders.length === 0 ? (
         <Card style={styles.card}>
           <Card.Content style={styles.emptyContent}>
             <MaterialCommunityIcons name="clipboard-text-off-outline" size={40} color="#ccc" />
-            <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8 }}>No orders for this period</Text>
+            <Text variant="bodyMedium" style={{ opacity: 0.5, marginTop: 8 }}>{t('No orders for this period')}</Text>
           </Card.Content>
         </Card>
       ) : (
@@ -457,16 +463,16 @@ export default function CashierReportsScreen() {
                   <View style={styles.row}>
                     <Chip mode="flat" compact style={{ backgroundColor: statusColor + '22', marginRight: 4 }}
                       textStyle={{ color: statusColor, fontSize: 10 }}>
-                      {order.status?.toUpperCase()}
+                      {t(order.status)?.toUpperCase()}
                     </Chip>
                     <Chip mode="flat" compact style={{ backgroundColor: payColor + '22' }}
                       textStyle={{ color: payColor, fontSize: 10 }}>
-                      {order.payment_status?.toUpperCase()}
+                      {t(order.payment_status)?.toUpperCase()}
                     </Chip>
                   </View>
                 </View>
                 <Text variant="bodySmall" style={styles.meta}>
-                  {order.order_type === 'delivery' ? '🚴 Delivery' : `Table ${order.table_number ?? '?'}`} · {order.items_count} items · by {order.ordered_by ?? '—'}
+                  {order.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: order.table_number ?? '?' })} · {t('{n} items', { n: order.items_count ?? '' })} · {t('by {name}', { name: order.ordered_by ?? '—' })}
                 </Text>
                 <Text variant="bodySmall" style={styles.meta}>
                   {new Date(order.created_at).toLocaleTimeString()}
@@ -485,29 +491,31 @@ export default function CashierReportsScreen() {
 
     </ScrollView>
     <Portal>
-      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{snack}</Snackbar>
+      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>{t(snack)}</Snackbar>
     </Portal>
     </View>
   );
 }
 
 function StatCard({ label, value, color, icon }) {
+  const t = useT();
   return (
     <Surface style={[styles.statCard, { backgroundColor: color + '12' }]} elevation={0}>
       <View style={[styles.statIconWrap, { backgroundColor: color + '25' }]}>
         <MaterialCommunityIcons name={icon} size={18} color={color} />
       </View>
       <Text style={[styles.statValue, { color }]} numberOfLines={1}>{value ?? 0}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statLabel}>{t(label)}</Text>
     </Surface>
   );
 }
 
 function BreakdownChip({ label, value, color }) {
+  const t = useT();
   return (
     <View style={[styles.breakdownItem, { backgroundColor: color + '15', borderColor: color + '40', borderWidth: 1 }]}>
       <Text style={[styles.breakdownValue, { color }]}>{value ?? 0}</Text>
-      <Text style={styles.breakdownLabel}>{label}</Text>
+      <Text style={styles.breakdownLabel}>{t(label)}</Text>
     </View>
   );
 }

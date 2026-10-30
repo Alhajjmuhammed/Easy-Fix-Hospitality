@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useT } from '../i18n';
 
 import RiderDashboardScreen       from '../screens/delivery/RiderDashboardScreen';
 import RiderActiveDeliveryScreen  from '../screens/delivery/RiderActiveDeliveryScreen';
@@ -20,15 +21,17 @@ const riderHeader = {
 };
 
 function RiderAttendanceStack() {
+  const t = useT();
   return (
     <AttendanceStack.Navigator screenOptions={riderHeader}>
-      <AttendanceStack.Screen name="AttendanceMain" component={AttendanceScreen} options={{ title: 'Attendance' }} />
-      <AttendanceStack.Screen name="MyAttendance" component={MyAttendanceScreen} options={{ title: 'My Attendance' }} />
+      <AttendanceStack.Screen name="AttendanceMain" component={AttendanceScreen} options={{ title: t('Attendance') }} />
+      <AttendanceStack.Screen name="MyAttendance" component={MyAttendanceScreen} options={{ title: t('My Attendance') }} />
     </AttendanceStack.Navigator>
   );
 }
 
 function DeliveryStack() {
+  const t = useT();
   return (
     <Stack.Navigator
       screenOptions={{
@@ -40,18 +43,19 @@ function DeliveryStack() {
       <Stack.Screen
         name="RiderDashboard"
         component={RiderDashboardScreen}
-        options={{ title: 'My Deliveries' }}
+        options={{ title: t('My Deliveries') }}
       />
       <Stack.Screen
         name="RiderActiveDelivery"
         component={RiderActiveDeliveryScreen}
-        options={{ title: 'Active Delivery' }}
+        options={{ title: t('Active Delivery') }}
       />
     </Stack.Navigator>
   );
 }
 
 export default function RiderNavigator() {
+  const t = useT();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -65,13 +69,13 @@ export default function RiderNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Deliveries" component={DeliveryStack} options={{ title: 'Deliveries' }} />
-      <Tab.Screen name="Attendance" component={RiderAttendanceStack} options={{ title: 'Attendance' }} />
+      <Tab.Screen name="Deliveries" component={DeliveryStack} options={{ title: t('Deliveries') }} />
+      <Tab.Screen name="Attendance" component={RiderAttendanceStack} options={{ title: t('Attendance') }} />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: 'Profile',
+          title: t('Profile'),
           headerShown: true,
           headerStyle: { backgroundColor: '#1565C0' },
           headerTintColor: '#fff',

@@ -9,6 +9,7 @@ import {
 } from '../../api/reservations';
 import { apiTables } from '../../api/tables';
 import DateTimeChips, { upcomingDates } from '../../components/DateTimeChips';
+import { useT } from '../../i18n';
 
 const LABELS = {
   confirmed: 'Confirm', declined: 'Decline', cancelled: 'Cancel', seated: 'Seated',
@@ -28,6 +29,7 @@ const shiftDay = (value, days) => {
 };
 
 export default function StaffReservationsScreen() {
+  const t = useT();
   const [day, setDay] = useState(isoDate(new Date()));
   const [filter, setFilter] = useState('active');
   const [data, setData] = useState({ reservations: [], pending_upcoming: [], can_manage: false });
@@ -61,7 +63,7 @@ export default function StaffReservationsScreen() {
   const changeStatus = async (res, status) => {
     try {
       await apiReservationStatus(res.id, status);
-      setSnack(`${res.name}: ${LABELS[status] || status}`);
+      setSnack(`${res.name}: ${LABELS[status] ? t(LABELS[status]) : status}`);
       load();
     } catch (err) {
       setSnack(err?.response?.data?.error || 'Could not update. Please try again.');
@@ -72,7 +74,7 @@ export default function StaffReservationsScreen() {
     setTableMenuFor(null);
     try {
       const r = await apiReservationTable(res.id, tableId);
-      showWarnings(r.warnings, tableId ? `Table set for ${res.name}` : `Table cleared for ${res.name}`);
+      showWarnings(r.warnings, tableId ? t('Table set for {name}', { name: res.name }) : t('Table cleared for {name}', { name: res.name }));
       load();
     } catch (err) {
       setSnack(err?.response?.data?.error || 'Could not set the table.');
@@ -98,22 +100,24 @@ export default function StaffReservationsScreen() {
       setAdding(false);
       setForm((f) => ({ ...f, name: '', phone: '', notes: '', time: '' }));
       if (form.date === day) load(); else setDay(form.date);   // same day: reload explicitly
-      showWarnings(r.warnings, `Booking added for ${r.reservation.name}`);
+      showWarnings(r.warnings, t('Booking added for {name}', { name: r.reservation.name }));
     } catch (err) {
       setSnack(err?.response?.data?.error || 'Could not add the booking.');
     }
   };
 
   // Older tables have no restaurant link; they belong to the owner's own (default) restaurant.
-  const tablesFor = (res) => tables.filter((t) => t.restaurant_id === res.restaurant_id
-    || (t.restaurant_id == null && res.restaurant_id === defaultRestaurantId));
+  const tablesFor = (res) => tables.filter((tb) => tb.restaurant_id === res.restaurant_id
+    || (tb.restaurant_id == null && res.restaurant_id === defaultRestaurantId));
 
   return (
     <View style={{ flex: 1 }}>
       {data.pending_upcoming?.length > 0 && (
         <Banner visible icon="timer-sand" style={{ backgroundColor: '#FFF8E1' }}
-                actions={[{ label: 'Show', onPress: () => { setDay(data.pending_upcoming[0].date); setFilter('pending'); } }]}>
-          {data.pending_upcoming.length} booking{data.pending_upcoming.length > 1 ? 's' : ''} waiting for confirmation
+                actions={[{ label: t('Show'), onPress: () => { setDay(data.pending_upcoming[0].date); setFilter('pending'); } }]}>
+          {data.pending_upcoming.length > 1
+            ? t('{n} bookings waiting for confirmation', { n: data.pending_upcoming.length })
+            : t('{n} booking waiting for confirmation', { n: data.pending_upcoming.length })}
         </Banner>
       )}
       <View style={styles.toolbar}>
@@ -122,7 +126,7 @@ export default function StaffReservationsScreen() {
         <IconButton icon="chevron-right" onPress={() => setDay((d) => shiftDay(d, 1))} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
           {[['active', 'Active'], ['pending', 'Pending'], ['all', 'All']].map(([k, label]) => (
-            <Chip key={k} compact selected={filter === k} onPress={() => setFilter(k)}>{label}</Chip>
+            <Chip key={k} compact selected={filter === k} onPress={() => setFilter(k)}>{t(label)}</Chip>
           ))}
         </ScrollView>
       </View>
@@ -132,16 +136,16 @@ export default function StaffReservationsScreen() {
         keyExtractor={(r) => String(r.id)}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { setLoading(true); load(); }} />}
-        ListEmptyComponent={!loading && <Text style={styles.empty}>No bookings for this day.</Text>}
+        ListEmptyComponent={!loading && <Text style={styles.empty}>{t('No bookings for this day.')}</Text>}
         renderItem={({ item }) => (
           <Card style={[styles.card, { borderLeftColor: STATUS_COLORS[item.status] || '#ccc' }]}>
             <Card.Content>
               <View style={styles.row}>
                 <Text variant="titleMedium" style={styles.time}>{item.time}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{item.name} · {item.party_size} people</Text>
+                  <Text style={styles.name}>{item.name} · {t('{n} people', { n: item.party_size })}</Text>
                   <Text style={styles.meta}>
-                    {item.phone} · {item.table_number ? `Table ${item.table_number}` : 'No table'}
+                    {item.phone} · {item.table_number ? t('Table {n}', { n: item.table_number }) : t('No table')}
                   </Text>
                   {!!item.notes && <Text style={styles.meta}>“{item.notes}”</Text>}
                   {(item.warnings || []).map((w, i) => <Text key={i} style={styles.warning}>⚠ {w}</Text>)}
@@ -154,14 +158,14 @@ export default function StaffReservationsScreen() {
                   {(item.next_statuses || []).map((s) => (
                     <Button key={s} compact mode={DANGER.includes(s) ? 'outlined' : 'contained'}
                             textColor={DANGER.includes(s) ? '#C62828' : undefined}
-                            onPress={() => changeStatus(item, s)}>{LABELS[s] || s}</Button>
+                            onPress={() => changeStatus(item, s)}>{LABELS[s] ? t(LABELS[s]) : s}</Button>
                   ))}
                   {['pending', 'confirmed', 'seated'].includes(item.status) && (
                     <Menu visible={tableMenuFor === item.id} onDismiss={() => setTableMenuFor(null)}
-                          anchor={<Button compact icon="table-chair" onPress={() => setTableMenuFor(item.id)}>Table</Button>}>
-                      <Menu.Item title="No table" onPress={() => setTable(item, null)} />
-                      {tablesFor(item).map((t) => (
-                        <Menu.Item key={t.id} title={`${t.tbl_no} (${t.capacity})`} onPress={() => setTable(item, t.id)} />
+                          anchor={<Button compact icon="table-chair" onPress={() => setTableMenuFor(item.id)}>{t('Table')}</Button>}>
+                      <Menu.Item title={t('No table')} onPress={() => setTable(item, null)} />
+                      {tablesFor(item).map((tb) => (
+                        <Menu.Item key={tb.id} title={`${tb.tbl_no} (${tb.capacity})`} onPress={() => setTable(item, tb.id)} />
                       ))}
                     </Menu>
                   )}
@@ -172,11 +176,11 @@ export default function StaffReservationsScreen() {
         )}
       />
 
-      {data.can_manage && <FAB icon="plus" label="Add booking" style={styles.fab} onPress={() => setAdding(true)} />}
+      {data.can_manage && <FAB icon="plus" label={t('Add booking')} style={styles.fab} onPress={() => setAdding(true)} />}
 
       <Portal>
         <Dialog visible={adding} onDismiss={() => setAdding(false)} style={{ maxHeight: '90%' }}>
-          <Dialog.Title>Add booking</Dialog.Title>
+          <Dialog.Title>{t('Add booking')}</Dialog.Title>
           <Dialog.ScrollArea>
             <ScrollView keyboardShouldPersistTaps="handled">
               {restaurants.length > 1 && (
@@ -187,21 +191,21 @@ export default function StaffReservationsScreen() {
                   ))}
                 </View>
               )}
-              <TextInput label="Name" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} mode="outlined" style={styles.input} />
-              <TextInput label="Phone" value={form.phone} keyboardType="phone-pad" onChangeText={(v) => setForm({ ...form, phone: v })} mode="outlined" style={styles.input} />
-              <TextInput label="People" value={form.people} keyboardType="number-pad" onChangeText={(v) => setForm({ ...form, people: v.replace(/\D/g, '') })} mode="outlined" style={styles.input} />
+              <TextInput label={t('Name')} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} mode="outlined" style={styles.input} />
+              <TextInput label={t('Phone')} value={form.phone} keyboardType="phone-pad" onChangeText={(v) => setForm({ ...form, phone: v })} mode="outlined" style={styles.input} />
+              <TextInput label={t('People')} value={form.people} keyboardType="number-pad" onChangeText={(v) => setForm({ ...form, people: v.replace(/\D/g, '') })} mode="outlined" style={styles.input} />
               <DateTimeChips date={form.date} time={form.time} minLeadMinutes={-24 * 60}
                              onDate={(v) => setForm((f) => ({ ...f, date: v }))} onTime={(v) => setForm((f) => ({ ...f, time: v }))} />
-              <TextInput label="Notes" value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} mode="outlined" style={styles.input} />
+              <TextInput label={t('Notes')} value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} mode="outlined" style={styles.input} />
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setAdding(false)}>Close</Button>
-            <Button mode="contained" onPress={addBooking}>Save</Button>
+            <Button onPress={() => setAdding(false)}>{t('Close')}</Button>
+            <Button mode="contained" onPress={addBooking}>{t('Save')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
-      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={5000}>{snack}</Snackbar>
+      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={5000}>{t(snack)}</Snackbar>
     </View>
   );
 }

@@ -11,11 +11,13 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { printReceipt } from '../../utils/printer';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getAllOfflinePayments, getOrderById } from '../../database/operations';
+import { useT } from '../../i18n';
 
 const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
 
 export default function CashierReceiptsScreen() {
   const theme = useTheme();
+  const t = useT();
   const { format } = useCurrency();
   const user = useAuthStore((s) => s.user);
   const mountedRef = useRef(true);
@@ -96,7 +98,7 @@ export default function CashierReceiptsScreen() {
       if (!mountedRef.current) return;
       setSnack('Receipt sent to printer');
     } catch (err) {
-      if (mountedRef.current) setSnack('Print failed: ' + (err?.message || 'Unknown error'));
+      if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err?.message || t('Unknown error') }));
     } finally {
       if (mountedRef.current) setLocalPrinting(null);
     }
@@ -134,7 +136,7 @@ export default function CashierReceiptsScreen() {
       if (!mountedRef.current) return;
       setSnack('Receipt sent to printer');
     } catch (err) {
-      if (mountedRef.current) setSnack('Print failed: ' + (err?.message || 'Unknown error'));
+      if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err?.message || t('Unknown error') }));
     } finally {
       if (mountedRef.current) setOfflinePrinting(null);
     }
@@ -165,10 +167,10 @@ export default function CashierReceiptsScreen() {
         actions={[]}
         style={{ backgroundColor: '#FFF8E1' }}
       >
-        Offline – showing locally queued payments. Connect to view full receipt history.
+        {t('Offline – showing locally queued payments. Connect to view full receipt history.')}
       </Banner>
       <TextInput
-        placeholder="Search by receipt # or order #..."
+        placeholder={t('Search by receipt # or order #...')}
         value={search}
         onChangeText={setSearch}
         mode="outlined"
@@ -194,7 +196,7 @@ export default function CashierReceiptsScreen() {
         ListEmptyComponent={() => (
           <View style={styles.center}>
             <MaterialCommunityIcons name="receipt-text-outline" size={48} color="#ccc" />
-            <Text variant="bodyLarge" style={{ opacity: 0.4, marginTop: 8 }}>No receipts found</Text>
+            <Text variant="bodyLarge" style={{ opacity: 0.4, marginTop: 8 }}>{t('No receipts found')}</Text>
           </View>
         )}
         ItemSeparatorComponent={() => <Divider />}
@@ -203,25 +205,25 @@ export default function CashierReceiptsScreen() {
             <Card.Content>
               <View style={styles.row}>
                 <Text variant="titleSmall" style={{ fontFamily: 'Poppins_700Bold' }}>
-                  {p._offline ? `Offline #${p.offline_id?.slice(-6)}` : `Receipt #${p.id}`}
+                  {p._offline ? t('Offline #{id}', { id: p.offline_id?.slice(-6) ?? '' }) : t('Receipt #{id}', { id: p.id })}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 4 }}>
                   {p._offline && (
                     <Chip mode="flat" compact
                       style={{ backgroundColor: p.sync_status === 'error' ? '#FFEBEE' : '#FFF8E1' }}
                       textStyle={{ color: p.sync_status === 'error' ? '#C62828' : '#E65100', fontSize: 11 }}>
-                      {p.sync_status === 'synced' ? 'Synced' : p.sync_status === 'error' ? 'Error' : 'Pending'}
+                      {p.sync_status === 'synced' ? t('Synced') : p.sync_status === 'error' ? t('Error') : t('Pending')}
                     </Chip>
                   )}
                   <Chip mode="flat" compact
                     style={{ backgroundColor: '#E8F5E9' }}
                     textStyle={{ color: '#2E7D32', fontSize: 11 }}>
-                    {METHOD_LABELS[p.payment_method] || p.payment_method}
+                    {METHOD_LABELS[p.payment_method] ? t(METHOD_LABELS[p.payment_method]) : p.payment_method}
                   </Chip>
                 </View>
               </View>
               <Text variant="bodySmall" style={styles.meta}>
-                Order #{p.order_number || p.order_id}{p.table_number != null ? ` · Table ${p.table_number}` : ''}
+                {t('Order #{number}', { number: p.order_number || p.order_id || '' })}{p.table_number != null ? ` · ${t('Table {n}', { n: p.table_number })}` : ''}
               </Text>
               <Text variant="bodySmall" style={styles.meta}>
                 {new Date(p.created_at).toLocaleString()}
@@ -240,7 +242,7 @@ export default function CashierReceiptsScreen() {
                   disabled={offlinePrinting === p.offline_id}
                   onPress={() => handleOfflinePrint(p)}
                 >
-                  Print Local
+                  {t('Print Local')}
                 </Button>
               </Card.Actions>
             ) : (
@@ -253,7 +255,7 @@ export default function CashierReceiptsScreen() {
                   disabled={reprinting === p.id || localPrinting === p.id}
                   onPress={() => handleReprint(p.id)}
                 >
-                  Reprint
+                  {t('Reprint')}
                 </Button>
                 <Button
                   mode="text"
@@ -263,7 +265,7 @@ export default function CashierReceiptsScreen() {
                   disabled={reprinting === p.id || localPrinting === p.id}
                   onPress={() => handleLocalPrint(p)}
                 >
-                  Print Here
+                  {t('Print Here')}
                 </Button>
               </Card.Actions>
             )}
@@ -272,7 +274,7 @@ export default function CashierReceiptsScreen() {
       />
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );
