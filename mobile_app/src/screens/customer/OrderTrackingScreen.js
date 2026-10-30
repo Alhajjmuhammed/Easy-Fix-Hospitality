@@ -23,6 +23,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import OrderRatingCard from '../../components/OrderRatingCard';
+import MobileMoneyBox from '../../components/MobileMoneyBox';
+import { useT } from '../../i18n';
 
 const STATUS_COLORS = {
   pending:          '#FFA000',
@@ -73,16 +75,16 @@ const DELIVERY_ORDER  = ['pending','confirmed','preparing','ready','out_for_deli
 
 const POLL_INTERVAL = 60_000; // 60-second safety-net; WebSocket delivers live updates faster
 
-function getRelativeTime(isoString) {
+function getRelativeTime(isoString, t) {
   try {
     const diffMs = Date.now() - new Date(isoString).getTime();
     if (isNaN(diffMs) || diffMs < 0) return '';
     const diffSecs = Math.floor(diffMs / 1000);
-    if (diffSecs < 60) return `${diffSecs} second${diffSecs !== 1 ? 's' : ''}`;
+    if (diffSecs < 60) return t(diffSecs !== 1 ? '{n} seconds' : '{n} second', { n: diffSecs });
     const diffMins = Math.floor(diffSecs / 60);
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''}`;
+    if (diffMins < 60) return t(diffMins !== 1 ? '{n} minutes' : '{n} minute', { n: diffMins });
     const diffHrs = Math.floor(diffMins / 60);
-    return `${diffHrs} hour${diffHrs !== 1 ? 's' : ''}`;
+    return t(diffHrs !== 1 ? '{n} hours' : '{n} hour', { n: diffHrs });
   } catch {
     return '';
   }
@@ -90,6 +92,7 @@ function getRelativeTime(isoString) {
 
 export default function OrderTrackingScreen({ route }) {
   const { orderId } = route.params;
+  const t = useT();
   const theme = useTheme();
   const navigation = useNavigation();
   const { refreshPendingCount } = useSyncStore();
@@ -164,16 +167,16 @@ export default function OrderTrackingScreen({ route }) {
         await apiCreateBillRequest(order.table_info);
         if (!mountedRef.current) return;
         setOrder((prev) => prev ? { ...prev, pending_bill_requested: true } : prev);
-        setSnack('Bill requested – staff have been notified');
+        setSnack(t('Bill requested – staff have been notified'));
       } else {
         await saveOfflineBillRequest(order.table_info);
         await refreshPendingCount();
         if (!mountedRef.current) return;
         setOrder(prev => prev ? { ...prev, pending_bill_requested: true } : prev);
-        setSnack('Bill request saved – will sync when online');
+        setSnack(t('Bill request saved – will sync when online'));
       }
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Could not request bill');
+      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Could not request bill'));
     } finally {
       if (mountedRef.current) setBillRequesting(false);
     }
@@ -182,7 +185,7 @@ export default function OrderTrackingScreen({ route }) {
   const handleCancelConfirm = async () => {
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to cancel the order'); setCancelVisible(false); return; }
+    if (!net.isConnected) { setSnack(t('No internet — connect to cancel the order')); setCancelVisible(false); return; }
     setCancelling(true);
     try {
       const reason = cancelReason.trim() || 'Changed mind / No longer needed';
@@ -190,10 +193,10 @@ export default function OrderTrackingScreen({ route }) {
       if (!mountedRef.current) return;
       setCancelVisible(false);
       setCancelReason('');
-      setSnack('Order cancelled');
+      setSnack(t('Order cancelled'));
       fetchOrder(); // refresh
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.error || 'Could not cancel order');
+      if (mountedRef.current) setSnack(err.response?.data?.error || t('Could not cancel order'));
     } finally {
       if (mountedRef.current) setCancelling(false);
     }
@@ -211,7 +214,7 @@ export default function OrderTrackingScreen({ route }) {
     return (
       <View style={styles.center}>
         <Text style={{ fontFamily: 'Poppins_400Regular' }}>
-          {isOffline ? 'You are offline – order not in local cache' : 'Order not found'}
+          {isOffline ? t('You are offline – order not in local cache') : t('Order not found')}
         </Text>
       </View>
     );
@@ -242,7 +245,7 @@ export default function OrderTrackingScreen({ route }) {
       {/* ── Offline banner ── */}
       {isOffline && (
         <Banner visible icon="wifi-off" actions={[]} style={{ backgroundColor: '#FFF8E1', marginBottom: 8 }}>
-          You are offline – showing last synced data. Live updates paused.
+          {t('You are offline – showing last synced data. Live updates paused.')}
         </Banner>
       )}
 
@@ -250,7 +253,7 @@ export default function OrderTrackingScreen({ route }) {
       <Card style={styles.statusCard}>
         <Card.Content style={styles.statusContent}>
           <Text variant="headlineMedium" style={[styles.orderNum, { fontFamily: P700 }]}>
-            Order #{order.order_number || order.id}
+            {t('Order #{number}', { number: order.order_number || order.id })}
           </Text>
           <View style={styles.badgeRow}>
             <Chip
@@ -262,13 +265,13 @@ export default function OrderTrackingScreen({ route }) {
             </Chip>
             <View style={[styles.payBadge, { backgroundColor: payInfo.bg }]}>
               <Text style={{ color: payInfo.color, fontSize: 12, fontFamily: P600 }}>
-                {payInfo.icon}  {payInfo.label}
+                {payInfo.icon}  {t(payInfo.label)}
               </Text>
             </View>
           </View>
           {order.confirmed_by_name ? (
             <Text variant="bodySmall" style={{ fontFamily: P400, color: '#9E9E9E', marginTop: 6 }}>
-              Confirmed by: {order.confirmed_by_name}
+              {t('Confirmed by:')} {order.confirmed_by_name}
             </Text>
           ) : null}
         </Card.Content>
@@ -279,11 +282,11 @@ export default function OrderTrackingScreen({ route }) {
         <Card style={[styles.card, { backgroundColor: '#FFEBEE' }]}>
           <Card.Content>
             <Text variant="titleSmall" style={{ fontFamily: P700, color: '#B71C1C', marginBottom: 4 }}>
-              ✗  Order Cancelled
+              ✗  {t('Order Cancelled')}
             </Text>
             {order.reason_if_cancelled ? (
               <Text variant="bodySmall" style={{ fontFamily: P400, color: '#B71C1C' }}>
-                Reason: {order.reason_if_cancelled}
+                {t('Reason:')} {order.reason_if_cancelled}
               </Text>
             ) : null}
           </Card.Content>
@@ -293,7 +296,7 @@ export default function OrderTrackingScreen({ route }) {
       {/* ── Progress timeline (not for cancelled orders) ── */}
       {!isCancelled && (
         <Card style={styles.card}>
-          <Card.Title title="Order Progress" titleStyle={{ fontFamily: P700 }} />
+          <Card.Title title={t('Order Progress')} titleStyle={{ fontFamily: P700 }} />
           <Card.Content>
             {PROGRESS_STEPS.map((step, idx) => {
               const isCompleted = currentStepIdx > idx;
@@ -312,14 +315,14 @@ export default function OrderTrackingScreen({ route }) {
                       fontFamily: isActive || isCompleted ? P700 : P400,
                       color: isPending ? '#9E9E9E' : '#212121',
                     }}>
-                      {step.label}
+                      {t(step.label)}
                     </Text>
                     <Text variant="bodySmall" style={{ fontFamily: P400, color: '#9E9E9E' }}>
-                      {step.desc}
+                      {t(step.desc)}
                     </Text>
                     {isActive && (
                       <Text variant="labelSmall" style={{ fontFamily: P600, color: '#2c3e50', marginTop: 2 }}>
-                        ● Current Status
+                        ● {t('Current Status')}
                       </Text>
                     )}
                   </View>
@@ -331,14 +334,14 @@ export default function OrderTrackingScreen({ route }) {
             {order.status === 'served' && order.payment_status !== 'paid' && (
               <View style={[styles.infoBanner, { backgroundColor: '#E3F2FD' }]}>
                 <Text style={{ fontFamily: P400, color: '#1565C0', fontSize: 13 }}>
-                  ℹ  Order complete! Please proceed to payment to finalize your order.
+                  ℹ  {t('Order complete! Please proceed to payment to finalize your order.')}
                 </Text>
               </View>
             )}
             {order.status === 'served' && order.payment_status === 'paid' && (
               <View style={[styles.infoBanner, { backgroundColor: '#E8F5E9' }]}>
                 <Text style={{ fontFamily: P700, color: '#2E7D32', fontSize: 13 }}>
-                  ✅  All done! Thank you for dining with us. Enjoy your meal!
+                  ✅  {t('All done! Thank you for dining with us. Enjoy your meal!')}
                 </Text>
               </View>
             )}
@@ -348,7 +351,7 @@ export default function OrderTrackingScreen({ route }) {
 
       {/* ── Order items ── */}
       <Card style={styles.card}>
-        <Card.Title title="Items" titleStyle={{ fontFamily: P700 }} />
+        <Card.Title title={t('Items')} titleStyle={{ fontFamily: P700 }} />
         <Card.Content>
           {order.items?.map((item) => (
             <View key={item.id} style={styles.itemRow}>
@@ -356,7 +359,7 @@ export default function OrderTrackingScreen({ route }) {
                 <Text variant="bodyMedium" style={{ fontFamily: P400 }}>{item.product_name}</Text>
                 {item.special_notes ? (
                   <Text variant="bodySmall" style={{ fontFamily: P400, color: '#9E9E9E' }}>
-                    Note: {item.special_notes}
+                    {t('Note:')} {item.special_notes}
                   </Text>
                 ) : null}
               </View>
@@ -367,35 +370,35 @@ export default function OrderTrackingScreen({ route }) {
           ))}
           <Divider style={styles.divider} />
           <View style={styles.itemRow}>
-            <Text variant="bodySmall" style={{ fontFamily: P400 }}>Subtotal</Text>
+            <Text variant="bodySmall" style={{ fontFamily: P400 }}>{t('Subtotal')}</Text>
             <Text variant="bodySmall" style={{ fontFamily: P400 }}>{fmt(order.subtotal)}</Text>
           </View>
           {order.tax_amount > 0 && (
             <View style={styles.itemRow}>
-              <Text variant="bodySmall" style={{ fontFamily: P400 }}>Tax</Text>
+              <Text variant="bodySmall" style={{ fontFamily: P400 }}>{t('Tax')}</Text>
               <Text variant="bodySmall" style={{ fontFamily: P400 }}>{fmt(order.tax_amount)}</Text>
             </View>
           )}
           {order.delivery_fee > 0 && (
             <View style={styles.itemRow}>
-              <Text variant="bodySmall" style={{ fontFamily: P400 }}>Delivery fee</Text>
+              <Text variant="bodySmall" style={{ fontFamily: P400 }}>{t('Delivery fee')}</Text>
               <Text variant="bodySmall" style={{ fontFamily: P400 }}>{fmt(order.delivery_fee)}</Text>
             </View>
           )}
           <View style={styles.itemRow}>
-            <Text variant="titleSmall" style={{ fontFamily: P700 }}>Total</Text>
+            <Text variant="titleSmall" style={{ fontFamily: P700 }}>{t('Total')}</Text>
             <Text variant="titleSmall" style={{ fontFamily: P700 }}>{fmt(order.total)}</Text>
           </View>
           {order.total_paid > 0 && order.payment_status !== 'paid' && (
             <View style={styles.itemRow}>
-              <Text variant="bodySmall" style={{ fontFamily: P600 }}>Paid</Text>
+              <Text variant="bodySmall" style={{ fontFamily: P600 }}>{t('Paid')}</Text>
               <Text variant="bodySmall" style={{ fontFamily: P600 }}>{fmt(order.total_paid)}</Text>
             </View>
           )}
           {order.balance_due > 0 && (
             <View style={[styles.itemRow, styles.balanceRow]}>
               <Text variant="bodyMedium" style={{ color: theme.colors.error, fontFamily: P600 }}>
-                Balance Due
+                {t('Balance Due')}
               </Text>
               <Text variant="bodyMedium" style={{ color: theme.colors.error, fontFamily: P700 }}>
                 {fmt(order.balance_due)}
@@ -415,7 +418,7 @@ export default function OrderTrackingScreen({ route }) {
           <Card style={styles.card}>
             <Card.Content>
               <Text variant="labelLarge" style={{ fontFamily: P600, color: '#9E9E9E', marginBottom: 4 }}>
-                SPECIAL INSTRUCTIONS
+                {t('SPECIAL INSTRUCTIONS')}
               </Text>
               <Text variant="bodyMedium" style={{ fontFamily: P400 }}>
                 {cleaned}
@@ -437,7 +440,7 @@ export default function OrderTrackingScreen({ route }) {
           icon="map-marker-radius"
           labelStyle={{ fontFamily: P600 }}
         >
-          {isDelivered ? 'View Delivery Map' : 'Track Live on Map'}
+          {isDelivered ? t('View Delivery Map') : t('Track Live on Map')}
         </Button>
       )}
 
@@ -446,12 +449,12 @@ export default function OrderTrackingScreen({ route }) {
         order.pending_bill_requested ? (
           <View style={[styles.infoBanner, { backgroundColor: '#E3F2FD', marginTop: 8 }]}>
             <Text style={{ fontFamily: P700, color: '#1565C0', fontSize: 13, marginBottom: 2 }}>
-              🕐  Bill Request Sent!
+              🕐  {t('Bill Request Sent!')}
             </Text>
             <Text style={{ fontFamily: P400, color: '#1565C0', fontSize: 12 }}>
               {order.pending_bill_requested_at
-                ? `Requested ${getRelativeTime(order.pending_bill_requested_at)} ago. Staff will bring your bill shortly.`
-                : 'Staff have been notified and will bring your bill shortly.'}
+                ? t('Requested {time} ago. Staff will bring your bill shortly.', { time: getRelativeTime(order.pending_bill_requested_at, t) })
+                : t('Staff have been notified and will bring your bill shortly.')}
             </Text>
           </View>
         ) : (
@@ -464,9 +467,15 @@ export default function OrderTrackingScreen({ route }) {
             icon="receipt"
             labelStyle={{ fontFamily: P600 }}
           >
-            Request Bill
+            {t('Request Bill')}
           </Button>
         )
+      )}
+
+      {/* Pay from the phone (only when the restaurant takes mobile money online) */}
+      {!isOffline && !isCancelled && order.payment_status !== 'paid' && (
+        <MobileMoneyBox orderId={order.id} onMessage={setSnack}
+          onPaid={() => { setSnack(t('Payment received — thank you!')); fetchOrder(); }} />
       )}
 
       {/* Rate the order – once served / delivered (customer only; hidden otherwise) */}
@@ -484,7 +493,7 @@ export default function OrderTrackingScreen({ route }) {
           icon="file-document-outline"
           labelStyle={{ fontFamily: P600 }}
         >
-          View Receipt
+          {t('View Receipt')}
         </Button>
       )}
 
@@ -499,7 +508,7 @@ export default function OrderTrackingScreen({ route }) {
           onPress={() => { setCancelReason(''); setCancelVisible(true); }}
           labelStyle={{ fontFamily: P600 }}
         >
-          {isOffline ? 'Cancel Order (connect first)' : 'Cancel Order'}
+          {isOffline ? t('Cancel Order (connect first)') : t('Cancel Order')}
         </Button>
       )}
 
@@ -507,7 +516,7 @@ export default function OrderTrackingScreen({ route }) {
       {['confirmed', 'preparing', 'ready'].includes(order.status) && (
         <View style={[styles.infoBanner, { backgroundColor: '#FFF3E0', marginTop: 8 }]}>
           <Text style={{ fontFamily: P400, color: '#E65100', fontSize: 12 }}>
-            ℹ  Order cannot be cancelled – it has been confirmed by the kitchen.
+            ℹ  {t('Order cannot be cancelled – it has been confirmed by the kitchen.')}
           </Text>
         </View>
       )}
@@ -515,24 +524,24 @@ export default function OrderTrackingScreen({ route }) {
       {/* ── Cancel Order Dialog ── */}
       <Portal>
         <Dialog visible={cancelVisible} onDismiss={() => setCancelVisible(false)}>
-          <Dialog.Title style={{ fontFamily: P700 }}>Cancel Order</Dialog.Title>
+          <Dialog.Title style={{ fontFamily: P700 }}>{t('Cancel Order')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ fontFamily: P400, marginBottom: 12 }}>
-              Are you sure you want to cancel Order #{order.order_number || order.id}?
-              This action cannot be undone.
+              {t('Are you sure you want to cancel Order #{number}?', { number: order.order_number || order.id })}
+              {' '}{t('This action cannot be undone.')}
             </Text>
             <TextInput
-              label="Reason (optional)"
+              label={t('Reason (optional)')}
               value={cancelReason}
               onChangeText={setCancelReason}
               mode="outlined"
-              placeholder="Changed mind / No longer needed"
+              placeholder={t('Changed mind / No longer needed')}
               style={{ fontFamily: P400 }}
             />
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setCancelVisible(false)} labelStyle={{ fontFamily: P600 }}>
-              Keep Order
+              {t('Keep Order')}
             </Button>
             <Button
               textColor="#B71C1C"
@@ -541,7 +550,7 @@ export default function OrderTrackingScreen({ route }) {
               onPress={handleCancelConfirm}
               labelStyle={{ fontFamily: P600 }}
             >
-              Cancel Order
+              {t('Cancel Order')}
             </Button>
           </Dialog.Actions>
         </Dialog>

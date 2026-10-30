@@ -29,6 +29,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { useNetworkSync } from './src/hooks/useNetworkSync';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import { useLockStore, IDLE_MS } from './src/store/useLockStore';
+import { useLanguageStore } from './src/store/useLanguageStore';
 import LockScreen from './src/screens/LockScreen';
 
 const fontConfig = {
@@ -75,7 +76,8 @@ function AppContent() {
   useEffect(() => {
     (async () => {
       try { require('@brooons/react-native-bluetooth-escpos-printer'); } catch (_) {}
-      await Promise.all([initDatabase(), loadToken(), loadPrinterSettings(), loadPin()]);
+      await Promise.all([initDatabase(), loadToken(), loadPrinterSettings(), loadPin(),
+        useLanguageStore.getState().load()]);
       await refreshPendingCount();
       setReady(true);
     })();

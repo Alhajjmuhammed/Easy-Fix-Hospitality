@@ -156,8 +156,29 @@ def po_form(request, pk=None):
         lines = [(str(l.item_id), f'{l.quantity.normalize():f}', f'{l.unit_price}') for l in order.lines.all()]
     else:
         data = {'supplier_id': request.GET.get('supplier', ''), 'order_date': timezone.localdate().isoformat()}
-        lines = []
+        lines = _prefill_lines(owner, request.GET.get('prefill', ''))
     return _render_form(request, owner, order, data, lines)
+
+
+def _prefill_lines(owner, raw):
+    """'item_id:qty,…' from the forecast's shopping list → form lines (own items only, item price)."""
+    prices = dict(InventoryItem.objects.filter(owner=owner, is_active=True).values_list('id', 'unit_price'))
+    lines = []
+    seen = set()
+    for part in (raw or '')[:4000].split(',')[:svc.MAX_LINES]:
+        item_id, _, qty = part.partition(':')
+        try:
+            item_id, qty = int(item_id), Decimal(qty[:20])
+            if not (qty.is_finite() and Decimal('0') < qty <= Decimal('999999')):
+                continue
+            qty_text = f'{qty.quantize(Decimal("0.01")).normalize():f}'
+        except (ValueError, ArithmeticError):
+            continue
+        if item_id in prices and item_id not in seen:
+            seen.add(item_id)
+            price = prices[item_id]
+            lines.append((str(item_id), qty_text, f'{price}' if price is not None else ''))
+    return lines
 
 
 def _render_form(request, owner, order, data, lines):

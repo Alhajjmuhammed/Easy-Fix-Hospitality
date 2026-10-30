@@ -554,6 +554,10 @@ _logger.info("Production settings loaded successfully")
 # Enhanced Logging for Production
 
 # Email configuration
+# Public https address of this site; mobile money providers send payment confirmations here.
+# When empty, the address the cashier/customer used is taken.
+PUBLIC_BASE_URL = config('PUBLIC_BASE_URL', default='')
+
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)

@@ -17,6 +17,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 import { useCurrency } from '../../hooks/useCurrency';
 import { buildReceiptText, shareOnWhatsApp } from '../../utils/shareReceipt';
+import { useT } from '../../i18n';
 
 const PAYMENT_METHOD_LABELS = {
   cash:    'Cash',
@@ -27,6 +28,7 @@ const PAYMENT_METHOD_LABELS = {
 
 export default function ReceiptScreen({ route }) {
   const { orderId } = route.params;
+  const t = useT();
   const theme = useTheme();
   const navigation = useNavigation();
   const user = useAuthStore((s) => s.user);
@@ -79,9 +81,9 @@ export default function ReceiptScreen({ route }) {
   if (!order) {
     return (
       <View style={styles.center}>
-        <Text style={{ fontFamily: 'Poppins_400Regular' }}>Receipt not available</Text>
+        <Text style={{ fontFamily: 'Poppins_400Regular' }}>{t('Receipt not available')}</Text>
         <Button onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
-          Go Back
+          {t('Go Back')}
         </Button>
       </View>
     );
@@ -125,65 +127,65 @@ export default function ReceiptScreen({ route }) {
 
       {isOffline && (
         <Banner visible icon="wifi-off" actions={[]} style={{ backgroundColor: '#FFF8E1' }}>
-          Offline – showing cached data. Connect to view live receipt details.
+          {t('Offline – showing cached data. Connect to view live receipt details.')}
         </Banner>
       )}
 
       {/* ── Receipt header ── */}
       <View style={[styles.header, { backgroundColor: '#2c3e50' }]}>
         <Text variant="headlineSmall" style={[styles.headerTitle, { fontFamily: P700 }]}>
-          Receipt
+          {t('Receipt')}
         </Text>
         <Text variant="bodyMedium" style={{ color: '#fff', fontFamily: P400 }}>
-          {user?.restaurant_name || 'Restaurant'}
+          {user?.restaurant_name || t('Restaurant')}
         </Text>
         <Text variant="bodySmall" style={{ color: '#ccc', fontFamily: P400, marginTop: 4 }}>
-          Order #{order.order_number || order.id}
+          {t('Order #{number}', { number: order.order_number || order.id })}
         </Text>
       </View>
 
       {/* ── Order Information ── */}
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="labelLarge" style={styles.sectionLabel}>ORDER INFORMATION</Text>
+          <Text variant="labelLarge" style={styles.sectionLabel}>{t('ORDER INFORMATION')}</Text>
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P600 }}>Order Number</Text>
+            <Text style={{ fontFamily: P600 }}>{t('Order Number')}</Text>
             <Text style={{ fontFamily: P400 }}>#{order.order_number || order.id}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={{ fontFamily: P600 }}>
-              {order.order_type === 'delivery' || order.order_type === 'pickup' ? 'Type' : 'Table'}
+              {order.order_type === 'delivery' || order.order_type === 'pickup' ? t('Type') : t('Table')}
             </Text>
             <Text style={{ fontFamily: P400 }}>
-              {order.order_type === 'delivery' ? 'Delivery' : order.order_type === 'pickup' ? 'Pickup' : `Table ${order.table_number}`}
+              {order.order_type === 'delivery' ? t('Delivery') : order.order_type === 'pickup' ? t('Pickup') : t('Table {n}', { n: order.table_number })}
             </Text>
           </View>
           {order.order_type === 'delivery' && order.delivery_address ? (
             <View style={styles.infoRow}>
-              <Text style={{ fontFamily: P600 }}>Address</Text>
+              <Text style={{ fontFamily: P600 }}>{t('Address')}</Text>
               <Text style={{ fontFamily: P400, flex: 1, textAlign: 'right' }}>
                 {order.delivery_address}
               </Text>
             </View>
           ) : null}
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P600 }}>Date & Time</Text>
+            <Text style={{ fontFamily: P600 }}>{t('Date & Time')}</Text>
             <Text style={{ fontFamily: P400, flex: 1, textAlign: 'right' }}>{createdAt}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P600 }}>Customer</Text>
+            <Text style={{ fontFamily: P600 }}>{t('Customer')}</Text>
             <Text style={{ fontFamily: P400 }}>{order.ordered_by_name || '—'}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P600 }}>Status</Text>
+            <Text style={{ fontFamily: P600 }}>{t('Status')}</Text>
             <Text style={{ fontFamily: P600, color: '#2E7D32' }}>
-              {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—'}
+              {order.status ? t(order.status.charAt(0).toUpperCase() + order.status.slice(1)) : '—'}
             </Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P600 }}>Payment</Text>
+            <Text style={{ fontFamily: P600 }}>{t('Payment')}</Text>
             <Text style={{ fontFamily: P600, color: order.payment_status === 'paid' ? '#2E7D32' : '#FF8F00' }}>
-              {order.payment_status ? order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1) : '—'}
+              {order.payment_status ? t(order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)) : '—'}
             </Text>
           </View>
         </Card.Content>
@@ -192,7 +194,7 @@ export default function ReceiptScreen({ route }) {
       {/* ── Order Items ── */}
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="labelLarge" style={styles.sectionLabel}>ORDER ITEMS</Text>
+          <Text variant="labelLarge" style={styles.sectionLabel}>{t('ORDER ITEMS')}</Text>
           {order.items?.map((item) => (
             <View key={item.id}>
               <View style={styles.itemRow}>
@@ -204,7 +206,7 @@ export default function ReceiptScreen({ route }) {
               </View>
               {item.special_notes ? (
                 <Text variant="bodySmall" style={{ fontFamily: P400, color: '#9E9E9E', marginBottom: 4, paddingLeft: 4 }}>
-                  Note: {item.special_notes}
+                  {t('Note:')} {item.special_notes}
                 </Text>
               ) : null}
               <Divider style={{ marginVertical: 4, opacity: 0.3 }} />
@@ -216,32 +218,32 @@ export default function ReceiptScreen({ route }) {
       {/* ── Order Summary ── */}
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="labelLarge" style={styles.sectionLabel}>ORDER SUMMARY</Text>
+          <Text variant="labelLarge" style={styles.sectionLabel}>{t('ORDER SUMMARY')}</Text>
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P400 }}>Subtotal</Text>
+            <Text style={{ fontFamily: P400 }}>{t('Subtotal')}</Text>
             <Text style={{ fontFamily: P400 }}>{fmt(order.subtotal)}</Text>
           </View>
           {order.tax_amount > 0 && (
             <View style={styles.infoRow}>
-              <Text style={{ fontFamily: P400 }}>Tax</Text>
+              <Text style={{ fontFamily: P400 }}>{t('Tax')}</Text>
               <Text style={{ fontFamily: P400 }}>{fmt(order.tax_amount)}</Text>
             </View>
           )}
           {order.delivery_fee > 0 && (
             <View style={styles.infoRow}>
-              <Text style={{ fontFamily: P400 }}>Delivery fee</Text>
+              <Text style={{ fontFamily: P400 }}>{t('Delivery fee')}</Text>
               <Text style={{ fontFamily: P400 }}>{fmt(order.delivery_fee)}</Text>
             </View>
           )}
           {order.discount_amount > 0 && (
             <View style={styles.infoRow}>
-              <Text style={{ fontFamily: P400, color: '#2E7D32' }}>Discount</Text>
+              <Text style={{ fontFamily: P400, color: '#2E7D32' }}>{t('Discount')}</Text>
               <Text style={{ fontFamily: P600, color: '#2E7D32' }}>-{fmt(order.discount_amount)}</Text>
             </View>
           )}
           <Divider style={{ marginVertical: 8 }} />
           <View style={styles.infoRow}>
-            <Text style={{ fontFamily: P700, fontSize: 16 }}>Total Paid</Text>
+            <Text style={{ fontFamily: P700, fontSize: 16 }}>{t('Total Paid')}</Text>
             <Text style={{ fontFamily: P700, fontSize: 16, color: '#2E7D32' }}>
               {fmt(order.total_paid ?? order.total)}
             </Text>
@@ -253,35 +255,35 @@ export default function ReceiptScreen({ route }) {
       {order.payments?.length > 0 && (
         <Card style={styles.card}>
           <Card.Content>
-            <Text variant="labelLarge" style={styles.sectionLabel}>PAYMENT INFORMATION</Text>
+            <Text variant="labelLarge" style={styles.sectionLabel}>{t('PAYMENT INFORMATION')}</Text>
             {order.payments.map((p, idx) => (
               <View key={p.id ?? idx}>
                 <View style={[styles.paymentBlock, { backgroundColor: '#E3F2FD' }]}>
                   <View style={styles.infoRow}>
-                    <Text style={{ fontFamily: P600 }}>Method</Text>
+                    <Text style={{ fontFamily: P600 }}>{t('Method')}</Text>
                     <Text style={{ fontFamily: P400 }}>
-                      {PAYMENT_METHOD_LABELS[p.payment_method] || p.payment_method}
+                      {PAYMENT_METHOD_LABELS[p.payment_method] ? t(PAYMENT_METHOD_LABELS[p.payment_method]) : p.payment_method}
                     </Text>
                   </View>
                   <View style={styles.infoRow}>
-                    <Text style={{ fontFamily: P600 }}>Amount</Text>
+                    <Text style={{ fontFamily: P600 }}>{t('Amount')}</Text>
                     <Text style={{ fontFamily: P700 }}>{fmt(p.amount)}</Text>
                   </View>
                   {p.processed_by_name ? (
                     <View style={styles.infoRow}>
-                      <Text style={{ fontFamily: P600 }}>Processed by</Text>
+                      <Text style={{ fontFamily: P600 }}>{t('Processed by')}</Text>
                       <Text style={{ fontFamily: P400 }}>{p.processed_by_name}</Text>
                     </View>
                   ) : null}
                   {p.reference_number ? (
                     <View style={styles.infoRow}>
-                      <Text style={{ fontFamily: P600 }}>Reference</Text>
+                      <Text style={{ fontFamily: P600 }}>{t('Reference')}</Text>
                       <Text style={{ fontFamily: P400 }}>{p.reference_number}</Text>
                     </View>
                   ) : null}
                   {p.notes ? (
                     <View style={styles.infoRow}>
-                      <Text style={{ fontFamily: P600 }}>Notes</Text>
+                      <Text style={{ fontFamily: P600 }}>{t('Notes')}</Text>
                       <Text style={{ fontFamily: P400, flex: 1, textAlign: 'right' }}>{p.notes}</Text>
                     </View>
                   ) : null}
@@ -300,7 +302,7 @@ export default function ReceiptScreen({ route }) {
         return note ? (
           <Card style={styles.card}>
             <Card.Content>
-              <Text variant="labelLarge" style={styles.sectionLabel}>SPECIAL INSTRUCTIONS</Text>
+              <Text variant="labelLarge" style={styles.sectionLabel}>{t('SPECIAL INSTRUCTIONS')}</Text>
               <Text variant="bodyMedium" style={{ fontFamily: P400 }}>{note}</Text>
             </Card.Content>
           </Card>
@@ -310,7 +312,7 @@ export default function ReceiptScreen({ route }) {
       {/* ── Thank you message ── */}
       <View style={[styles.thankYou, { backgroundColor: '#E8F5E9' }]}>
         <Text style={{ fontFamily: P700, color: '#2E7D32', fontSize: 15, textAlign: 'center' }}>
-          ❤  Thank you for dining with us!
+          ❤  {t('Thank you for dining with us!')}
         </Text>
       </View>
 
@@ -324,7 +326,7 @@ export default function ReceiptScreen({ route }) {
         style={[styles.backBtn, { marginBottom: 8 }]}
         labelStyle={{ fontFamily: P600 }}
       >
-        Print on This Device
+        {t('Print on This Device')}
       </Button>
 
       <Button
@@ -335,7 +337,7 @@ export default function ReceiptScreen({ route }) {
         style={[styles.backBtn, { marginBottom: 8 }]}
         labelStyle={{ fontFamily: P600 }}
       >
-        Share on WhatsApp
+        {t('Share on WhatsApp')}
       </Button>
 
       <Button
@@ -345,7 +347,7 @@ export default function ReceiptScreen({ route }) {
         style={styles.backBtn}
         labelStyle={{ fontFamily: P600 }}
       >
-        Back to My Orders
+        {t('Back to My Orders')}
       </Button>
     </ScrollView>
   );

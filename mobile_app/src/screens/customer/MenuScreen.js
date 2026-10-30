@@ -26,9 +26,11 @@ import { getCategories, saveCategories, getSyncMeta } from '../../database/opera
 import { useCartStore } from '../../store/useCartStore';
 import { MENU_STALE_THRESHOLD_MS } from '../../config';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useT } from '../../i18n';
 
 export default function MenuScreen({ navigation }) {
   const theme = useTheme();
+  const t = useT();
   const { items, addItem, getItemCount, getSubtotal } = useCartStore();
   const { format } = useCurrency();
 
@@ -62,7 +64,7 @@ export default function MenuScreen({ navigation }) {
         if (lastSynced) {
           const age = Date.now() - new Date(lastSynced).getTime();
           if (age > MENU_STALE_THRESHOLD_MS) {
-            setSnack('Menu may be outdated â€” you are offline');
+            setSnack('Menu may be outdated — you are offline');
           }
         }
       }
@@ -143,7 +145,7 @@ export default function MenuScreen({ navigation }) {
     addItem(product, qty);
     // Reset qty back to 1 and show toast â€” matches web behaviour
     setLocalQtys((prev) => ({ ...prev, [product.id]: 1 }));
-    setSnack(`${product.name} added to cart`);
+    setSnack(t('{name} added to cart', { name: product.name }));
   };
 
   if (loading) {
@@ -159,19 +161,19 @@ export default function MenuScreen({ navigation }) {
       <View style={styles.container}>
         {/* Search + filter chips still visible */}
         <Searchbar
-          placeholder="Search menu..."
+          placeholder={t('Search menu...')}
           value={search}
           onChangeText={setSearch}
           style={styles.searchbar}
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catList}>
-          <Chip selected={!selectedCat} onPress={() => setSelectedCat(null)} style={styles.catChip}>All</Chip>
+          <Chip selected={!selectedCat} onPress={() => setSelectedCat(null)} style={styles.catChip}>{t('All')}</Chip>
           {categories.filter((c) => catsWithProducts.has(c.id)).map((c) => (
             <Chip key={c.id} selected={selectedCat === c.id} onPress={() => setSelectedCat(selectedCat === c.id ? null : c.id)} style={styles.catChip}>{c.name}</Chip>
           ))}
         </ScrollView>
         <View style={styles.center}>
-          <Text variant="bodyLarge" style={{ opacity: 0.5, fontFamily: 'Poppins_400Regular' }}>No items found</Text>
+          <Text variant="bodyLarge" style={{ opacity: 0.5, fontFamily: 'Poppins_400Regular' }}>{t('No items found')}</Text>
         </View>
       </View>
     );
@@ -181,7 +183,7 @@ export default function MenuScreen({ navigation }) {
     <View style={styles.container}>
       {/* Search bar */}
       <Searchbar
-        placeholder="Search menu..."
+        placeholder={t('Search menu...')}
         value={search}
         onChangeText={setSearch}
         style={styles.searchbar}
@@ -199,7 +201,7 @@ export default function MenuScreen({ navigation }) {
             onPress={() => setSelectedCat(null)}
             style={styles.catChip}
           >
-            All
+            {t('All')}
           </Chip>
           {categories.filter((cat) => catsWithProducts.has(cat.id)).map((cat) => (
             <Chip
@@ -264,7 +266,7 @@ export default function MenuScreen({ navigation }) {
                   </Text>
                   {product.has_promotion && (
                     <Chip compact mode="flat" style={styles.promoBadge} textStyle={styles.promoBadgeText}>
-                      Happy Hour
+                      {t('Happy Hour')}
                     </Chip>
                   )}
                   {cartQty > 0 && (
@@ -298,7 +300,7 @@ export default function MenuScreen({ navigation }) {
                     </Text>
                   )}
                   <Text variant="bodySmall" style={styles.prepTime}>
-                    â± {product.preparation_time || '?'} min
+                    ⏱ {t('{n} min', { n: product.preparation_time || '?' })}
                   </Text>
                 </View>
 
@@ -312,8 +314,8 @@ export default function MenuScreen({ navigation }) {
                     ]}
                   >
                     {outOfStock
-                      ? 'âœ— Out of Stock'
-                      : `âœ“ ${product.available_in_stock} in stock`}
+                      ? `✗ ${t('Out of Stock')}`
+                      : `✓ ${t('{n} in stock', { n: product.available_in_stock })}`}
                   </Text>
                 )}
 
@@ -325,7 +327,7 @@ export default function MenuScreen({ navigation }) {
                     compact
                     style={styles.outOfStockBtn}
                   >
-                    Out of Stock
+                    {t('Out of Stock')}
                   </Button>
                 ) : (
                   <View style={styles.addRow}>
@@ -359,7 +361,7 @@ export default function MenuScreen({ navigation }) {
                       style={styles.addBtn}
                       icon="cart-plus"
                     >
-                      Add
+                      {t('Add')}
                     </Button>
                   </View>
                 )}
@@ -383,7 +385,7 @@ export default function MenuScreen({ navigation }) {
               </Text>
             </View>
             <Text variant="labelLarge" style={{ color: theme.colors.onPrimary, marginLeft: 8, fontFamily: 'Poppins_700Bold' }}>
-              View Cart
+              {t('View Cart')}
             </Text>
           </View>
           <Text variant="titleSmall" style={{ color: theme.colors.onPrimary, fontFamily: 'Poppins_700Bold' }}>
@@ -393,7 +395,7 @@ export default function MenuScreen({ navigation }) {
       )}
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={2500}>
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );

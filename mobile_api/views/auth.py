@@ -130,6 +130,18 @@ def save_push_token(request):
     return Response({'message': 'Push token saved.'})
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_language(request):
+    """Remember the language this person chose ('en' / 'sw') for notifications and texts."""
+    language = request.data.get('language')
+    if language not in ('en', 'sw'):
+        return Response({'error': 'Language must be en or sw.'}, status=status.HTTP_400_BAD_REQUEST)
+    request.user.language = language
+    request.user.save(update_fields=['language'])
+    return Response({'language': language})
+
+
 _USERNAME_RE = re.compile(r'^[a-zA-Z0-9_]{3,150}$')
 
 

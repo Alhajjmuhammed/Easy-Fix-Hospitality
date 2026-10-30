@@ -4,6 +4,7 @@ import { Text, Menu as PaperMenu, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
+import { useT } from '../i18n';
 
 const PRIMARY = '#2c3e50';
 
@@ -17,6 +18,7 @@ function initials(name = '') {
 }
 
 export default function CustomerHeader({ onBack = null }) {
+  const t = useT();
   const { user, logout } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [menuVisible,    setMenuVisible]    = useState(false);
@@ -25,15 +27,15 @@ export default function CustomerHeader({ onBack = null }) {
   const fullName =
     [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
     user?.username ||
-    'Guest';
+    t('Guest');
   const userInitials    = initials(fullName) || fullName.slice(0, 2).toUpperCase();
   const firstName       = fullName.split(' ')[0];
 
   const handleLogout = () => {
     setMenuVisible(false);
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
+    Alert.alert(t('Logout'), t('Are you sure you want to logout?'), [
+      { text: t('Cancel'), style: 'cancel' },
+      { text: t('Logout'), style: 'destructive', onPress: logout },
     ]);
   };
 
@@ -60,7 +62,7 @@ export default function CustomerHeader({ onBack = null }) {
           </View>
           <View style={styles.nameBlock}>
             <Text style={styles.brandName} numberOfLines={1}>Easy Fix</Text>
-            <Text style={styles.greetingText} numberOfLines={1}>Hello, {firstName} 👋</Text>
+            <Text style={styles.greetingText} numberOfLines={1}>{t('Hello, {name} 👋', { name: firstName })}</Text>
           </View>
         </View>
 
@@ -84,13 +86,13 @@ export default function CustomerHeader({ onBack = null }) {
           >
             <PaperMenu.Item
               leadingIcon="account-circle-outline"
-              title="Profile"
+              title={t('Profile')}
               onPress={handleProfile}
             />
             <Divider />
             <PaperMenu.Item
               leadingIcon="logout"
-              title="Logout"
+              title={t('Logout')}
               onPress={handleLogout}
               titleStyle={{ color: '#E53935' }}
             />
@@ -118,7 +120,7 @@ export default function CustomerHeader({ onBack = null }) {
               <Text style={styles.cardAvatarText}>{userInitials}</Text>
             </View>
             <Text style={styles.cardName}>{fullName}</Text>
-            <Text style={styles.cardRole}>Customer</Text>
+            <Text style={styles.cardRole}>{t('Customer')}</Text>
             <View style={styles.sep} />
             <View style={styles.row}>
               <MaterialCommunityIcons name="account-outline" size={16} color="#888" />
@@ -146,7 +148,7 @@ export default function CustomerHeader({ onBack = null }) {
               <View style={styles.row}>
                 <MaterialCommunityIcons name="calendar-outline" size={16} color="#888" />
                 <Text style={styles.rowText}>
-                  Member since {new Date(user.date_joined).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {t('Member since {date}', { date: new Date(user.date_joined).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) })}
                 </Text>
               </View>
             )}
@@ -154,7 +156,7 @@ export default function CustomerHeader({ onBack = null }) {
               <View style={styles.row}>
                 <MaterialCommunityIcons name="clock-outline" size={16} color="#888" />
                 <Text style={styles.rowText}>
-                  Last login {new Date(user.last_login).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {t('Last login {date}', { date: new Date(user.last_login).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) })}
                 </Text>
               </View>
             )}
@@ -162,7 +164,7 @@ export default function CustomerHeader({ onBack = null }) {
               style={styles.closeBtn}
               onPress={() => setProfileVisible(false)}
             >
-              <Text style={styles.closeBtnText}>Close</Text>
+              <Text style={styles.closeBtnText}>{t('Close')}</Text>
             </TouchableOpacity>
           </View>
         </View>

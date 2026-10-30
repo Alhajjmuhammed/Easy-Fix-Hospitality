@@ -19,6 +19,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
 import LoyaltyPayBox from '../../components/LoyaltyPayBox';
+import MobileMoneyBox from '../../components/MobileMoneyBox';
 
 const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
@@ -714,6 +715,10 @@ export default function CashierDashboardScreen({ navigation }) {
             <TextInput label="Amount" value={amount} onChangeText={setAmount}
               keyboardType="decimal-pad" mode="outlined" style={{ marginBottom: 12 }}
               autoFocus returnKeyType="done" onSubmitEditing={handlePayment} />
+            {!payDialog?._is_offline_pending && (
+              <MobileMoneyBox orderId={payDialog?.id} amount={amount} onMessage={setSnack}
+                onPaid={() => { setPayDialog(null); setSnack('Mobile money payment received'); fetchOrders(true); }} />
+            )}
             <LoyaltyPayBox order={payDialog} balanceDue={payDialog?.balance_due ?? payDialog?.total ?? 0} format={format}
               onMessage={setSnack} onCode={setLoyaltyCode} onUsePoints={(amt, code) => { setAmount(amt); setLoyaltyCode(code); setMethod('loyalty'); }} />
             {method === 'loyalty' && (

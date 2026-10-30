@@ -4,6 +4,7 @@ import { Button, Text, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { apiLinkLoyaltyCustomer, apiOrderLoyalty } from '../api/loyalty';
+import { useT } from '../i18n';
 
 /**
  * Inside the cashier's pay dialog: shows the customer's loyalty points, lets the cashier link a
@@ -11,6 +12,7 @@ import { apiLinkLoyaltyCustomer, apiOrderLoyalty } from '../api/loyalty';
  * is offline-only, the device is offline, or the server is older.
  */
 export default function LoyaltyPayBox({ order, balanceDue, format, onUsePoints, onCode, onMessage }) {
+  const t = useT();
   const [info, setInfo] = useState(null);
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -36,7 +38,7 @@ export default function LoyaltyPayBox({ order, balanceDue, format, onUsePoints, 
     try {
       setInfo(await apiLinkLoyaltyCustomer(order.id, phone.trim()));
     } catch (err) {
-      onMessage?.(err?.response?.data?.error || 'Could not find the customer.');
+      onMessage?.(err?.response?.data?.error || t('Could not find the customer.'));
     } finally {
       setLinking(false);
     }
@@ -51,35 +53,35 @@ export default function LoyaltyPayBox({ order, balanceDue, format, onUsePoints, 
     <View style={styles.box}>
       <View style={styles.row}>
         <MaterialCommunityIcons name="gift-outline" size={18} color="#C2185B" />
-        <Text style={styles.title}>Loyalty points</Text>
+        <Text style={styles.title}>{t('Loyalty points')}</Text>
       </View>
       {c ? (
         <>
-          <Text style={styles.text}>{c.name}{c.phone ? ` (${c.phone})` : ''}: {c.points} points · worth {format(Number(c.worth))}</Text>
+          <Text style={styles.text}>{c.name}{c.phone ? ` (${c.phone})` : ''}: {t('{points} points · worth {amount}', { points: c.points, amount: format(Number(c.worth)) })}</Text>
           {canUse ? (
             <>
               <View style={[styles.row, { marginTop: 6 }]}>
-                <TextInput dense mode="outlined" label="Customer's code" keyboardType="number-pad" maxLength={6}
+                <TextInput dense mode="outlined" label={t("Customer's code")} keyboardType="number-pad" maxLength={6}
                            value={code} onChangeText={(v) => { setCode(v.replace(/\D/g, '')); onCode?.(v.replace(/\D/g, '')); }}
                            style={{ width: 140 }} />
                 <Button compact mode="outlined" icon="gift" disabled={code.length !== 6}
                         onPress={() => onUsePoints(usable.toFixed(2), code)}>
-                  Use {needed} points
+                  {t('Use {points} points', { points: needed })}
                 </Button>
               </View>
-              <Text style={styles.hint}>The customer finds the code in their app under My Points.</Text>
+              <Text style={styles.hint}>{t('The customer finds the code in their app under My Points.')}</Text>
             </>
           ) : (
-            <Text style={styles.hint}>Points can be used from {info.min_redeem_points} points.</Text>
+            <Text style={styles.hint}>{t('Points can be used from {points} points.', { points: info.min_redeem_points })}</Text>
           )}
         </>
       ) : (
         <>
-          <Text style={styles.hint}>Registered customer? Enter their phone number so they earn points.</Text>
+          <Text style={styles.hint}>{t('Registered customer? Enter their phone number so they earn points.')}</Text>
           <View style={styles.row}>
-            <TextInput dense mode="outlined" label="Customer phone" keyboardType="phone-pad" value={phone}
+            <TextInput dense mode="outlined" label={t('Customer phone')} keyboardType="phone-pad" value={phone}
                        onChangeText={setPhone} style={{ flex: 1 }} />
-            <Button compact onPress={link} loading={linking} disabled={linking || phone.trim().length < 6}>Link</Button>
+            <Button compact onPress={link} loading={linking} disabled={linking || phone.trim().length < 6}>{t('Link')}</Button>
           </View>
         </>
       )}

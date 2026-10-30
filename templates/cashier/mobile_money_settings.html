@@ -1,0 +1,115 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Mobile Money{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-1"><i class="fas fa-mobile-alt me-2"></i>Mobile Money</h1>
+    <p class="text-muted small mb-3">Customers pay from their phone (PIN prompt). The money goes straight to your own account with the provider. Your restaurant currency: <strong>{{ currency }}</strong>.</p>
+
+    {% if inherited and not account %}
+    <div class="alert alert-info small">This branch currently uses the main restaurant's mobile money account ({{ inherited.get_provider_display }}). Save your own account below if this branch should be paid into a different one.</div>
+    {% endif %}
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <form method="post" class="card shadow-sm border-0" autocomplete="off">
+                {% csrf_token %}
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold" for="provider">Provider</label>
+                        <select class="form-select" id="provider" name="provider" required>
+                            <option value="">Choose…</option>
+                            {% for k, label in provider_choices %}
+                            <option value="{{ k }}" {% if account.provider == k %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Kenya (KES): M-Pesa Daraja. Tanzania, Uganda, Rwanda, Ghana: Flutterwave.</div>
+                    </div>
+
+                    {% for provider, fields in fields.items %}
+                    <div class="provider-fields" data-provider="{{ provider }}" hidden>
+                        {% for f in fields %}
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold" for="{{ provider }}_{{ f.key }}">{{ f.label }}</label>
+                            <input class="form-control" id="{{ provider }}_{{ f.key }}" data-name="{{ f.key }}"
+                                   {% if f.secret %}type="password" placeholder="{% if f.is_set %}Saved — leave empty to keep{% endif %}"{% else %}value="{{ f.value }}"{% endif %}>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+
+                    <div class="mb-2 mt-3">
+                        <label class="form-label small fw-semibold">Mode</label>
+                        <div>
+                            <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="environment" id="envS" value="sandbox" {% if not account or account.environment == 'sandbox' %}checked{% endif %}><label class="form-check-label" for="envS">Test (sandbox)</label></div>
+                            <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="environment" id="envL" value="live" {% if account.environment == 'live' %}checked{% endif %}><label class="form-check-label" for="envL">Live (real money)</label></div>
+                        </div>
+                        <div class="form-text">Flutterwave: test or live is decided by which secret key you paste.</div>
+                    </div>
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" {% if account.enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="enabled">Take mobile money payments</label>
+                    </div>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="allow_customer_payments" name="allow_customer_payments" {% if not account or account.allow_customer_payments %}checked{% endif %}>
+                        <label class="form-check-label" for="allow_customer_payments">Customers can also pay their own orders in the app / website</label>
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-primary" name="action" value="save">Save</button>
+                        <button class="btn btn-outline-secondary" name="action" value="test">Save &amp; test connection</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="col-lg-6">
+            {% if account %}
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body small">
+                    <div class="fw-semibold mb-1">Callback address</div>
+                    <p class="text-muted mb-1">{% if account.provider == 'flutterwave' %}In your Flutterwave dashboard → Settings → Webhooks, paste this URL and the same Secret Hash you entered here.{% else %}Used automatically for every M-Pesa request — nothing to set in Daraja.{% endif %}</p>
+                    <div class="input-group input-group-sm">
+                        <input class="form-control" id="cbUrl" value="{{ callback_url }}" readonly aria-label="Callback address">
+                        <button class="btn btn-outline-secondary" type="button" onclick="var i=document.getElementById('cbUrl'); i.select(); (navigator.clipboard ? navigator.clipboard.writeText(i.value).catch(function(){ document.execCommand('copy'); }) : document.execCommand('copy'));">Copy</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="px-3 pt-3 fw-semibold small">Recent requests</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm small mb-0">
+                            <thead><tr><th class="ps-3">When</th><th>Order</th><th class="text-end">Amount</th><th>Status</th><th>Receipt</th></tr></thead>
+                            <tbody>
+                            {% for c in recent %}
+                            <tr><td class="ps-3">{{ c.created_at|date:"j M H:i" }}</td><td>#{{ c.order.order_number }}</td><td class="text-end">{{ c.amount }}</td>
+                                <td>{{ c.get_status_display }}{% if c.failure_reason %}<div class="text-muted">{{ c.failure_reason }}</div>{% endif %}</td><td>{{ c.receipt|default:"—" }}</td></tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">No requests yet.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var sel = document.getElementById('provider');
+    function show() {
+        document.querySelectorAll('.provider-fields').forEach(function (box) {
+            var on = box.dataset.provider === sel.value;
+            box.hidden = !on;
+            box.querySelectorAll('input').forEach(function (i) {
+                if (on) i.setAttribute('name', i.dataset.name); else i.removeAttribute('name');
+            });
+        });
+    }
+    sel.addEventListener('change', show);
+    show();
+})();
+</script>
+{% endblock %}

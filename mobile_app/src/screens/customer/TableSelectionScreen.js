@@ -21,9 +21,11 @@ import { getTables, saveTables } from '../../database/operations';
 import { useCartStore } from '../../store/useCartStore';
 import { apiActiveOrdersForTable } from '../../api/orders';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useT } from '../../i18n';
 
 export default function TableSelectionScreen({ navigation }) {
   const theme = useTheme();
+  const t = useT();
   const { format } = useCurrency();
   const { setTable, clearCart, setExistingOrder } = useCartStore();
   const { setRestaurant, user } = useAuthStore();
@@ -95,7 +97,7 @@ export default function TableSelectionScreen({ navigation }) {
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
     if (!net.isConnected) {
-      setSnack('Offline – cannot fetch active orders. Use "New Order" to continue offline.');
+      setSnack(t('Offline – cannot fetch active orders. Use "New Order" to continue offline.'));
       return;
     }
     setShowOccupiedDialog(false);
@@ -104,13 +106,13 @@ export default function TableSelectionScreen({ navigation }) {
       const orders = await apiActiveOrdersForTable(occupiedTable.id);
       if (!mountedRef.current) return;
       if (!orders || orders.length === 0) {
-        setSnack(`You have no active orders at Table ${occupiedTable.table_number ?? occupiedTable.tbl_no}. Choose "New Order" to start one.`);
+        setSnack(t('You have no active orders at Table {n}. Choose "New Order" to start one.', { n: occupiedTable.table_number ?? occupiedTable.tbl_no }));
         return;
       }
       setActiveOrders(orders);
       setShowOrderPicker(true);
     } catch {
-      if (mountedRef.current) setSnack('Could not fetch orders. Please try again.');
+      if (mountedRef.current) setSnack(t('Could not fetch orders. Please try again.'));
     } finally {
       if (mountedRef.current) setLoadingOrders(false);
     }
@@ -148,13 +150,13 @@ export default function TableSelectionScreen({ navigation }) {
               await setRestaurant(null);
               navigation.replace('RestaurantSelector');
             } catch {
-              setSnack('Could not change restaurant. Please try again.');
+              setSnack(t('Could not change restaurant. Please try again.'));
             }
           }}
           style={styles.changeRestaurantBtn}
           labelStyle={styles.changeRestaurantLabel}
         >
-          Change Restaurant
+          {t('Change Restaurant')}
         </Button>
       )}
 
@@ -182,11 +184,11 @@ export default function TableSelectionScreen({ navigation }) {
                 style={[styles.chip, { backgroundColor: chipBg }]}
                 textStyle={{ fontSize: 11, color: accent, fontFamily: 'Poppins_600SemiBold' }}
               >
-                {available ? 'Available' : 'Occupied'}
+                {available ? t('Available') : t('Occupied')}
               </Chip>
               {item.capacity ? (
                 <Text variant="bodySmall" style={styles.capacity}>
-                  Seats {item.capacity}
+                  {t('Seats {n}', { n: item.capacity })}
                 </Text>
               ) : null}
             </Card.Content>
@@ -200,16 +202,16 @@ export default function TableSelectionScreen({ navigation }) {
       {/* Occupied table action dialog */}
       <Portal>
         <Dialog visible={showOccupiedDialog} onDismiss={() => setShowOccupiedDialog(false)}>
-          <Dialog.Title>Table Occupied</Dialog.Title>
+          <Dialog.Title>{t('Table Occupied')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>
-              Table {occupiedTable?.table_number ?? occupiedTable?.tbl_no} is currently occupied. What would you like to do?
+              {t('Table {n} is currently occupied. What would you like to do?', { n: occupiedTable?.table_number ?? occupiedTable?.tbl_no })}
             </Text>
           </Dialog.Content>
           <Dialog.Actions style={styles.dialogActions}>
-            <Button onPress={() => setShowOccupiedDialog(false)}>Cancel</Button>
-            <Button loading={loadingOrders} onPress={handleAddToExisting}>Add to Existing</Button>
-            <Button mode="contained" onPress={handleNewOrder}>New Order</Button>
+            <Button onPress={() => setShowOccupiedDialog(false)}>{t('Cancel')}</Button>
+            <Button loading={loadingOrders} onPress={handleAddToExisting}>{t('Add to Existing')}</Button>
+            <Button mode="contained" onPress={handleNewOrder}>{t('New Order')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -217,31 +219,31 @@ export default function TableSelectionScreen({ navigation }) {
       {/* Order picker dialog — always shown when adding to existing (matches web) */}
       <Portal>
         <Dialog visible={showOrderPicker} onDismiss={() => setShowOrderPicker(false)}>
-          <Dialog.Title>Your Orders at Table {occupiedTable?.table_number ?? occupiedTable?.tbl_no}</Dialog.Title>
+          <Dialog.Title>{t('Your Orders at Table {n}', { n: occupiedTable?.table_number ?? occupiedTable?.tbl_no })}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={{ marginBottom: 8, opacity: 0.7, fontFamily: 'Poppins_400Regular' }}>
-              Select the order you want to add items to:
+              {t('Select the order you want to add items to:')}
             </Text>
             {activeOrders.map((order, idx) => (
               <View key={order.id}>
                 {idx > 0 && <Divider style={{ marginVertical: 6 }} />}
                 <List.Item
-                  title={`Order #${order.order_number || order.id}`}
+                  title={t('Order #{number}', { number: order.order_number || order.id })}
                   titleStyle={{ fontFamily: 'Poppins_600SemiBold' }}
                   description={() => (
                     <View style={{ marginTop: 4 }}>
                       <Text style={{ fontSize: 12, color: '#555', fontFamily: 'Poppins_400Regular' }}>
-                        {(order.items || []).map((i) => `${i.product_name} ×${i.quantity}`).join(', ') || 'No items'}
+                        {(order.items || []).map((i) => `${i.product_name} ×${i.quantity}`).join(', ') || t('No items')}
                       </Text>
                       <Text style={{ fontSize: 12, color: '#888', marginTop: 2, fontFamily: 'Poppins_400Regular' }}>
-                        Total: {format(order.total_amount ?? 0)} · {order.status} · {order.payment_status}
+                        {t('Total')}: {format(order.total_amount ?? 0)} · {order.status} · {order.payment_status}
                       </Text>
                     </View>
                   )}
                   left={(props) => <List.Icon {...props} icon="clipboard-list" />}
                   right={(props) => (
                     <Button {...props} compact mode="contained" onPress={() => handlePickOrder(order)}>
-                      Select
+                      {t('Select')}
                     </Button>
                   )}
                 />
@@ -249,7 +251,7 @@ export default function TableSelectionScreen({ navigation }) {
             ))}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setShowOrderPicker(false)}>Cancel</Button>
+            <Button onPress={() => setShowOrderPicker(false)}>{t('Cancel')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -259,7 +261,7 @@ export default function TableSelectionScreen({ navigation }) {
         onDismiss={() => setSnack('')}
         duration={4500}
       >
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );

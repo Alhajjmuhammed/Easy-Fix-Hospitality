@@ -71,3 +71,4 @@ class VoidTransaction(models.Model):
         return f"Void ${self.refund_amount} for Payment {self.original_payment.id}"
 
 from .models_loyalty import LoyaltyOrderCustomer, LoyaltyProgram, LoyaltyTransaction  # noqa: E402,F401
+from .models_mobile_money import MobileMoneyAccount, MobileMoneyCharge  # noqa: E402,F401

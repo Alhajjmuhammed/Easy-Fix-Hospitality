@@ -5,13 +5,14 @@ import { WebView } from 'react-native-webview';
 import { useAuthStore } from '../../store/useAuthStore';
 import { apiTrackOrder } from '../../api/delivery';
 import { API_BASE_URL } from '../../config';
+import { useT } from '../../i18n';
 
 // Build the Leaflet map HTML — shows moving rider + customer's home pin
 function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildMapHtml({ riderLat, riderLng, riderName, vehicle, destLat, destLng, destAddress }) {
+function buildMapHtml({ riderLat, riderLng, riderName, vehicle, destLat, destLng, destAddress }, t) {
   const hasRider = riderLat != null && riderLng != null;
   const hasDest  = destLat  != null && destLng  != null;
   const centerLat = hasRider ? riderLat : (hasDest ? destLat : -1.286389);
@@ -20,8 +21,9 @@ function buildMapHtml({ riderLat, riderLng, riderName, vehicle, destLat, destLng
   const vehicleEmoji = { motorcycle: '🏍', bicycle: '🚲', car: '🚗', foot: '🚶' };
   const emoji = vehicleEmoji[vehicle] || '🏍';
   // Safe versions for HTML and JS string contexts to prevent XSS via riderName
-  const safeRiderNameHtml = escHtml(riderName || 'Rider');
-  const safeRiderNameJs   = JSON.stringify(riderName || 'Rider');
+  const safeRiderNameHtml = escHtml(t('{name} is on the way!', { name: riderName || t('Rider') }));
+  const safeRiderNameJs   = JSON.stringify(riderName || t('Rider'));
+  const deliveredTextJs   = JSON.stringify(t('✅ Delivered!'));
 
   return `<!DOCTYPE html>
 <html>
@@ -38,7 +40,7 @@ function buildMapHtml({ riderLat, riderLng, riderName, vehicle, destLat, destLng
 </style>
 </head>
 <body>
-<div id="info">${emoji} ${safeRiderNameHtml} is on the way!</div>
+<div id="info">${emoji} ${safeRiderNameHtml}</div>
 <div id="map"></div>
 <script>
 var map = L.map('map').setView([${centerLat}, ${centerLng}], 14);
@@ -65,7 +67,7 @@ riderMarker = L.marker([${riderLat}, ${riderLng}], {icon: riderIcon})
 
 ${hasDest ? `
 homeMarker = L.marker([${destLat}, ${destLng}], {icon: homeIcon})
-  .addTo(map).bindPopup(${JSON.stringify('🏠 ' + (destAddress || 'Your address'))});
+  .addTo(map).bindPopup(${JSON.stringify('🏠 ' + (destAddress || t('Your address')))});
 ` : ''}
 
 ${hasRider && hasDest ? `
@@ -91,7 +93,7 @@ function handleMsg(e) {
     var d = JSON.parse(e.data);
     if (d.type === 'location_update') moveRider(d.lat, d.lng);
     if (d.type === 'delivered') {
-      document.getElementById('info').textContent = '✅ Delivered!';
+      document.getElementById('info').textContent = ${deliveredTextJs};
       document.getElementById('info').style.color = '#2E7D32';
     }
   } catch(err) {}
@@ -113,6 +115,10 @@ const STATUS_COLOR = {
 export default function DeliveryTrackingScreen({ route }) {
   const { orderId } = route.params;
   const { token }   = useAuthStore();
+  const t = useT();
+  // Latest t for callbacks/effects, so a language change does not reconnect the live tracking
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [trackData, setTrackData]   = useState(null);
   const [loading, setLoading]       = useState(true);
@@ -149,7 +155,7 @@ export default function DeliveryTrackingScreen({ route }) {
         });
       }
     } catch {
-      if (mountedRef.current) setSnack('Could not load tracking info');
+      if (mountedRef.current) setSnack(tRef.current('Could not load tracking info'));
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -185,7 +191,7 @@ export default function DeliveryTrackingScreen({ route }) {
           if (msg.status === 'delivered') {
             setDelivered(true);
             webViewRef.current?.injectJavaScript(
-              `document.getElementById('info').textContent='✅ Delivered!';
+              `document.getElementById('info').textContent=${JSON.stringify(tRef.current('✅ Delivered!'))};
                document.getElementById('info').style.color='#2E7D32'; true;`
             );
           }
@@ -204,7 +210,7 @@ export default function DeliveryTrackingScreen({ route }) {
       } catch { /* ignore parse errors */ }
     };
 
-    ws.onerror = () => { setSnack('Live tracking disconnected — auto-refreshing'); loadTrack(); };
+    ws.onerror = () => { setSnack(tRef.current('Live tracking disconnected — auto-refreshing')); loadTrack(); };
 
     // Fallback poll every 15 s when WS is unavailable
     const poll = setInterval(loadTrack, 15_000);
@@ -226,7 +232,7 @@ export default function DeliveryTrackingScreen({ route }) {
     destLat:     initMapData?.destLat     ?? null,
     destLng:     initMapData?.destLng     ?? null,
     destAddress: initMapData?.destAddress,
-  }), [initMapData]);
+  }, t), [initMapData, t]);
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" /></View>;
@@ -236,7 +242,7 @@ export default function DeliveryTrackingScreen({ route }) {
     return (
       <View style={styles.center}>
         <Text style={{ fontFamily: 'Poppins_400Regular', color: '#757575' }}>
-          No tracking data available
+          {t('No tracking data available')}
         </Text>
       </View>
     );
@@ -256,7 +262,7 @@ export default function DeliveryTrackingScreen({ route }) {
           actions={[]}
           style={{ backgroundColor: '#E8F5E9' }}
         >
-          Your order has been delivered! Enjoy your meal.
+          {t('Your order has been delivered! Enjoy your meal.')}
         </Banner>
       )}
 
@@ -265,20 +271,20 @@ export default function DeliveryTrackingScreen({ route }) {
         <Card.Content>
           <View style={styles.row}>
             <Text variant="titleMedium" style={styles.bold}>
-              Order #{a?.order_number}
+              {t('Order #{number}', { number: a?.order_number })}
             </Text>
             <Chip
               compact
               style={{ backgroundColor: col + '22' }}
               textStyle={{ color: col, fontFamily: 'Poppins_600SemiBold', fontSize: 11 }}
             >
-              {a?.status_display || 'Out for Delivery'}
+              {a?.status_display || t('Out for Delivery')}
             </Chip>
           </View>
 
           {rider && (
             <View style={styles.riderRow}>
-              <Text variant="bodySmall" style={styles.riderLabel}>Rider</Text>
+              <Text variant="bodySmall" style={styles.riderLabel}>{t('Rider')}</Text>
               <Text variant="bodyMedium" style={styles.riderName}>
                 {rider.name}  ·  {rider.vehicle_display}
               </Text>
@@ -289,7 +295,7 @@ export default function DeliveryTrackingScreen({ route }) {
           )}
 
           <Text variant="bodySmall" style={styles.meta}>
-            📍 {a?.delivery_address || 'Your delivery address'}
+            📍 {a?.delivery_address || t('Your delivery address')}
           </Text>
         </Card.Content>
       </Card>
@@ -307,7 +313,7 @@ export default function DeliveryTrackingScreen({ route }) {
       {!delivered && (
         <View style={styles.liveBar}>
           <View style={styles.liveDot} />
-          <Text style={styles.liveText}>LIVE  ·  Map updates in real time</Text>
+          <Text style={styles.liveText}>{t('LIVE')}  ·  {t('Map updates in real time')}</Text>
         </View>
       )}
 

@@ -20,12 +20,14 @@ import BookTableScreen           from '../screens/customer/BookTableScreen';
 import MyReservationsScreen      from '../screens/customer/MyReservationsScreen';
 import MyPointsScreen            from '../screens/customer/MyPointsScreen';
 import CustomerHeader            from '../components/CustomerHeader';
+import { useT } from '../i18n';
 
 const Tab            = createBottomTabNavigator();
 const OrderStack     = createNativeStackNavigator();
 const MyOrdersStack  = createNativeStackNavigator();
 
 function OrderStackNavigator() {
+  const t = useT();
   return (
     <OrderStack.Navigator
       screenOptions={({ navigation }) => ({
@@ -54,7 +56,7 @@ function OrderStackNavigator() {
         options={{ headerShown: false }}
       />
       <OrderStack.Screen name="OrderTracking"     component={OrderTrackingScreen} />
-      <OrderStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: 'Track Delivery' }} />
+      <OrderStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: t('Track Delivery') }} />
       <OrderStack.Screen name="Receipt"          component={ReceiptScreen} />
       <OrderStack.Screen name="BookTable"        component={BookTableScreen} />
       <OrderStack.Screen name="MyReservations"   component={MyReservationsScreen} />
@@ -63,6 +65,7 @@ function OrderStackNavigator() {
 }
 
 function MyOrdersStackNavigator() {
+  const t = useT();
   return (
     <MyOrdersStack.Navigator
       screenOptions={({ navigation }) => ({
@@ -76,7 +79,7 @@ function MyOrdersStackNavigator() {
     >
       <MyOrdersStack.Screen name="MyOrdersList"     component={MyOrdersScreen} />
       <MyOrdersStack.Screen name="OrderTracking"   component={OrderTrackingScreen} />
-      <MyOrdersStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: 'Track Delivery' }} />
+      <MyOrdersStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: t('Track Delivery') }} />
       <MyOrdersStack.Screen name="Receipt"         component={ReceiptScreen} />
       <MyOrdersStack.Screen name="MyReservations"  component={MyReservationsScreen} />
       <MyOrdersStack.Screen name="MyPoints"        component={MyPointsScreen} />
@@ -85,6 +88,7 @@ function MyOrdersStackNavigator() {
 }
 
 export default function CustomerNavigator() {
+  const t = useT();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -112,17 +116,17 @@ export default function CustomerNavigator() {
       <Tab.Screen
         name="Order"
         component={OrderStackNavigator}
-        options={{ title: 'Order', headerShown: false }}
+        options={{ title: t('Order'), headerShown: false }}
       />
       <Tab.Screen
         name="MyOrders"
         component={MyOrdersStackNavigator}
-        options={{ title: 'My Orders', headerShown: false }}
+        options={{ title: t('My Orders'), headerShown: false }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: 'Profile' }}
+        options={{ title: t('Profile') }}
       />
     </Tab.Navigator>
   );

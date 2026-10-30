@@ -15,9 +15,11 @@ import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { checkoutTotals } from '../../utils/checkoutTotals';
+import { useT } from '../../i18n';
 
 export default function CartScreen({ navigation }) {
   const theme = useTheme();
+  const t = useT();
   const { items, tableName, updateQuantity, removeItem, getSubtotal, orderType, existingOrderId } = useCartStore();
   const { user } = useAuthStore();
   const { format } = useCurrency();
@@ -34,10 +36,10 @@ export default function CartScreen({ navigation }) {
     return (
       <View style={styles.emptyContainer}>
         <Text variant="headlineSmall" style={styles.emptyText}>
-          Your cart is empty
+          {t('Your cart is empty')}
         </Text>
         <Button onPress={() => navigation.navigate('Menu')} mode="outlined" style={styles.backBtn}>
-          Back to Menu
+          {t('Back to Menu')}
         </Button>
       </View>
     );
@@ -46,7 +48,7 @@ export default function CartScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Text variant="titleMedium" style={styles.tableLabel}>
-        {tableName || 'No table selected'}
+        {tableName || t('No table selected')}
       </Text>
 
       <FlatList
@@ -111,25 +113,25 @@ export default function CartScreen({ navigation }) {
 
       <Surface style={styles.footer} elevation={4}>
         <View style={styles.totalRow}>
-          <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Subtotal</Text>
+          <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{t('Subtotal')}</Text>
           <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{format(subtotal)}</Text>
         </View>
         {taxRate > 0 && (
           <View style={styles.totalRow}>
-            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Tax ({parseFloat((taxRate * 100).toFixed(2))}%)</Text>
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{t('Tax ({rate}%)', { rate: parseFloat((taxRate * 100).toFixed(2)) })}</Text>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{format(taxAmount)}</Text>
           </View>
         )}
         {isDelivery && (
           <View style={styles.totalRow}>
-            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Delivery fee</Text>
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{t('Delivery fee')}</Text>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular', color: deliveryFee > 0 ? undefined : '#2e7d32' }}>
-              {deliveryFee > 0 ? format(deliveryFee) : 'Free'}
+              {deliveryFee > 0 ? format(deliveryFee) : t('Free')}
             </Text>
           </View>
         )}
         <View style={[styles.totalRow, styles.grandTotalRow]}>
-          <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>Total</Text>
+          <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>{t('Total')}</Text>
           <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold', color: theme.colors.primary }}>
             {format(finalTotal)}
           </Text>
@@ -142,7 +144,7 @@ export default function CartScreen({ navigation }) {
             style={styles.continueBtn}
             icon="arrow-left"
           >
-            Continue
+            {t('Continue')}
           </Button>
           <Button
             mode="contained"
@@ -151,19 +153,19 @@ export default function CartScreen({ navigation }) {
             contentStyle={styles.placeBtnContent}
             icon="check-circle"
           >
-            Place Order
+            {t('Place Order')}
           </Button>
         </View>
       </Surface>
 
       <Portal>
         <Dialog visible={!!removeId} onDismiss={() => setRemoveId(null)}>
-          <Dialog.Title>Remove Item</Dialog.Title>
+          <Dialog.Title>{t('Remove Item')}</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>Remove this item from your cart?</Text>
+            <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>{t('Remove this item from your cart?')}</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setRemoveId(null)}>Cancel</Button>
+            <Button onPress={() => setRemoveId(null)}>{t('Cancel')}</Button>
             <Button
               textColor={theme.colors.error}
               onPress={() => {
@@ -171,14 +173,14 @@ export default function CartScreen({ navigation }) {
                 setRemoveId(null);
               }}
             >
-              Remove
+              {t('Remove')}
             </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
+        {t(snack)}
       </Snackbar>
     </View>
   );

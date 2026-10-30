@@ -22,9 +22,11 @@ import { printOrderTicket } from '../../utils/printer';
 import { saveOfflineOrder, cacheOrders } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { checkoutTotals } from '../../utils/checkoutTotals';
+import { useT } from '../../i18n';
 
 export default function PlaceOrderScreen({ navigation }) {
   const theme = useTheme();
+  const t = useT();
   const { items, tableId, tableName, clearCart, getSubtotal, existingOrderId, orderType, deliveryAddress, deliveryPhone, deliveryLat, deliveryLng } = useCartStore();
   const { user, restaurantId } = useAuthStore();
   const { refreshPendingCount } = useSyncStore();
@@ -127,19 +129,19 @@ export default function PlaceOrderScreen({ navigation }) {
             const { price_changes, unavailable_items } = err.response.data;
             if (unavailable_items?.length) {
               setSnack(
-                `Some items are no longer available: ${unavailable_items.map(i => i.name || i).join(', ')}`
+                t('Some items are no longer available: {items}', { items: unavailable_items.map(i => i.name || i).join(', ') })
               );
             }
             if (price_changes?.length) {
               setConflictDialog(price_changes);
             } else if (!unavailable_items?.length) {
-              setSnack(err.response.data?.detail || 'Order failed. Please try again.');
+              setSnack(err.response.data?.detail || t('Order failed. Please try again.'));
             }
           } else {
             const friendlyMsg = err.response?.data?.detail
               || err.response?.data?.error
               || err.response?.data?.message
-              || (err.response ? 'Please check your order and try again.' : 'No internet connection. Please try again.');
+              || (err.response ? t('Please check your order and try again.') : t('No internet connection. Please try again.'));
             setSnack(friendlyMsg);
           }
         }
@@ -179,10 +181,10 @@ export default function PlaceOrderScreen({ navigation }) {
 
         clearCart();
         if (isAddingToExisting) {
-          setSnack('Items saved – will be added to order when online');
+          setSnack(t('Items saved – will be added to order when online'));
           navTimer.current = setTimeout(() => navigation.goBack(), 1500);
         } else {
-          setSnack('Order saved – will sync when online');
+          setSnack(t('Order saved – will sync when online'));
           navTimer.current = setTimeout(() => {
             const resetTarget = (orderType === 'delivery' || orderType === 'pickup')
               ? 'RestaurantSelector'
@@ -192,7 +194,7 @@ export default function PlaceOrderScreen({ navigation }) {
         }
       }
     } catch (err) {
-      if (mountedRef.current) setSnack(err.message || 'Something went wrong.');
+      if (mountedRef.current) setSnack(err.message || t('Something went wrong.'));
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -207,7 +209,7 @@ export default function PlaceOrderScreen({ navigation }) {
     if (updateItemPrice) {
       changes.forEach(({ product_id, new_price }) => updateItemPrice(product_id, new_price));
     }
-    setSnack('Prices updated – tap Confirm Order again to proceed.');
+    setSnack(t('Prices updated – tap Confirm Order again to proceed.'));
   };
 
   return (
@@ -217,22 +219,22 @@ export default function PlaceOrderScreen({ navigation }) {
         <MaterialCommunityIcons name="information" size={16} color="#2c3e50" style={{ marginRight: 6 }} />
         <Text variant="bodySmall" style={styles.infoBannerText}>
           {isAddingToExisting
-            ? `${tableName || 'Unknown table'} • Adding items to existing order`
+            ? t('{table} • Adding items to existing order', { table: tableName || t('Unknown table') })
             : orderType === 'delivery'
-              ? `Delivery to: ${deliveryAddress || 'your address'}`
+              ? t('Delivery to: {address}', { address: deliveryAddress || t('your address') })
               : orderType === 'pickup'
-                ? 'Pickup order • Please review before confirming'
-                : `${tableName || 'Unknown table'} • Please review your order before confirming`}
+                ? t('Pickup order • Please review before confirming')
+                : t('{table} • Please review your order before confirming', { table: tableName || t('Unknown table') })}
         </Text>
       </Surface>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Special instructions — matches web's textarea */}
         <Text variant="titleSmall" style={styles.sectionTitle}>
-          Special Instructions (optional)
+          {t('Special Instructions (optional)')}
         </Text>
         <TextInput
-          label="e.g. no onions, extra spicy…"
+          label={t('e.g. no onions, extra spicy…')}
           value={notes}
           onChangeText={setNotes}
           mode="outlined"
@@ -243,7 +245,7 @@ export default function PlaceOrderScreen({ navigation }) {
 
         {/* Order summary — read-only, matches web's order summary table */}
         <Text variant="titleSmall" style={styles.sectionTitle}>
-          Order Summary
+          {t('Order Summary')}
         </Text>
         <Surface style={styles.summaryCard} elevation={1}>
           {items.map((item, idx) => (
@@ -266,16 +268,16 @@ export default function PlaceOrderScreen({ navigation }) {
           {isDelivery && (
             <View style={styles.summaryRow}>
               <Text variant="bodyMedium" style={[styles.summaryName, { fontFamily: 'Poppins_400Regular' }]}>
-                Delivery fee
+                {t('Delivery fee')}
               </Text>
               <Text variant="bodyMedium" style={{ color: deliveryFee > 0 ? undefined : '#2e7d32' }}>
-                {deliveryFee > 0 ? format(deliveryFee) : 'Free'}
+                {deliveryFee > 0 ? format(deliveryFee) : t('Free')}
               </Text>
             </View>
           )}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold', flex: 1 }}>
-              Total
+              {t('Total')}
             </Text>
             <Text
               variant="titleMedium"
@@ -297,7 +299,7 @@ export default function PlaceOrderScreen({ navigation }) {
             icon="arrow-left"
             disabled={loading}
           >
-            Back to Cart
+            {t('Back to Cart')}
           </Button>
           <Button
             mode="contained"
@@ -308,7 +310,7 @@ export default function PlaceOrderScreen({ navigation }) {
             contentStyle={styles.confirmBtnContent}
             icon="check-circle"
           >
-            {isAddingToExisting ? 'Add to Order' : 'Confirm Order'}
+            {isAddingToExisting ? t('Add to Order') : t('Confirm Order')}
           </Button>
         </View>
       </Surface>
@@ -316,7 +318,7 @@ export default function PlaceOrderScreen({ navigation }) {
       {/* Price change conflict dialog */}
       <Portal>
         <Dialog visible={!!conflictDialog} onDismiss={() => setConflictDialog(null)}>
-          <Dialog.Title>Prices Have Changed</Dialog.Title>
+          <Dialog.Title>{t('Prices Have Changed')}</Dialog.Title>
           <Dialog.Content>
             {conflictDialog?.map((c) => (
               <Text key={c.product_id} variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular' }}>
@@ -324,12 +326,12 @@ export default function PlaceOrderScreen({ navigation }) {
               </Text>
             ))}
             <Text variant="bodySmall" style={{ marginTop: 8, fontFamily: 'Poppins_400Regular' }}>
-              Accept updated prices to continue.
+              {t('Accept updated prices to continue.')}
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setConflictDialog(null)}>Cancel</Button>
-            <Button onPress={acceptPriceChanges}>Accept</Button>
+            <Button onPress={() => setConflictDialog(null)}>{t('Cancel')}</Button>
+            <Button onPress={acceptPriceChanges}>{t('Accept')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

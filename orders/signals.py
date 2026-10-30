@@ -24,6 +24,9 @@ def _payment_status_changed(sender, instance, created, update_fields=None, **kwa
     if instance.payment_status == 'paid' or old == 'paid':
         from cashier.loyalty import sync_order_points  # never raises
         sync_order_points(instance)
+    if instance.payment_status == 'paid':
+        from .sms import order_paid  # never raises
+        order_paid(instance)
 
 
 @receiver(post_save, sender=Order)
@@ -42,6 +45,8 @@ def _status_changed(sender, instance, created, update_fields=None, **kwargs):
         # Only moves like confirmed→preparing or served→wasted touch stock; normal kitchen
         # steps (preparing→ready→served) cost nothing extra.
         _sync_recipe_stock(instance)
+    from .sms import order_status_changed  # never raises; restaurant chooses which texts
+    order_status_changed(instance)
     if getattr(instance, '_skip_status_push', False):
         return  # e.g. the customer cancelled it themselves
     from .push import notify_customer_status

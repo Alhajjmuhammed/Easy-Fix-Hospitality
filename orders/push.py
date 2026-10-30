@@ -117,6 +117,9 @@ def notify_customer_status(order, new_status):
     title, body = CUSTOMER_STATUS_MESSAGES[new_status]
     if new_status == 'ready':
         body = _READY_BY_TYPE.get(order.order_type, body)
+    from .i18n import language_of, tr
+    lang = language_of(customer)
+    title, body = tr(lang, title), tr(lang, body)
     send_push([customer.expo_push_token], title, body,
               {'kind': 'order_status', 'orderId': order.id, 'status': new_status})
 
@@ -193,8 +196,12 @@ def notify_reservation_status(res):
     if res.status not in RESERVATION_STATUS_MESSAGES:
         return
     title, body = RESERVATION_STATUS_MESSAGES[res.status]
-    send_push([customer.expo_push_token], title,
-              body.format(party=f'{res.party_size} people', when=_reservation_when(res)),
+    from django.utils import timezone as _tz
+    from .i18n import language_of, tr, when_text
+    lang = language_of(customer)
+    send_push([customer.expo_push_token], tr(lang, title),
+              tr(lang, body, party=tr(lang, '{n} people', n=res.party_size),
+                 when=when_text(lang, _tz.localtime(res.start))),
               {'kind': 'reservation', 'reservationId': res.id, 'status': res.status})
 
 
@@ -217,7 +224,8 @@ def notify_rating_reply(rating):
     customer = rating.customer
     if not customer.expo_push_token:
         return
-    send_push([customer.expo_push_token], 'The restaurant replied 💬', rating.reply[:120],
+    from .i18n import language_of, tr
+    send_push([customer.expo_push_token], tr(language_of(customer), 'The restaurant replied 💬'), rating.reply[:120],
               {'kind': 'rating_reply', 'orderId': rating.order_id})
 
 

@@ -3,6 +3,7 @@ import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, Dialog, Portal, Snackbar, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiCancelReservation, apiReservations } from '../../api/reservations';
+import { useT } from '../../i18n';
 
 const STATUS_COLORS = {
   pending: '#F9A825', confirmed: '#2E7D32', seated: '#1565C0', completed: '#757575',
@@ -10,6 +11,7 @@ const STATUS_COLORS = {
 };
 
 export default function MyReservationsScreen({ route }) {
+  const t = useT();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [snack, setSnack] = useState(route?.params?.message || '');
@@ -20,11 +22,11 @@ export default function MyReservationsScreen({ route }) {
       const data = await apiReservations();
       setItems(data.reservations || []);
     } catch {
-      setSnack('Could not load reservations. Pull down to retry.');
+      setSnack(t('Could not load reservations. Pull down to retry.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => { if (route?.params?.message) setSnack(route.params.message); }, [route?.params?.message]);
@@ -34,10 +36,10 @@ export default function MyReservationsScreen({ route }) {
     setConfirmCancel(null);
     try {
       await apiCancelReservation(res.id);
-      setSnack('Reservation cancelled.');
+      setSnack(t('Reservation cancelled.'));
       load();
     } catch (err) {
-      setSnack(err?.response?.data?.error || 'Could not cancel. Please try again.');
+      setSnack(err?.response?.data?.error || t('Could not cancel. Please try again.'));
     }
   };
 
@@ -49,7 +51,7 @@ export default function MyReservationsScreen({ route }) {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { setLoading(true); load(); }} />}
         ListEmptyComponent={!loading && (
-          <Text style={styles.empty}>No reservations yet. Book a table from a restaurant's page.</Text>
+          <Text style={styles.empty}>{t("No reservations yet. Book a table from a restaurant's page.")}</Text>
         )}
         renderItem={({ item }) => (
           <Card style={styles.card}>
@@ -58,17 +60,17 @@ export default function MyReservationsScreen({ route }) {
                 <Text variant="titleMedium" style={styles.name}>{item.restaurant_name}</Text>
                 <Chip compact textStyle={{ color: '#fff', fontSize: 11 }}
                       style={{ backgroundColor: STATUS_COLORS[item.status] || '#757575' }}>
-                  {item.status === 'pending' ? 'Waiting for confirmation' : item.status_display}
+                  {item.status === 'pending' ? t('Waiting for confirmation') : item.status_display}
                 </Chip>
               </View>
               <Text style={styles.meta}>
-                {item.date} at {item.time} · {item.party_size} people
-                {item.table_number ? ` · Table ${item.table_number}` : ''}
+                {t('{date} at {time}', { date: item.date, time: item.time })} · {t('{n} people', { n: item.party_size })}
+                {item.table_number ? ` · ${t('Table {n}', { n: item.table_number })}` : ''}
               </Text>
               {!!item.notes && <Text style={styles.meta}>“{item.notes}”</Text>}
               {item.can_cancel && (
                 <Button mode="text" textColor="#C62828" onPress={() => setConfirmCancel(item)} style={{ alignSelf: 'flex-start' }}>
-                  Cancel booking
+                  {t('Cancel booking')}
                 </Button>
               )}
             </Card.Content>
@@ -77,13 +79,13 @@ export default function MyReservationsScreen({ route }) {
       />
       <Portal>
         <Dialog visible={!!confirmCancel} onDismiss={() => setConfirmCancel(null)}>
-          <Dialog.Title>Cancel reservation?</Dialog.Title>
+          <Dialog.Title>{t('Cancel reservation?')}</Dialog.Title>
           <Dialog.Content>
-            <Text>{confirmCancel ? `${confirmCancel.restaurant_name}, ${confirmCancel.date} at ${confirmCancel.time}` : ''}</Text>
+            <Text>{confirmCancel ? `${confirmCancel.restaurant_name}, ${t('{date} at {time}', { date: confirmCancel.date, time: confirmCancel.time })}` : ''}</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setConfirmCancel(null)}>Keep</Button>
-            <Button textColor="#C62828" onPress={doCancel}>Cancel it</Button>
+            <Button onPress={() => setConfirmCancel(null)}>{t('Keep')}</Button>
+            <Button textColor="#C62828" onPress={doCancel}>{t('Cancel it')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

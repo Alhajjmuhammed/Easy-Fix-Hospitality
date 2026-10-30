@@ -5,8 +5,9 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { useCartStore } from '../../store/useCartStore';
 import { reverseGeocode } from '../../utils/geocoding';
+import { useT } from '../../i18n';
 
-function buildMapHtml(initLat, initLng) {
+function buildMapHtml(initLat, initLng, tipText) {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -30,7 +31,7 @@ function buildMapHtml(initLat, initLng) {
 </head>
 <body>
 <div id="pin">📍</div>
-<div id="tip">Move the map to place the pin on your door</div>
+<div id="tip">${String(tipText).replace(/</g, '&lt;')}</div>
 <div id="map"></div>
 <script>
 var map = L.map('map', { zoomControl: true }).setView([${initLat}, ${initLng}], 17);
@@ -51,6 +52,7 @@ sendCoords();
 }
 
 export default function DeliveryInfoScreen({ route, navigation }) {
+  const t = useT();
   const { restaurant, orderType } = route.params;
   const { setRemoteOrder } = useCartStore();
 
@@ -68,7 +70,7 @@ export default function DeliveryInfoScreen({ route, navigation }) {
   // Must be before any early returns — hooks must run unconditionally
   // Only generates HTML once initPos is set; stable reference thereafter
   const mapSource = useMemo(
-    () => initPos ? { html: buildMapHtml(initPos.lat, initPos.lng) } : null,
+    () => initPos ? { html: buildMapHtml(initPos.lat, initPos.lng, t('Move the map to place the pin on your door')) } : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [initPos?.lat, initPos?.lng],
   );
@@ -116,11 +118,11 @@ export default function DeliveryInfoScreen({ route, navigation }) {
 
   const handleContinue = () => {
     if (!coords) {
-      setSnack('Please move the map to place the pin on your delivery location.');
+      setSnack(t('Please move the map to place the pin on your delivery location.'));
       return;
     }
     if (!phone.trim()) {
-      setSnack('Please enter your phone number so the rider can contact you.');
+      setSnack(t('Please enter your phone number so the rider can contact you.'));
       return;
     }
     setRemoteOrder(
@@ -138,7 +140,7 @@ export default function DeliveryInfoScreen({ route, navigation }) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#E65100" />
-        <Text style={styles.locText}>Getting your location…</Text>
+        <Text style={styles.locText}>{t('Getting your location…')}</Text>
       </View>
     );
   }
@@ -159,23 +161,23 @@ export default function DeliveryInfoScreen({ route, navigation }) {
       {/* Details below the map */}
       <View style={styles.controls}>
         <Text variant="bodySmall" style={styles.hint}>
-          Move the map so the 📍 pin lands on your door, then confirm below
+          {t('Move the map so the 📍 pin lands on your door, then confirm below')}
         </Text>
 
         <TextInput
-          label="Delivery Address"
+          label={t('Delivery Address')}
           value={address}
           onChangeText={setAddress}
           mode="outlined"
           multiline
           numberOfLines={2}
-          placeholder="Auto-filled from pin — tap to edit if needed"
+          placeholder={t('Auto-filled from pin — tap to edit if needed')}
           style={styles.input}
           left={<TextInput.Icon icon="map-marker" />}
         />
 
         <TextInput
-          label="Phone Number *"
+          label={t('Phone Number *')}
           value={phone}
           onChangeText={setPhone}
           mode="outlined"
@@ -193,7 +195,7 @@ export default function DeliveryInfoScreen({ route, navigation }) {
           contentStyle={styles.continueBtnContent}
           labelStyle={{ fontFamily: 'Poppins_700Bold', fontSize: 15 }}
         >
-          Browse Menu
+          {t('Browse Menu')}
         </Button>
 
         <Button
@@ -202,7 +204,7 @@ export default function DeliveryInfoScreen({ route, navigation }) {
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
         >
-          Back
+          {t('Back')}
         </Button>
       </View>
 

@@ -353,3 +353,4 @@ class DeliveryAssignment(models.Model):
 
 
 from .models_feedback import OrderRating  # noqa: E402,F401  (customer ratings)
+from .models_sms import SmsAccount, SmsLog  # noqa: E402,F401  (customer text messages)

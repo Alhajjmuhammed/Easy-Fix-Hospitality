@@ -10,9 +10,11 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { apiRestaurants, apiRestaurantByQR } from '../../api/restaurants';
 import { API_BASE_URL } from '../../config';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useT } from '../../i18n';
 
 export default function RestaurantSelectorScreen({ navigation }) {
   const theme = useTheme();
+  const t = useT();
   const { setRestaurant, restaurantId } = useAuthStore();
 
   const [restaurants, setRestaurants] = useState([]);
@@ -62,7 +64,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        setSnack('Camera permission is required to scan QR codes.');
+        setSnack(t('Camera permission is required to scan QR codes.'));
         return;
       }
     }
@@ -85,7 +87,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
       const menuMatch = code.match(/\/menu-view\/([A-Za-z0-9_-]+)\/?$/);
       if (menuMatch) {
         setScannerOpen(false);
-        setSnack('This is a view-only menu. Please ask a waiter to place your order.');
+        setSnack(t('This is a view-only menu. Please ask a waiter to place your order.'));
         const site = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
         Linking.openURL(`${site}/menu-view/${menuMatch[1]}/`).catch(() => {});
         return;
@@ -100,7 +102,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
       navigation.replace('TableSelection');
     } catch (err) {
       if (!mountedRef.current) return;
-      const msg = err?.response?.data?.error || 'QR code not recognised. Please try again.';
+      const msg = err?.response?.data?.error || t('QR code not recognised. Please try again.');
       setSnack(msg);
       scannedRef.current = false;  // allow retry
     } finally {
@@ -121,7 +123,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2c3e50" />
-        <Text variant="bodyMedium" style={styles.loadingText}>Loading restaurants…</Text>
+        <Text variant="bodyMedium" style={styles.loadingText}>{t('Loading restaurants…')}</Text>
       </View>
     );
   }
@@ -131,8 +133,8 @@ export default function RestaurantSelectorScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <MaterialCommunityIcons name="silverware-fork-knife" size={32} color="#2c3e50" />
-        <Text variant="headlineSmall" style={styles.title}>Order from Anywhere</Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>Browse restaurants that accept delivery &amp; pickup orders</Text>
+        <Text variant="headlineSmall" style={styles.title}>{t('Order from Anywhere')}</Text>
+        <Text variant="bodyMedium" style={styles.subtitle}>{t('Browse restaurants that accept delivery & pickup orders')}</Text>
 
         {/* QR Scan button */}
         <Button
@@ -143,12 +145,12 @@ export default function RestaurantSelectorScreen({ navigation }) {
           contentStyle={styles.qrButtonContent}
           labelStyle={styles.qrButtonLabel}
         >
-          Scan QR Code
+          {t('Scan QR Code')}
         </Button>
       </View>
 
       <Searchbar
-        placeholder="Search restaurants…"
+        placeholder={t('Search restaurants…')}
         value={search}
         onChangeText={setSearch}
         style={styles.searchbar}
@@ -169,7 +171,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
           <View style={styles.center}>
             <MaterialCommunityIcons name="store-off-outline" size={52} color="#ccc" />
             <Text variant="bodyLarge" style={styles.emptyText}>
-              {search ? 'No restaurants match your search' : 'No restaurants accepting remote orders right now'}
+              {search ? t('No restaurants match your search') : t('No restaurants accepting remote orders right now')}
             </Text>
           </View>
         )}
@@ -205,8 +207,8 @@ export default function RestaurantSelectorScreen({ navigation }) {
                   </Text>
                 ) : null}
                 <View style={styles.badgeRow}>
-                  <View style={styles.badge}><Text style={styles.badgeText}>Delivery</Text></View>
-                  <View style={styles.badge}><Text style={styles.badgeText}>Pickup</Text></View>
+                  <View style={styles.badge}><Text style={styles.badgeText}>{t('Delivery')}</Text></View>
+                  <View style={styles.badge}><Text style={styles.badgeText}>{t('Pickup')}</Text></View>
                 </View>
               </View>
 
@@ -217,7 +219,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
       />
 
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={4000}>
-        {snack}
+        {t(snack)}
       </Snackbar>
 
       {/* ── QR Camera Modal ─────────────────────────────────────────── */}
@@ -243,7 +245,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
           {scanLoading && (
             <View style={styles.scanLoadingBox}>
               <ActivityIndicator color="#fff" size="large" />
-              <Text style={styles.scanLoadingText}>Looking up restaurant…</Text>
+              <Text style={styles.scanLoadingText}>{t('Looking up restaurant…')}</Text>
             </View>
           )}
 
@@ -251,7 +253,7 @@ export default function RestaurantSelectorScreen({ navigation }) {
           <View style={styles.scanInstructions}>
             <MaterialCommunityIcons name="qrcode-scan" size={22} color="#fff" />
             <Text style={styles.scanInstructionsText}>
-              Point the camera at the restaurant QR code
+              {t('Point the camera at the restaurant QR code')}
             </Text>
           </View>
 

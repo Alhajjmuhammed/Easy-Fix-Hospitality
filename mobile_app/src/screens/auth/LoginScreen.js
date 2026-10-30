@@ -17,8 +17,11 @@ import {
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useT } from '../../i18n';
+import LanguageSwitch from '../../components/LanguageSwitch';
 
 export default function LoginScreen() {
+  const t = useT();
   const theme = useTheme();
   const navigation = useNavigation();
   const { login, isLoading, error, clearError } = useAuthStore();
@@ -46,11 +49,11 @@ export default function LoginScreen() {
       >
         <Surface style={styles.card} elevation={3}>
           <Text variant="headlineMedium" style={styles.title}>
-            Welcome Back
+            {t('Welcome Back')}
           </Text>
 
           <TextInput
-            label="Username"
+            label={t('Username')}
             value={username}
             onChangeText={handleChange(setUsername)}
             autoCapitalize="none"
@@ -65,7 +68,7 @@ export default function LoginScreen() {
 
           <TextInput
             ref={passwordRef}
-            label="Password"
+            label={t('Password')}
             value={password}
             onChangeText={handleChange(setPassword)}
             secureTextEntry={!passwordVisible}
@@ -85,7 +88,7 @@ export default function LoginScreen() {
 
           {error ? (
             <HelperText type="error" visible>
-              {error}
+              {t(error)}
             </HelperText>
           ) : null}
 
@@ -97,7 +100,7 @@ export default function LoginScreen() {
             style={styles.button}
             contentStyle={styles.buttonContent}
           >
-            Sign In
+            {t('Sign In')}
           </Button>
 
           <TouchableOpacity
@@ -105,9 +108,11 @@ export default function LoginScreen() {
             style={styles.registerLink}
           >
             <Text style={{ color: theme.colors.primary }}>
-              New customer? Create an account
+              {t('New customer? Create an account')}
             </Text>
           </TouchableOpacity>
+
+          <LanguageSwitch style={{ marginTop: 16 }} />
         </Surface>
       </ScrollView>
     </KeyboardAvoidingView>

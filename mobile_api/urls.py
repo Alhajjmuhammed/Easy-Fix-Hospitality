@@ -2,6 +2,7 @@ from django.urls import path
 from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants, delivery, reservations, feedback
 from attendance import views_mobile as attendance
 from cashier import views_loyalty as loyalty
+from cashier import views_mobile_money as mobile_money
 
 app_name = 'mobile_api'
 
@@ -12,6 +13,7 @@ urlpatterns = [
     path('auth/me/',          auth.me,              name='me'),
     path('auth/register/',    auth.register,        name='register'),
     path('auth/push-token/',  auth.save_push_token, name='save_push_token'),
+    path('auth/language/',    auth.save_language,   name='save_language'),
 
     # ── Menu ───────────────────────────────────────────────────────────────
     path('menu/',         menu.menu,          name='menu'),
@@ -79,6 +81,8 @@ urlpatterns = [
     path('orders/<int:order_id>/rating/',       feedback.order_rating,           name='order_rating'),
     path('orders/<int:order_id>/loyalty/',      loyalty.order_loyalty_api,       name='order_loyalty'),
     path('loyalty/me/',                         loyalty.my_points_api,           name='my_loyalty_points'),
+    path('orders/<int:order_id>/mobile-money/', mobile_money.start_api,          name='mobile_money_start'),
+    path('mobile-money/<int:charge_id>/',       mobile_money.charge_status_api,  name='mobile_money_status'),
 
     # ── Attendance ────────────────────────────────────────────────────────
     path('attendance/scan/',    attendance.attendance_scan,    name='attendance_scan'),

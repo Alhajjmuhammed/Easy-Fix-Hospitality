@@ -4,6 +4,7 @@ import { Text, Card, Button, Snackbar, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useT } from '../../i18n';
 
 const ORDER_TYPES = [
   {
@@ -34,6 +35,7 @@ const BOOK_TABLE = {
 };
 
 export default function OrderTypeScreen({ route, navigation }) {
+  const t = useT();
   const { restaurant } = route.params;   // { id, name, address, ... }
   const { setRemoteOrder } = useCartStore();
   const { setRestaurant } = useAuthStore();
@@ -54,7 +56,7 @@ export default function OrderTypeScreen({ route, navigation }) {
     try {
       await setRestaurant(restaurant.id);
     } catch {
-      setSnack('Could not save restaurant. Please try again.');
+      setSnack(t('Could not save restaurant. Please try again.'));
       return;
     }
     if (type === 'delivery') {
@@ -75,7 +77,7 @@ export default function OrderTypeScreen({ route, navigation }) {
         <Text variant="bodyMedium" style={styles.subtitle}>{restaurant.address}</Text>
       </View>
 
-      <Text variant="titleMedium" style={styles.sectionLabel}>What would you like to do?</Text>
+      <Text variant="titleMedium" style={styles.sectionLabel}>{t('What would you like to do?')}</Text>
 
       {options.map((opt) => (
         <Card
@@ -89,9 +91,9 @@ export default function OrderTypeScreen({ route, navigation }) {
             </View>
             <View style={styles.textWrap}>
               <Text variant="titleMedium" style={[styles.optTitle, { color: opt.color }]}>
-                {opt.title}
+                {t(opt.title)}
               </Text>
-              <Text variant="bodySmall" style={styles.optSub}>{opt.subtitle}</Text>
+              <Text variant="bodySmall" style={styles.optSub}>{t(opt.subtitle)}</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={24} color="#ccc" />
           </Card.Content>
@@ -104,7 +106,7 @@ export default function OrderTypeScreen({ route, navigation }) {
         onPress={() => navigation.goBack()}
         style={styles.backBtn}
       >
-        Back
+        {t('Back')}
       </Button>
     </ScrollView>
     <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>

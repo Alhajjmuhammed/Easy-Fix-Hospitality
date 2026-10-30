@@ -1,0 +1,75 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}SMS Messages{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-1"><i class="fas fa-sms me-2"></i>SMS Messages</h1>
+    <p class="text-muted small mb-3">Text customers about their orders and bookings through your own Africa's Talking account (you pay Africa's Talking for the messages). Customers using the app also get free push notifications.</p>
+    {% if not can_edit %}<div class="alert alert-info small">SMS is shared by all branches and set up by the main restaurant owner.</div>{% endif %}
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <form method="post" class="card shadow-sm border-0" autocomplete="off">
+                {% csrf_token %}
+                <fieldset class="card-body" {% if not can_edit %}disabled{% endif %}>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold" for="username">Africa's Talking username</label>
+                        <input class="form-control" id="username" name="username" value="{{ username }}" maxlength="100">
+                        <div class="form-text">Use <code>sandbox</code> with the sandbox API key while testing.</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold" for="api_key">API key</label>
+                        <input class="form-control" type="password" id="api_key" name="api_key" placeholder="{% if key_saved %}Saved — leave empty to keep{% endif %}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold" for="sender_id">Sender name (optional)</label>
+                        <input class="form-control" id="sender_id" name="sender_id" value="{{ account.sender_id }}" maxlength="11">
+                        <div class="form-text">Only if Africa's Talking registered it for you. Leave empty to use their default.</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="environment" id="envS" value="sandbox" {% if account.environment != 'live' %}checked{% endif %}><label class="form-check-label" for="envS">Test (sandbox)</label></div>
+                        <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="environment" id="envL" value="live" {% if account.environment == 'live' %}checked{% endif %}><label class="form-check-label" for="envL">Live</label></div>
+                    </div>
+                    <div class="fw-semibold small mb-1">Send a text when…</div>
+                    {% for key, label, on in events %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="ev_{{ key }}" name="event_{{ key }}" {% if on %}checked{% endif %}>
+                        <label class="form-check-label small" for="ev_{{ key }}">{{ label }}</label>
+                    </div>
+                    {% endfor %}
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" {% if account.enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="enabled">Send SMS</label>
+                    </div>
+                    <div class="d-flex gap-2 mt-3 flex-wrap align-items-center">
+                        <button class="btn btn-primary" name="action" value="save">Save</button>
+                        <input class="form-control" style="max-width:180px" name="test_phone" type="tel" placeholder="Phone for a test" aria-label="Phone number for a test message">
+                        <button class="btn btn-outline-secondary" name="action" value="test">Save &amp; send test</button>
+                    </div>
+                </fieldset>
+            </form>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="px-3 pt-3 fw-semibold small">Recent messages</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm small mb-0">
+                            <thead><tr><th class="ps-3">When</th><th>To</th><th>Message</th><th>Status</th></tr></thead>
+                            <tbody>
+                            {% for log in logs %}
+                            <tr><td class="ps-3 text-nowrap">{{ log.created_at|date:"j M H:i" }}</td><td>{{ log.to }}</td><td>{{ log.message|truncatechars:70 }}</td>
+                                <td>{{ log.get_status_display }}{% if log.cost %} · {{ log.cost }}{% endif %}{% if log.error %}<div class="text-danger">{{ log.error|truncatechars:60 }}</div>{% endif %}</td></tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">No messages yet.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

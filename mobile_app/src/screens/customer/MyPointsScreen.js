@@ -4,8 +4,10 @@ import { Card, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiMyPoints } from '../../api/loyalty';
+import { useT } from '../../i18n';
 
 export default function MyPointsScreen() {
+  const t = useT();
   const [programs, setPrograms] = useState([]);
   const [code, setCode] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,10 +37,10 @@ export default function MyPointsScreen() {
       ListHeaderComponent={code && programs.length > 0 ? (
         <Card style={[styles.card, { backgroundColor: '#FFF0F6' }]}>
           <Card.Content style={{ alignItems: 'center' }}>
-            <Text style={styles.small}>Your code to pay with points</Text>
-            <Text style={styles.code} accessibilityLabel={`Your points code ${code.split('').join(' ')}`}>{code}</Text>
+            <Text style={styles.small}>{t('Your code to pay with points')}</Text>
+            <Text style={styles.code} accessibilityLabel={t('Your points code {code}', { code: code.split('').join(' ') })}>{code}</Text>
             <Text style={[styles.small, { textAlign: 'center' }]}>
-              Tell it to the cashier only when you want to use your points. It changes after each use.
+              {t('Tell it to the cashier only when you want to use your points. It changes after each use.')}
             </Text>
           </Card.Content>
         </Card>
@@ -47,8 +49,8 @@ export default function MyPointsScreen() {
         <View style={styles.empty}>
           <MaterialCommunityIcons name="gift-outline" size={56} color="#B0BEC5" />
           <Text style={styles.emptyText}>
-            {error ? 'Could not load your points. Pull down to retry.'
-              : 'No points yet. Restaurants with a loyalty programme give you points when you pay for an order.'}
+            {error ? t('Could not load your points. Pull down to retry.')
+              : t('No points yet. Restaurants with a loyalty programme give you points when you pay for an order.')}
           </Text>
         </View>
       )}
@@ -58,11 +60,11 @@ export default function MyPointsScreen() {
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.restaurant_name}</Text>
-                <Text style={styles.small}>1 point per {item.spend_per_point} spent · use from {item.min_redeem_points} points</Text>
+                <Text style={styles.small}>{t('1 point per {spend} spent · use from {min} points', { spend: item.spend_per_point, min: item.min_redeem_points })}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.points}>{item.points} pts</Text>
-                <Text style={styles.small}>worth {item.worth}</Text>
+                <Text style={styles.points}>{t('{n} pts', { n: item.points })}</Text>
+                <Text style={styles.small}>{t('worth {amount}', { amount: item.worth })}</Text>
               </View>
             </View>
             {item.history.map((h, i) => (
@@ -71,7 +73,7 @@ export default function MyPointsScreen() {
                 <Text style={[styles.small, { color: h.points < 0 ? '#C62828' : '#2E7D32' }]}>{h.points > 0 ? '+' : ''}{h.points}</Text>
               </View>
             ))}
-            <Text style={[styles.small, { marginTop: 8 }]}>To use your points, ask the cashier to pay with “Loyalty points”.</Text>
+            <Text style={[styles.small, { marginTop: 8 }]}>{t('To use your points, ask the cashier to pay with “Loyalty points”.')}</Text>
           </Card.Content>
         </Card>
       )}

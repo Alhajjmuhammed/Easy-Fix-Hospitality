@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Chip, Text } from 'react-native-paper';
+import { useT } from '../i18n';
 
 const pad = (n) => String(n).padStart(2, '0');
 const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -33,20 +34,21 @@ export function timeSlots(dateValue, minLeadMinutes = 15) {
 
 /** Date chips + time chips. Controlled: date/time strings and setters. */
 export default function DateTimeChips({ date, time, onDate, onTime, minLeadMinutes = 15 }) {
+  const t = useT();
   const dates = useMemo(() => upcomingDates(14), []);
   const slots = useMemo(() => timeSlots(date, minLeadMinutes), [date, minLeadMinutes]);
   return (
     <View>
-      <Text variant="titleSmall" style={styles.label}>Date</Text>
+      <Text variant="titleSmall" style={styles.label}>{t('Date')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {dates.map((d) => (
           <Chip key={d.value} selected={date === d.value} onPress={() => { onDate(d.value); onTime(''); }}
-                style={styles.chip}>{d.label}</Chip>
+                style={styles.chip}>{t(d.label)}</Chip>
         ))}
       </ScrollView>
-      <Text variant="titleSmall" style={styles.label}>Time</Text>
+      <Text variant="titleSmall" style={styles.label}>{t('Time')}</Text>
       {slots.length === 0 ? (
-        <Text style={styles.empty}>No more times today — please choose another day.</Text>
+        <Text style={styles.empty}>{t('No more times today — please choose another day.')}</Text>
       ) : (
         <View style={styles.wrap}>
           {slots.map((s) => (

@@ -17,8 +17,10 @@ import {
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useT } from '../../i18n';
 
 export default function RegisterScreen() {
+  const t = useT();
   const theme = useTheme();
   const navigation = useNavigation();
   const { register, isLoading, error } = useAuthStore();
@@ -54,15 +56,15 @@ export default function RegisterScreen() {
   const handleRegister = () => {
     if (!isValid) return;
     if (!EMAIL_RE.test(form.email.trim())) {
-      setLocalError('Please enter a valid email address.');
+      setLocalError(t('Please enter a valid email address.'));
       return;
     }
     if (form.password.length < 8) {
-      setLocalError('Password must be at least 8 characters.');
+      setLocalError(t('Password must be at least 8 characters.'));
       return;
     }
     if (form.password !== form.confirm_password) {
-      setLocalError('Passwords do not match.');
+      setLocalError(t('Passwords do not match.'));
       return;
     }
     setLocalError('');
@@ -88,19 +90,19 @@ export default function RegisterScreen() {
       >
         <Surface style={styles.card} elevation={3}>
           <Text variant="headlineMedium" style={styles.title}>
-            Create Account
+            {t('Create Account')}
           </Text>
 
           <View style={styles.row}>
             <TextInput
-              label="First Name"
+              label={t('First Name')}
               value={form.first_name}
               onChangeText={set('first_name')}
               style={[styles.input, styles.halfInput]}
               mode="outlined"
             />
             <TextInput
-              label="Last Name"
+              label={t('Last Name')}
               value={form.last_name}
               onChangeText={set('last_name')}
               style={[styles.input, styles.halfInput]}
@@ -109,7 +111,7 @@ export default function RegisterScreen() {
           </View>
 
           <TextInput
-            label="Username"
+            label={t('Username')}
             value={form.username}
             onChangeText={set('username')}
             autoCapitalize="none"
@@ -120,7 +122,7 @@ export default function RegisterScreen() {
           />
 
           <TextInput
-            label="Email"
+            label={t('Email')}
             value={form.email}
             onChangeText={set('email')}
             autoCapitalize="none"
@@ -131,7 +133,7 @@ export default function RegisterScreen() {
           />
 
           <TextInput
-            label="Phone Number (optional)"
+            label={t('Phone Number (optional)')}
             value={form.phone_number}
             onChangeText={set('phone_number')}
             keyboardType="phone-pad"
@@ -141,7 +143,7 @@ export default function RegisterScreen() {
           />
 
           <TextInput
-            label="Password"
+            label={t('Password')}
             value={form.password}
             onChangeText={set('password')}
             secureTextEntry={!passwordVisible}
@@ -157,7 +159,7 @@ export default function RegisterScreen() {
           />
 
           <TextInput
-            label="Confirm Password"
+            label={t('Confirm Password')}
             value={form.confirm_password}
             onChangeText={set('confirm_password')}
             secureTextEntry={!confirmVisible}
@@ -174,7 +176,7 @@ export default function RegisterScreen() {
 
           {(localError || error) ? (
             <HelperText type="error" visible>
-              {localError || error}
+              {localError || t(error)}
             </HelperText>
           ) : null}
 
@@ -186,7 +188,7 @@ export default function RegisterScreen() {
             style={styles.button}
             contentStyle={styles.buttonContent}
           >
-            Register
+            {t('Register')}
           </Button>
 
           <TouchableOpacity
@@ -194,7 +196,7 @@ export default function RegisterScreen() {
             style={styles.loginLink}
           >
             <Text style={{ color: theme.colors.primary }}>
-              Already have an account? Sign In
+              {t('Already have an account? Sign In')}
             </Text>
           </TouchableOpacity>
         </Surface>

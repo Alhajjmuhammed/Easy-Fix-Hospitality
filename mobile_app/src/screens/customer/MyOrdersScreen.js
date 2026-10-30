@@ -21,6 +21,7 @@ import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { STATUS_COLORS } from '../../constants/statusColors';
+import { useT } from '../../i18n';
 
 const PAYMENT_COLORS = {
   unpaid:  { bg: '#FFF3E0', text: '#E65100', label: 'Payment Pending' },
@@ -36,6 +37,7 @@ const FILTER_TABS = [
 ];
 
 export default function MyOrdersScreen() {
+  const t = useT();
   const theme = useTheme();
   const navigation = useNavigation();
   const { format } = useCurrency();
@@ -103,7 +105,7 @@ export default function MyOrdersScreen() {
 
   const handleOrderAgain = useCallback((order) => {
     if (!order.items?.length) {
-      setSnack('No items found in this order');
+      setSnack(t('No items found in this order'));
       return;
     }
     setReorderingId(order.id);
@@ -126,22 +128,22 @@ export default function MyOrdersScreen() {
       navigation.navigate('Order', { screen: 'DeliveryInfo', params: { restaurant: { id: restaurantId }, orderType: 'delivery' } });
     } else if (order.order_type === 'pickup') {
       setRemoteOrder(restaurantId, 'pickup');
-      setSnack('Items added to cart!');
+      setSnack(t('Items added to cart!'));
       setTimeout(() => setReorderingId(null), 400);
       navigation.navigate('Order', { screen: 'Cart' });
     } else {
       if (order.table_info) setTable(order.table_info, `Table ${order.table_number}`, restaurantId);
-      setSnack('Items added to cart!');
+      setSnack(t('Items added to cart!'));
       setTimeout(() => setReorderingId(null), 400);
       navigation.navigate('Order', { screen: 'Cart' });
     }
-  }, [clearCart, setTable, setRemoteOrder, addItem, navigation, restaurantId]);
+  }, [clearCart, setTable, setRemoteOrder, addItem, navigation, restaurantId, t]);
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet – connect to cancel an order'); return; }
+    if (!net.isConnected) { setSnack(t('No internet – connect to cancel an order')); return; }
     setCancelling(true);
     try {
       const reason = cancelReason.trim() || 'Changed mind / No longer needed';
@@ -149,10 +151,10 @@ export default function MyOrdersScreen() {
       if (!mountedRef.current) return;
       setCancelTarget(null);
       setCancelReason('');
-      setSnack('Order cancelled');
+      setSnack(t('Order cancelled'));
       fetchOrders(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.error || 'Could not cancel order');
+      if (mountedRef.current) setSnack(err.response?.data?.error || t('Could not cancel order'));
     } finally {
       if (mountedRef.current) setCancelling(false);
     }
@@ -183,7 +185,7 @@ export default function MyOrdersScreen() {
         actions={[]}
         style={styles.offlineBanner}
       >
-        You are offline – showing your last synced orders.
+        {t('You are offline – showing your last synced orders.')}
       </Banner>
 
       {/* ── Filter tabs ── */}
@@ -203,7 +205,7 @@ export default function MyOrdersScreen() {
               activeFilter === tab.key && styles.filterChipTextActive,
             ]}
           >
-            {tab.label}
+            {t(tab.label)}
           </Chip>
         ))}
         <Chip
@@ -212,7 +214,7 @@ export default function MyOrdersScreen() {
           style={styles.filterChip}
           textStyle={styles.filterChipText}
         >
-          My Reservations
+          {t('My Reservations')}
         </Chip>
         <Chip
           icon="gift-outline"
@@ -220,7 +222,7 @@ export default function MyOrdersScreen() {
           style={styles.filterChip}
           textStyle={styles.filterChipText}
         >
-          My Points
+          {t('My Points')}
         </Chip>
       </ScrollView>
 
@@ -240,7 +242,7 @@ export default function MyOrdersScreen() {
         ListEmptyComponent={() => (
           <View style={styles.center}>
             <Text variant="bodyLarge" style={{ opacity: 0.5, fontFamily: 'Poppins_400Regular' }}>
-              {activeFilter === 'all' ? 'No orders yet' : `No ${activeFilter} orders`}
+              {activeFilter === 'all' ? t('No orders yet') : t('No {filter} orders', { filter: t((FILTER_TABS.find((f) => f.key === activeFilter) || {}).label || activeFilter).toLowerCase() })}
             </Text>
           </View>
         )}
@@ -258,7 +260,7 @@ export default function MyOrdersScreen() {
                 {/* Header row: order# + status */}
                 <View style={styles.row}>
                   <Text variant="titleMedium" style={{ fontFamily: 'Poppins_700Bold' }}>
-                    Order #{order.order_number || order.id}
+                    {t('Order #{number}', { number: order.order_number || order.id })}
                   </Text>
                   <Chip
                     mode="flat"
@@ -272,18 +274,18 @@ export default function MyOrdersScreen() {
                 {/* Payment status badge */}
                 <View style={[styles.payBadge, { backgroundColor: pay.bg }]}>
                   <Text style={{ color: pay.text, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}>
-                    {pay.label}
+                    {t(pay.label)}
                   </Text>
                 </View>
 
                 <Text variant="bodySmall" style={styles.meta}>
                   {order.order_type === 'delivery'
-                    ? `📦 Delivery${order.delivery_address ? ` · ${order.delivery_address}` : ''}`
+                    ? `📦 ${t('Delivery')}${order.delivery_address ? ` · ${order.delivery_address}` : ''}`
                     : order.order_type === 'pickup'
-                      ? '🛍 Pickup'
-                      : `Table ${order.table_number}`
+                      ? `🛍 ${t('Pickup')}`
+                      : t('Table {n}', { n: order.table_number })
                   }
-                  {` · ${order.items_count ?? order.items?.length ?? '?'} item${(order.items_count ?? order.items?.length ?? 0) !== 1 ? 's' : ''} · Total: ${format(order.total)}`}
+                  {` · ${t((order.items_count ?? order.items?.length ?? 0) !== 1 ? '{n} items' : '{n} item', { n: order.items_count ?? order.items?.length ?? '?' })} · ${t('Total')}: ${format(order.total)}`}
                 </Text>
                 {order.created_at ? (
                   <Text variant="bodySmall" style={styles.date}>
@@ -310,7 +312,7 @@ export default function MyOrdersScreen() {
                   onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
                   labelStyle={{ fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}
                 >
-                  Track
+                  {t('Track')}
                 </Button>
 
                 {order.payment_status === 'paid' && (
@@ -323,7 +325,7 @@ export default function MyOrdersScreen() {
                     onPress={() => navigation.navigate('Receipt', { orderId: order.id })}
                     labelStyle={{ fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}
                   >
-                    Receipt
+                    {t('Receipt')}
                   </Button>
                 )}
 
@@ -339,7 +341,7 @@ export default function MyOrdersScreen() {
                     onPress={() => handleOrderAgain(order)}
                     labelStyle={{ fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}
                   >
-                    Order Again
+                    {t('Order Again')}
                   </Button>
                 )}
 
@@ -355,7 +357,7 @@ export default function MyOrdersScreen() {
                     onPress={() => handleCancel(order)}
                     labelStyle={{ fontFamily: 'Poppins_600SemiBold', fontSize: 12 }}
                   >
-                    Cancel
+                    {t('Cancel')}
                   </Button>
                 )}
               </Card.Actions>
@@ -367,17 +369,17 @@ export default function MyOrdersScreen() {
       {/* Cancel Order Dialog */}
       <Portal>
         <Dialog visible={!!cancelTarget} onDismiss={() => setCancelTarget(null)}>
-          <Dialog.Title style={{ fontFamily: 'Poppins_700Bold' }}>Cancel Order</Dialog.Title>
+          <Dialog.Title style={{ fontFamily: 'Poppins_700Bold' }}>{t('Cancel Order')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ fontFamily: 'Poppins_400Regular', marginBottom: 12 }}>
-              Cancel Order #{cancelTarget?.order_number || cancelTarget?.id}?{`\n`}This action cannot be undone.
+              {t('Cancel Order #{number}?', { number: cancelTarget?.order_number || cancelTarget?.id })}{`\n`}{t('This action cannot be undone.')}
             </Text>
             <TextInput
-              label="Reason (optional)"
+              label={t('Reason (optional)')}
               value={cancelReason}
               onChangeText={setCancelReason}
               mode="outlined"
-              placeholder="Changed mind / No longer needed"
+              placeholder={t('Changed mind / No longer needed')}
               style={{ fontFamily: 'Poppins_400Regular' }}
             />
           </Dialog.Content>
@@ -386,7 +388,7 @@ export default function MyOrdersScreen() {
               onPress={() => setCancelTarget(null)}
               labelStyle={{ fontFamily: 'Poppins_600SemiBold' }}
             >
-              Keep Order
+              {t('Keep Order')}
             </Button>
             <Button
               textColor="#B71C1C"
@@ -395,7 +397,7 @@ export default function MyOrdersScreen() {
               onPress={handleCancelConfirm}
               labelStyle={{ fontFamily: 'Poppins_600SemiBold' }}
             >
-              Cancel Order
+              {t('Cancel Order')}
             </Button>
           </Dialog.Actions>
         </Dialog>

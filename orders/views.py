@@ -1147,6 +1147,16 @@ def order_detail(request, order_id):
     from .models_feedback import OrderRating
     context['rating'] = OrderRating.objects.filter(order=order).first()
     context['can_rate'] = context['rating'] is None and can_rate(order, request.user)
+    # Customer's own unpaid order at a restaurant that takes mobile money online
+    context['can_pay_mobile'] = False
+    if request.user.is_customer() and order.payment_status != 'paid' and order.status not in (
+            'cancelled', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted'):
+        from cashier.mobile_money import PROVIDER_CURRENCIES, account_for_owner, restaurant_currency
+        from .push import _restaurant_owner
+        _owner = _restaurant_owner(order)
+        _acc = account_for_owner(_owner) if _owner else None
+        context['can_pay_mobile'] = bool(_acc and _acc.allow_customer_payments and
+                                         restaurant_currency(_acc.owner) in PROVIDER_CURRENCIES[_acc.provider])
 
     return render(request, 'orders/order_detail.html', context)
 

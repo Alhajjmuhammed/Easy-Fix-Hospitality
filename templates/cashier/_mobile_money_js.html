@@ -1,0 +1,115 @@
+<script>
+/* Mobile money box: phone (+ network) → send PIN prompt → follow the status until paid / failed.
+   mountMobileMoney(container, {startUrl, statusUrl: id => url, amount, currencySymbol, onPaid}) */
+function mountMobileMoney(container, opts) {
+    if (!container) return;
+    // A box from an earlier order in the same modal must stop following its request
+    if (container._mmStop) container._mmStop();
+    let stopped = false;
+    container._mmStop = () => { stopped = true; clearTimeout(timer); };
+    let timer = null;
+    const csrf = (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+    fetch(opts.startUrl, { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : null)
+        .then(info => {
+            if (!info || !info.enabled) return;
+            container.innerHTML = '';
+            const box = el('div', 'border rounded p-2 small');
+            const title = el('div', 'fw-semibold mb-1');
+            title.innerHTML = '<i class="fas fa-mobile-alt me-1"></i>';
+            title.appendChild(document.createTextNode('Mobile money (' + info.provider + ')'));
+            box.appendChild(title);
+            const row = el('div', 'd-flex gap-1 flex-wrap align-items-center');
+            const phone = el('input', 'form-control form-control-sm');
+            phone.type = 'tel'; phone.style.maxWidth = '170px'; phone.placeholder = 'Phone number';
+            phone.setAttribute('aria-label', 'Customer mobile money number');
+            phone.value = info.customer_phone || '';
+            row.appendChild(phone);
+            let network = null;
+            if (info.networks && info.networks.length) {
+                network = el('select', 'form-select form-select-sm');
+                network.style.maxWidth = '120px';
+                network.setAttribute('aria-label', 'Mobile network');
+                info.networks.forEach(n => { const o = el('option', '', n); o.value = n; network.appendChild(o); });
+                row.appendChild(network);
+            }
+            const btn = el('button', 'btn btn-sm btn-success', 'Send payment request');
+            btn.type = 'button';
+            row.appendChild(btn);
+            box.appendChild(row);
+            const status = el('div', 'mt-1');
+            box.appendChild(status);
+            if (info.whole_amounts_only) box.appendChild(el('div', 'text-muted', 'M-Pesa takes whole amounts only.'));
+            container.appendChild(box);
+
+            const show = (text, cls) => { status.className = 'mt-1 ' + (cls || ''); status.textContent = text; };
+            const follow = (charge) => {
+                const startedAt = Date.now();
+                if (charge.redirect_url) {
+                    status.innerHTML = '';
+                    status.appendChild(el('div', '', 'The customer must open this link to approve:'));
+                    const a = el('a', '', charge.redirect_url);
+                    a.href = charge.redirect_url; a.target = '_blank'; a.rel = 'noopener';
+                    status.appendChild(a);
+                } else if (charge.warning) {
+                    show(charge.warning, 'text-warning');
+                } else {
+                    show('Request sent to ' + charge.phone + '. Waiting for the customer to enter their PIN…', 'text-primary');
+                }
+                const poll = () => {
+                    if (stopped) return;
+                    if (Date.now() - startedAt > 25 * 60 * 1000) {     // stop following; the server keeps checking
+                        btn.disabled = false;
+                        show('Still not confirmed. It will be recorded automatically if the customer pays.', 'text-warning');
+                        return;
+                    }
+                    fetch(opts.statusUrl(charge.id), { credentials: 'same-origin' })
+                        .then(r => {
+                            if (r.status >= 400 && r.status < 500) { stopped = true; throw new Error('stop'); }
+                            return r.json();
+                        })
+                        .then(c => {
+                            if (stopped) return;
+                            if (c.status === 'pending') { timer = setTimeout(poll, 4000); return; }
+                            btn.disabled = false;
+                            if (c.status === 'successful') {
+                                if (c.needs_refund) {
+                                    show('Paid, but more than was due: ' + c.message, 'text-danger fw-semibold');
+                                    return;                    // let the cashier read it: no automatic reload
+                                }
+                                show('Paid' + (c.receipt ? ' — receipt ' + c.receipt : '') + '.', 'text-success fw-semibold');
+                                if (opts.onPaid) opts.onPaid(c);
+                            } else if (c.status === 'unknown') {
+                                show(c.status_display + '.', 'text-warning');
+                            } else {
+                                show(c.status_display + (c.message ? ': ' + c.message : '') + '. You can try again.', 'text-danger');
+                            }
+                        })
+                        .catch(() => { if (!stopped) timer = setTimeout(poll, 6000); else { btn.disabled = false; } });
+                };
+                timer = setTimeout(poll, 4000);
+            };
+            btn.onclick = () => {
+                const amountEl = opts.amountInput ? document.getElementById(opts.amountInput) : null;
+                const amount = amountEl ? amountEl.value : (opts.amount || info.balance_due);
+                btn.disabled = true;
+                clearTimeout(timer);
+                stopped = false;
+                show('Sending…', 'text-muted');
+                fetch(opts.startUrl, {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                    body: JSON.stringify({ phone: phone.value, amount: amount, network: network ? network.value : '' }),
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) { show(res.error, 'text-danger'); btn.disabled = false; return; }
+                    follow(res);
+                })
+                .catch(() => { show('Connection error. Please try again.', 'text-danger'); btn.disabled = false; });
+            };
+        })
+        .catch(() => { /* mobile money is optional */ });
+}
+</script>

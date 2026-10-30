@@ -5,10 +5,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { apiCreateReservation } from '../../api/reservations';
 import DateTimeChips, { upcomingDates } from '../../components/DateTimeChips';
+import { useT } from '../../i18n';
 
 export default function BookTableScreen({ route, navigation }) {
   const { restaurant } = route.params;   // { id, name, reservations_auto_confirm, ... }
   const user = useAuthStore((s) => s.user);
+  const t = useT();
 
   const [date, setDate] = useState(upcomingDates(1)[0].value);
   const [time, setTime] = useState('');
@@ -20,8 +22,8 @@ export default function BookTableScreen({ route, navigation }) {
   const [snack, setSnack] = useState('');
 
   const submit = async () => {
-    if (!time) { setSnack('Please choose a time.'); return; }
-    if (!name.trim() || !phone.trim()) { setSnack('Please enter your name and phone number.'); return; }
+    if (!time) { setSnack(t('Please choose a time.')); return; }
+    if (!name.trim() || !phone.trim()) { setSnack(t('Please enter your name and phone number.')); return; }
     setSaving(true);
     try {
       const { reservation } = await apiCreateReservation({
@@ -30,11 +32,11 @@ export default function BookTableScreen({ route, navigation }) {
       });
       navigation.replace('MyReservations', {
         message: reservation.status === 'confirmed'
-          ? 'Your table is confirmed.'
-          : 'Booking request sent. You will be notified when the restaurant confirms.',
+          ? t('Your table is confirmed.')
+          : t('Booking request sent. You will be notified when the restaurant confirms.'),
       });
     } catch (err) {
-      setSnack(err?.response?.data?.error || 'Could not book. Please check your connection and try again.');
+      setSnack(err?.response?.data?.error || t('Could not book. Please check your connection and try again.'));
     } finally {
       setSaving(false);
     }
@@ -45,14 +47,14 @@ export default function BookTableScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <MaterialCommunityIcons name="calendar-check" size={40} color="#2e7d32" />
-          <Text variant="headlineSmall" style={styles.title}>Book a Table</Text>
+          <Text variant="headlineSmall" style={styles.title}>{t('Book a Table')}</Text>
           <Text variant="bodyMedium" style={styles.subtitle}>{restaurant.name}</Text>
           {!restaurant.reservations_auto_confirm && (
-            <Text variant="bodySmall" style={styles.subtitle}>The restaurant will confirm your booking.</Text>
+            <Text variant="bodySmall" style={styles.subtitle}>{t('The restaurant will confirm your booking.')}</Text>
           )}
         </View>
 
-        <Text variant="titleSmall" style={styles.label}>Number of people</Text>
+        <Text variant="titleSmall" style={styles.label}>{t('Number of people')}</Text>
         <View style={styles.people}>
           <IconButton icon="minus" mode="outlined" onPress={() => setPeople((p) => Math.max(1, p - 1))} />
           <Text variant="headlineSmall" style={{ fontFamily: 'Poppins_700Bold', minWidth: 40, textAlign: 'center' }}>{people}</Text>
@@ -61,16 +63,16 @@ export default function BookTableScreen({ route, navigation }) {
 
         <DateTimeChips date={date} time={time} onDate={setDate} onTime={setTime} />
 
-        <TextInput label="Name for the booking" value={name} onChangeText={setName} mode="outlined"
+        <TextInput label={t('Name for the booking')} value={name} onChangeText={setName} mode="outlined"
                    style={styles.input} maxLength={120} />
-        <TextInput label="Phone" value={phone} onChangeText={setPhone} mode="outlined" keyboardType="phone-pad"
+        <TextInput label={t('Phone')} value={phone} onChangeText={setPhone} mode="outlined" keyboardType="phone-pad"
                    style={styles.input} maxLength={30} />
-        <TextInput label="Requests (optional)" value={notes} onChangeText={setNotes} mode="outlined" multiline
-                   numberOfLines={2} style={styles.input} maxLength={1000} placeholder="Birthday, high chair…" />
+        <TextInput label={t('Requests (optional)')} value={notes} onChangeText={setNotes} mode="outlined" multiline
+                   numberOfLines={2} style={styles.input} maxLength={1000} placeholder={t('Birthday, high chair…')} />
 
         <Button mode="contained" icon="check-circle" onPress={submit} loading={saving} disabled={saving}
                 style={styles.submit} contentStyle={{ paddingVertical: 6 }}>
-          Request booking
+          {t('Request booking')}
         </Button>
       </ScrollView>
       <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={4000}>{snack}</Snackbar>

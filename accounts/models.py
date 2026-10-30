@@ -156,6 +156,8 @@ class User(AbstractUser):
     is_active_staff = models.BooleanField(default=True)
     # Mobile push notification token (Expo push token for customer notifications)
     expo_push_token = models.CharField(max_length=200, blank=True, null=True)
+    # Language this person chose (web, app, push notifications and SMS): 'en' or 'sw'
+    language = models.CharField(max_length=5, default='en', choices=[('en', 'English'), ('sw', 'Kiswahili')])
     # Custom role assigned to this staff member (overrides built-in role permissions)
     custom_role = models.ForeignKey(
         'CustomRole',

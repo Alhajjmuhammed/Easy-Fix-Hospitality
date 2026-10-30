@@ -633,13 +633,13 @@ export default function CCPaymentsScreen({ navigation }) {
                         textStyle={!t.is_available ? { color: '#FF8F00' } : undefined}
                       >
                         {`Table ${t.table_number ?? t.tbl_no}`}
-                        {!t.is_available ? ' â—' : ''}
+                        {!t.is_available ? ' ●' : ''}
                       </Chip>
                     ))}
                 </View>
                 {selectedTableId && !tables.find((t) => String(t.id) === selectedTableId)?.is_available && (
                   <Text variant="bodySmall" style={{ color: '#FF8F00', marginTop: 8 }}>
-                    âš  This table is occupied. Order will still be transferred.
+                    ⚠ This table is occupied. Order will still be transferred.
                   </Text>
                 )}
               </>

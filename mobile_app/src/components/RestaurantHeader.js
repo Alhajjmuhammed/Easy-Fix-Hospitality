@@ -4,6 +4,7 @@ import { Text, Menu as PaperMenu, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
+import { useT } from '../i18n';
 
 function stringToColor(str = '') {
   const PALETTE = ['#2c3e50', '#AD1457', '#6A1B9A', '#00838F', '#2E7D32', '#E65100', '#4527A0', '#37474F'];
@@ -17,6 +18,7 @@ function initials(name = '') {
 }
 
 export default function RestaurantHeader({ extraMenuItems = [], onBack = null }) {
+  const t = useT();
   const { user, logout } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -33,9 +35,9 @@ export default function RestaurantHeader({ extraMenuItems = [], onBack = null })
 
   const handleLogout = () => {
     setMenuVisible(false);
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
+    Alert.alert(t('Logout'), t('Are you sure you want to logout?'), [
+      { text: t('Cancel'), style: 'cancel' },
+      { text: t('Logout'), style: 'destructive', onPress: logout },
     ]);
   };
 
@@ -66,7 +68,7 @@ export default function RestaurantHeader({ extraMenuItems = [], onBack = null })
           )}
           <View style={styles.nameBlock}>
             <Text style={styles.restaurantName} numberOfLines={1}>{restaurantName}</Text>
-            <Text style={styles.greetingText} numberOfLines={1}>Welcome, {staffName.split(' ')[0]}</Text>
+            <Text style={styles.greetingText} numberOfLines={1}>{t('Welcome, {name}', { name: staffName.split(' ')[0] })}</Text>
           </View>
         </View>
 
@@ -96,13 +98,13 @@ export default function RestaurantHeader({ extraMenuItems = [], onBack = null })
             {extraMenuItems.length > 0 && <Divider />}
             <PaperMenu.Item
               leadingIcon="account-circle-outline"
-              title="Profile"
+              title={t('Profile')}
               onPress={handleProfile}
             />
             <Divider />
             <PaperMenu.Item
               leadingIcon="logout"
-              title="Logout"
+              title={t('Logout')}
               onPress={handleLogout}
               titleStyle={{ color: '#E53935' }}
             />
@@ -150,7 +152,7 @@ export default function RestaurantHeader({ extraMenuItems = [], onBack = null })
               style={[styles.profileCloseBtn, { backgroundColor: restaurantColor }]}
               onPress={() => setProfileVisible(false)}
             >
-              <Text style={styles.profileCloseBtnText}>Close</Text>
+              <Text style={styles.profileCloseBtnText}>{t('Close')}</Text>
             </TouchableOpacity>
           </View>
         </View>

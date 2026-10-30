@@ -119,6 +119,10 @@ def create_reservation(restaurant, *, name, phone, party_size, start, email='', 
     _notify_new(res)
     if status == 'confirmed' and customer is not None and not staff:
         _notify_customer(res)
+    elif status == 'confirmed' and staff:
+        # Booked by phone / at the counter: a confirmation text (when the restaurant switched it on)
+        from orders.sms import reservation_changed  # never raises
+        reservation_changed(res)
     return res, res.warnings()
 
 
@@ -187,3 +191,5 @@ def _notify_customer(res):
     except Exception:
         import logging
         logging.getLogger(__name__).warning('Reservation status push failed for %s', res.pk, exc_info=True)
+    from orders.sms import reservation_changed  # never raises
+    reservation_changed(res)

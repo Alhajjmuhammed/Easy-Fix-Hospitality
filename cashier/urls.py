@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_loyalty
+from . import views, views_loyalty, views_mobile_money
 
 app_name = 'cashier'
 
@@ -18,4 +18,8 @@ urlpatterns = [
     path('reports/', views.cashier_reports, name='cashier_reports'),
     path('order-loyalty/<int:order_id>/', views_loyalty.order_loyalty_web, name='order_loyalty'),
     path('loyalty/', views_loyalty.loyalty_settings, name='loyalty_settings'),
+    path('mobile-money/settings/', views_mobile_money.mobile_money_settings, name='mobile_money_settings'),
+    path('mobile-money/order/<int:order_id>/', views_mobile_money.start_web, name='mobile_money_start'),
+    path('mobile-money/charge/<int:charge_id>/', views_mobile_money.charge_status_web, name='mobile_money_status'),
+    path('mm-callback/<str:provider>/<str:token>/', views_mobile_money.provider_callback, name='mm_callback'),
 ]

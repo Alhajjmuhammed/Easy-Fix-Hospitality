@@ -14,6 +14,8 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuthStore } from '../../store/useAuthStore';
 import { apiMe } from '../../api/auth';
+import { useT } from '../../i18n';
+import LanguageSwitch from '../../components/LanguageSwitch';
 
 const P700 = 'Poppins_700Bold';
 const P600 = 'Poppins_600SemiBold';
@@ -46,6 +48,7 @@ function InfoRow({ label, value }) {
 }
 
 export default function ProfileScreen() {
+  const t = useT();
   const theme = useTheme();
   const { user: cachedUser, logout } = useAuthStore();
   const [user, setUser] = useState(cachedUser);
@@ -86,10 +89,10 @@ export default function ProfileScreen() {
       return (
         <View style={styles.center}>
           <Text style={{ fontFamily: P400, color: '#757575', marginBottom: 16 }}>
-            Could not load profile
+            {t('Could not load profile')}
           </Text>
           <Button mode="outlined" icon="refresh" onPress={refresh}>
-            Retry
+            {t('Retry')}
           </Button>
         </View>
       );
@@ -129,7 +132,7 @@ export default function ProfileScreen() {
         </Text>
         <View style={[styles.roleBadge, { backgroundColor: theme.colors.primaryContainer }]}>
           <Text style={{ fontFamily: P600, fontSize: 12, color: theme.colors.onPrimaryContainer }}>
-            Customer
+            {t('Customer')}
           </Text>
         </View>
         {user.restaurant_name ? (
@@ -139,27 +142,34 @@ export default function ProfileScreen() {
         ) : null}
       </View>
 
+      {/* Language */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <LanguageSwitch />
+        </Card.Content>
+      </Card>
+
       {/* Account info */}
       <Card style={styles.card}>
-        <Card.Title title="Account Details" titleStyle={{ fontFamily: P700 }} />
+        <Card.Title title={t('Account Details')} titleStyle={{ fontFamily: P700 }} />
         <Card.Content>
-          <InfoRow label="Username"    value={user.username} />
+          <InfoRow label={t('Username')}    value={user.username} />
           <Divider style={styles.divider} />
-          <InfoRow label="Email"       value={user.email} />
+          <InfoRow label={t('Email')}       value={user.email} />
           <Divider style={styles.divider} />
-          <InfoRow label="Phone"       value={user.phone_number} />
+          <InfoRow label={t('Phone')}       value={user.phone_number} />
           <Divider style={styles.divider} />
-          <InfoRow label="Address"     value={user.address} />
+          <InfoRow label={t('Address')}     value={user.address} />
         </Card.Content>
       </Card>
 
       {/* Membership info */}
       <Card style={styles.card}>
-        <Card.Title title="Membership" titleStyle={{ fontFamily: P700 }} />
+        <Card.Title title={t('Membership')} titleStyle={{ fontFamily: P700 }} />
         <Card.Content>
-          <InfoRow label="Member Since" value={formatDate(user.date_joined)} />
+          <InfoRow label={t('Member Since')} value={formatDate(user.date_joined)} />
           <Divider style={styles.divider} />
-          <InfoRow label="Last Login"   value={formatDate(user.last_login)} />
+          <InfoRow label={t('Last Login')}   value={formatDate(user.last_login)} />
         </Card.Content>
       </Card>
 
@@ -172,28 +182,28 @@ export default function ProfileScreen() {
         labelStyle={{ fontFamily: P600 }}
         onPress={() => setLogoutVisible(true)}
       >
-        Log Out
+        {t('Log Out')}
       </Button>
 
       {/* Logout confirmation dialog */}
       <Portal>
         <Dialog visible={logoutVisible} onDismiss={() => setLogoutVisible(false)}>
-          <Dialog.Title style={{ fontFamily: P700 }}>Log Out</Dialog.Title>
+          <Dialog.Title style={{ fontFamily: P700 }}>{t('Log Out')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ fontFamily: P400 }}>
-              Are you sure you want to log out?
+              {t('Are you sure you want to log out?')}
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setLogoutVisible(false)} labelStyle={{ fontFamily: P600 }}>
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button
               textColor="#B71C1C"
               onPress={handleLogout}
               labelStyle={{ fontFamily: P600 }}
             >
-              Log Out
+              {t('Log Out')}
             </Button>
           </Dialog.Actions>
         </Dialog>

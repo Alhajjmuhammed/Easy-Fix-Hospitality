@@ -5,9 +5,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useCartStore } from '../../store/useCartStore';
+import { useT } from '../../i18n';
 
 export default function OrderConfirmationScreen({ route, navigation }) {
   const theme = useTheme();
+  const t = useT();
   const { format } = useCurrency();
   const { setRestaurant } = useAuthStore();
   const { clearCart } = useCartStore();
@@ -55,18 +57,18 @@ export default function OrderConfirmationScreen({ route, navigation }) {
       />
 
       <Text variant="headlineMedium" style={styles.heading}>
-        Order Confirmed!
+        {t('Order Confirmed!')}
       </Text>
 
       <Text variant="bodyMedium" style={styles.subtitle}>
-        Your order has been placed successfully
+        {t('Your order has been placed successfully')}
       </Text>
 
       {/* Order details card */}
       <View style={[styles.detailsCard, { backgroundColor: theme.colors.surface }]}>
         {order?.order_number && (
           <View style={styles.detailRow}>
-            <Text variant="bodyMedium" style={styles.label}>Order Number</Text>
+            <Text variant="bodyMedium" style={styles.label}>{t('Order Number')}</Text>
             <Text variant="titleSmall" style={[styles.value, { fontFamily: 'Poppins_600SemiBold' }]}>
               #{order.order_number}
             </Text>
@@ -75,7 +77,7 @@ export default function OrderConfirmationScreen({ route, navigation }) {
 
         {order?.order_type === 'delivery' && order?.delivery_address ? (
           <View style={styles.detailRow}>
-            <Text variant="bodyMedium" style={styles.label}>Delivery to</Text>
+            <Text variant="bodyMedium" style={styles.label}>{t('Delivery to')}</Text>
             <Text
               variant="titleSmall"
               style={[styles.value, { fontFamily: 'Poppins_600SemiBold', flex: 1, textAlign: 'right' }]}
@@ -86,34 +88,34 @@ export default function OrderConfirmationScreen({ route, navigation }) {
           </View>
         ) : order?.order_type === 'pickup' ? (
           <View style={styles.detailRow}>
-            <Text variant="bodyMedium" style={styles.label}>Order Type</Text>
-            <Text variant="titleSmall" style={[styles.value, { fontFamily: 'Poppins_600SemiBold' }]}>Pickup</Text>
+            <Text variant="bodyMedium" style={styles.label}>{t('Order Type')}</Text>
+            <Text variant="titleSmall" style={[styles.value, { fontFamily: 'Poppins_600SemiBold' }]}>{t('Pickup')}</Text>
           </View>
         ) : order?.table_number && order.table_number !== 'N/A' ? (
           <View style={styles.detailRow}>
-            <Text variant="bodyMedium" style={styles.label}>Table</Text>
+            <Text variant="bodyMedium" style={styles.label}>{t('Table')}</Text>
             <Text variant="titleSmall" style={[styles.value, { fontFamily: 'Poppins_600SemiBold' }]}>
-              Table {order.table_number}
+              {t('Table {n}', { n: order.table_number })}
             </Text>
           </View>
         ) : null}
 
         <View style={styles.detailRow}>
-          <Text variant="bodyMedium" style={styles.label}>Total</Text>
+          <Text variant="bodyMedium" style={styles.label}>{t('Total')}</Text>
           <Text variant="titleSmall" style={[styles.value, { color: theme.colors.primary, fontFamily: 'Poppins_700Bold' }]}>
             {total}
           </Text>
         </View>
 
         <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-          <Text variant="bodyMedium" style={styles.label}>Status</Text>
+          <Text variant="bodyMedium" style={styles.label}>{t('Status')}</Text>
           <Chip
             compact
             mode="flat"
             style={{ backgroundColor: '#FFF3CD' }}
             textStyle={{ color: '#856404', fontSize: 12 }}
           >
-            Pending
+            {t('Pending')}
           </Chip>
         </View>
       </View>
@@ -128,7 +130,7 @@ export default function OrderConfirmationScreen({ route, navigation }) {
           icon="map-marker-path"
           buttonColor="#2e7d32"
         >
-          Track Order
+          {t('Track Order')}
         </Button>
       )}
 
@@ -139,7 +141,7 @@ export default function OrderConfirmationScreen({ route, navigation }) {
         contentStyle={styles.btnContent}
         icon="receipt"
       >
-        View My Orders
+        {t('View My Orders')}
       </Button>
 
       <Button
@@ -149,7 +151,7 @@ export default function OrderConfirmationScreen({ route, navigation }) {
         contentStyle={styles.btnContent}
         icon="silverware-fork-knife"
       >
-        {isRemote ? 'Order Again' : 'New Order'}
+        {isRemote ? t('Order Again') : t('New Order')}
       </Button>
     </ScrollView>
   );
