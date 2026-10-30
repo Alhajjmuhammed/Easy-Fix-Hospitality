@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}My Loyalty Points{% endblock %}
+{% block title %}{% translate "My Loyalty Points" %}{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:640px; padding: 2rem 1rem;">
-    <h1 class="h3 fw-bold mb-3"><i class="bi bi-gift me-2" style="color:#d63384"></i>My Loyalty Points</h1>
+    <h1 class="h3 fw-bold mb-3"><i class="bi bi-gift me-2" style="color:#d63384"></i>{% translate "My Loyalty Points" %}</h1>
     {% if code and programs %}
     <div class="card border-0 shadow-sm mb-3 text-center" style="border-radius:16px; background:#fff0f6;">
         <div class="card-body">
-            <div class="small text-muted">Your code to pay with points</div>
+            <div class="small text-muted">{% translate "Your code to pay with points" %}</div>
             <div class="display-6 fw-bold" style="letter-spacing:.3em;">{{ code }}</div>
-            <div class="small text-muted">Tell it to the cashier only when you want to use your points. It changes after each use.</div>
+            <div class="small text-muted">{% translate "Tell it to the cashier only when you want to use your points. It changes after each use." %}</div>
         </div>
     </div>
     {% endif %}
@@ -20,11 +21,11 @@
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <div>
                     <div class="fw-bold">{{ p.restaurant_name }}</div>
-                    <div class="small text-muted">1 point for every {{ p.spend_per_point }} spent · use from {{ p.min_redeem_points }} points</div>
+                    <div class="small text-muted">{% blocktranslate with spend=p.spend_per_point min=p.min_redeem_points %}1 point for every {{ spend }} spent · use from {{ min }} points{% endblocktranslate %}</div>
                 </div>
                 <div class="text-end">
-                    <div class="h4 mb-0 fw-bold">{{ p.points }} pts</div>
-                    <div class="small text-muted">worth {{ p.worth }}</div>
+                    <div class="h4 mb-0 fw-bold">{% blocktranslate with n=p.points %}{{ n }} pts{% endblocktranslate %}</div>
+                    <div class="small text-muted">{% blocktranslate with amount=p.worth %}worth {{ amount }}{% endblocktranslate %}</div>
                 </div>
             </div>
             {% if p.history %}
@@ -36,13 +37,13 @@
                 </tbody>
             </table>
             {% endif %}
-            <p class="small text-muted mt-2 mb-0">To use your points, ask the cashier to pay with “Loyalty points”.</p>
+            <p class="small text-muted mt-2 mb-0">{% translate "To use your points, ask the cashier to pay with “Loyalty points”." %}</p>
         </div>
     </div>
     {% empty %}
     <div class="text-center text-muted py-5">
         <i class="bi bi-gift display-5 d-block mb-2" style="opacity:.3"></i>
-        You have no points yet. Restaurants with a loyalty programme give you points when you pay for an order.
+        {% translate "You have no points yet. Restaurants with a loyalty programme give you points when you pay for an order." %}
     </div>
     {% endfor %}
 </div>

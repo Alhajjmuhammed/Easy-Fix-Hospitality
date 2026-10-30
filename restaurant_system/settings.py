@@ -68,6 +68,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',  # Re-enabled for security
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'restaurant_system.language_middleware.UserLanguageMiddleware',  # English unless the person chose Kiswahili
     'restaurant_system.session_timeout_middleware.SessionTimeoutMiddleware',  # ✅ Auto-logout after 15 min inactivity - RE-ENABLED
     'restaurant_system.subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -128,6 +129,8 @@ TIME_ZONE = 'Africa/Nairobi'  # East Africa Standard Time (UTC+3)
 
 USE_I18N = True
 USE_TZ = True
+LANGUAGES = [('en', 'English'), ('sw', 'Kiswahili')]
+LOCALE_PATHS = [BASE_DIR / 'locale']
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'

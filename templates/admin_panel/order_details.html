@@ -1,49 +1,49 @@
-{% load restaurant_tags %}
+{% load i18n restaurant_tags %}
 <div class="order-details">
     <div class="row">
         <div class="col-md-6">
-            <h6 class="mb-3">Order Information</h6>
+            <h6 class="mb-3">{% translate "Order Information" %}</h6>
             <table class="table table-sm">
                 <tr>
-                    <td><strong>Order Number:</strong></td>
+                    <td><strong>{% translate "Order Number:" %}</strong></td>
                     <td>#{{ order.order_number }}</td>
                 </tr>
                 <tr>
-                    <td><strong>Status:</strong></td>
+                    <td><strong>{% translate "Status:" %}</strong></td>
                     <td>
                         <span class="badge bg-{% if order.status == 'pending' %}warning{% elif order.status == 'confirmed' %}info{% elif order.status == 'preparing' %}primary{% elif order.status == 'ready' %}success{% elif order.status == 'served' %}success{% elif order.status == 'cancelled' %}danger{% else %}secondary{% endif %}">
-                            {{ order.status|title }}
+                            {% translate order.status|title %}
                         </span>
                     </td>
                 </tr>
                 <tr>
-                    <td><strong>Table:</strong></td>
-                    <td>{% if order.table_info %}{{ order.table_info.tbl_no }} (Capacity: {{ order.table_info.capacity }}){% else %}{{ order.get_order_type_display }}{% endif %}</td>
+                    <td><strong>{% translate "Table:" %}</strong></td>
+                    <td>{% if order.table_info %}{{ order.table_info.tbl_no }} {% blocktranslate with n=order.table_info.capacity %}(Capacity: {{ n }}){% endblocktranslate %}{% else %}{% translate order.get_order_type_display %}{% endif %}</td>
                 </tr>
                 <tr>
-                    <td><strong>Customer:</strong></td>
+                    <td><strong>{% translate "Customer:" %}</strong></td>
                     <td>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</td>
                 </tr>
                 {% if order.entered_by %}
                 <tr>
-                    <td><strong>Entered By:</strong></td>
+                    <td><strong>{% translate "Entered By:" %}</strong></td>
                     <td>
                         <span class="badge bg-secondary">
                             <i class="bi bi-person-check me-1"></i>{{ order.entered_by.get_full_name|default:order.entered_by.username }}
                         </span>
-                        <small class="text-muted ms-1">(Cashier)</small>
+                        <small class="text-muted ms-1">{% translate "(Cashier)" %}</small>
                     </td>
                 </tr>
                 {% endif %}
                 <tr>
-                    <td><strong>Total Amount:</strong></td>
+                    <td><strong>{% translate "Total Amount:" %}</strong></td>
                     <td><strong>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong></td>
                 </tr>
                 <tr>
-                    <td><strong>Payment Status:</strong></td>
+                    <td><strong>{% translate "Payment Status:" %}</strong></td>
                     <td>
                         <span class="badge bg-{% if order.payment_status == 'paid' %}success{% elif order.payment_status == 'partial' %}warning{% else %}danger{% endif %}">
-                            {{ order.payment_status|title }}
+                            {% translate order.payment_status|title %}
                         </span>
                     </td>
                 </tr>
@@ -51,33 +51,33 @@
         </div>
         
         <div class="col-md-6">
-            <h6 class="mb-3">Timestamps</h6>
+            <h6 class="mb-3">{% translate "Timestamps" %}</h6>
             <table class="table table-sm">
                 <tr>
-                    <td><strong>Created:</strong></td>
+                    <td><strong>{% translate "Created:" %}</strong></td>
                     <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
                 </tr>
                 <tr>
-                    <td><strong>Updated:</strong></td>
+                    <td><strong>{% translate "Updated:" %}</strong></td>
                     <td>{{ order.updated_at|date:"M d, Y H:i" }}</td>
                 </tr>
                 {% if order.confirmed_by %}
                 <tr>
-                    <td><strong>Confirmed By:</strong></td>
+                    <td><strong>{% translate "Confirmed By:" %}</strong></td>
                     <td>{{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</td>
                 </tr>
                 {% endif %}
             </table>
             
             {% if order.display_instructions %}
-            <h6 class="mb-2 mt-3">Special Instructions</h6>
+            <h6 class="mb-2 mt-3">{% translate "Special Instructions" %}</h6>
             <div class="alert alert-info">
                 {{ order.display_instructions }}
             </div>
             {% endif %}
             
             {% if order.reason_if_cancelled %}
-            <h6 class="mb-2 mt-3">Cancellation Reason</h6>
+            <h6 class="mb-2 mt-3">{% translate "Cancellation Reason" %}</h6>
             <div class="alert alert-warning">
                 {{ order.reason_if_cancelled }}
             </div>
@@ -88,15 +88,15 @@
     {% if order_items %}
     <div class="row mt-4">
         <div class="col-12">
-            <h6 class="mb-3">Order Items</h6>
+            <h6 class="mb-3">{% translate "Order Items" %}</h6>
             <div class="table-responsive">
                 <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th>Product</th>
-                            <th>Quantity</th>
-                            <th>Unit Price</th>
-                            <th>Subtotal</th>
+                            <th>{% translate "Product" %}</th>
+                            <th>{% translate "Quantity" %}</th>
+                            <th>{% translate "Unit Price" %}</th>
+                            <th>{% translate "Subtotal" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -119,7 +119,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="table-light">
-                            <th colspan="3">Total:</th>
+                            <th colspan="3">{% translate "Total:" %}</th>
                             <th>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</th>
                         </tr>
                     </tfoot>

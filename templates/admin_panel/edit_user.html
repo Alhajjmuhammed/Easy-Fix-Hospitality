@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Edit User - Admin Panel{% endblock %}
+{% block title %}{% translate "Edit User" %} - {% translate "Admin Panel" %}{% endblock %}
 
-{% block page_title %}Edit User{% endblock %}
-{% block page_description %}Update user account information{% endblock %}
+{% block page_title %}{% translate "Edit User" %}{% endblock %}
+{% block page_description %}{% translate "Update user account information" %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -12,10 +13,10 @@
             <div class="card-header d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-user-edit me-2"></i>
-                    <h5 class="mb-0">Edit User: {{ edit_user.username }}</h5>
+                    <h5 class="mb-0">{% blocktranslate with username=edit_user.username %}Edit User: {{ username }}{% endblocktranslate %}</h5>
                 </div>
                 <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-sm btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-1"></i> Back to Users
+                    <i class="fas fa-arrow-left me-1"></i> {% translate "Back to Users" %}
                 </a>
             </div>
             <div class="card-body">
@@ -25,12 +26,12 @@
                     {% csrf_token %}
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <label for="first_name" class="form-label">{% translate "First Name" %} <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="first_name" name="first_name"
                                    value="{{ edit_user.first_name }}" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <label for="last_name" class="form-label">{% translate "Last Name" %} <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="last_name" name="last_name"
                                    value="{{ edit_user.last_name }}" required>
                         </div>
@@ -38,12 +39,12 @@
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                            <label for="username" class="form-label">{% translate "Username" %} <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="username" name="username"
                                    value="{{ edit_user.username }}" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                            <label for="email" class="form-label">{% translate "Email" %} <span class="text-danger">*</span></label>
                             <input type="email" class="form-control" id="email" name="email"
                                    value="{{ edit_user.email }}" required>
                         </div>
@@ -51,12 +52,12 @@
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="phone_number" class="form-label">Phone Number</label>
+                            <label for="phone_number" class="form-label">{% translate "Phone Number" %}</label>
                             <input type="tel" class="form-control" id="phone_number" name="phone_number"
                                    value="{{ edit_user.phone_number }}">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
+                            <label for="role" class="form-label">{% translate "Role" %} <span class="text-danger">*</span></label>
                             <select class="form-select" id="role" name="role" required>
                                 {% for r in roles %}
                                 <option value="{{ r.name }}" {% if r == edit_user.role %}selected{% endif %}>
@@ -68,28 +69,28 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="address" class="form-label">Address</label>
+                        <label for="address" class="form-label">{% translate "Address" %}</label>
                         <textarea class="form-control" id="address" name="address" rows="2">{{ edit_user.address }}</textarea>
                     </div>
 
                     <div class="mb-3">
-                        <label for="password" class="form-label">New Password</label>
+                        <label for="password" class="form-label">{% translate "New Password" %}</label>
                         <input type="password" class="form-control" id="password" name="password"
-                               placeholder="Leave blank to keep current password">
-                        <div class="form-text">Only fill this if you want to change the password.</div>
+                               placeholder="{% translate 'Leave blank to keep current password' %}">
+                        <div class="form-text">{% translate "Only fill this if you want to change the password." %}</div>
                     </div>
 
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="is_active" name="is_active"
                                {% if edit_user.is_active %}checked{% endif %}>
-                        <label class="form-check-label" for="is_active">Account Active</label>
+                        <label class="form-check-label" for="is_active">{% translate "Account Active" %}</label>
                     </div>
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i> Save Changes
+                            <i class="fas fa-save me-1"></i> {% translate "Save Changes" %}
                         </button>
-                        <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-secondary">Cancel</a>
+                        <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-secondary">{% translate "Cancel" %}</a>
                     </div>
                 </form>
             </div>
@@ -97,6 +98,7 @@
     </div>
 </div>
 
+{% translate "An unexpected error occurred. Please try again." as t_unexpected %}
 <script>
 document.getElementById('editUserForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -119,7 +121,7 @@ document.getElementById('editUserForm').addEventListener('submit', function(e) {
         }
     })
     .catch(() => {
-        alertBox.innerHTML = '<div class="alert alert-danger">An unexpected error occurred. Please try again.</div>';
+        alertBox.innerHTML = '<div class="alert alert-danger">' + "{{ t_unexpected|escapejs }}" + '</div>';
     });
 });
 </script>

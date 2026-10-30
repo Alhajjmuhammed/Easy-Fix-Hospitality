@@ -1,7 +1,8 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Customer Care Dashboard - Restaurant System{% endblock %}
+{% block title %}{% translate "Customer Care Dashboard" %} - {% translate "Restaurant System" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -25,21 +26,21 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
             <div class="flex-grow-1 min-w-0">
                 <h2 class="mb-0 d-md-block d-none text-nowrap text-truncate">
-                    <i class="bi bi-headset text-primary"></i> Customer Care Dashboard
+                    <i class="bi bi-headset text-primary"></i> {% translate "Customer Care Dashboard" %}
                 </h2>
                 <p class="text-muted mb-0 small">
                     <i class="bi bi-person-circle"></i> <span class="fw-medium">{{ user.get_full_name|default:user.username }}</span>
                     {% if user.owner %}
-                    <br class="d-sm-none"><span class="d-none d-sm-inline"> • </span><i class="bi bi-building"></i> {{ user.owner.restaurant_name|default:"Restaurant" }}
+                    <br class="d-sm-none"><span class="d-none d-sm-inline"> • </span><i class="bi bi-building"></i> {{ user.owner.restaurant_name|default:_("Restaurant") }}
                     {% endif %}
                 </p>
             </div>
             <div class="d-flex flex-column flex-sm-row gap-2 flex-shrink-0 dashboard-buttons">
                 <a href="{% url 'orders:my_orders' %}" class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-list-check"></i> <span class="d-none d-sm-inline">My </span>Orders
+                    <i class="bi bi-list-check"></i> <span class="d-none d-sm-inline">{% translate "My Orders" %}</span><span class="d-sm-none">{% translate "Orders" %}</span>
                 </a>
                 <a href="{% url 'restaurant:menu' %}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-menu-button-wide"></i> Menu
+                    <i class="bi bi-menu-button-wide"></i> {% translate "Menu" %}
                 </a>
             </div>
         </div>
@@ -52,10 +53,10 @@
         <div class="card bg-primary text-white h-100">
             <div class="card-body text-center p-3">
                 <i class="bi bi-receipt display-6 display-md-4 mb-2"></i>
-                <h6 class="card-title mb-1 d-none d-sm-block">My Orders</h6>
-                <h5 class="card-title mb-1 d-sm-none">Orders</h5>
+                <h6 class="card-title mb-1 d-none d-sm-block">{% translate "My Orders" %}</h6>
+                <h5 class="card-title mb-1 d-sm-none">{% translate "Orders" %}</h5>
                 <h3 class="h2 mb-0">{{ stats.total_orders }}</h3>
-                <small class="opacity-75">Today</small>
+                <small class="opacity-75">{% translate "Today" %}</small>
             </div>
         </div>
     </div>
@@ -63,10 +64,10 @@
         <div class="card bg-warning text-white h-100">
             <div class="card-body text-center p-3">
                 <i class="bi bi-clock-history display-6 display-md-4 mb-2"></i>
-                <h6 class="card-title mb-1 d-none d-sm-block">My Pending Orders</h6>
-                <h5 class="card-title mb-1 d-sm-none">Pending</h5>
+                <h6 class="card-title mb-1 d-none d-sm-block">{% translate "My Pending Orders" %}</h6>
+                <h5 class="card-title mb-1 d-sm-none">{% translate "Pending" %}</h5>
                 <h3 class="h2 mb-0">{{ stats.pending_orders }}</h3>
-                <small class="opacity-75">Need Attention</small>
+                <small class="opacity-75">{% translate "Need Attention" %}</small>
             </div>
         </div>
     </div>
@@ -74,10 +75,10 @@
         <div class="card bg-success text-white h-100">
             <div class="card-body text-center p-3">
                 <i class="bi bi-check-circle display-6 display-md-4 mb-2"></i>
-                <h6 class="card-title mb-1 d-none d-sm-block">My Completed Orders</h6>
-                <h5 class="card-title mb-1 d-sm-none">Completed</h5>
+                <h6 class="card-title mb-1 d-none d-sm-block">{% translate "My Completed Orders" %}</h6>
+                <h5 class="card-title mb-1 d-sm-none">{% translate "Completed" %}</h5>
                 <h3 class="h2 mb-0">{{ stats.completed_orders }}</h3>
-                <small class="opacity-75">Today</small>
+                <small class="opacity-75">{% translate "Today" %}</small>
             </div>
         </div>
     </div>
@@ -85,10 +86,10 @@
         <div class="card bg-danger text-white h-100">
             <div class="card-body text-center p-3">
                 <i class="bi bi-x-circle display-6 display-md-4 mb-2"></i>
-                <h6 class="card-title mb-1 d-none d-sm-block">Cancelled Orders</h6>
-                <h5 class="card-title mb-1 d-sm-none">Cancelled</h5>
+                <h6 class="card-title mb-1 d-none d-sm-block">{% translate "Cancelled Orders" %}</h6>
+                <h5 class="card-title mb-1 d-sm-none">{% translate "Cancelled" %}</h5>
                 <h3 class="h2 mb-0">{{ stats.cancelled_orders }}</h3>
-                <small class="opacity-75">Today</small>
+                <small class="opacity-75">{% translate "Today" %}</small>
             </div>
         </div>
     </div>
@@ -100,10 +101,10 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
                 <h5 class="mb-0">
-                    <i class="bi bi-clock"></i> My Recent Orders
+                    <i class="bi bi-clock"></i> {% translate "My Recent Orders" %}
                 </h5>
                 <a href="{% url 'orders:my_orders' %}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-eye"></i> <span class="d-none d-sm-inline">View All</span><span class="d-sm-none">All</span>
+                    <i class="bi bi-eye"></i> <span class="d-none d-sm-inline">{% translate "View All" %}</span><span class="d-sm-none">{% translate "All" %}</span>
                 </a>
             </div>
             <div class="card-body">
@@ -112,14 +113,14 @@
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>SN</th>
-                                    <th>Order #</th>
-                                    <th>Table</th>
-                                    <th>Status</th>
-                                    <th>Items</th>
-                                    <th>Total</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
+                                    <th>{% translate "SN" %}</th>
+                                    <th>{% translate "Order #" %}</th>
+                                    <th>{% translate "Table" %}</th>
+                                    <th>{% translate "Status" %}</th>
+                                    <th>{% translate "Items" %}</th>
+                                    <th>{% translate "Total" %}</th>
+                                    <th>{% translate "Date" %}</th>
+                                    <th>{% translate "Actions" %}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -132,9 +133,9 @@
                                     </td>
                                     <td>
                                         {% if order.table_info %}
-                                        <i class="bi bi-table me-1"></i>Table {{ order.table_info.tbl_no }}
+                                        <i class="bi bi-table me-1"></i>{% blocktranslate with n=order.table_info.tbl_no %}Table {{ n }}{% endblocktranslate %}
                                         {% if order.table_info.capacity %}
-                                        <br><small class="text-muted">{{ order.table_info.capacity }} seats</small>
+                                        <br><small class="text-muted">{% blocktranslate with n=order.table_info.capacity %}{{ n }} seats{% endblocktranslate %}</small>
                                         {% endif %}
                                         {% else %}
                                         <span class="text-muted">{{ order.get_order_type_display }}</span>
@@ -145,11 +146,11 @@
                                             {{ order.get_status_display }}
                                         </span>
                                         {% if order.confirmed_by %}
-                                        <br><small class="text-muted">by {{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</small>
+                                        <br><small class="text-muted">{% blocktranslate with name=order.confirmed_by.get_full_name|default:order.confirmed_by.username %}by {{ name }}{% endblocktranslate %}</small>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <strong>{{ order.get_total_products }}</strong> items
+                                        {% blocktranslate count n=order.get_total_products %}<strong>{{ n }}</strong> item{% plural %}<strong>{{ n }}</strong> items{% endblocktranslate %}
                                         {% if order.order_items.all|length > 0 %}
                                         <br><small class="text-muted">
                                             {% for item in order.order_items.all|slice:":2" %}
@@ -163,33 +164,34 @@
                                         <strong>{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                                         {% if order.payment_status %}
                                         <br><span class="badge badge-sm bg-{% if order.payment_status == 'paid' %}success{% elif order.payment_status == 'partial' %}warning{% else %}secondary{% endif %}">
-                                            {{ order.get_payment_status_display|default:"Unpaid" }}
+                                            {{ order.get_payment_status_display|default:_("Unpaid") }}
                                         </span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <small class="text-muted">{{ order.created_at|timesince }} ago</small>
+                                        <small class="text-muted">{% blocktranslate with t=order.created_at|timesince %}{{ t }} ago{% endblocktranslate %}</small>
                                     </td>
                                     <td>
                                         <div class="btn-group-vertical btn-group-sm">
                                             <a href="{% url 'orders:print_kot' order.id %}" 
                                                target="_blank"
                                                class="btn btn-sm btn-info"
-                                               title="Print Kitchen Order Ticket">
+                                               title="{% translate "Print Kitchen Order Ticket" %}">
                                                 <i class="bi bi-printer"></i> KOT
                                             </a>
                                             <a href="{% url 'orders:order_detail' order.id %}" 
                                                class="btn btn-sm btn-outline-primary"
-                                               title="View Details">
+                                               title="{% translate "View Details" %}">
                                                 <i class="bi bi-eye"></i>
                                             </a>
                                             {% if order.status == 'pending' %}
                                                 {% with feats=request.user.visible_features %}
                                                 {% if 'cancel_orders' in feats %}
+                                                {% blocktranslate with n=order.order_number asvar t_cancel_q %}Are you sure you want to cancel order #{{ n }}?{% endblocktranslate %}
                                                 <a href="{% url 'orders:customer_cancel_order' order.id %}"
                                                    class="btn btn-sm btn-outline-danger"
-                                                   onclick="return confirm('Are you sure you want to cancel order #{{ order.order_number }}?')"
-                                                   title="Cancel Order">
+                                                   onclick="return confirm('{{ t_cancel_q|escapejs }}')"
+                                                   title="{% translate "Cancel Order" %}">
                                                     <i class="bi bi-x-circle"></i>
                                                 </a>
                                                 {% endif %}
@@ -205,10 +207,10 @@
                 {% else %}
                     <div class="text-center py-4">
                         <i class="bi bi-receipt display-4 text-muted mb-3"></i>
-                        <h5>No Orders Yet</h5>
-                        <p class="text-muted">You haven't placed any orders yet. Start by selecting a restaurant and table.</p>
+                        <h5>{% translate "No Orders Yet" %}</h5>
+                        <p class="text-muted">{% translate "You haven't placed any orders yet. Start by selecting a restaurant and table." %}</p>
                         <a href="{% url 'orders:select_table' %}" class="btn btn-primary">
-                            <i class="bi bi-plus-circle"></i> Place New Order
+                            <i class="bi bi-plus-circle"></i> {% translate "Place New Order" %}
                         </a>
                     </div>
                 {% endif %}
@@ -220,25 +222,25 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="bi bi-gear"></i> Quick Actions
+                    <i class="bi bi-gear"></i> {% translate "Quick Actions" %}
                 </h5>
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
                     <a href="{% url 'orders:select_table' %}" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> Place New Order
+                        <i class="bi bi-plus-circle"></i> {% translate "Place New Order" %}
                     </a>
                     <a href="{% url 'orders:customer_care_payments' %}" class="btn btn-success">
-                        <i class="bi bi-cash-coin"></i> Process Payments
+                        <i class="bi bi-cash-coin"></i> {% translate "Process Payments" %}
                     </a>
                     <a href="{% url 'orders:my_orders' %}" class="btn btn-outline-primary">
-                        <i class="bi bi-list-check"></i> View My Orders
+                        <i class="bi bi-list-check"></i> {% translate "View My Orders" %}
                     </a>
                     <a href="{% url 'restaurant:menu' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-menu-button-wide"></i> Browse Menu
+                        <i class="bi bi-menu-button-wide"></i> {% translate "Browse Menu" %}
                     </a>
                     <a href="{% url 'accounts:profile' %}" class="btn btn-outline-info">
-                        <i class="bi bi-person"></i> My Profile
+                        <i class="bi bi-person"></i> {% translate "My Profile" %}
                     </a>
                 </div>
             </div>
@@ -249,18 +251,19 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="bi bi-receipt"></i> Pending Bill Requests
+                    <i class="bi bi-receipt"></i> {% translate "Pending Bill Requests" %}
                     <span class="badge bg-warning ms-2">{{ pending_bill_requests|length }}</span>
                 </h5>
             </div>
             <div class="card-body">
+                {% translate "Mark this bill request as completed?" as t_bill_q %}
                 {% for request in pending_bill_requests %}
                 <div class="d-flex justify-content-between align-items-center mb-3 p-2 border rounded">
                     <div>
-                        <strong><i class="bi bi-table"></i> Table {{ request.table_info.tbl_no }}</strong>
+                        <strong><i class="bi bi-table"></i> {% blocktranslate with n=request.table_info.tbl_no %}Table {{ n }}{% endblocktranslate %}</strong>
                         <br>
                         <small class="text-muted">
-                            <i class="bi bi-person"></i> Requested by: {{ request.requested_by.get_full_name|default:request.requested_by.username }}
+                            <i class="bi bi-person"></i> {% blocktranslate with name=request.requested_by.get_full_name|default:request.requested_by.username %}Requested by: {{ name }}{% endblocktranslate %}
                         </small>
                         <br>
                         <small class="text-muted">
@@ -270,8 +273,8 @@
                     <div>
                         <a href="{% url 'orders:mark_bill_completed' request.id %}" 
                            class="btn btn-success btn-sm"
-                           onclick="return confirm('Mark this bill request as completed?')">
-                            <i class="bi bi-check-circle"></i> Complete
+                           onclick="return confirm('{{ t_bill_q|escapejs }}')">
+                            <i class="bi bi-check-circle"></i> {% translate "Complete" %}
                         </a>
                     </div>
                 </div>
@@ -283,26 +286,26 @@
         <div class="card shadow-sm">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="bi bi-info-circle"></i> Customer Care Tips
+                    <i class="bi bi-info-circle"></i> {% translate "Customer Care Tips" %}
                 </h5>
             </div>
             <div class="card-body">
                 <ul class="list-unstyled mb-0">
                     <li class="mb-2">
                         <i class="bi bi-check-circle text-success me-2"></i>
-                        Monitor order statuses regularly
+                        {% translate "Monitor order statuses regularly" %}
                     </li>
                     <li class="mb-2">
                         <i class="bi bi-check-circle text-success me-2"></i>
-                        Assist customers with order issues
+                        {% translate "Assist customers with order issues" %}
                     </li>
                     <li class="mb-2">
                         <i class="bi bi-check-circle text-success me-2"></i>
-                        Handle special requests promptly
+                        {% translate "Handle special requests promptly" %}
                     </li>
                     <li class="mb-0">
                         <i class="bi bi-check-circle text-success me-2"></i>
-                        Maintain excellent customer service
+                        {% translate "Maintain excellent customer service" %}
                     </li>
                 </ul>
             </div>

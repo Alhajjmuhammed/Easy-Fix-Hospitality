@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Table {{ table.tbl_no }} - Order Options{% endblock %}
+{% block title %}{% blocktranslate with no=table.tbl_no %}Table {{ no }}{% endblocktranslate %} - {% translate "Order Options" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -151,19 +152,18 @@
     <!-- Table Status Card -->
     <div class="table-status-card">
         <div class="table-number">
-            <i class="fas fa-utensils"></i> Table {{ table.tbl_no }}
+            <i class="fas fa-utensils"></i> {% blocktranslate with no=table.tbl_no %}Table {{ no }}{% endblocktranslate %}
         </div>
         <div class="table-info">
-            <i class="fas fa-info-circle"></i> Currently Occupied
+            <i class="fas fa-info-circle"></i> {% translate "Currently Occupied" %}
             <br>
-            <strong>{{ total_orders }}</strong> Active Order{{ total_orders|pluralize }}
+            {% blocktranslate count n=total_orders %}<strong>{{ n }}</strong> Active Order{% plural %}<strong>{{ n }}</strong> Active Orders{% endblocktranslate %}
         </div>
     </div>
 
     {% if other_orders_count > 0 %}
     <div class="alert-info-custom">
-        <i class="fas fa-users"></i> <strong>{{ other_orders_count }}</strong> other customer{{ other_orders_count|pluralize }} 
-        {{ other_orders_count|pluralize:"is,are" }} also dining at this table
+        <i class="fas fa-users"></i> {% blocktranslate count n=other_orders_count %}<strong>{{ n }}</strong> other customer is also dining at this table{% plural %}<strong>{{ n }}</strong> other customers are also dining at this table{% endblocktranslate %}
     </div>
     {% endif %}
 
@@ -180,10 +180,10 @@
                             <i class="fas fa-plus-circle"></i>
                         </div>
                         <div class="action-title">
-                            Add to Existing Order
+                            {% translate "Add to Existing Order" %}
                         </div>
                         <div class="action-description">
-                            Same customer adding more items
+                            {% translate "Same customer adding more items" %}
                         </div>
                     </div>
                 </div>
@@ -198,10 +198,10 @@
                             <i class="fas fa-file-invoice"></i>
                         </div>
                         <div class="action-title">
-                            Create New Order
+                            {% translate "Create New Order" %}
                         </div>
                         <div class="action-description">
-                            Different customer at this table
+                            {% translate "Different customer at this table" %}
                         </div>
                     </div>
                 </div>
@@ -213,7 +213,7 @@
 
     <div class="text-center mt-3">
         <a href="{% url 'orders:select_table' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i> Choose Different Table
+            <i class="fas fa-arrow-left"></i> {% translate "Choose Different Table" %}
         </a>
     </div>
 </div>

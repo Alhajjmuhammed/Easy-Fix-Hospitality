@@ -1,4 +1,4 @@
-{% load restaurant_tags %}
+{% load i18n restaurant_tags %}
 {% if orders %}
 <div class="modern-table">
     <div class="table-responsive">
@@ -6,17 +6,17 @@
             <thead class="table-dark">
                 <tr>
                     <th style="width: 40px;">
-                        <input type="checkbox" class="form-check-input select-all-orders" title="Select All">
+                        <input type="checkbox" class="form-check-input select-all-orders" title="{% translate "Select All" %}">
                     </th>
-                    <th style="width: 50px;">SN</th>
-                    <th>Order</th>
-                    <th>Table</th>
-                    <th>Time</th>
-                    <th>Customer</th>
-                    <th>Type</th>
-                    <th>Total</th>
-                    <th>Notes</th>
-                    <th>Actions</th>
+                    <th style="width: 50px;">{% translate "SN" %}</th>
+                    <th>{% translate "Order" context "noun" %}</th>
+                    <th>{% translate "Table" %}</th>
+                    <th>{% translate "Time" %}</th>
+                    <th>{% translate "Customer" %}</th>
+                    <th>{% translate "Type" %}</th>
+                    <th>{% translate "Total" %}</th>
+                    <th>{% translate "Notes" %}</th>
+                    <th>{% translate "Actions" %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -30,7 +30,7 @@
                         <strong>#{{ order.order_number }}</strong>
                     </td>
                     <td>
-                        <span class="badge bg-secondary" style="font-size: 0.7rem;">{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
+                        <span class="badge bg-secondary" style="font-size: 0.7rem;">{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{% translate order.get_order_type_display %}{% endif %}</span>
                     </td>
                     <td>
                         <small style="font-size: 0.75rem;">{{ order.created_at|date:"M d, H:i" }}</small>
@@ -41,13 +41,13 @@
                     <td>
                         {% regroup order.order_items.all by product.station as station_groups %}
                         {% if station_groups|length > 1 %}
-                            <span class="badge bg-info" style="font-size: 0.7rem;">Mixed</span>
+                            <span class="badge bg-info" style="font-size: 0.7rem;">{% translate "Mixed" %}</span>
                         {% else %}
                             {% for station_group in station_groups %}
                                 {% if station_group.grouper == 'kitchen' %}
-                                    <span class="badge bg-success" style="font-size: 0.7rem;">Kitchen</span>
+                                    <span class="badge bg-success" style="font-size: 0.7rem;">{% translate "Kitchen" %}</span>
                                 {% elif station_group.grouper == 'bar' %}
-                                    <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">Bar</span>
+                                    <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">{% translate "Bar" %}</span>
                                 {% else %}
                                     <span class="badge bg-secondary" style="font-size: 0.7rem;">{{ station_group.grouper|title }}</span>
                                 {% endif %}
@@ -67,38 +67,38 @@
                     <td>
                         <div class="btn-group" role="group">
                             <button type="button" class="btn btn-sm btn-outline-info view-order-btn" 
-                                    data-order-id="{{ order.id }}" title="View Details">
+                                    data-order-id="{{ order.id }}" title="{% translate "View Details" %}">
                                 <i class="fas fa-eye"></i>
                             </button>
                             
                             {% if order.status == 'pending' %}
                             <button type="button" class="btn btn-sm btn-outline-success update-status-btn" 
-                                    data-order-id="{{ order.id }}" data-status="confirmed" title="Confirm Order">
+                                    data-order-id="{{ order.id }}" data-status="confirmed" title="{% translate "Confirm Order" %}">
                                 <i class="fas fa-check"></i>
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-danger update-status-btn" 
-                                    data-order-id="{{ order.id }}" data-status="cancelled" title="Cancel Order">
+                                    data-order-id="{{ order.id }}" data-status="cancelled" title="{% translate "Cancel Order" %}">
                                 <i class="fas fa-times"></i>
                             </button>
                             {% elif order.status == 'confirmed' %}
                             <button type="button" class="btn btn-sm btn-outline-primary update-status-btn" 
-                                    data-order-id="{{ order.id }}" data-status="preparing" title="Start Preparing">
+                                    data-order-id="{{ order.id }}" data-status="preparing" title="{% translate "Start Preparing" %}">
                                 <i class="fas fa-utensils"></i>
                             </button>
                             {% elif order.status == 'preparing' %}
                             <button type="button" class="btn btn-sm btn-outline-success update-status-btn" 
-                                    data-order-id="{{ order.id }}" data-status="ready" title="Mark as Ready">
+                                    data-order-id="{{ order.id }}" data-status="ready" title="{% translate "Mark as Ready" %}">
                                 <i class="fas fa-check-circle"></i>
                             </button>
                             {% elif order.status == 'ready' %}
                             <button type="button" class="btn btn-sm btn-outline-success update-status-btn" 
-                                    data-order-id="{{ order.id }}" data-status="served" title="Mark as Served">
+                                    data-order-id="{{ order.id }}" data-status="served" title="{% translate "Mark as Served" %}">
                                 <i class="fas fa-truck"></i>
                             </button>
                             {% endif %}
 
                             <button type="button" class="btn btn-sm btn-outline-danger delete-order-btn" 
-                                    data-order-id="{{ order.id }}" data-order-number="{{ order.order_number }}" title="Delete Order">
+                                    data-order-id="{{ order.id }}" data-order-number="{{ order.order_number }}" title="{% translate "Delete Order" %}">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -111,11 +111,11 @@
 
     <!-- Pagination -->
     {% if orders.paginator.num_pages > 1 %}
-    <nav aria-label="{{ status_name }} orders pagination" class="mt-3">
+    <nav aria-label="{% blocktranslate with status=status_name %}{{ status }} orders pagination{% endblocktranslate %}" class="mt-3">
         <div class="row align-items-center">
             <div class="col-md-6">
                 <p class="text-muted mb-2" style="font-size:0.85rem;">
-                    Showing {{ orders.start_index }} to {{ orders.end_index }} of {{ orders.paginator.count }} orders
+                    {% blocktranslate with start=orders.start_index end=orders.end_index total=orders.paginator.count %}Showing {{ start }} to {{ end }} of {{ total }} orders{% endblocktranslate %}
                 </p>
             </div>
             <div class="col-md-6">
@@ -163,7 +163,12 @@
     <div class="mb-3">
         <i class="fas fa-inbox fa-3x text-muted"></i>
     </div>
-    <h5 class="text-muted">No {{ status_name|default:"" }} Orders</h5>
-    <p class="text-muted">{{ status_name|default:"Orders" }} will appear here when available.</p>
+    {% if status_name %}
+    <h5 class="text-muted">{% blocktranslate with status=status_name %}No {{ status }} Orders{% endblocktranslate %}</h5>
+    <p class="text-muted">{% blocktranslate with status=status_name %}{{ status }} orders will appear here when available.{% endblocktranslate %}</p>
+    {% else %}
+    <h5 class="text-muted">{% translate "No Orders" %}</h5>
+    <p class="text-muted">{% translate "Orders will appear here when available." %}</p>
+    {% endif %}
 </div>
 {% endif %}

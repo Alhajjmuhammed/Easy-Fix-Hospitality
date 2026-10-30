@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Login - Restaurant System{% endblock %}
+{% block title %}{% translate "Login" %} - {% translate "Restaurant System" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -259,20 +260,23 @@
         <!-- Left branding panel -->
         <div class="login-brand-panel">
             <div class="brand-logo"><i class="bi bi-shop"></i></div>
-            <div class="brand-title">Restaurant System</div>
-            <p class="brand-subtitle">Your complete restaurant<br>management platform</p>
+            <div class="brand-title">{% translate "Restaurant System" %}</div>
+            <p class="brand-subtitle">{% translate "Your complete restaurant<br>management platform" %}</p>
             <ul class="brand-features">
-                <li><i class="bi bi-graph-up-arrow"></i> Real-time Reports</li>
-                <li><i class="bi bi-boxes"></i> Inventory Control</li>
-                <li><i class="bi bi-receipt"></i> Order Management</li>
-                <li><i class="bi bi-cash-coin"></i> Money Flow Tracking</li>
+                <li><i class="bi bi-graph-up-arrow"></i> {% translate "Real-time Reports" %}</li>
+                <li><i class="bi bi-boxes"></i> {% translate "Inventory Control" %}</li>
+                <li><i class="bi bi-receipt"></i> {% translate "Order Management" %}</li>
+                <li><i class="bi bi-cash-coin"></i> {% translate "Money Flow Tracking" %}</li>
             </ul>
         </div>
 
         <!-- Right form panel -->
         <div class="login-form-panel">
-            <h2><i class="bi bi-hand-wave me-1" style="color:#d63384;"></i> Welcome back!</h2>
-            <p class="lead-text">Sign in to continue to your dashboard</p>
+            <div class="d-flex justify-content-end mb-3">
+                {% include '_language_switch.html' with switch_id='Login' %}
+            </div>
+            <h2><i class="bi bi-hand-wave me-1" style="color:#d63384;"></i> {% translate "Welcome back!" %}</h2>
+            <p class="lead-text">{% translate "Sign in to continue to your dashboard" %}</p>
 
             {% if form.non_field_errors %}
                 <div class="alert alert-danger login-alert" role="alert">
@@ -286,14 +290,14 @@
 
                 <!-- Username -->
                 <div class="form-floating-custom">
-                    <label class="form-label-custom" for="{{ form.username.id_for_label }}">Username</label>
+                    <label class="form-label-custom" for="{{ form.username.id_for_label }}">{% translate "Username" %}</label>
                     <div class="input-icon-wrap">
                         <i class="bi bi-person-fill input-icon"></i>
                         <input type="text"
                                id="{{ form.username.id_for_label }}"
                                name="{{ form.username.html_name }}"
                                class="form-control{% if form.username.errors %} is-invalid{% endif %}"
-                               placeholder="Enter your username"
+                               placeholder="{% translate 'Enter your username' %}"
                                value="{{ form.username.value|default:'' }}"
                                autocomplete="username"
                                autofocus>
@@ -307,16 +311,16 @@
 
                 <!-- Password -->
                 <div class="form-floating-custom">
-                    <label class="form-label-custom" for="{{ form.password.id_for_label }}">Password</label>
+                    <label class="form-label-custom" for="{{ form.password.id_for_label }}">{% translate "Password" %}</label>
                     <div class="input-icon-wrap">
                         <i class="bi bi-lock-fill input-icon"></i>
                         <input type="password"
                                id="{{ form.password.id_for_label }}"
                                name="{{ form.password.html_name }}"
                                class="form-control{% if form.password.errors %} is-invalid{% endif %}"
-                               placeholder="Enter your password"
+                               placeholder="{% translate 'Enter your password' %}"
                                autocomplete="current-password">
-                        <button type="button" class="pw-toggle" id="pw-eye" aria-label="Toggle password visibility">
+                        <button type="button" class="pw-toggle" id="pw-eye" aria-label="{% translate 'Toggle password visibility' %}">
                             <i class="bi bi-eye-fill" id="pw-eye-icon"></i>
                         </button>
                     </div>
@@ -330,13 +334,13 @@
                 <!-- Submit -->
                 <div class="d-grid mt-1">
                     <button type="submit" class="btn btn-primary btn-signin">
-                        <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+                        <i class="bi bi-box-arrow-in-right me-1"></i> {% translate "Sign In" %}
                     </button>
                 </div>
             </form>
 
             <p class="divider-text">
-                Don't have an account? <a href="{% url 'accounts:register' %}">Sign up here</a>
+                {% translate "Don't have an account?" %} <a href="{% url 'accounts:register' %}">{% translate "Sign up here" %}</a>
             </p>
         </div>
 

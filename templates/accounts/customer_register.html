@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Register - {{ display_name }}{% endblock %}
+{% block title %}{% translate "Register" %} - {{ display_name }}{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -12,14 +13,14 @@
                     <div class="text-center mb-4">
                         <i class="bi bi-shop display-4 text-primary"></i>
                         <h3 class="card-title mt-2">{{ display_name }}</h3>
-                        <p class="text-muted">Create your customer account to start ordering</p>
+                        <p class="text-muted">{% translate "Create your customer account to start ordering" %}</p>
                     </div>
 
                     <!-- QR Code Alert -->
                     <div class="alert alert-info mb-4">
                         <i class="bi bi-qr-code"></i>
-                        <strong>QR Access Detected!</strong><br>
-                        You've accessed {{ display_name }} via QR code.
+                        <strong>{% translate "QR Access Detected!" %}</strong><br>
+                        {% blocktranslate with name=display_name %}You've accessed {{ name }} via QR code.{% endblocktranslate %}
                     </div>
 
                     <form method="post">
@@ -28,7 +29,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.first_name.id_for_label }}" class="form-label">
-                                    <i class="bi bi-person"></i> First Name
+                                    <i class="bi bi-person"></i> {% translate "First Name" %}
                                 </label>
                                 {{ form.first_name }}
                                 {% if form.first_name.errors %}
@@ -40,7 +41,7 @@
                             
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.last_name.id_for_label }}" class="form-label">
-                                    <i class="bi bi-person"></i> Last Name
+                                    <i class="bi bi-person"></i> {% translate "Last Name" %}
                                 </label>
                                 {{ form.last_name }}
                                 {% if form.last_name.errors %}
@@ -53,7 +54,7 @@
 
                         <div class="mb-3">
                             <label for="{{ form.username.id_for_label }}" class="form-label">
-                                <i class="bi bi-at"></i> Username
+                                <i class="bi bi-at"></i> {% translate "Username" %}
                             </label>
                             {{ form.username }}
                             {% if form.username.errors %}
@@ -65,7 +66,7 @@
 
                         <div class="mb-3">
                             <label for="{{ form.email.id_for_label }}" class="form-label">
-                                <i class="bi bi-envelope"></i> Email Address
+                                <i class="bi bi-envelope"></i> {% translate "Email Address" %}
                             </label>
                             {{ form.email }}
                             {% if form.email.errors %}
@@ -77,7 +78,7 @@
 
                         <div class="mb-3">
                             <label for="{{ form.phone_number.id_for_label }}" class="form-label">
-                                <i class="bi bi-telephone"></i> Phone Number
+                                <i class="bi bi-telephone"></i> {% translate "Phone Number" %}
                             </label>
                             {{ form.phone_number }}
                             {% if form.phone_number.errors %}
@@ -90,7 +91,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.password.id_for_label }}" class="form-label">
-                                    <i class="bi bi-lock"></i> Password
+                                    <i class="bi bi-lock"></i> {% translate "Password" %}
                                 </label>
                                 {{ form.password }}
                                 {% if form.password.errors %}
@@ -102,7 +103,7 @@
                             
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.confirm_password.id_for_label }}" class="form-label">
-                                    <i class="bi bi-lock-fill"></i> Confirm Password
+                                    <i class="bi bi-lock-fill"></i> {% translate "Confirm Password" %}
                                 </label>
                                 {{ form.confirm_password }}
                                 {% if form.confirm_password.errors %}
@@ -122,15 +123,15 @@
 
                         <div class="d-grid gap-2 mb-3">
                             <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-person-plus"></i> Create Account & Start Ordering
+                                <i class="bi bi-person-plus"></i> {% translate "Create Account & Start Ordering" %}
                             </button>
                         </div>
 
                         <div class="text-center">
                             <p class="mb-0">
-                                Already have an account? 
+                                {% translate "Already have an account?" %}
                                 <a href="{% url 'accounts:login' %}?next=/r/{{ qr_code }}/" class="text-decoration-none">
-                                    Sign in here
+                                    {% translate "Sign in here" %}
                                 </a>
                             </p>
                         </div>
@@ -141,7 +142,7 @@
                     <div class="text-center">
                         <small class="text-muted">
                             <i class="bi bi-shield-check"></i>
-                            Creating an account for {{ display_name }}
+                            {% blocktranslate with name=display_name %}Creating an account for {{ name }}{% endblocktranslate %}
                         </small>
                     </div>
                 </div>

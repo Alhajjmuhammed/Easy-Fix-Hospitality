@@ -1,6 +1,7 @@
+{% load i18n %}
 <div class="d-flex flex-wrap gap-2 mb-3">
-    <a href="{% url 'inventory:dashboard' %}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-boxes me-1"></i>Inventory</a>
-    <a href="{% url 'inventory:po_list' %}" class="btn btn-sm {% if request.resolver_match.url_name == 'po_list' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="fas fa-file-invoice me-1"></i>Purchase Orders</a>
-    <a href="{% url 'inventory:recipes' %}" class="btn btn-sm {% if request.resolver_match.url_name == 'recipes' or request.resolver_match.url_name == 'recipe_edit' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="fas fa-utensils me-1"></i>Recipes</a>
-    <a href="{% url 'inventory:suppliers' %}" class="btn btn-sm {% if request.resolver_match.url_name == 'suppliers' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="fas fa-truck me-1"></i>Suppliers</a>
+    <a href="{% url 'inventory:dashboard' %}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-boxes me-1"></i>{% translate "Inventory" %}</a>
+    <a href="{% url 'inventory:po_list' %}" class="btn btn-sm {% if request.resolver_match.url_name == 'po_list' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="fas fa-file-invoice me-1"></i>{% translate "Purchase Orders" %}</a>
+    <a href="{% url 'inventory:recipes' %}" class="btn btn-sm {% if request.resolver_match.url_name == 'recipes' or request.resolver_match.url_name == 'recipe_edit' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="fas fa-utensils me-1"></i>{% translate "Recipes" %}</a>
+    <a href="{% url 'inventory:suppliers' %}" class="btn btn-sm {% if request.resolver_match.url_name == 'suppliers' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="fas fa-truck me-1"></i>{% translate "Suppliers" %}</a>
 </div>

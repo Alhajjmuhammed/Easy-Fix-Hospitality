@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Edit Role - Admin Panel{% endblock %}
+{% block title %}{% translate "Edit Role" %} - {% translate "Admin Panel" %}{% endblock %}
 
-{% block page_title %}Edit Role{% endblock %}
-{% block page_description %}Update role description{% endblock %}
+{% block page_title %}{% translate "Edit Role" %}{% endblock %}
+{% block page_description %}{% translate "Update role description" %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -12,10 +13,10 @@
             <div class="card-header d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-shield-alt me-2"></i>
-                    <h5 class="mb-0">Edit Role: {{ edit_role.get_name_display }}</h5>
+                    <h5 class="mb-0">{% blocktranslate with role=edit_role.get_name_display %}Edit Role: {{ role }}{% endblocktranslate %}</h5>
                 </div>
                 <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-sm btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-1"></i> Back to Users
+                    <i class="fas fa-arrow-left me-1"></i> {% translate "Back to Users" %}
                 </a>
             </div>
             <div class="card-body">
@@ -24,22 +25,22 @@
                 <form id="editRoleForm">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label class="form-label">Role Name</label>
+                        <label class="form-label">{% translate "Role Name" %}</label>
                         <input type="text" class="form-control" value="{{ edit_role.get_name_display }}" readonly>
-                        <div class="form-text">Role names are system-defined and cannot be changed.</div>
+                        <div class="form-text">{% translate "Role names are system-defined and cannot be changed." %}</div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
+                        <label for="description" class="form-label">{% translate "Description" %}</label>
                         <textarea class="form-control" id="description" name="description" rows="3">{{ edit_role.description }}</textarea>
-                        <div class="form-text">Brief description of this role's responsibilities.</div>
+                        <div class="form-text">{% translate "Brief description of this role's responsibilities." %}</div>
                     </div>
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i> Save Changes
+                            <i class="fas fa-save me-1"></i> {% translate "Save Changes" %}
                         </button>
-                        <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-secondary">Cancel</a>
+                        <a href="{% url 'admin_panel:manage_users' %}" class="btn btn-outline-secondary">{% translate "Cancel" %}</a>
                     </div>
                 </form>
             </div>
@@ -47,6 +48,7 @@
     </div>
 </div>
 
+{% translate "An unexpected error occurred. Please try again." as t_unexpected %}
 <script>
 document.getElementById('editRoleForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -69,7 +71,7 @@ document.getElementById('editRoleForm').addEventListener('submit', function(e) {
         }
     })
     .catch(() => {
-        alertBox.innerHTML = '<div class="alert alert-danger">An unexpected error occurred. Please try again.</div>';
+        alertBox.innerHTML = '<div class="alert alert-danger">' + "{{ t_unexpected|escapejs }}" + '</div>';
     });
 });
 </script>

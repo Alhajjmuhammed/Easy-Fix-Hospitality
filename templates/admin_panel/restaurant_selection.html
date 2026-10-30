@@ -1,7 +1,7 @@
 {% extends 'admin_panel/base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Select Restaurant{% endblock %}
+{% block title %}{% translate "Select Restaurant" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -265,30 +265,30 @@
         <div class="header-icon">
             <i class="fas fa-store"></i>
         </div>
-        <h2>Select Restaurant</h2>
-        <p class="text-muted">Choose which restaurant location you want to manage</p>
+        <h2>{% translate "Select Restaurant" %}</h2>
+        <p class="text-muted">{% translate "Choose which restaurant location you want to manage" %}</p>
     </div>
 
     <!-- Current Selection -->
     {% if current_restaurant %}
     <div class="current-selection">
         <h6 class="mb-2">
-            <i class="fas fa-check-circle text-success"></i> Currently Selected
+            <i class="fas fa-check-circle text-success"></i> {% translate "Currently Selected" %}
         </h6>
         <strong>{{ current_restaurant.name }}</strong>
         {% if current_restaurant.is_main_restaurant %}
-            <span class="restaurant-status status-main ml-2">Main Restaurant</span>
+            <span class="restaurant-status status-main ml-2">{% translate "Main Restaurant" %}</span>
         {% else %}
-            <span class="restaurant-status status-branch ml-2">Branch</span>
+            <span class="restaurant-status status-branch ml-2">{% translate "Branch" %}</span>
         {% endif %}
     </div>
     {% elif request.session.view_all_restaurants %}
     <div class="current-selection">
         <h6 class="mb-2">
-            <i class="fas fa-check-circle text-success"></i> Currently Selected
+            <i class="fas fa-check-circle text-success"></i> {% translate "Currently Selected" %}
         </h6>
-        <strong>All Restaurants</strong>
-        <span class="restaurant-status status-all ml-2">Consolidated View</span>
+        <strong>{% translate "All Restaurants" %}</strong>
+        <span class="restaurant-status status-all ml-2">{% translate "Consolidated View" %}</span>
     </div>
     {% endif %}
 
@@ -303,33 +303,32 @@
                         <div class="flex-grow-1">
                             <h5 class="card-title">
                                 <i class="fas fa-globe text-purple me-2"></i>
-                                All Restaurants
+                                {% translate "All Restaurants" %}
                             </h5>
-                            <span class="restaurant-status status-all">Consolidated View</span>
+                            <span class="restaurant-status status-all">{% translate "Consolidated View" %}</span>
                         </div>
                         <i class="fas fa-chart-line fa-lg text-purple opacity-50"></i>
                     </div>
                     
                     <p class="card-text">
-                        View combined data from all your restaurant locations for 
-                        consolidated reporting and analytics.
+                        {% translate "View combined data from all your restaurant locations for consolidated reporting and analytics." %}
                     </p>
                     
                     <div class="restaurant-stats">
                         <div class="row">
                             <div class="col-6 stat-item">
                                 <span class="stat-number">{{ restaurants|length }}</span>
-                                <span class="stat-label">Total Locations</span>
+                                <span class="stat-label">{% translate "Total Locations" %}</span>
                             </div>
                             <div class="col-6 stat-item">
                                 <span class="stat-number">{{ restaurants|length|add:"-1" }}</span>
-                                <span class="stat-label">Branches</span>
+                                <span class="stat-label">{% translate "Branches" %}</span>
                             </div>
                         </div>
                     </div>
                     
                     <button class="btn btn-select">
-                        <i class="fas fa-chart-bar me-1"></i> View All Data
+                        <i class="fas fa-chart-bar me-1"></i> {% translate "View All Data" %}
                     </button>
                 </div>
             </div>
@@ -354,7 +353,7 @@
                                 {{ restaurant.name }}
                             </h5>
                             <span class="restaurant-status {% if restaurant.is_main_restaurant %}status-main{% else %}status-branch{% endif %}">
-                                {% if restaurant.is_main_restaurant %}Main Restaurant{% else %}Branch{% endif %}
+                                {% if restaurant.is_main_restaurant %}{% translate "Main Restaurant" %}{% else %}{% translate "Branch" %}{% endif %}
                             </span>
                         </div>
                         {% if restaurant.is_main_restaurant %}
@@ -377,12 +376,12 @@
                         
                         <div>
                             <i class="fas fa-user me-1"></i> 
-                            <strong>Owner:</strong> {{ restaurant.branch_owner.get_full_name|default:restaurant.branch_owner.username }}
+                            <strong>{% translate "Owner:" %}</strong> {{ restaurant.branch_owner.get_full_name|default:restaurant.branch_owner.username }}
                         </div>
                         
                         <div>
                             <i class="fas fa-percentage me-1"></i> 
-                            <strong>Tax:</strong> {{ restaurant.tax_rate_percentage|floatformat:1 }}%
+                            <strong>{% translate "Tax:" %}</strong> {{ restaurant.tax_rate_percentage|floatformat:1 }}%
                         </div>
                     </div>
                     
@@ -391,21 +390,21 @@
                         <div class="row">
                             <div class="col-4 stat-item">
                                 <span class="stat-number">--</span>
-                                <span class="stat-label">Today's Orders</span>
+                                <span class="stat-label">{% translate "Today's Orders" %}</span>
                             </div>
                             <div class="col-4 stat-item">
                                 <span class="stat-number">--</span>
-                                <span class="stat-label">Tables</span>
+                                <span class="stat-label">{% translate "Tables" %}</span>
                             </div>
                             <div class="col-4 stat-item">
                                 <span class="stat-number">{{ restaurant.get_products_count|default:"--" }}</span>
-                                <span class="stat-label">Products</span>
+                                <span class="stat-label">{% translate "Products" %}</span>
                             </div>
                         </div>
                     </div>
                     
                     <button class="btn btn-select">
-                        <i class="fas fa-arrow-right me-1"></i> Select Location
+                        <i class="fas fa-arrow-right me-1"></i> {% translate "Select Location" %}
                     </button>
                 </div>
             </div>
@@ -416,23 +415,24 @@
     <!-- Action Buttons -->
     <div class="action-buttons">
         <a href="{% url 'admin_panel:admin_dashboard' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+            <i class="fas fa-arrow-left me-1"></i> {% translate "Back to Dashboard" %}
         </a>
         <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-outline-primary">
-            <i class="fas fa-cog me-1"></i> Manage Branches
+            <i class="fas fa-cog me-1"></i> {% translate "Manage Branches" %}
         </a>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Switching..." as t_switching %}{% translate "Error:" as t_error_prefix %}{% translate "Select Location" as t_select_location %}{% translate "An error occurred while switching restaurant." as t_switch_error %}{% translate "View All Data" as t_view_all %}{% translate "An error occurred while switching to all restaurants view." as t_switch_all_error %}
 <script>
 function selectRestaurant(restaurantId, restaurantName) {
     // Create a safe selector by using attribute selectors instead of onclick text matching
     var buttonSelector = `[onclick*="selectRestaurant(${restaurantId},"] .btn-select`;
     
     // Show loading state
-    $(buttonSelector).html('<i class="fas fa-spinner fa-spin"></i> Switching...');
+    $(buttonSelector).html('<i class="fas fa-spinner fa-spin"></i> ' + "{{ t_switching|escapejs }}");
     
     $.ajax({
         url: '{% url "admin_panel:switch_restaurant" %}',
@@ -461,22 +461,22 @@ function selectRestaurant(restaurantId, restaurantName) {
                     window.location.href = redirectUrl;
                 }, 1000);
             } else {
-                showErrorMessage('Error: ' + data.error);
+                showErrorMessage("{{ t_error_prefix|escapejs }} " + data.error);
                 // Reset button using the same safe selector
-                $(buttonSelector).html('<i class="fas fa-arrow-right"></i> Select Location');
+                $(buttonSelector).html('<i class="fas fa-arrow-right"></i> ' + "{{ t_select_location|escapejs }}");
             }
         },
         error: function(xhr, status, error) {
-            showErrorMessage('An error occurred while switching restaurant.');
+            showErrorMessage("{{ t_switch_error|escapejs }}");
             // Reset button using the same safe selector
-            $(buttonSelector).html('<i class="fas fa-arrow-right"></i> Select Location');
+            $(buttonSelector).html('<i class="fas fa-arrow-right"></i> ' + "{{ t_select_location|escapejs }}");
         }
     });
 }
 
 function selectAllRestaurants() {
     // Show loading state
-    $('.all-restaurants .btn-select').html('<i class="fas fa-spinner fa-spin"></i> Switching...');
+    $('.all-restaurants .btn-select').html('<i class="fas fa-spinner fa-spin"></i> ' + "{{ t_switching|escapejs }}");
     
     $.ajax({
         url: '{% url "admin_panel:set_view_all_restaurants" %}',
@@ -494,15 +494,15 @@ function selectAllRestaurants() {
                     window.location.href = '{% url "admin_panel:main_owner_dashboard" %}';
                 }, 1000);
             } else {
-                showErrorMessage('Error: ' + data.error);
+                showErrorMessage("{{ t_error_prefix|escapejs }} " + data.error);
                 // Reset button
-                $('.all-restaurants .btn-select').html('<i class="fas fa-chart-bar"></i> View All Data');
+                $('.all-restaurants .btn-select').html('<i class="fas fa-chart-bar"></i> ' + "{{ t_view_all|escapejs }}");
             }
         },
         error: function() {
-            showErrorMessage('An error occurred while switching to all restaurants view.');
+            showErrorMessage("{{ t_switch_all_error|escapejs }}");
             // Reset button
-            $('.all-restaurants .btn-select').html('<i class="fas fa-chart-bar"></i> View All Data');
+            $('.all-restaurants .btn-select').html('<i class="fas fa-chart-bar"></i> ' + "{{ t_view_all|escapejs }}");
         }
     });
 }

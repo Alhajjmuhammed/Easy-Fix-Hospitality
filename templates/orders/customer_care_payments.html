@@ -1,9 +1,10 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
 {% block title %}
-    {% if user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %}Payment Management - Management{% else %}Payment Processing - Customer Care{% endif %}
+    {% if user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %}{% translate "Payment Management" %} - {% translate "Management" %}{% else %}{% translate "Payment Processing" %} - {% translate "Customer Care" %}{% endif %}
 {% endblock %}
 
 {% block extra_css %}
@@ -57,25 +58,25 @@
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
                 <div>
                     <h2 class="mb-1">
-                        <i class="bi bi-cash-coin text-success"></i> Payment Processing
+                        <i class="bi bi-cash-coin text-success"></i> {% translate "Payment Processing" %}
                     </h2>
                     <p class="text-muted mb-0">
                         <i class="bi bi-person-badge"></i> {{ user.get_full_name|default:user.username }}
-                        {% if user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %} - Management{% else %} - Customer Care{% endif %}
+                        {% if user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %} - {% translate "Management" %}{% else %} - {% translate "Customer Care" %}{% endif %}
                     </p>
                 </div>
                 <div class="d-flex gap-2">
                     {% if user.is_customer_care %}
                     <a href="{% url 'orders:customer_care_dashboard' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        <i class="bi bi-arrow-left"></i> {% translate "Back to Dashboard" %}
                     </a>
                     {% elif user.is_owner or user.is_manager %}
                     <a href="{% url 'admin_panel:admin_dashboard' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        <i class="bi bi-arrow-left"></i> {% translate "Back to Dashboard" %}
                     </a>
                     {% endif %}
                     <button class="btn btn-outline-primary" onclick="window.location.reload()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                        <i class="bi bi-arrow-clockwise"></i> {% translate "Refresh" %}
                     </button>
                 </div>
             </div>
@@ -86,44 +87,44 @@
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="mb-0">
-                <i class="bi bi-funnel"></i> Filter Orders
+                <i class="bi bi-funnel"></i> {% translate "Filter Orders" %}
             </h5>
         </div>
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-6 col-md-3">
-                    <label for="period" class="form-label">Period</label>
+                    <label for="period" class="form-label">{% translate "Period" %}</label>
                     <select name="period" id="period" class="form-select">
-                        <option value="today" {% if period_filter == 'today' %}selected{% endif %}>Today</option>
-                        <option value="weekly" {% if period_filter == 'weekly' %}selected{% endif %}>This Week</option>
+                        <option value="today" {% if period_filter == 'today' %}selected{% endif %}>{% translate "Today" %}</option>
+                        <option value="weekly" {% if period_filter == 'weekly' %}selected{% endif %}>{% translate "This Week" %}</option>
                     </select>
                 </div>
                 <div class="col-6 col-md-3">
-                    <label for="table" class="form-label">Table Number</label>
+                    <label for="table" class="form-label">{% translate "Table Number" %}</label>
                     <select name="table" id="table" class="form-select">
-                        <option value="">All Tables</option>
+                        <option value="">{% translate "All Tables" %}</option>
                         {% for table in tables %}
                             <option value="{{ table.tbl_no }}" {% if table_filter == table.tbl_no %}selected{% endif %}>
-                                Table {{ table.tbl_no }}
+                                {% blocktranslate with n=table.tbl_no %}Table {{ n }}{% endblocktranslate %}
                             </option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-6 col-md-3">
-                    <label for="status" class="form-label">Payment Status</label>
+                    <label for="status" class="form-label">{% translate "Payment Status" %}</label>
                     <select name="status" id="status" class="form-select">
-                        <option value="">All Status</option>
-                        <option value="unpaid" {% if status_filter == 'unpaid' %}selected{% endif %}>Unpaid</option>
-                        <option value="partial" {% if status_filter == 'partial' %}selected{% endif %}>Partial</option>
-                        <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="">{% translate "All Status" %}</option>
+                        <option value="unpaid" {% if status_filter == 'unpaid' %}selected{% endif %}>{% translate "Unpaid" %}</option>
+                        <option value="partial" {% if status_filter == 'partial' %}selected{% endif %}>{% translate "Partial" %}</option>
+                        <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>{% translate "Paid" %}</option>
                     </select>
                 </div>
                 <div class="col-6 col-md-3 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary flex-grow-1">
-                        <i class="bi bi-search"></i> Filter
+                        <i class="bi bi-search"></i> {% translate "Filter" %}
                     </button>
                     <a href="{% url 'orders:customer_care_payments' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-x-circle"></i> Clear
+                        <i class="bi bi-x-circle"></i> {% translate "Clear" %}
                     </a>
                 </div>
             </form>
@@ -136,7 +137,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="bi bi-receipt"></i> Orders 
+                        <i class="bi bi-receipt"></i> {% translate "Orders" %} 
                         <span class="badge bg-primary">{{ orders|length }}</span>
                     </h5>
                 </div>
@@ -146,15 +147,15 @@
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>SN</th>
-                                        <th>Order #</th>
-                                        <th>Table</th>
-                                        <th>Items</th>
-                                        <th>Total</th>
-                                        <th>Paid</th>
-                                        <th>Balance</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
+                                        <th>{% translate "SN" %}</th>
+                                        <th>{% translate "Order #" %}</th>
+                                        <th>{% translate "Table" %}</th>
+                                        <th>{% translate "Items" %}</th>
+                                        <th>{% translate "Total" %}</th>
+                                        <th>{% translate "Paid" %}</th>
+                                        <th>{% translate "Balance" %}</th>
+                                        <th>{% translate "Status" %}</th>
+                                        <th>{% translate "Actions" %}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -172,7 +173,7 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-info">{{ order.order_items.all|length }} items</span>
+                                            <span class="badge bg-info">{% blocktranslate count n=order.order_items.all|length %}{{ n }} item{% plural %}{{ n }} items{% endblocktranslate %}</span>
                                             <br>
                                             <small class="text-muted">
                                                 {% for item in order.order_items.all|slice:":2" %}
@@ -195,7 +196,7 @@
                                                 {% if order.payment_status == 'paid' %}bg-success
                                                 {% elif order.payment_status == 'partial' %}bg-warning
                                                 {% else %}bg-danger{% endif %}">
-                                                {{ order.get_payment_status_display|default:"Unpaid" }}
+                                                {{ order.get_payment_status_display|default:_("Unpaid") }}
                                             </span>
                                             <br>
                                             <small class="badge bg-secondary">{{ order.get_status_display }}</small>
@@ -207,26 +208,26 @@
                                                 {% if 'process_payments' in feats %}
                                                 <button class="btn btn-success btn-sm mb-1"
                                                         onclick="processPayment('{{ order.id }}', '{{ order.order_number }}', {{ order.balance|default:order.total_amount }})">
-                                                    <i class="bi bi-cash"></i> Pay
+                                                    <i class="bi bi-cash"></i> {% translate "Pay" %}
                                                 </button>
                                                 {% endif %}
                                                 {% if 'view_receipts' in feats %}
                                                 <button class="btn btn-secondary btn-sm mb-1"
                                                         onclick="printBill('{{ order.id }}', '{{ order.order_number }}')">
-                                                    <i class="bi bi-receipt"></i> Print Bill
+                                                    <i class="bi bi-receipt"></i> {% translate "Print Bill" %}
                                                 </button>
                                                 {% endif %}
                                                 {% endif %}
                                                 <a href="{% url 'orders:order_detail' order.id %}"
                                                    class="btn btn-info btn-sm mb-1">
-                                                    <i class="bi bi-eye"></i> View
+                                                    <i class="bi bi-eye"></i> {% translate "View" %}
                                                 </a>
                                                 {% if order.payments.exists %}
                                                     {% if order.latest_payment %}
                                                     {% if 'view_receipts' in feats %}
                                                     <button class="btn btn-outline-secondary btn-sm"
                                                             onclick="generateReceipt('{{ order.latest_payment.id }}')">
-                                                        <i class="bi bi-printer"></i> Receipt
+                                                        <i class="bi bi-printer"></i> {% translate "Receipt" %}
                                                     </button>
                                                     {% endif %}
                                                     {% endif %}
@@ -234,7 +235,7 @@
                                                 {% if 'transfer_orders' in feats %}
                                                 <button class="btn btn-warning btn-sm mt-1"
                                                         onclick="openTransferModal({{ order.id }}, '{{ order.order_number|escapejs }}', '{{ order.table_info.tbl_no|escapejs }}')">
-                                                    <i class="bi bi-arrow-left-right"></i> Transfer
+                                                    <i class="bi bi-arrow-left-right"></i> {% translate "Transfer" %}
                                                 </button>
                                                 {% endif %}
                                                 {% endif %}                                            </div>
@@ -248,11 +249,11 @@
                     {% else %}
                         <div class="text-center py-5">
                             <i class="bi bi-inbox display-1 text-muted"></i>
-                            <h4 class="mt-3">No Orders Found</h4>
-                            <p class="text-muted">There are no orders matching your filters.</p>
+                            <h4 class="mt-3">{% translate "No Orders Found" %}</h4>
+                            <p class="text-muted">{% translate "There are no orders matching your filters." %}</p>
                             {% if table_filter or status_filter %}
                             <a href="{% url 'orders:customer_care_payments' %}" class="btn btn-primary">
-                                <i class="bi bi-x-circle"></i> Clear Filters
+                                <i class="bi bi-x-circle"></i> {% translate "Clear Filters" %}
                             </a>
                             {% endif %}
                         </div>
@@ -269,20 +270,20 @@
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">
-                    <i class="bi bi-cash-coin"></i> Process Payment
+                    <i class="bi bi-cash-coin"></i> {% translate "Process Payment" %}
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
-                    <strong>Order #:</strong> <span id="modalOrderNumber"></span>
+                    <strong>{% translate "Order #:" %}</strong> <span id="modalOrderNumber"></span>
                 </div>
                 <form id="paymentForm">
                     {% csrf_token %}
                     <input type="hidden" id="orderId" name="order_id">
                     
                     <div class="mb-3">
-                        <label class="form-label">Amount Due</label>
+                        <label class="form-label">{% translate "Amount Due" %}</label>
                         <div class="input-group">
                             <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="text" class="form-control form-control-lg" id="amountDue" readonly>
@@ -290,38 +291,38 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="paymentMethod" class="form-label">Payment Method *</label>
+                        <label for="paymentMethod" class="form-label">{% translate "Payment Method *" %}</label>
                         <select class="form-select" id="paymentMethod" name="payment_method" required>
-                            <option value="">Select Payment Method</option>
-                            <option value="cash">Cash</option>
-                            <option value="card">Card</option>
-                            <option value="mobile">Mobile Payment</option>
+                            <option value="">{% translate "Select Payment Method" %}</option>
+                            <option value="cash">{% translate "Cash" %}</option>
+                            <option value="card">{% translate "Card" %}</option>
+                            <option value="mobile">{% translate "Mobile Payment" %}</option>
                         </select>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="amountPaid" class="form-label">Amount Paid *</label>
+                        <label for="amountPaid" class="form-label">{% translate "Amount Paid *" %}</label>
                         <div class="input-group">
                             <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="number" class="form-control" id="amountPaid" name="amount_paid" 
                                    step="0.01" min="0" required>
                         </div>
-                        <small class="text-muted">Enter the amount customer is paying</small>
+                        <small class="text-muted">{% translate "Enter the amount customer is paying" %}</small>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="notes" class="form-label">Notes (Optional)</label>
+                        <label for="notes" class="form-label">{% translate "Notes (Optional)" %}</label>
                         <textarea class="form-control" id="notes" name="notes" rows="2" 
-                                  placeholder="Any additional notes..."></textarea>
+                                  placeholder="{% translate "Any additional notes..." %}"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-circle"></i> Cancel
+                    <i class="bi bi-x-circle"></i> {% translate "Cancel" %}
                 </button>
                 <button type="button" class="btn btn-success" onclick="submitPayment()">
-                    <i class="bi bi-check-circle"></i> Process Payment
+                    <i class="bi bi-check-circle"></i> {% translate "Process Payment" %}
                 </button>
             </div>
         </div>
@@ -333,27 +334,27 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Order to Another Table</h5>
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> {% translate "Transfer Order to Another Table" %}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-3">Transferring <strong id="transferOrderNumber"></strong> from <strong>Table <span id="transferFromTable"></span></strong>.</p>
+                <p class="mb-3">{% translate "Transferring" %} <strong id="transferOrderNumber"></strong> {% translate "from" context "transfer table" %} <strong>{% translate "Table" %} <span id="transferFromTable"></span></strong>.</p>
                 <div class="mb-3">
-                    <label for="transferTargetTable" class="form-label">Move to Table:</label>
+                    <label for="transferTargetTable" class="form-label">{% translate "Move to Table:" %}</label>
                     <select class="form-select" id="transferTargetTable">
-                        <option value="">-- Select destination table --</option>
+                        <option value="">{% translate "-- Select destination table --" %}</option>
                         {% for table in tables %}
-                            <option value="{{ table.id }}" data-available="{{ table.is_available|yesno:'true,false' }}">Table {{ table.tbl_no }}{% if not table.is_available %} (Occupied){% endif %}</option>
+                            <option value="{{ table.id }}" data-available="{{ table.is_available|yesno:'true,false' }}">{% blocktranslate with n=table.tbl_no %}Table {{ n }}{% endblocktranslate %}{% if not table.is_available %} ({% translate "Occupied" %}){% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div id="transferOccupiedWarning" class="alert alert-warning d-none">
-                    &#9888; This table is currently occupied. The order will still be transferred.
+                    &#9888; {% translate "This table is currently occupied. The order will still be transferred." %}
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-warning" id="confirmTransfer">Transfer Order</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                <button type="button" class="btn btn-warning" id="confirmTransfer">{% translate "Transfer Order" %}</button>
             </div>
         </div>
     </div>
@@ -362,7 +363,33 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Session expired or access denied. Please refresh the page and try again." as t_session %}
+{% translate "Payment processed successfully!" as t_paid_ok %}
+{% translate "Payment processing failed. Please try again." as t_paid_fail %}
+{% translate "Connection error. Please refresh the page and try again." as t_conn %}
+{% translate "Print bill for Order #{number}?" as t_print_q %}
+{% translate "The bill will be sent to the receipt printer." as t_print_q2 %}
+{% translate "Error:" as t_error %}
+{% translate "Bill print failed" as t_bill_fail %}
+{% translate "An error occurred while printing the bill" as t_bill_err %}
+{% translate "Order #" as t_order_no %}
+{% translate "Please select a destination table." as t_pick_table %}
+{% translate "Error transferring order" as t_transfer_err %}
 <script>
+const CCP_T = {
+    session: "{{ t_session|escapejs }}",
+    paidOk: "{{ t_paid_ok|escapejs }}",
+    paidFail: "{{ t_paid_fail|escapejs }}",
+    conn: "{{ t_conn|escapejs }}",
+    printQ: "{{ t_print_q|escapejs }}",
+    printQ2: "{{ t_print_q2|escapejs }}",
+    error: "{{ t_error|escapejs }}",
+    billFail: "{{ t_bill_fail|escapejs }}",
+    billErr: "{{ t_bill_err|escapejs }}",
+    orderNo: "{{ t_order_no|escapejs }}",
+    pickTable: "{{ t_pick_table|escapejs }}",
+    transferErr: "{{ t_transfer_err|escapejs }}"
+};
 let paymentModal;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -404,7 +431,7 @@ function submitPayment() {
     })
     .then(response => {
         if (response.status === 403) {
-            alert('Session expired or access denied. Please refresh the page and try again.');
+            alert(CCP_T.session);
             window.location.reload();
             return null;
         }
@@ -414,10 +441,10 @@ function submitPayment() {
         if (data === null) return;
         if (data.success) {
             paymentModal.hide();
-            alert('Payment processed successfully!');
+            alert(CCP_T.paidOk);
             window.location.reload();
         } else {
-            alert(data.error || 'Payment processing failed. Please try again.');
+            alert(data.error || CCP_T.paidFail);
             if (data.error && data.error.toLowerCase().includes('already fully paid')) {
                 paymentModal.hide();
                 window.location.reload();
@@ -426,7 +453,7 @@ function submitPayment() {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Connection error. Please refresh the page and try again.');
+        alert(CCP_T.conn);
     });
 }
 
@@ -435,7 +462,7 @@ function generateReceipt(paymentId) {
 }
 
 function printBill(orderId, orderNumber) {
-    if (!confirm(`Print bill for Order #${orderNumber}?\n\nThe bill will be sent to the receipt printer.`)) {
+    if (!confirm(CCP_T.printQ.replace('{number}', orderNumber) + '\n\n' + CCP_T.printQ2)) {
         return;
     }
     
@@ -451,14 +478,14 @@ function printBill(orderId, orderNumber) {
         if (data.success) {
             alert('✅ ' + data.message);
         } else if (data.error) {
-            alert('❌ Error: ' + data.error);
+            alert('❌ ' + CCP_T.error + ' ' + data.error);
         } else {
-            alert('❌ ' + (data.message || 'Bill print failed'));
+            alert('❌ ' + (data.message || CCP_T.billFail));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('❌ An error occurred while printing the bill');
+        alert('❌ ' + CCP_T.billErr);
     });
 }
 
@@ -466,7 +493,7 @@ let transferOrderId = null;
 
 function openTransferModal(orderId, orderNumber, fromTable) {
     transferOrderId = orderId;
-    document.getElementById('transferOrderNumber').textContent = 'Order #' + orderNumber;
+    document.getElementById('transferOrderNumber').textContent = CCP_T.orderNo + orderNumber;
     document.getElementById('transferFromTable').textContent = fromTable;
     document.getElementById('transferTargetTable').value = '';
     document.getElementById('transferOccupiedWarning').classList.add('d-none');
@@ -487,7 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('confirmTransfer').addEventListener('click', function() {
         const targetTableId = document.getElementById('transferTargetTable').value;
         if (!targetTableId) {
-            alert('Please select a destination table.');
+            alert(CCP_T.pickTable);
             return;
         }
         fetch(`/cashier/transfer-table/${transferOrderId}/`, {
@@ -504,12 +531,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert(data.message);
                 location.reload();
             } else {
-                alert('Error: ' + data.error);
+                alert(CCP_T.error + ' ' + data.error);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error transferring order');
+            alert(CCP_T.transferErr);
         });
     });
 });

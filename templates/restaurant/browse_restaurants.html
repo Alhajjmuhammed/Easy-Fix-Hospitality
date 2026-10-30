@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Order from Anywhere{% endblock %}
+{% block title %}{% translate "Order from Anywhere" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -50,15 +51,15 @@
 
 {% block content %}
 <div class="browse-hero">
-    <h1><i class="bi bi-bicycle me-2" style="color:#d63384"></i>Order from Anywhere</h1>
-    <p>Restaurants that accept delivery &amp; pickup orders</p>
+    <h1><i class="bi bi-bicycle me-2" style="color:#d63384"></i>{% translate "Order from Anywhere" %}</h1>
+    <p>{% translate "Restaurants that accept delivery & pickup orders" %}</p>
 
     {% if not active_restaurant_name %}
     <form method="get" class="search-wrap" id="searchForm">
         <div class="input-group">
             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
             <input type="text" name="q" id="searchInput" value="{{ search }}" class="form-control border-start-0"
-                   placeholder="Search restaurants…" autocomplete="off">
+                   placeholder="{% translate 'Search restaurants…' %}" autocomplete="off">
             <span class="input-group-text bg-white border-start-0 d-none" id="searchSpinner">
                 <span class="spinner-border spinner-border-sm text-muted" role="status"></span>
             </span>
@@ -80,18 +81,18 @@
             {% endif %}
         </div>
         <h5 class="fw-bold" style="color:#1a1a2e;">
-            You have an active {{ active_order_type }} order session
+            {% if active_order_type == 'delivery' %}{% translate "You have an active delivery order session" %}{% elif active_order_type == 'pickup' %}{% translate "You have an active pickup order session" %}{% else %}{% blocktranslate with type=active_order_type %}You have an active {{ type }} order session{% endblocktranslate %}{% endif %}
         </h5>
         <p class="text-muted mb-4">
-            Currently ordering from <strong>{{ active_restaurant_name }}</strong>.
-            Would you like to continue or choose a different restaurant?
+            {% blocktranslate with name=active_restaurant_name %}Currently ordering from <strong>{{ name }}</strong>.{% endblocktranslate %}
+            {% translate "Would you like to continue or choose a different restaurant?" %}
         </p>
         <div class="d-flex flex-wrap gap-3 justify-content-center">
             <a href="{% url 'restaurant:menu' %}" class="btn btn-primary btn-lg px-4" style="background:#d63384; border-color:#d63384; border-radius:50px;">
-                <i class="bi bi-arrow-right me-2"></i>Continue with {{ active_restaurant_name }}
+                <i class="bi bi-arrow-right me-2"></i>{% blocktranslate with name=active_restaurant_name %}Continue with {{ name }}{% endblocktranslate %}
             </a>
             <a href="{% url 'restaurant:browse_restaurants' %}?switch=1" class="btn btn-outline-secondary btn-lg px-4" style="border-radius:50px;">
-                <i class="bi bi-arrow-repeat me-2"></i>Choose Another Restaurant
+                <i class="bi bi-arrow-repeat me-2"></i>{% translate "Choose Another Restaurant" %}
             </a>
         </div>
     </div>
@@ -111,8 +112,8 @@
                         <div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>{{ r.address|truncatechars:60 }}</div>
                         {% endif %}
                         <div class="mt-2 d-flex gap-2">
-                            <span class="badge-delivery"><i class="bi bi-bicycle me-1"></i>Delivery</span>
-                            <span class="badge-pickup"><i class="bi bi-bag-check me-1"></i>Pickup</span>
+                            <span class="badge-delivery"><i class="bi bi-bicycle me-1"></i>{% translate "Delivery" %}</span>
+                            <span class="badge-pickup"><i class="bi bi-bag-check me-1"></i>{% translate "Pickup" %}</span>
                         </div>
                     </div>
                     <i class="bi bi-chevron-right text-muted fs-5"></i>
@@ -125,10 +126,10 @@
     <div class="text-center py-5">
         <i class="bi bi-shop-window fs-1 text-muted"></i>
         <h5 class="mt-3 text-muted">
-            {% if search %}No restaurants match "{{ search }}"{% else %}No restaurants accepting remote orders right now{% endif %}
+            {% if search %}{% blocktranslate with q=search %}No restaurants match "{{ q }}"{% endblocktranslate %}{% else %}{% translate "No restaurants accepting remote orders right now" %}{% endif %}
         </h5>
         {% if search %}
-        <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-secondary mt-2">Clear search</a>
+        <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-secondary mt-2">{% translate "Clear search" %}</a>
         {% endif %}
     </div>
 {% endif %}
@@ -136,9 +137,9 @@
 {% endif %}
 
     <div class="text-center mt-4">
-        <p class="text-muted small">Want to dine in instead?</p>
+        <p class="text-muted small">{% translate "Want to dine in instead?" %}</p>
         <a href="{% url 'orders:scan_qr' %}" class="btn btn-outline-primary">
-            <i class="bi bi-qr-code-scan me-1"></i> Scan QR for Dine-In
+            <i class="bi bi-qr-code-scan me-1"></i> {% translate "Scan QR for Dine-In" %}
         </a>
     </div>
 </div>

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Scan QR Code — Dine-In{% endblock %}
+{% block title %}{% translate "Scan QR Code — Dine-In" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -35,8 +36,8 @@
 
 {% block content %}
 <div class="scan-hero">
-    <h1><i class="bi bi-qr-code-scan me-2" style="color:#d63384"></i>Scan Your Table QR</h1>
-    <p>Point your camera at the QR code on your table to start ordering.</p>
+    <h1><i class="bi bi-qr-code-scan me-2" style="color:#d63384"></i>{% translate "Scan Your Table QR" %}</h1>
+    <p>{% translate "Point your camera at the QR code on your table to start ordering." %}</p>
 </div>
 
 <div class="container" style="max-width:600px; padding:2rem 1rem;">
@@ -47,24 +48,26 @@
 
     <hr class="my-4">
 
-    <h6 class="fw-bold text-muted text-uppercase small mb-3">How it works</h6>
+    <h6 class="fw-bold text-muted text-uppercase small mb-3">{% translate "How it works" %}</h6>
     <ol class="steps-list text-muted small">
-        <li>Find the QR code card on your table</li>
-        <li>Allow camera access when prompted</li>
-        <li>Hold the QR code in front of your camera</li>
-        <li>You'll be taken straight to the menu!</li>
+        <li>{% translate "Find the QR code card on your table" %}</li>
+        <li>{% translate "Allow camera access when prompted" %}</li>
+        <li>{% translate "Hold the QR code in front of your camera" %}</li>
+        <li>{% translate "You'll be taken straight to the menu!" %}</li>
     </ol>
 
     <div class="text-center mt-4">
-        <p class="text-muted small">Ordering delivery or pickup instead?</p>
+        <p class="text-muted small">{% translate "Ordering delivery or pickup instead?" %}</p>
         <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-bicycle me-1"></i> Order from Anywhere
+            <i class="bi bi-bicycle me-1"></i> {% translate "Order from Anywhere" %}
         </a>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{% translate "QR code detected! Loading your table…" as t_qr_ok %}
+{% translate "That QR code doesn't look like a restaurant table code. Please scan the QR on your table." as t_qr_bad %}
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 (function () {
@@ -91,12 +94,12 @@
         scanning = false;
 
         if (isRestaurantQR(decodedText)) {
-            showStatus('QR code detected! Loading your table…', 'success');
+            showStatus('{{ t_qr_ok|escapejs }}', 'success');
             setTimeout(function () {
                 window.location.href = decodedText;
             }, 600);
         } else {
-            showStatus('That QR code doesn\'t look like a restaurant table code. Please scan the QR on your table.', 'warning');
+            showStatus('{{ t_qr_bad|escapejs }}', 'warning');
             setTimeout(function () { scanning = true; }, 2000);
         }
     }

@@ -1,4 +1,4 @@
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 <form id="editProductForm" method="post" enctype="multipart/form-data" action="/admin-panel/products/{{ product.id }}/update/">
     {% csrf_token %}
     <div class="row g-4">
@@ -6,20 +6,20 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0 fw-bold">Product Information</h6>
+                    <h6 class="mb-0 fw-bold">{% translate "Product Information" %}</h6>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-12">
-                            <label for="editProductName" class="form-label">Product Name *</label>
+                            <label for="editProductName" class="form-label">{% translate "Product Name" %} *</label>
                             <input type="text" class="form-control" id="editProductName" name="name" value="{{ product.name }}" required>
                         </div>
                         <div class="col-md-12">
-                            <label for="editProductDescription" class="form-label">Description *</label>
+                            <label for="editProductDescription" class="form-label">{% translate "Description" %} *</label>
                             <textarea class="form-control" id="editProductDescription" name="description" rows="3" required>{{ product.description }}</textarea>
                         </div>
                         <div class="col-md-6">
-                            <label for="editProductMainCategory" class="form-label">Main Category *</label>
+                            <label for="editProductMainCategory" class="form-label">{% translate "Main Category" %} *</label>
                             <select class="form-select" id="editProductMainCategory" name="main_category" required>
                                 {% for category in main_categories %}
                                 <option value="{{ category.id }}" {% if category.id == product.main_category.id %}selected{% endif %}>
@@ -29,7 +29,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="editProductSubCategory" class="form-label">Sub Category *</label>
+                            <label for="editProductSubCategory" class="form-label">{% translate "Sub Category" %} *</label>
                             <select class="form-select" id="editProductSubCategory" name="sub_category" required>
                                 {% for subcategory in subcategories %}
                                 <option value="{{ subcategory.id }}" {% if subcategory.id == product.sub_category.id %}selected{% endif %}>
@@ -39,32 +39,32 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="editProductPrice" class="form-label">Price ({% currency_symbol %}) *</label>
+                            <label for="editProductPrice" class="form-label">{% translate "Price" %} ({% currency_symbol %}) *</label>
                             <input type="number" step="0.01" min="0.01" class="form-control" id="editProductPrice" name="price" value="{{ product.price }}" required>
                         </div>
                         <div class="col-md-4">
-                            <label for="editProductStock" class="form-label">Stock Quantity *</label>
+                            <label for="editProductStock" class="form-label">{% translate "Stock Quantity" %} *</label>
                             <input type="number" min="0" class="form-control" id="editProductStock" name="available_in_stock" value="{{ product.available_in_stock }}" required>
                         </div>
                         <div class="col-md-4">
-                            <label for="editProductPrepTime" class="form-label">Prep Time (min)</label>
+                            <label for="editProductPrepTime" class="form-label">{% translate "Prep Time (min)" %}</label>
                             <input type="number" min="1" class="form-control" id="editProductPrepTime" name="preparation_time" value="{{ product.preparation_time }}">
                         </div>
                         <div class="col-md-12">
-                            <label for="editProductStation" class="form-label">Station *</label>
+                            <label for="editProductStation" class="form-label">{% translate "Station" %} *</label>
                             <select class="form-select" id="editProductStation" name="station" required>
-                                <option value="kitchen" {% if product.station == 'kitchen' %}selected{% endif %}>🍴 Kitchen</option>
-                                <option value="bar" {% if product.station == 'bar' %}selected{% endif %}>🍸 Bar</option>
-                                <option value="buffet" {% if product.station == 'buffet' %}selected{% endif %}>🍽️ Buffet</option>
-                                <option value="service" {% if product.station == 'service' %}selected{% endif %}>🛎️ Service</option>
+                                <option value="kitchen" {% if product.station == 'kitchen' %}selected{% endif %}>🍴 {% translate "Kitchen" %}</option>
+                                <option value="bar" {% if product.station == 'bar' %}selected{% endif %}>🍸 {% translate "Bar" %}</option>
+                                <option value="buffet" {% if product.station == 'buffet' %}selected{% endif %}>🍽️ {% translate "Buffet" %}</option>
+                                <option value="service" {% if product.station == 'service' %}selected{% endif %}>🛎️ {% translate "Service" %}</option>
                             </select>
-                            <div class="form-text">Assign this product to Kitchen, Bar, Buffet, or Service station</div>
+                            <div class="form-text">{% translate "Assign this product to Kitchen, Bar, Buffet, or Service station" %}</div>
                         </div>
                         <div class="col-md-12">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="editProductAvailable" name="is_available" {% if product.is_available %}checked{% endif %}>
                                 <label class="form-check-label" for="editProductAvailable">
-                                    Product is available for ordering
+                                    {% translate "Product is available for ordering" %}
                                 </label>
                             </div>
                         </div>
@@ -77,25 +77,25 @@
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0 fw-bold">Product Image</h6>
+                    <h6 class="mb-0 fw-bold">{% translate "Product Image" %}</h6>
                 </div>
                 <div class="card-body">
                     {% if product.main_category.image %}
                         <div class="current-image mb-3">
                             <img src="{{ product.main_category.image.url }}" alt="{{ product.name }}" class="img-fluid rounded">
                             <div class="text-center mt-2">
-                                <small class="text-muted">Category Image</small>
+                                <small class="text-muted">{% translate "Category Image" %}</small>
                             </div>
                         </div>
                     {% else %}
                         <div class="text-center p-3">
                             <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
-                            <p class="text-muted mt-2">No category image set</p>
+                            <p class="text-muted mt-2">{% translate "No category image set" %}</p>
                         </div>
                     {% endif %}
                     
                     <div class="alert alert-info">
-                        <small><i class="bi bi-info-circle me-1"></i>Product images are managed at the category level. To change this image, edit the "{{ product.main_category.name }}" category.</small>
+                        <small><i class="bi bi-info-circle me-1"></i>{% blocktranslate with name=product.main_category.name %}Product images are managed at the category level. To change this image, edit the "{{ name }}" category.{% endblocktranslate %}</small>
                     </div>
                 </div>
             </div>
@@ -104,22 +104,22 @@
     
     <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-            <i class="fas fa-times me-2"></i>Cancel
+            <i class="fas fa-times me-2"></i>{% translate "Cancel" %}
         </button>
         <button type="submit" class="btn btn-success">
-            <i class="fas fa-save me-2"></i>Update Product
+            <i class="fas fa-save me-2"></i>{% translate "Update Product" %}
         </button>
     </div>
 </form>
 
-<script>
+{% translate "Updating..." as t_updating %}<script>
 // Simple form submission with loading state
 document.getElementById('editProductForm').addEventListener('submit', function(e) {
     const submitBtn = this.querySelector('button[type="submit"]');
     
     // Show loading state
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>{{ t_updating|escapejs }}';
     
     // Let the form submit naturally - no preventDefault()
     // The backend will handle the redirect

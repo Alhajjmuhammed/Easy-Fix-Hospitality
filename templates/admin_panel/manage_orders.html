@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Orders Management - Admin Panel{% endblock %}
+{% block title %}{% translate "Orders Management" %} - {% translate "Admin Panel" %}{% endblock %}
 
-{% block page_title %}Orders Management{% endblock %}
-{% block page_description %}Manage restaurant orders and track order status{% endblock %}
+{% block page_title %}{% translate "Orders Management" %}{% endblock %}
+{% block page_description %}{% translate "Manage restaurant orders and track order status" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -132,11 +133,11 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h4 class="mb-1">Orders Management</h4>
-                    <p class="text-muted mb-0">{{ restaurant_name }} - Total Orders: {{ total_count }}</p>
+                    <h4 class="mb-1">{% translate "Orders Management" %}</h4>
+                    <p class="text-muted mb-0">{{ restaurant_name }} - {% translate "Total Orders:" %} {{ total_count }}</p>
                 </div>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOrderModal">
-                    <i class="fas fa-plus"></i> Manual Order Entry
+                    <i class="fas fa-plus"></i> {% translate "Manual Order Entry" %}
                 </button>
             </div>
         </div>
@@ -150,25 +151,25 @@
                     <!-- Search Input -->
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
                         <label for="orderSearch" class="form-label">
-                            <i class="fas fa-search"></i> Search Orders
+                            <i class="fas fa-search"></i> {% translate "Search Orders" %}
                         </label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="orderSearch" name="search" 
-                                   value="{{ request.GET.search }}" placeholder="Order#, Table, Customer...">
+                                   value="{{ request.GET.search }}" placeholder="{% translate "Order#, Table, Customer..." %}">
                             <span class="input-group-text">
                                 <i class="fas fa-search"></i>
                             </span>
                         </div>
-                        <small class="text-muted">Press ESC to clear</small>
+                        <small class="text-muted">{% translate "Press ESC to clear" %}</small>
                     </div>
 
                     <!-- Restaurant Filter -->
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="restaurantFilter" class="form-label">
-                            <i class="fas fa-building"></i> Restaurant
+                            <i class="fas fa-building"></i> {% translate "Restaurant" %}
                         </label>
                         <select class="form-select" id="restaurantFilter" name="restaurant">
-                            <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                            <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>{% translate "All Restaurants" %}</option>
                             {% for restaurant in accessible_restaurants %}
                             <option value="{{ restaurant.id }}" 
                                 {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
@@ -183,34 +184,34 @@
                     <!-- Payment Status Filter -->
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="paymentStatusFilter" class="form-label">
-                            <i class="fas fa-credit-card"></i> Payment
+                            <i class="fas fa-credit-card"></i> {% translate "Payment" %}
                         </label>
                         <select class="form-select" id="paymentStatusFilter" name="payment_status">
-                            <option value="">All Payment</option>
-                            <option value="unpaid" {% if request.GET.payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
-                            <option value="paid" {% if request.GET.payment_status == 'paid' %}selected{% endif %}>Paid</option>
-                            <option value="partial" {% if request.GET.payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                            <option value="">{% translate "All Payment" %}</option>
+                            <option value="unpaid" {% if request.GET.payment_status == 'unpaid' %}selected{% endif %}>{% translate "Unpaid" %}</option>
+                            <option value="paid" {% if request.GET.payment_status == 'paid' %}selected{% endif %}>{% translate "Paid" %}</option>
+                            <option value="partial" {% if request.GET.payment_status == 'partial' %}selected{% endif %}>{% translate "Partial" %}</option>
                         </select>
                     </div>
 
                     <!-- Period Filter -->
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="periodFilter" class="form-label">
-                            <i class="fas fa-calendar-alt"></i> Period
+                            <i class="fas fa-calendar-alt"></i> {% translate "Period" %}
                         </label>
                         <select class="form-select" id="periodFilter" name="period" onchange="this.form.submit()">
-                            <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
-                            <option value="week" {% if period == 'week' %}selected{% endif %}>This Week</option>
-                            <option value="month" {% if period == 'month' %}selected{% endif %}>This Month</option>
-                            <option value="year" {% if period == 'year' %}selected{% endif %}>This Year</option>
-                            <option value="all" {% if period == 'all' or not period %}selected{% endif %}>All Time</option>
+                            <option value="today" {% if period == 'today' %}selected{% endif %}>{% translate "Today" %}</option>
+                            <option value="week" {% if period == 'week' %}selected{% endif %}>{% translate "This Week" %}</option>
+                            <option value="month" {% if period == 'month' %}selected{% endif %}>{% translate "This Month" %}</option>
+                            <option value="year" {% if period == 'year' %}selected{% endif %}>{% translate "This Year" %}</option>
+                            <option value="all" {% if period == 'all' or not period %}selected{% endif %}>{% translate "All Time" %}</option>
                         </select>
                     </div>
 
                     <!-- Per Page -->
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="perPageSelect" class="form-label">
-                            <i class="fas fa-list"></i> Per Page
+                            <i class="fas fa-list"></i> {% translate "Per Page" %}
                         </label>
                         <select class="form-select" id="perPageSelect" name="per_page" onchange="this.form.submit()">
                             <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
@@ -224,14 +225,14 @@
                     {% if period == 'all' or not period %}
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="dateFrom" class="form-label">
-                            <i class="fas fa-calendar-alt"></i> From Date
+                            <i class="fas fa-calendar-alt"></i> {% translate "From Date" %}
                         </label>
                         <input type="date" class="form-control" id="dateFrom" name="date_from"
                                value="{{ request.GET.date_from }}">
                     </div>
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                         <label for="dateTo" class="form-label">
-                            <i class="fas fa-calendar-check"></i> To Date
+                            <i class="fas fa-calendar-check"></i> {% translate "To Date" %}
                         </label>
                         <input type="date" class="form-control" id="dateTo" name="date_to"
                                value="{{ request.GET.date_to }}">
@@ -251,9 +252,9 @@
             <div class="mt-3">
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i> 
-                    Showing {{ total_count }} order{{ total_count|pluralize }} total
+                    {% blocktranslate count counter=total_count %}Showing {{ counter }} order total{% plural %}Showing {{ counter }} orders total{% endblocktranslate %}
                     {% if request.GET.search or request.GET.restaurant or request.GET.payment_status or request.GET.date_from or request.GET.date_to %}
-                        (filtered)
+                        {% translate "(filtered)" %}
                     {% endif %}
                 </small>
             </div>
@@ -267,11 +268,11 @@
                 <div class="card-body py-2 d-flex justify-content-between align-items-center">
                     <div>
                         <i class="fas fa-check-square text-primary"></i>
-                        <span id="selectedOrdersCount" class="fw-bold text-primary">0</span> order(s) selected
+                        <span id="selectedOrdersCount" class="fw-bold text-primary">0</span> {% translate "order(s) selected" %}
                     </div>
                     <div>
                         <button type="button" class="btn btn-sm btn-danger" id="bulkDeleteOrdersBtn">
-                            <i class="fas fa-trash"></i> Delete Selected
+                            <i class="fas fa-trash"></i> {% translate "Delete Selected" %}
                         </button>
                     </div>
                 </div>
@@ -285,37 +286,37 @@
             <ul class="nav nav-pills mb-3" id="orderStatusTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="pending-tab" data-bs-toggle="pill" data-bs-target="#pending" type="button" role="tab">
-                        <i class="fas fa-clock text-warning"></i> Pending
+                        <i class="fas fa-clock text-warning"></i> {% translate "Pending" %}
                         {% if pending_count > 0 %}<span class="badge bg-warning text-dark ms-1">{{ pending_count }}</span>{% endif %}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="confirmed-tab" data-bs-toggle="pill" data-bs-target="#confirmed" type="button" role="tab">
-                        <i class="fas fa-check-circle text-info"></i> Confirmed
+                        <i class="fas fa-check-circle text-info"></i> {% translate "Confirmed" %}
                         {% if confirmed_count > 0 %}<span class="badge bg-info ms-1">{{ confirmed_count }}</span>{% endif %}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="preparing-tab" data-bs-toggle="pill" data-bs-target="#preparing" type="button" role="tab">
-                        <i class="fas fa-utensils text-primary"></i> Preparing
+                        <i class="fas fa-utensils text-primary"></i> {% translate "Preparing" %}
                         {% if preparing_count > 0 %}<span class="badge bg-primary ms-1">{{ preparing_count }}</span>{% endif %}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="ready-tab" data-bs-toggle="pill" data-bs-target="#ready" type="button" role="tab">
-                        <i class="fas fa-bell text-success"></i> Ready
+                        <i class="fas fa-bell text-success"></i> {% translate "Ready" %}
                         {% if ready_count > 0 %}<span class="badge bg-success ms-1">{{ ready_count }}</span>{% endif %}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="served-tab" data-bs-toggle="pill" data-bs-target="#served" type="button" role="tab">
-                        <i class="fas fa-check text-success"></i> Served
+                        <i class="fas fa-check text-success"></i> {% translate "Served" %}
                         {% if served_count > 0 %}<span class="badge bg-success ms-1">{{ served_count }}</span>{% endif %}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="cancelled-tab" data-bs-toggle="pill" data-bs-target="#cancelled" type="button" role="tab">
-                        <i class="fas fa-times text-danger"></i> Cancelled
+                        <i class="fas fa-times text-danger"></i> {% translate "Cancelled" %}
                         {% if cancelled_count > 0 %}<span class="badge bg-danger ms-1">{{ cancelled_count }}</span>{% endif %}
                     </button>
                 </li>
@@ -325,32 +326,32 @@
             <div class="tab-content" id="orderStatusTabsContent">
                 <!-- Pending Orders Tab -->
                 <div class="tab-pane fade show active" id="pending" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=pending_orders status_name="Pending" page_param=pending_page_param %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=pending_orders status_name=_("Pending") page_param=pending_page_param %}
                 </div>
 
                 <!-- Confirmed Orders Tab -->
                 <div class="tab-pane fade" id="confirmed" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=confirmed_orders status_name="Confirmed" page_param=confirmed_page_param %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=confirmed_orders status_name=_("Confirmed") page_param=confirmed_page_param %}
                 </div>
 
                 <!-- Preparing Orders Tab -->
                 <div class="tab-pane fade" id="preparing" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=preparing_orders status_name="Preparing" page_param=preparing_page_param %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=preparing_orders status_name=_("Preparing") page_param=preparing_page_param %}
                 </div>
 
                 <!-- Ready Orders Tab -->
                 <div class="tab-pane fade" id="ready" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=ready_orders status_name="Ready" page_param=ready_page_param %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=ready_orders status_name=_("Ready") page_param=ready_page_param %}
                 </div>
 
                 <!-- Served Orders Tab -->
                 <div class="tab-pane fade" id="served" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=served_orders status_name="Served" page_param=served_page_param %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=served_orders status_name=_("Served") page_param=served_page_param %}
                 </div>
 
                 <!-- Cancelled Orders Tab -->
                 <div class="tab-pane fade" id="cancelled" role="tabpanel">
-                    {% include 'admin_panel/partials/orders_table.html' with orders=cancelled_orders status_name="Cancelled" page_param=cancelled_page_param %}
+                    {% include 'admin_panel/partials/orders_table.html' with orders=cancelled_orders status_name=_("Cancelled") page_param=cancelled_page_param %}
                 </div>
             </div>
         </div>
@@ -363,36 +364,36 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addOrderModalLabel">
-                    <i class="fas fa-plus-circle"></i> Manual Order Entry
+                    <i class="fas fa-plus-circle"></i> {% translate "Manual Order Entry" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="addOrderForm">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="addOrderTable" class="form-label">Table <span class="text-danger">*</span></label>
+                        <label for="addOrderTable" class="form-label">{% translate "Table" %} <span class="text-danger">*</span></label>
                         <select class="form-select" id="addOrderTable" name="table_id" required>
-                            <option value="">Select Table</option>
+                            <option value="">{% translate "Select Table" %}</option>
                             <!-- Will be populated via AJAX -->
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="addOrderCustomer" class="form-label">Customer <span class="text-danger">*</span></label>
+                        <label for="addOrderCustomer" class="form-label">{% translate "Customer" %} <span class="text-danger">*</span></label>
                         <select class="form-select" id="addOrderCustomer" name="customer_id" required>
-                            <option value="">Select Customer</option>
+                            <option value="">{% translate "Select Customer" %}</option>
                             <!-- Will be populated via AJAX -->
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="addOrderInstructions" class="form-label">Special Instructions</label>
+                        <label for="addOrderInstructions" class="form-label">{% translate "Special Instructions" %}</label>
                         <textarea class="form-control" id="addOrderInstructions" name="special_instructions" rows="3"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Add Order
+                        <i class="fas fa-save"></i> {% translate "Add Order" %}
                     </button>
                 </div>
             </form>
@@ -406,9 +407,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="orderDetailsModalLabel">
-                    <i class="fas fa-info-circle"></i> Order Details
+                    <i class="fas fa-info-circle"></i> {% translate "Order Details" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body" id="orderDetailsContent">
                 <!-- Order details will be loaded here -->
@@ -423,18 +424,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="deleteOrderModalLabel">
-                    <i class="fas fa-exclamation-triangle text-danger"></i> Confirm Delete
+                    <i class="fas fa-exclamation-triangle text-danger"></i> {% translate "Confirm Delete" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete <strong id="deleteOrderInfo"></strong>?</p>
-                <p class="text-muted mb-0">This action cannot be undone.</p>
+                <p>{% translate "Are you sure you want to delete" %} <strong id="deleteOrderInfo"></strong>?</p>
+                <p class="text-muted mb-0">{% translate "This action cannot be undone." %}</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteOrder">
-                    <i class="fas fa-trash"></i> Delete Order
+                    <i class="fas fa-trash"></i> {% translate "Delete Order" %}
                 </button>
             </div>
         </div>
@@ -443,6 +444,34 @@
 {% endblock %}
 
 {% block extra_js %}
+{% autoescape off %}
+{% translate "Failed to load order details." as t_load_failed %}
+{% translate "An error occurred while loading order details." as t_load_error %}
+{% translate 'Are you sure you want to update this order status to "{status}"?' as t_confirm_status %}
+{% translate "Failed to update order status." as t_status_failed %}
+{% translate "An error occurred while updating order status." as t_status_error %}
+{% translate "An error occurred while adding the order." as t_add_error %}
+{% translate "Order #{number}" as t_order_n %}
+{% translate "Failed to delete order." as t_delete_failed %}
+{% translate "An error occurred while deleting the order." as t_delete_error %}
+{% translate "Select Table" as t_select_table %}
+{% blocktranslate with n="{n}" asvar t_table_n %}Table {{ n }}{% endblocktranslate %}
+{% translate "(Occupied)" as t_occupied %}
+{% translate "No tables found" as t_no_tables %}
+{% translate "Select Customer" as t_select_customer %}
+{% translate "No customers found" as t_no_customers %}
+{% translate "Close" as t_close %}
+{% translate "Please select at least one order to delete." as t_select_one %}
+{% translate "Are you sure you want to delete {count} order(s)?" as t_bulk_confirm %}
+{% translate "Orders:" as t_orders_colon %}
+{% translate "Failed to delete selected orders." as t_bulk_failed %}
+{% translate "An error occurred while deleting orders." as t_bulk_error %}
+{% translate "Confirmed" as t_st_confirmed %}
+{% translate "Cancelled" as t_st_cancelled %}
+{% translate "Preparing" as t_st_preparing %}
+{% translate "Ready" as t_st_ready %}
+{% translate "Served" as t_st_served %}
+{% endautoescape %}
 <script>
 $(document).ready(function() {
     // Filter form auto-submit
@@ -485,11 +514,11 @@ $(document).ready(function() {
                     $('#orderDetailsContent').html(response.html);
                     $('#orderDetailsModal').modal('show');
                 } else {
-                    showAlert('danger', response.message || 'Failed to load order details.');
+                    showAlert('danger', response.message || "{{ t_load_failed|escapejs }}");
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while loading order details.');
+                showAlert('danger', "{{ t_load_error|escapejs }}");
             }
         });
     });
@@ -498,9 +527,10 @@ $(document).ready(function() {
     $('.update-status-btn').on('click', function() {
         const orderId = $(this).data('order-id');
         const newStatus = $(this).data('status');
-        const statusText = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+        const statusLabels = {confirmed: "{{ t_st_confirmed|escapejs }}", cancelled: "{{ t_st_cancelled|escapejs }}", preparing: "{{ t_st_preparing|escapejs }}", ready: "{{ t_st_ready|escapejs }}", served: "{{ t_st_served|escapejs }}"};
+        const statusText = statusLabels[newStatus] || (newStatus.charAt(0).toUpperCase() + newStatus.slice(1));
         
-        if (confirm(`Are you sure you want to update this order status to "${statusText}"?`)) {
+        if (confirm("{{ t_confirm_status|escapejs }}".replace('{status}', () => statusText))) {
             $.ajax({
                 url: '{% url "admin_panel:update_order_status" %}',
                 type: 'POST',
@@ -514,11 +544,11 @@ $(document).ready(function() {
                         showAlert('success', response.message);
                         location.reload();
                     } else {
-                        showAlert('danger', response.message || 'Failed to update order status.');
+                        showAlert('danger', response.message || "{{ t_status_failed|escapejs }}");
                     }
                 },
                 error: function() {
-                    showAlert('danger', 'An error occurred while updating order status.');
+                    showAlert('danger', "{{ t_status_error|escapejs }}");
                 }
             });
         }
@@ -546,7 +576,7 @@ $(document).ready(function() {
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while adding the order.');
+                showAlert('danger', "{{ t_add_error|escapejs }}");
             }
         });
     });
@@ -556,7 +586,7 @@ $(document).ready(function() {
         const orderId = $(this).data('order-id');
         const orderNumber = $(this).data('order-number');
         
-        $('#deleteOrderInfo').text(`Order #${orderNumber}`);
+        $('#deleteOrderInfo').text("{{ t_order_n|escapejs }}".replace('{number}', () => orderNumber));
         $('#confirmDeleteOrder').data('order-id', orderId);
         $('#deleteOrderModal').modal('show');
     });
@@ -577,11 +607,11 @@ $(document).ready(function() {
                     showAlert('success', response.message);
                     location.reload();
                 } else {
-                    showAlert('danger', response.message || 'Failed to delete order.');
+                    showAlert('danger', response.message || "{{ t_delete_failed|escapejs }}");
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while deleting the order.');
+                showAlert('danger', "{{ t_delete_error|escapejs }}");
             }
         });
     });
@@ -610,25 +640,25 @@ $(document).ready(function() {
     function populateTableSelect(tables) {
         const tableSelect = $('#addOrderTable');
         tableSelect.empty();
-        tableSelect.append('<option value="">Select Table</option>');
+        tableSelect.append('<option value="">' + "{{ t_select_table|escapejs }}" + '</option>');
         tables.forEach(function(t) {
-            const label = 'Table ' + t.tbl_no + (t.is_available ? '' : ' (Occupied)');
+            const label = "{{ t_table_n|escapejs }}".replace('{n}', () => t.tbl_no) + (t.is_available ? '' : ' ' + "{{ t_occupied|escapejs }}");
             tableSelect.append('<option value="' + t.id + '">' + label + '</option>');
         });
         if (tables.length === 0) {
-            tableSelect.append('<option value="" disabled>No tables found</option>');
+            tableSelect.append('<option value="" disabled>' + "{{ t_no_tables|escapejs }}" + '</option>');
         }
     }
 
     function populateCustomerSelect(customers) {
         const customerSelect = $('#addOrderCustomer');
         customerSelect.empty();
-        customerSelect.append('<option value="">Select Customer</option>');
+        customerSelect.append('<option value="">' + "{{ t_select_customer|escapejs }}" + '</option>');
         customers.forEach(function(c) {
             customerSelect.append('<option value="' + c.id + '">' + c.name + '</option>');
         });
         if (customers.length === 0) {
-            customerSelect.append('<option value="" disabled>No customers found</option>');
+            customerSelect.append('<option value="" disabled>' + "{{ t_no_customers|escapejs }}" + '</option>');
         }
     }
 
@@ -642,7 +672,7 @@ $(document).ready(function() {
         const alertHtml = `
             <div class="alert alert-${type} alert-dismissible fade show" role="alert">
                 ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ t_close|escapejs }}"></button>
             </div>
         `;
         
@@ -716,7 +746,7 @@ $(document).ready(function() {
         const selectedOrders = $('.order-checkbox:checked');
         
         if (selectedOrders.length === 0) {
-            showAlert('warning', 'Please select at least one order to delete.');
+            showAlert('warning', "{{ t_select_one|escapejs }}");
             return;
         }
         
@@ -726,8 +756,8 @@ $(document).ready(function() {
             orderNumbers.push($(this).data('order-number'));
         });
         
-        const confirmMessage = `Are you sure you want to delete ${selectedOrders.length} order(s)?\n\n` +
-                             `Orders: ${orderNumbers.slice(0, 5).join(', ')}${orderNumbers.length > 5 ? '...' : ''}`;
+        const confirmMessage = "{{ t_bulk_confirm|escapejs }}".replace('{count}', () => selectedOrders.length) + '\n\n' +
+                             `{{ t_orders_colon|escapejs }} ${orderNumbers.slice(0, 5).join(', ')}${orderNumbers.length > 5 ? '...' : ''}`;
         
         if (!confirm(confirmMessage)) {
             return;
@@ -764,11 +794,11 @@ $(document).ready(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert('danger', response.error || 'Failed to delete selected orders.');
+                    showAlert('danger', response.error || "{{ t_bulk_failed|escapejs }}");
                 }
             },
             error: function(xhr) {
-                let errorMessage = 'An error occurred while deleting orders.';
+                let errorMessage = "{{ t_bulk_error|escapejs }}";
                 if (xhr.responseJSON && xhr.responseJSON.error) {
                     errorMessage = xhr.responseJSON.error;
                 }

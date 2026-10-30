@@ -1,24 +1,25 @@
 {% extends base_template %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Place Order - Restaurant System{% endblock %}
+{% block title %}{% translate "Place Order" %} - Restaurant System{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h4 class="mb-0"><i class="bi bi-check-circle"></i> Confirm Your Order</h4>
+                <h4 class="mb-0"><i class="bi bi-check-circle"></i> {% translate "Confirm Your Order" %}</h4>
             </div>
             <div class="card-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
                     {% if order_type == 'delivery' %}
-                    <strong><i class="bi bi-bicycle me-1"></i>Delivery</strong>{% if delivery_address %} to {{ delivery_address|truncatechars:50 }}{% endif %} • Please review your order before confirming.
+                    <strong><i class="bi bi-bicycle me-1"></i>{% translate "Delivery" %}</strong>{% if delivery_address %} {% blocktranslate with address=delivery_address|truncatechars:50 %}to {{ address }}{% endblocktranslate %}{% endif %} • {% translate "Please review your order before confirming." %}
                     {% elif order_type == 'pickup' %}
-                    <strong><i class="bi bi-bag-check me-1"></i>Pickup order</strong> • Please review your order before confirming.
+                    <strong><i class="bi bi-bag-check me-1"></i>{% translate "Pickup order" %}</strong> • {% translate "Please review your order before confirming." %}
                     {% else %}
-                    <strong>Table {{ table_number }}</strong> • Please review your order before confirming.
+                    <strong>{% blocktranslate with n=table_number %}Table {{ n }}{% endblocktranslate %}</strong> • {% translate "Please review your order before confirming." %}
                     {% endif %}
                 </div>
                 
@@ -28,10 +29,10 @@
                     {% if customer_care_staff %}
                     <div class="mb-4">
                         <label for="entered_for_id" class="form-label fw-semibold">
-                            <i class="bi bi-person-badge me-1"></i> Ordering on behalf of (optional)
+                            <i class="bi bi-person-badge me-1"></i> {% translate "Ordering on behalf of (optional)" %}
                         </label>
                         <select name="entered_for_id" id="entered_for_id" class="form-select">
-                            <option value="">— My own order —</option>
+                            <option value="">— {% translate "My own order" %} —</option>
                             {% for staff in customer_care_staff %}
                             <option value="{{ staff.id }}">
                                 {% if staff.first_name %}{{ staff.first_name }}{% if staff.last_name %} {{ staff.last_name }}{% endif %}{% else %}{{ staff.username }}{% endif %} ({{ staff.role_display }})
@@ -39,7 +40,7 @@
                             {% endfor %}
                         </select>
                         <div class="form-text text-muted">
-                            If selected, the order will be attributed to that staff member. You (cashier) will be recorded as the one who entered it.
+                            {% translate "If selected, the order will be attributed to that staff member. You (cashier) will be recorded as the one who entered it." %}
                         </div>
                     </div>
                     {% endif %}
@@ -58,7 +59,7 @@
                     
                     <div class="card mb-4">
                         <div class="card-header">
-                            <h6 class="mb-0">Order Summary</h6>
+                            <h6 class="mb-0">{% translate "Order Summary" %}</h6>
                         </div>
                         <div class="card-body">
                             {% for product_id, item in cart.items %}
@@ -72,21 +73,21 @@
                             {% endfor %}
                             
                             <div class="d-flex justify-content-between align-items-center pt-3">
-                                <span>Subtotal:</span>
+                                <span>{% translate "Subtotal" %}:</span>
                                 <span>{% currency_symbol %}{{ cart_total|floatformat:2 }}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center">
-                                <span>Tax ({{ tax_percentage|floatformat:"-2" }}%):</span>
+                                <span>{% blocktranslate with rate=tax_percentage|floatformat:"-2" %}Tax ({{ rate }}%){% endblocktranslate %}:</span>
                                 <span>{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
                             </div>
                             {% if show_delivery_fee %}
                             <div class="d-flex justify-content-between align-items-center">
-                                <span>Delivery fee:</span>
-                                <span>{% if delivery_fee > 0 %}{% currency_symbol %}{{ delivery_fee|floatformat:2 }}{% else %}<span class="text-success">Free</span>{% endif %}</span>
+                                <span>{% translate "Delivery fee" %}:</span>
+                                <span>{% if delivery_fee > 0 %}{% currency_symbol %}{{ delivery_fee|floatformat:2 }}{% else %}<span class="text-success">{% translate "Free" %}</span>{% endif %}</span>
                             </div>
                             {% endif %}
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-2">
-                                <strong>Total:</strong>
+                                <strong>{% translate "Total" %}:</strong>
                                 <strong class="text-primary">{% currency_symbol %}{{ final_total|floatformat:2 }}</strong>
                             </div>
                         </div>
@@ -94,10 +95,10 @@
                     
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'orders:view_cart' %}" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> Back to Cart
+                            <i class="bi bi-arrow-left"></i> {% translate "Back to Cart" %}
                         </a>
                         <button type="submit" class="btn btn-success btn-lg">
-                            <i class="bi bi-check-circle"></i> Confirm Order
+                            <i class="bi bi-check-circle"></i> {% translate "Confirm Order" %}
                         </button>
                     </div>
                 </form>

@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Owner Dashboard - Restaurant System{% endblock %}
+{% block title %}{% translate "Owner Dashboard" %} - {% translate "Restaurant System" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -97,37 +98,37 @@
 <div class="owner-header">
     <div class="row align-items-center">
         <div class="col-md-8">
-            <h1 class="mb-2"><i class="bi bi-crown"></i> Owner Dashboard</h1>
-            <p class="mb-0 opacity-75">Complete restaurant management and control center</p>
+            <h1 class="mb-2"><i class="bi bi-crown"></i> {% translate "Owner Dashboard" %}</h1>
+            <p class="mb-0 opacity-75">{% translate "Complete restaurant management and control center" %}</p>
         </div>
         <div class="col-md-4 text-end">
             <div class="dropdown">
                 <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="bi bi-gear"></i> Quick Actions
+                    <i class="bi bi-gear"></i> {% translate "Quick Actions" %}
                 </button>
                 <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="{% url 'admin_panel:manage_products' %}">
-                        <i class="bi bi-box-seam"></i> Manage Products
+                        <i class="bi bi-box-seam"></i> {% translate "Manage Products" %}
                     </a></li>
                     <li><a class="dropdown-item" href="{% url 'admin_panel:manage_tables' %}">
-                        <i class="bi bi-table"></i> Manage Tables
+                        <i class="bi bi-table"></i> {% translate "Manage Tables" %}
                     </a></li>
                     <li><a class="dropdown-item" href="{% url 'admin_panel:manage_orders' %}">
-                        <i class="bi bi-receipt"></i> View Orders
+                        <i class="bi bi-receipt"></i> {% translate "View Orders" %}
                     </a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="{% url 'waste_management:dashboard' %}">
-                        <i class="fas fa-trash-alt"></i> Waste Dashboard
+                        <i class="fas fa-trash-alt"></i> {% translate "Waste Dashboard" %}
                     </a></li>
                     <li><a class="dropdown-item" href="{% url 'waste_management:reports' %}">
-                        <i class="fas fa-chart-bar"></i> Waste Reports
+                        <i class="fas fa-chart-bar"></i> {% translate "Waste Reports" %}
                     </a></li>
                     <li><a class="dropdown-item" href="{% url 'waste_management:cost_settings' %}">
-                        <i class="fas fa-cog"></i> Waste Cost Settings
+                        <i class="fas fa-cog"></i> {% translate "Waste Cost Settings" %}
                     </a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="#" onclick="showStaffModal()">
-                        <i class="bi bi-person-plus"></i> Add Staff
+                        <i class="bi bi-person-plus"></i> {% translate "Add Staff" %}
                     </a></li>
                 </ul>
             </div>
@@ -142,7 +143,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="stats-number text-primary">{{ total_products }}</div>
-                    <div class="stats-label">Total Products</div>
+                    <div class="stats-label">{% translate "Total Products" %}</div>
                 </div>
                 <i class="bi bi-box-seam stats-icon text-primary"></i>
             </div>
@@ -154,7 +155,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="stats-number text-success">{{ total_orders }}</div>
-                    <div class="stats-label">Total Orders</div>
+                    <div class="stats-label">{% translate "Total Orders" %}</div>
                 </div>
                 <i class="bi bi-receipt stats-icon text-success"></i>
             </div>
@@ -166,7 +167,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="stats-number text-warning">{{ pending_orders }}</div>
-                    <div class="stats-label">Pending Orders</div>
+                    <div class="stats-label">{% translate "Pending Orders" %}</div>
                 </div>
                 <i class="bi bi-clock stats-icon text-warning"></i>
             </div>
@@ -178,7 +179,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="stats-number text-info">{{ total_staff }}</div>
-                    <div class="stats-label">Staff Members</div>
+                    <div class="stats-label">{% translate "Staff Members" %}</div>
                 </div>
                 <i class="bi bi-people stats-icon text-info"></i>
             </div>
@@ -192,24 +193,24 @@
     <div class="col-lg-4 mb-4">
         <div class="card management-card h-100">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Management</h5>
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> {% translate "Quick Management" %}</h5>
             </div>
             <div class="card-body text-center">
                 <div class="d-grid gap-2">
                     <a href="{% url 'admin_panel:manage_products' %}" class="btn btn-primary quick-action-btn">
-                        <i class="bi bi-box-seam"></i> Manage Products
+                        <i class="bi bi-box-seam"></i> {% translate "Manage Products" %}
                     </a>
                     <a href="{% url 'admin_panel:manage_categories' %}" class="btn btn-success quick-action-btn">
-                        <i class="bi bi-tags"></i> Manage Categories
+                        <i class="bi bi-tags"></i> {% translate "Manage Categories" %}
                     </a>
                     <a href="{% url 'admin_panel:manage_tables' %}" class="btn btn-info quick-action-btn">
-                        <i class="bi bi-table"></i> Manage Tables
+                        <i class="bi bi-table"></i> {% translate "Manage Tables" %}
                     </a>
                     <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-warning quick-action-btn">
-                        <i class="bi bi-receipt"></i> View All Orders
+                        <i class="bi bi-receipt"></i> {% translate "View All Orders" %}
                     </a>
                     <button class="btn btn-secondary quick-action-btn" onclick="showStaffModal()">
-                        <i class="bi bi-person-plus"></i> Add Kitchen/Care Staff
+                        <i class="bi bi-person-plus"></i> {% translate "Add Kitchen/Care Staff" %}
                     </button>
                 </div>
             </div>
@@ -220,8 +221,8 @@
     <div class="col-lg-8 mb-4">
         <div class="card management-card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Orders</h5>
-                <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> {% translate "Recent Orders" %}</h5>
+                <a href="{% url 'admin_panel:manage_orders' %}" class="btn btn-sm btn-outline-primary">{% translate "View All" %}</a>
             </div>
             <div class="card-body">
                 {% if recent_orders %}
@@ -229,11 +230,11 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Order #</th>
-                                <th>Table</th>
-                                <th>Status</th>
-                                <th>Total</th>
-                                <th>Time</th>
+                                <th>{% translate "Order #" %}</th>
+                                <th>{% translate "Table" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th>{% translate "Total" %}</th>
+                                <th>{% translate "Time" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -254,7 +255,7 @@
                                     </span>
                                 </td>
                                 <td>{% currency_symbol %}{{ order.total_amount }}</td>
-                                <td>{{ order.created_at|timesince }} ago</td>
+                                <td>{% blocktranslate with t=order.created_at|timesince %}{{ t }} ago{% endblocktranslate %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -263,7 +264,7 @@
                 {% else %}
                 <div class="text-center py-4">
                     <i class="bi bi-inbox display-6 text-muted"></i>
-                    <p class="text-muted mt-2">No recent orders found</p>
+                    <p class="text-muted mt-2">{% translate "No recent orders found" %}</p>
                 </div>
                 {% endif %}
             </div>
@@ -276,7 +277,7 @@
     <div class="col-lg-6 mb-4">
         <div class="card management-card h-100">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-star"></i> Popular Products</h5>
+                <h5 class="mb-0"><i class="bi bi-star"></i> {% translate "Popular Products" %}</h5>
             </div>
             <div class="card-body">
                 {% if popular_products %}
@@ -287,14 +288,14 @@
                             <h6 class="mb-1">{{ product.name }}</h6>
                             <small class="text-muted">{% currency_symbol %}{{ product.price }}</small>
                         </div>
-                        <span class="badge bg-primary rounded-pill">{{ product.order_count }} orders</span>
+                        <span class="badge bg-primary rounded-pill">{% blocktranslate count counter=product.order_count %}{{ counter }} order{% plural %}{{ counter }} orders{% endblocktranslate %}</span>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
                 <div class="text-center py-4">
                     <i class="bi bi-graph-up display-6 text-muted"></i>
-                    <p class="text-muted mt-2">No order data available yet</p>
+                    <p class="text-muted mt-2">{% translate "No order data available yet" %}</p>
                 </div>
                 {% endif %}
             </div>
@@ -305,54 +306,54 @@
     <div class="col-lg-6 mb-4">
         <div class="card management-card h-100">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-shield-check"></i> Your Permissions</h5>
+                <h5 class="mb-0"><i class="bi bi-shield-check"></i> {% translate "Your Permissions" %}</h5>
             </div>
             <div class="card-body">
                 <div class="row g-2">
                     <div class="col-6">
                         <span class="permission-badge bg-success text-white d-block text-center">
-                            <i class="bi bi-check"></i> Manage Products
+                            <i class="bi bi-check"></i> {% translate "Manage Products" %}
                         </span>
                     </div>
                     <div class="col-6">
                         <span class="permission-badge bg-success text-white d-block text-center">
-                            <i class="bi bi-check"></i> Manage Categories
+                            <i class="bi bi-check"></i> {% translate "Manage Categories" %}
                         </span>
                     </div>
                     <div class="col-6">
                         <span class="permission-badge bg-success text-white d-block text-center">
-                            <i class="bi bi-check"></i> Manage Tables
+                            <i class="bi bi-check"></i> {% translate "Manage Tables" %}
                         </span>
                     </div>
                     <div class="col-6">
                         <span class="permission-badge bg-success text-white d-block text-center">
-                            <i class="bi bi-check"></i> View All Orders
+                            <i class="bi bi-check"></i> {% translate "View All Orders" %}
                         </span>
                     </div>
                     <div class="col-6">
                         <span class="permission-badge bg-success text-white d-block text-center">
-                            <i class="bi bi-check"></i> Add Kitchen Staff
+                            <i class="bi bi-check"></i> {% translate "Add Kitchen Staff" %}
                         </span>
                     </div>
                     <div class="col-6">
                         <span class="permission-badge bg-success text-white d-block text-center">
-                            <i class="bi bi-check"></i> Add Customer Care
+                            <i class="bi bi-check"></i> {% translate "Add Customer Care" %}
                         </span>
                     </div>
                     <div class="col-6">
                         <span class="permission-badge bg-warning text-dark d-block text-center">
-                            <i class="bi bi-x"></i> Manage Roles
+                            <i class="bi bi-x"></i> {% translate "Manage Roles" %}
                         </span>
                     </div>
                     <div class="col-6">
                         <span class="permission-badge bg-warning text-dark d-block text-center">
-                            <i class="bi bi-x"></i> Manage Admins
+                            <i class="bi bi-x"></i> {% translate "Manage Admins" %}
                         </span>
                     </div>
                 </div>
                 <div class="mt-3">
                     <small class="text-muted">
-                        <i class="bi bi-info-circle"></i> You have full management access except for role/admin management which is restricted to administrators.
+                        <i class="bi bi-info-circle"></i> {% translate "You have full management access except for role/admin management which is restricted to administrators." %}
                     </small>
                 </div>
             </div>
@@ -365,34 +366,34 @@
     <div class="col-12">
         <div class="card management-card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-trash-alt"></i> Food Waste Management</h5>
-                <small class="text-muted">Track, analyze, and reduce food waste in your restaurant</small>
+                <h5 class="mb-0"><i class="fas fa-trash-alt"></i> {% translate "Food Waste Management" %}</h5>
+                <small class="text-muted">{% translate "Track, analyze, and reduce food waste in your restaurant" %}</small>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <div class="d-grid">
                             <a href="{% url 'waste_management:dashboard' %}" class="btn btn-primary quick-action-btn">
-                                <i class="fas fa-chart-pie"></i> Waste Dashboard
+                                <i class="fas fa-chart-pie"></i> {% translate "Waste Dashboard" %}
                             </a>
                         </div>
-                        <small class="text-muted d-block text-center mt-1">View waste overview and record new incidents</small>
+                        <small class="text-muted d-block text-center mt-1">{% translate "View waste overview and record new incidents" %}</small>
                     </div>
                     <div class="col-md-4 mb-3">
                         <div class="d-grid">
                             <a href="{% url 'waste_management:reports' %}" class="btn btn-success quick-action-btn">
-                                <i class="fas fa-chart-bar"></i> Waste Reports
+                                <i class="fas fa-chart-bar"></i> {% translate "Waste Reports" %}
                             </a>
                         </div>
-                        <small class="text-muted d-block text-center mt-1">Generate detailed reports and analytics</small>
+                        <small class="text-muted d-block text-center mt-1">{% translate "Generate detailed reports and analytics" %}</small>
                     </div>
                     <div class="col-md-4 mb-3">
                         <div class="d-grid">
                             <a href="{% url 'waste_management:cost_settings' %}" class="btn btn-info quick-action-btn">
-                                <i class="fas fa-cog"></i> Cost Settings
+                                <i class="fas fa-cog"></i> {% translate "Cost Settings" %}
                             </a>
                         </div>
-                        <small class="text-muted d-block text-center mt-1">Configure waste cost calculations</small>
+                        <small class="text-muted d-block text-center mt-1">{% translate "Configure waste cost calculations" %}</small>
                     </div>
                 </div>
                 <div class="row mt-2">
@@ -400,7 +401,7 @@
                         <div class="alert alert-info d-flex align-items-center">
                             <i class="fas fa-info-circle me-2"></i>
                             <div>
-                                <strong>New Feature:</strong> Track food waste incidents, calculate cost impact, and export detailed reports in PDF, CSV, or Excel formats.
+                                <strong>{% translate "New Feature:" %}</strong> {% translate "Track food waste incidents, calculate cost impact, and export detailed reports in PDF, CSV, or Excel formats." %}
                             </div>
                         </div>
                     </div>
@@ -415,48 +416,48 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-person-plus"></i> Add Staff Member</h5>
+                <h5 class="modal-title"><i class="bi bi-person-plus"></i> {% translate "Add Staff Member" %}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="addStaffForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
+                        <label for="username" class="form-label">{% translate "Username" %}</label>
                         <input type="text" class="form-control" id="username" name="username" required>
                     </div>
                     <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
+                        <label for="email" class="form-label">{% translate "Email" %}</label>
                         <input type="email" class="form-control" id="email" name="email" required>
                     </div>
                     <div class="mb-3">
-                        <label for="first_name" class="form-label">First Name</label>
+                        <label for="first_name" class="form-label">{% translate "First Name" %}</label>
                         <input type="text" class="form-control" id="first_name" name="first_name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="last_name" class="form-label">Last Name</label>
+                        <label for="last_name" class="form-label">{% translate "Last Name" %}</label>
                         <input type="text" class="form-control" id="last_name" name="last_name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="role" class="form-label">Role</label>
+                        <label for="role" class="form-label">{% translate "Role" %}</label>
                         <select class="form-select" id="role" name="role" required>
-                            <option value="">Select Role</option>
-                            <option value="kitchen">Kitchen Staff</option>
-                            <option value="customer_care">Customer Care</option>
+                            <option value="">{% translate "Select Role" %}</option>
+                            <option value="kitchen">{% translate "Kitchen Staff" %}</option>
+                            <option value="customer_care">{% translate "Customer Care" %}</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="phone_number" class="form-label">Phone Number</label>
+                        <label for="phone_number" class="form-label">{% translate "Phone Number" %}</label>
                         <input type="tel" class="form-control" id="phone_number" name="phone_number">
                     </div>
                     <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
+                        <label for="password" class="form-label">{% translate "Password" %}</label>
                         <input type="password" class="form-control" id="password" name="password" required>
-                        <div class="form-text">Password will be set to this value. User can change it later.</div>
+                        <div class="form-text">{% translate "Password will be set to this value. User can change it later." %}</div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Staff Member</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary">{% translate "Add Staff Member" %}</button>
                 </div>
             </form>
         </div>
@@ -465,6 +466,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Staff member added successfully!" as t_staff_added %}{% translate "Error adding staff member" as t_staff_error %}
 <script>
 function showStaffModal() {
     const modal = new bootstrap.Modal(document.getElementById('addStaffModal'));
@@ -488,17 +490,17 @@ document.getElementById('addStaffForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showNotification('Staff member added successfully!', 'success');
+            showNotification("{{ t_staff_added|escapejs }}", 'success');
             bootstrap.Modal.getInstance(document.getElementById('addStaffModal')).hide();
             this.reset();
             setTimeout(() => location.reload(), 1500);
         } else {
-            showNotification(data.message || 'Error adding staff member', 'error');
+            showNotification(data.message || "{{ t_staff_error|escapejs }}", 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showNotification('Error adding staff member', 'error');
+        showNotification("{{ t_staff_error|escapejs }}", 'error');
     });
 });
 

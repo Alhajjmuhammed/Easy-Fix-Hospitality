@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Rate Order #{{ order.order_number }}{% endblock %}
+{% block title %}{% blocktranslate with n=order.order_number %}Rate Order #{{ n }}{% endblocktranslate %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -16,38 +17,38 @@
 {% block content %}
 <div class="container" style="max-width:520px; padding: 2rem 1rem;">
     <div class="text-center mb-4">
-        <h1 class="h3 fw-bold mb-1">How was your order?</h1>
-        <p class="text-muted mb-0">Order #{{ order.order_number }}</p>
+        <h1 class="h3 fw-bold mb-1">{% translate "How was your order?" %}</h1>
+        <p class="text-muted mb-0">{% blocktranslate with n=order.order_number %}Order #{{ n }}{% endblocktranslate %}</p>
     </div>
     <form method="post" onsubmit="var b=this.querySelector('button[type=submit]'); if (b) { b.disabled = true; }">
         {% csrf_token %}
         <fieldset class="mb-4 text-center">
-            <legend class="fs-6 fw-semibold">Food</legend>
+            <legend class="fs-6 fw-semibold">{% translate "Food" %}</legend>
             <div class="star-row">
                 {% for n in "54321" %}
                 <input type="radio" name="food" id="food{{ n }}" value="{{ n }}" {% if form.food == n %}checked{% endif %} required>
-                <label for="food{{ n }}" title="{{ n }} star{{ n|pluralize }}"><i class="bi bi-star-fill"></i></label>
+                <label for="food{{ n }}" title="{% blocktranslate count counter=n|add:0 %}{{ counter }} star{% plural %}{{ counter }} stars{% endblocktranslate %}"><i class="bi bi-star-fill"></i></label>
                 {% endfor %}
             </div>
         </fieldset>
         {% if order.order_type == 'delivery' %}
         <fieldset class="mb-4 text-center">
-            <legend class="fs-6 fw-semibold">Delivery <span class="text-muted fw-normal small">(optional)</span></legend>
+            <legend class="fs-6 fw-semibold">{% blocktranslate %}Delivery <span class="text-muted fw-normal small">(optional)</span>{% endblocktranslate %}</legend>
             <div class="star-row">
                 {% for n in "54321" %}
                 <input type="radio" name="delivery" id="del{{ n }}" value="{{ n }}" {% if form.delivery == n %}checked{% endif %}>
-                <label for="del{{ n }}" title="{{ n }} star{{ n|pluralize }}"><i class="bi bi-star-fill"></i></label>
+                <label for="del{{ n }}" title="{% blocktranslate count counter=n|add:0 %}{{ counter }} star{% plural %}{{ counter }} stars{% endblocktranslate %}"><i class="bi bi-star-fill"></i></label>
                 {% endfor %}
             </div>
         </fieldset>
         {% endif %}
         <div class="mb-4">
-            <label class="form-label fw-semibold" for="comment">Comment <span class="text-muted fw-normal small">(optional)</span></label>
-            <textarea class="form-control" id="comment" name="comment" rows="3" maxlength="1000" placeholder="What did you like? What could be better?">{{ form.comment }}</textarea>
+            <label class="form-label fw-semibold" for="comment">{% translate "Comment" %} <span class="text-muted fw-normal small">{% translate "(optional)" %}</span></label>
+            <textarea class="form-control" id="comment" name="comment" rows="3" maxlength="1000" placeholder="{% translate 'What did you like? What could be better?' %}">{{ form.comment }}</textarea>
         </div>
         <div class="d-grid gap-2">
-            <button type="submit" class="btn btn-warning btn-lg fw-bold">Send rating</button>
-            <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-outline-secondary">Back to order</a>
+            <button type="submit" class="btn btn-warning btn-lg fw-bold">{% translate "Send rating" %}</button>
+            <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-outline-secondary">{% translate "Back to order" %}</a>
         </div>
     </form>
 </div>

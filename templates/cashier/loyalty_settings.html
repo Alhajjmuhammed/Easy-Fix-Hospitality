@@ -1,40 +1,41 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Loyalty Points{% endblock %}
+{% block title %}{% translate "Loyalty Points" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <h1 class="h3 mb-3"><i class="fas fa-gift me-2"></i>Loyalty Points</h1>
+    <h1 class="h3 mb-3"><i class="fas fa-gift me-2"></i>{% translate "Loyalty Points" %}</h1>
 
     <div class="row g-3">
         <div class="col-lg-5">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-3">Settings</h6>
-                    {% if not can_edit %}<div class="alert alert-info small">Loyalty points are shared by all branches and set by the main restaurant owner.</div>{% endif %}
+                    <h6 class="fw-bold mb-3">{% translate "Settings" %}</h6>
+                    {% if not can_edit %}<div class="alert alert-info small">{% translate "Loyalty points are shared by all branches and set by the main restaurant owner." %}</div>{% endif %}
                     <form method="post">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="settings">
                         <div class="form-check form-switch mb-3">
                             <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" {% if program.enabled %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
-                            <label class="form-check-label fw-semibold" for="enabled">Give customers loyalty points</label>
+                            <label class="form-check-label fw-semibold" for="enabled">{% translate "Give customers loyalty points" %}</label>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold" for="spend_per_point">Customers earn 1 point for every</label>
+                            <label class="form-label small fw-semibold" for="spend_per_point">{% translate "Customers earn 1 point for every" %}</label>
                             <input class="form-control" id="spend_per_point" name="spend_per_point" inputmode="decimal" value="{{ program.spend_per_point }}" {% if not can_edit %}disabled{% endif %}>
-                            <div class="form-text">spent on a fully paid order (money paid with points earns nothing).</div>
+                            <div class="form-text">{% translate "spent on a fully paid order (money paid with points earns nothing)." %}</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold" for="point_value">1 point is worth</label>
+                            <label class="form-label small fw-semibold" for="point_value">{% translate "1 point is worth" %}</label>
                             <input class="form-control" id="point_value" name="point_value" inputmode="decimal" value="{{ program.point_value }}" {% if not can_edit %}disabled{% endif %}>
-                            <div class="form-text">when the customer pays with points at the cashier.</div>
+                            <div class="form-text">{% translate "when the customer pays with points at the cashier." %}</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold" for="min_redeem_points">Smallest number of points used at once</label>
+                            <label class="form-label small fw-semibold" for="min_redeem_points">{% translate "Smallest number of points used at once" %}</label>
                             <input type="number" min="1" class="form-control" id="min_redeem_points" name="min_redeem_points" value="{{ program.min_redeem_points }}" {% if not can_edit %}disabled{% endif %}>
                         </div>
                         <div class="small text-muted mb-3" id="example"></div>
-                        {% if can_edit %}<button class="btn btn-primary">Save settings</button>{% endif %}
+                        {% if can_edit %}<button class="btn btn-primary">{% translate "Save settings" %}</button>{% endif %}
                     </form>
                 </div>
             </div>
@@ -42,12 +43,12 @@
         <div class="col-lg-7">
             <div class="row g-3 mb-3">
                 <div class="col-6"><div class="card shadow-sm border-0"><div class="card-body">
-                    <div class="small text-uppercase text-muted fw-semibold">Points customers hold</div>
+                    <div class="small text-uppercase text-muted fw-semibold">{% translate "Points customers hold" %}</div>
                     <div class="h4 mb-0 fw-bold">{{ outstanding }}</div>
-                    <div class="small text-muted">worth {{ outstanding_worth }}</div>
+                    <div class="small text-muted">{% blocktranslate with worth=outstanding_worth %}worth {{ worth }}{% endblocktranslate %}</div>
                 </div></div></div>
                 <div class="col-6"><div class="card shadow-sm border-0"><div class="card-body">
-                    <div class="small text-uppercase text-muted fw-semibold">Points used to pay</div>
+                    <div class="small text-uppercase text-muted fw-semibold">{% translate "Points used to pay" %}</div>
                     <div class="h4 mb-0 fw-bold">{{ redeemed }}</div>
                 </div></div></div>
             </div>
@@ -55,7 +56,7 @@
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
-                            <thead class="table-light"><tr><th class="ps-3">Customer</th><th>Phone</th><th class="text-end">Points</th>{% if can_edit %}<th class="pe-3">Adjust</th>{% endif %}</tr></thead>
+                            <thead class="table-light"><tr><th class="ps-3">{% translate "Customer" %}</th><th>{% translate "Phone" %}</th><th class="text-end">{% translate "Points" %}</th>{% if can_edit %}<th class="pe-3">{% translate "Adjust" %}</th>{% endif %}</tr></thead>
                             <tbody>
                             {% for c in customers %}
                             <tr>
@@ -68,15 +69,15 @@
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="adjust">
                                         <input type="hidden" name="customer_id" value="{{ c.customer }}">
-                                        <input name="points" type="number" class="form-control form-control-sm" style="width:90px" placeholder="+/-" required aria-label="Points to add or remove">
-                                        <input name="note" class="form-control form-control-sm" style="width:140px" maxlength="200" placeholder="Reason" aria-label="Reason">
-                                        <button class="btn btn-sm btn-outline-primary">Save</button>
+                                        <input name="points" type="number" class="form-control form-control-sm" style="width:90px" placeholder="+/-" required aria-label="{% translate "Points to add or remove" %}">
+                                        <input name="note" class="form-control form-control-sm" style="width:140px" maxlength="200" placeholder="{% translate "Reason" %}" aria-label="{% translate "Reason" %}">
+                                        <button class="btn btn-sm btn-outline-primary">{% translate "Save" %}</button>
                                     </form>
                                 </td>
                                 {% endif %}
                             </tr>
                             {% empty %}
-                            <tr><td colspan="4" class="text-center text-muted py-4">No customer has points yet.</td></tr>
+                            <tr><td colspan="4" class="text-center text-muted py-4">{% translate "No customer has points yet." %}</td></tr>
                             {% endfor %}
                             </tbody>
                         </table>
@@ -86,6 +87,7 @@
         </div>
     </div>
 </div>
+{% translate "Example: a customer who spends {spend} earns 100 points, worth {back} ({pct}% back). They can use them from {min} points." as t_example %}
 <script>
 (function () {
     var s = document.getElementById('spend_per_point'), v = document.getElementById('point_value'), m = document.getElementById('min_redeem_points');
@@ -93,8 +95,8 @@
     function show() {
         if (!n(s) || !n(v)) { document.getElementById('example').textContent = ''; return; }
         var spend = n(s) * 100, back = 100 * n(v);
-        document.getElementById('example').textContent = 'Example: a customer who spends ' + spend.toLocaleString() +
-            ' earns 100 points, worth ' + back.toLocaleString() + ' (' + (back / spend * 100).toFixed(1) + '% back). They can use them from ' + (n(m) || 1) + ' points.';
+        document.getElementById('example').textContent = "{{ t_example|escapejs }}".replace('{spend}', spend.toLocaleString())
+            .replace('{back}', back.toLocaleString()).replace('{pct}', (back / spend * 100).toFixed(1)).replace('{min}', (n(m) || 1));
     }
     [s, v, m].forEach(function (el) { el.addEventListener('input', show); });
     show();

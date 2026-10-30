@@ -1,0 +1,410 @@
+msgid "Welcome to"
+msgstr "Karibu"
+
+msgid "Orders, inventory, reports and money flow — all in one place."
+msgstr "Oda, stoo, ripoti na mzunguko wa pesa — vyote mahali pamoja."
+
+msgid "Get Started"
+msgstr "Anza sasa"
+
+msgid "Dine-In (Scan QR)"
+msgstr "Kula hapa (Skani QR)"
+
+msgid "Order from Anywhere"
+msgstr "Agiza Ukiwa Popote"
+
+msgid "Digital Menu"
+msgstr "Menyu ya kidijitali"
+
+msgid "Browse categories, descriptions and prices in real time."
+msgstr "Tazama makundi, maelezo na bei papo hapo."
+
+msgid "Easy Ordering"
+msgstr "Kuagiza kwa urahisi"
+
+msgid "Place and track orders from any table instantly."
+msgstr "Weka na fuatilia oda kutoka meza yoyote papo hapo."
+
+msgid "Revenue, tax and money flow — always accurate."
+msgstr "Mapato, kodi na mzunguko wa pesa — sahihi kila wakati."
+
+msgid "Restaurants that accept delivery & pickup orders"
+msgstr "Migahawa inayopokea oda za kuletewa na kuchukua mwenyewe"
+
+msgid "Search restaurants…"
+msgstr "Tafuta migahawa…"
+
+msgid "You have an active delivery order session"
+msgstr "Una oda ya kuletewa inayoendelea"
+
+msgid "You have an active pickup order session"
+msgstr "Una oda ya kuchukua mwenyewe inayoendelea"
+
+msgid "You have an active %(type)s order session"
+msgstr "Una oda inayoendelea (%(type)s)"
+
+msgid "Currently ordering from <strong>%(name)s</strong>."
+msgstr "Kwa sasa unaagiza kutoka <strong>%(name)s</strong>."
+
+msgid "Would you like to continue or choose a different restaurant?"
+msgstr "Ungependa kuendelea au kuchagua mgahawa mwingine?"
+
+msgid "Continue with %(name)s"
+msgstr "Endelea na %(name)s"
+
+msgid "Choose Another Restaurant"
+msgstr "Chagua Mgahawa Mwingine"
+
+msgid "No restaurants match \"%(q)s\""
+msgstr "Hakuna mgahawa unaolingana na \"%(q)s\""
+
+msgid "No restaurants accepting remote orders right now"
+msgstr "Hakuna mgahawa unaopokea oda za mbali kwa sasa"
+
+msgid "Clear search"
+msgstr "Futa utafutaji"
+
+msgid "Want to dine in instead?"
+msgstr "Ungependa kula hapa badala yake?"
+
+msgid "Scan QR for Dine-In"
+msgstr "Skani QR ili kula hapa"
+
+msgid "How would you like to order?"
+msgstr "Ungependa kuagiza vipi?"
+
+msgid "How would you like to receive your order?"
+msgstr "Ungependa kupokea oda yako vipi?"
+
+msgid "What would you like to do?"
+msgstr "Ungependa kufanya nini?"
+
+msgid "Order now and get it delivered to your door"
+msgstr "Agiza sasa uletewe hadi mlangoni"
+
+msgid "Order ahead and collect at the restaurant"
+msgstr "Agiza mapema uchukue mgahawani"
+
+msgid "Book a table"
+msgstr "Hifadhi meza"
+
+msgid "Reserve a table for dining in"
+msgstr "Hifadhi meza ya kulia hapa"
+
+msgid "Back to Restaurants"
+msgstr "Rudi kwenye Migahawa"
+
+msgid "Book a Table"
+msgstr "Hifadhi meza"
+
+msgid "at <strong>%(name)s</strong>"
+msgstr "katika <strong>%(name)s</strong>"
+
+msgid "The restaurant will confirm your booking. You'll be notified."
+msgstr "Mgahawa utathibitisha uhifadhi wako. Utajulishwa."
+
+msgid "Date"
+msgstr "Tarehe"
+
+msgid "Time"
+msgstr "Saa"
+
+msgid "Number of people"
+msgstr "Idadi ya watu"
+
+msgid "Name for the booking"
+msgstr "Jina la mhifadhi"
+
+msgid "Requests (optional)"
+msgstr "Maombi maalum (si lazima)"
+
+msgid "Birthday, high chair, window seat…"
+msgstr "Siku ya kuzaliwa, kiti cha mtoto, kiti cha dirishani…"
+
+msgid "Request booking"
+msgstr "Omba kuhifadhi"
+
+msgid "My reservations"
+msgstr "Meza nilizohifadhi"
+
+msgid "Cancel this reservation?"
+msgstr "Ghairi uhifadhi huu?"
+
+msgid "%(n)s people"
+msgstr "watu %(n)s"
+
+msgid "Table %(no)s"
+msgstr "Meza %(no)s"
+
+msgid "Waiting for confirmation"
+msgstr "Inasubiri kuthibitishwa"
+
+msgid "Cancel"
+msgstr "Ghairi"
+
+msgid "You have no upcoming reservations."
+msgstr "Huna meza uliyohifadhi inayokuja."
+
+msgid "Past"
+msgstr "Zilizopita"
+
+msgid "Delivery Details"
+msgstr "Taarifa za Kuletewa"
+
+msgid "Ordering from <strong>%(name)s</strong>"
+msgstr "Unaagiza kutoka <strong>%(name)s</strong>"
+
+msgid "Our delivery rider will use these details to find you."
+msgstr "Msafirishaji wetu atatumia taarifa hizi kukupata."
+
+msgid "— free for orders from %(sym)s%(amount)s"
+msgstr "— bure kwa oda kuanzia %(sym)s%(amount)s"
+
+msgid "Free delivery"
+msgstr "Kuletewa bure"
+
+msgid "Delivery Address"
+msgstr "Anwani ya Kuletewa"
+
+msgid "Street, building, floor, landmark…"
+msgstr "Mtaa, jengo, ghorofa, alama ya karibu…"
+
+msgid "Use my current location (optional)"
+msgstr "Tumia mahali nilipo sasa (si lazima)"
+
+msgid "Location pin saved for the rider."
+msgstr "Alama ya mahali imehifadhiwa kwa ajili ya msafirishaji."
+
+msgid "Helps the rider find you exactly."
+msgstr "Inamsaidia msafirishaji kukupata kwa usahihi."
+
+msgid "Browse Menu"
+msgstr "Tazama Menyu"
+
+msgid "Back"
+msgstr "Rudi"
+
+msgid "Location is not available on this device."
+msgstr "Mahali hapapatikani kwenye kifaa hiki."
+
+msgid "Getting your location…"
+msgstr "Inatafuta mahali ulipo…"
+
+msgid "✓ Location pin added for the rider."
+msgstr "✓ Alama ya mahali imeongezwa kwa ajili ya msafirishaji."
+
+msgid "Could not get your location. You can still continue with the address."
+msgstr "Imeshindikana kupata mahali ulipo. Bado unaweza kuendelea kwa kutumia anwani."
+
+msgid "Restaurant Logo"
+msgstr "Nembo ya mgahawa"
+
+msgid "Free WiFi Available"
+msgstr "WiFi ya bure inapatikana"
+
+msgid "Network:"
+msgstr "Mtandao:"
+
+msgid "Copy network name"
+msgstr "Nakili jina la mtandao"
+
+msgid "Password:"
+msgstr "Nenosiri:"
+
+msgid "Copy password"
+msgstr "Nakili nenosiri"
+
+msgid "Menu View Only"
+msgstr "Menyu ya kuangalia tu"
+
+msgid "Please call our staff to place your order"
+msgstr "Tafadhali mwite mhudumu wetu akuwekee oda"
+
+msgid "How to Order"
+msgstr "Jinsi ya kuagiza"
+
+msgid "Browse our menu below and call our staff to place your order. We're happy to assist you!"
+msgstr "Tazama menyu yetu hapa chini kisha mwite mhudumu wetu akuwekee oda. Tunafurahi kukuhudumia!"
+
+msgid "Unavailable"
+msgstr "Haipatikani"
+
+msgid "No Menu Available"
+msgstr "Hakuna menyu"
+
+msgid "Please contact the restaurant staff for menu information."
+msgstr "Tafadhali wasiliana na wahudumu wa mgahawa kwa taarifa za menyu."
+
+msgid "Ready to Order?"
+msgstr "Uko tayari kuagiza?"
+
+msgid "Please call our staff to place your order. We look forward to serving you!"
+msgstr "Tafadhali mwite mhudumu wetu akuwekee oda. Tunatarajia kukuhudumia!"
+
+msgid "Table <strong>%(no)s</strong>"
+msgstr "Meza <strong>%(no)s</strong>"
+
+msgid "Select items to add to your cart"
+msgstr "Chagua bidhaa za kuongeza kwenye kikapu chako"
+
+msgid "%(t)sm"
+msgstr "Dak %(t)s"
+
+msgid "Add"
+msgstr "Ongeza"
+
+msgid "No Menu Items Available"
+msgstr "Hakuna bidhaa kwenye menyu"
+
+msgid "%(n)s item"
+msgid_plural "%(n)s items"
+msgstr[0] "bidhaa %(n)s"
+msgstr[1] "bidhaa %(n)s"
+
+msgid "Scan QR Code — Dine-In"
+msgstr "Skani QR — Kula hapa"
+
+msgid "Scan Your Table QR"
+msgstr "Skani QR ya meza yako"
+
+msgid "Point your camera at the QR code on your table to start ordering."
+msgstr "Elekeza kamera kwenye QR iliyo mezani kwako ili uanze kuagiza."
+
+msgid "How it works"
+msgstr "Jinsi inavyofanya kazi"
+
+msgid "Find the QR code card on your table"
+msgstr "Tafuta kadi ya QR mezani kwako"
+
+msgid "Allow camera access when prompted"
+msgstr "Ruhusu kamera itumike ukiulizwa"
+
+msgid "Hold the QR code in front of your camera"
+msgstr "Shikilia QR mbele ya kamera yako"
+
+msgid "You'll be taken straight to the menu!"
+msgstr "Utapelekwa moja kwa moja kwenye menyu!"
+
+msgid "Ordering delivery or pickup instead?"
+msgstr "Unataka kuletewa au kuchukua mwenyewe badala yake?"
+
+msgid "QR code detected! Loading your table…"
+msgstr "QR imetambuliwa! Inapakia meza yako…"
+
+msgid "That QR code doesn't look like a restaurant table code. Please scan the QR on your table."
+msgstr "QR hiyo haionekani kuwa ya meza ya mgahawa. Tafadhali skani QR iliyo mezani kwako."
+
+msgid "Select Table"
+msgstr "Chagua Meza"
+
+msgid "Welcome to %(name)s!"
+msgstr "Karibu %(name)s!"
+
+msgid "Welcome!"
+msgstr "Karibu!"
+
+msgid "Restaurant selected via QR code"
+msgstr "Mgahawa umechaguliwa kupitia QR"
+
+msgid "Please select your table to start ordering"
+msgstr "Tafadhali chagua meza yako ili uanze kuagiza"
+
+msgid "Occupied"
+msgstr "Ina wateja"
+
+msgid "%(n)s seats"
+msgstr "viti %(n)s"
+
+msgid "No Tables Available"
+msgstr "Hakuna meza zilizo wazi"
+
+msgid "Please contact our staff for assistance."
+msgstr "Tafadhali wasiliana na wahudumu wetu kwa msaada."
+
+msgid "Back to Restaurant"
+msgstr "Rudi kwenye Mgahawa"
+
+msgid "Can't find your table? Ask our staff for assistance."
+msgstr "Huioni meza yako? Omba msaada kwa wahudumu wetu."
+
+msgid "Confirm Table Selection"
+msgstr "Thibitisha Meza Uliyochagua"
+
+msgid "You've selected this table for your order. Continue to browse the menu?"
+msgstr "Umechagua meza hii kwa oda yako. Uendelee kutazama menyu?"
+
+msgid "This table is currently occupied"
+msgstr "Meza hii ina wateja kwa sasa"
+
+msgid "Add to Existing Order"
+msgstr "Ongeza kwenye Oda Iliyopo"
+
+msgid "Same customer adding more items"
+msgstr "Mteja yule yule anaongeza bidhaa"
+
+msgid "Create New Order"
+msgstr "Anzisha Oda Mpya"
+
+msgid "Different customer at this table"
+msgstr "Mteja mwingine kwenye meza hii"
+
+msgid "Continue"
+msgstr "Endelea"
+
+msgid "Order Options"
+msgstr "Chaguo za Oda"
+
+msgid "Currently Occupied"
+msgstr "Ina wateja kwa sasa"
+
+msgid "<strong>%(n)s</strong> Active Order"
+msgid_plural "<strong>%(n)s</strong> Active Orders"
+msgstr[0] "Oda <strong>%(n)s</strong> inayoendelea"
+msgstr[1] "Oda <strong>%(n)s</strong> zinazoendelea"
+
+msgid "<strong>%(n)s</strong> other customer is also dining at this table"
+msgid_plural "<strong>%(n)s</strong> other customers are also dining at this table"
+msgstr[0] "Mteja mwingine <strong>%(n)s</strong> pia anakula kwenye meza hii"
+msgstr[1] "Wateja wengine <strong>%(n)s</strong> pia wanakula kwenye meza hii"
+
+msgid "Choose Different Table"
+msgstr "Chagua Meza Nyingine"
+
+msgid "Select Order"
+msgstr "Chagua Oda"
+
+msgid "Select which order to add items to"
+msgstr "Chagua oda unayotaka kuongezea bidhaa"
+
+msgid "%(t)s ago"
+msgstr "%(t)s zilizopita"
+
+msgid "Continue to Menu"
+msgstr "Endelea kwenye Menyu"
+
+msgid "Please select an order"
+msgstr "Tafadhali chagua oda"
+
+msgid "My Loyalty Points"
+msgstr "Pointi Zangu"
+
+msgid "Your code to pay with points"
+msgstr "Namba yako ya kulipia kwa pointi"
+
+msgid "Tell it to the cashier only when you want to use your points. It changes after each use."
+msgstr "Mwambie keshia tu unapotaka kutumia pointi zako. Inabadilika kila baada ya kutumika."
+
+msgid "1 point for every %(spend)s spent · use from %(min)s points"
+msgstr "Pointi 1 kwa kila %(spend)s unazotumia · tumia kuanzia pointi %(min)s"
+
+msgid "%(n)s pts"
+msgstr "pointi %(n)s"
+
+msgid "worth %(amount)s"
+msgstr "thamani %(amount)s"
+
+msgid "To use your points, ask the cashier to pay with “Loyalty points”."
+msgstr "Kutumia pointi zako, mwombe keshia akulipishe kwa “Loyalty points”."
+
+msgid "You have no points yet. Restaurants with a loyalty programme give you points when you pay for an order."
+msgstr "Bado huna pointi. Migahawa yenye mpango wa zawadi kwa wateja hukupa pointi unapolipia oda."

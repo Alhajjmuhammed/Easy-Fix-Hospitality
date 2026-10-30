@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Categories Management - Admin Panel{% endblock %}
+{% block title %}{% translate "Categories Management" %} - {% translate "Admin Panel" %}{% endblock %}
 
-{% block page_title %}Categories Management{% endblock %}
-{% block page_description %}Manage menu categories and subcategories{% endblock %}
+{% block page_title %}{% translate "Categories Management" %}{% endblock %}
+{% block page_description %}{% translate "Manage menu categories and subcategories" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -62,12 +63,12 @@
 <ul class="nav nav-tabs" id="categoryTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active" id="main-categories-tab" data-bs-toggle="tab" data-bs-target="#main-categories" type="button" role="tab" aria-controls="main-categories" aria-selected="true">
-            <i class="fas fa-folder me-2"></i>Main Categories
+            <i class="fas fa-folder me-2"></i>{% translate "Main Categories" %}
         </button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="subcategories-tab" data-bs-toggle="tab" data-bs-target="#subcategories" type="button" role="tab" aria-controls="subcategories" aria-selected="false">
-            <i class="fas fa-folder-open me-2"></i>Subcategories
+            <i class="fas fa-folder-open me-2"></i>{% translate "Subcategories" %}
         </button>
     </li>
 </ul>
@@ -84,25 +85,25 @@
                         <!-- Search Input -->
                         <div class="col-md-5">
                             <label for="categorySearch" class="form-label">
-                                <i class="fas fa-search"></i> Search Categories
+                                <i class="fas fa-search"></i> {% translate "Search Categories" %}
                             </label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="categorySearch" name="search" 
-                                       value="{{ request.GET.search }}" placeholder="Search by category name...">
+                                       value="{{ request.GET.search }}" placeholder="{% translate "Search by category name..." %}">
                                 <span class="input-group-text">
                                     <i class="fas fa-search"></i>
                                 </span>
                             </div>
-                            <small class="text-muted">Press ESC to clear search</small>
+                            <small class="text-muted">{% translate "Press ESC to clear search" %}</small>
                         </div>
 
                         <!-- Restaurant Filter -->
                         <div class="col-md-3">
                             <label for="restaurantFilter" class="form-label">
-                                <i class="fas fa-building"></i> Restaurant
+                                <i class="fas fa-building"></i> {% translate "Restaurant" %}
                             </label>
                             <select class="form-select" id="restaurantFilter" name="restaurant">
-                                <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                                <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>{% translate "All Restaurants" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}" 
                                     {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
@@ -117,19 +118,19 @@
                         <!-- Status Filter -->
                         <div class="col-md-2">
                             <label for="statusFilter" class="form-label">
-                                <i class="fas fa-toggle-on"></i> Status
+                                <i class="fas fa-toggle-on"></i> {% translate "Status" %}
                             </label>
                             <select class="form-select" id="statusFilter" name="status">
-                                <option value="">All Status</option>
-                                <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
-                                <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                <option value="">{% translate "All Status" %}</option>
+                                <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
+                                <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
                             </select>
                         </div>
 
                         <!-- Items Per Page -->
                         <div class="col-md-2">
                             <label for="perPageSelect" class="form-label">
-                                <i class="fas fa-list"></i> Per Page
+                                <i class="fas fa-list"></i> {% translate "Per Page" %}
                             </label>
                             <select class="form-select" id="perPageSelect" name="per_page">
                                 <option value="5" {% if request.GET.per_page == '5' %}selected{% endif %}>5</option>
@@ -145,9 +146,9 @@
                     <div class="mt-3">
                         <div class="text-muted">
                             {% if page_obj %}
-                                Showing <strong>{{ page_obj.paginator.count }}</strong> categories total
+                                {% blocktranslate with total=page_obj.paginator.count %}Showing <strong>{{ total }}</strong> categories total{% endblocktranslate %}
                             {% else %}
-                                Showing <strong>{{ main_categories|length }}</strong> categories total
+                                {% blocktranslate with total=main_categories|length %}Showing <strong>{{ total }}</strong> categories total{% endblocktranslate %}
                             {% endif %}
                         </div>
                     </div>
@@ -158,10 +159,10 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="d-flex gap-2">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMainCategoryModal">
-                    <i class="fas fa-plus me-2"></i>Add Main Category
+                    <i class="fas fa-plus me-2"></i>{% translate "Add Main Category" %}
                 </button>
                 <button class="btn btn-danger" id="bulkDeleteMainCategoriesBtn" style="display: none;">
-                    <i class="fas fa-trash me-2"></i>Delete Selected (<span id="selectedMainCategoriesCount">0</span>)
+                    <i class="fas fa-trash me-2"></i>{% translate "Delete Selected" %} (<span id="selectedMainCategoriesCount">0</span>)
                 </button>
             </div>
         </div>
@@ -173,12 +174,12 @@
                         <th width="40">
                             <input type="checkbox" class="form-check-input" id="selectAllMainCategories">
                         </th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Restaurant/Branch</th>
-                        <th>Status</th>
-                        <th>Subcategories</th>
-                        <th>Actions</th>
+                        <th>{% translate "Category" %}</th>
+                        <th>{% translate "Description" %}</th>
+                        <th>{% translate "Restaurant/Branch" %}</th>
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Subcategories" %}</th>
+                        <th>{% translate "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody id="mainCategoriesTableBody">
@@ -198,12 +199,12 @@
                                 </div>
                                 <div>
                                     <div class="fw-semibold">{{ category.name }}</div>
-                                    <small class="text-muted">Main Category</small>
+                                    <small class="text-muted">{% translate "Main Category" %}</small>
                                 </div>
                             </div>
                         </td>
                         <td>
-                            <span class="text-muted">{{ category.description|truncatewords:8|default:"No description provided" }}</span>
+                            <span class="text-muted cat-desc" data-description="{{ category.description }}">{{ category.description|truncatewords:8|default:_("No description provided") }}</span>
                         </td>
                         <td>
                             {% if category.restaurant %}
@@ -217,11 +218,11 @@
                         <td>
                             {% if category.is_active %}
                                 <span class="badge bg-success">
-                                    <i class="fas fa-check me-1"></i>Active
+                                    <i class="fas fa-check me-1"></i>{% translate "Active" %}
                                 </span>
                             {% else %}
                                 <span class="badge bg-secondary">
-                                    <i class="fas fa-times me-1"></i>Inactive
+                                    <i class="fas fa-times me-1"></i>{% translate "Inactive" %}
                                 </span>
                             {% endif %}
                         </td>
@@ -234,13 +235,13 @@
                             <div class="btn-group" role="group">
                                 <button class="btn btn-sm btn-outline-primary edit-main-category-btn" 
                                         data-category-id="{{ category.id }}" 
-                                        title="Edit Category">
+                                        title="{% translate "Edit Category" %}">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button class="btn btn-sm btn-outline-warning toggle-main-category-btn" 
                                         data-category-id="{{ category.id }}" 
                                         data-active="{{ category.is_active|yesno:'true,false' }}" 
-                                        title="{% if category.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                        title="{% if category.is_active %}{% translate "Deactivate" %}{% else %}{% translate "Activate" %}{% endif %}">
                                     {% if category.is_active %}
                                         <i class="fas fa-eye-slash"></i>
                                     {% else %}
@@ -250,7 +251,7 @@
                                 <button class="btn btn-sm btn-outline-danger delete-main-category-btn" 
                                         data-category-id="{{ category.id }}" 
                                         data-name="{{ category.name }}" 
-                                        title="Delete Category">
+                                        title="{% translate "Delete Category" %}">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -260,7 +261,7 @@
                     <tr>
                         <td colspan="7" class="text-center text-muted py-4">
                             <i class="fas fa-folder fa-3x mb-3 d-block text-light"></i>
-                            No main categories found
+                            {% translate "No main categories found" %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -270,11 +271,11 @@
 
         <!-- Pagination Controls -->
         {% if page_obj.paginator.num_pages > 1 %}
-        <nav aria-label="Categories pagination" class="mt-4">
+        <nav aria-label="{% translate "Categories pagination" %}" class="mt-4">
             <div class="row align-items-center">
                 <div class="col-md-6">
                     <p class="text-muted mb-2">
-                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} categories
+                        {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }} to {{ end }} of {{ total }} categories{% endblocktranslate %}
                     </p>
                 </div>
                 <div class="col-md-6">
@@ -329,15 +330,15 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="d-flex gap-2">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubCategoryModal">
-                    <i class="fas fa-plus me-2"></i>Add Subcategory
+                    <i class="fas fa-plus me-2"></i>{% translate "Add Subcategory" %}
                 </button>
                 <button class="btn btn-danger" id="bulkDeleteSubcategoriesBtn" style="display: none;">
-                    <i class="fas fa-trash me-2"></i>Delete Selected (<span id="selectedSubcategoriesCount">0</span>)
+                    <i class="fas fa-trash me-2"></i>{% translate "Delete Selected" %} (<span id="selectedSubcategoriesCount">0</span>)
                 </button>
             </div>
             <div class="input-group" style="width: 300px;">
                 <span class="input-group-text"><i class="fas fa-search"></i></span>
-                <input type="text" class="form-control" placeholder="Search subcategories..." id="subcategorySearchInput">
+                <input type="text" class="form-control" placeholder="{% translate "Search subcategories..." %}" id="subcategorySearchInput">
             </div>
         </div>
         
@@ -348,13 +349,13 @@
                         <th width="40">
                             <input type="checkbox" class="form-check-input" id="selectAllSubcategories">
                         </th>
-                        <th>Subcategory</th>
-                        <th>Main Category</th>
-                        <th>Description</th>
-                        <th>Restaurant/Branch</th>
-                        <th>Status</th>
-                        <th>Products</th>
-                        <th>Actions</th>
+                        <th>{% translate "Subcategory" %}</th>
+                        <th>{% translate "Main Category" %}</th>
+                        <th>{% translate "Description" %}</th>
+                        <th>{% translate "Restaurant/Branch" %}</th>
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Products" %}</th>
+                        <th>{% translate "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody id="subcategoriesTableBody">
@@ -374,7 +375,7 @@
                                 </div>
                                 <div>
                                     <div class="fw-semibold">{{ subcategory.name }}</div>
-                                    <small class="text-muted">Subcategory</small>
+                                    <small class="text-muted">{% translate "Subcategory" %}</small>
                                 </div>
                             </div>
                         </td>
@@ -389,7 +390,7 @@
                             </span>
                         </td>
                         <td>
-                            <span class="text-muted">{{ subcategory.description|truncatewords:8|default:"No description provided" }}</span>
+                            <span class="text-muted cat-desc" data-description="{{ subcategory.description }}">{{ subcategory.description|truncatewords:8|default:_("No description provided") }}</span>
                         </td>
                         <td>
                             {% if subcategory.main_category.restaurant %}
@@ -403,11 +404,11 @@
                         <td>
                             {% if subcategory.is_active %}
                                 <span class="badge bg-success">
-                                    <i class="fas fa-check me-1"></i>Active
+                                    <i class="fas fa-check me-1"></i>{% translate "Active" %}
                                 </span>
                             {% else %}
                                 <span class="badge bg-secondary">
-                                    <i class="fas fa-times me-1"></i>Inactive
+                                    <i class="fas fa-times me-1"></i>{% translate "Inactive" %}
                                 </span>
                             {% endif %}
                         </td>
@@ -420,13 +421,13 @@
                             <div class="btn-group" role="group">
                                 <button class="btn btn-sm btn-outline-primary edit-subcategory-btn" 
                                         data-subcategory-id="{{ subcategory.id }}" 
-                                        title="Edit Subcategory">
+                                        title="{% translate "Edit Subcategory" %}">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button class="btn btn-sm btn-outline-warning toggle-subcategory-btn" 
                                         data-subcategory-id="{{ subcategory.id }}" 
                                         data-active="{{ subcategory.is_active|yesno:'true,false' }}" 
-                                        title="{% if subcategory.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                        title="{% if subcategory.is_active %}{% translate "Deactivate" %}{% else %}{% translate "Activate" %}{% endif %}">
                                     {% if subcategory.is_active %}
                                         <i class="fas fa-eye-slash"></i>
                                     {% else %}
@@ -436,7 +437,7 @@
                                 <button class="btn btn-sm btn-outline-danger delete-subcategory-btn" 
                                         data-subcategory-id="{{ subcategory.id }}" 
                                         data-name="{{ subcategory.name }}" 
-                                        title="Delete Subcategory">
+                                        title="{% translate "Delete Subcategory" %}">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -446,7 +447,7 @@
                     <tr>
                         <td colspan="8" class="text-center text-muted py-4">
                             <i class="fas fa-folder-open fa-3x mb-3 d-block text-light"></i>
-                            No subcategories found
+                            {% translate "No subcategories found" %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -462,62 +463,62 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-folder me-2"></i>Add Main Category
+                    <i class="fas fa-folder me-2"></i>{% translate "Add Main Category" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="addMainCategoryForm" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="mainCategoryName" class="form-label">Category Name</label>
+                        <label for="mainCategoryName" class="form-label">{% translate "Category Name" %}</label>
                         <input type="text" class="form-control" id="mainCategoryName" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="mainCategoryDescription" class="form-label">Description</label>
+                        <label for="mainCategoryDescription" class="form-label">{% translate "Description" %}</label>
                         <textarea class="form-control" id="mainCategoryDescription" name="description" rows="3"></textarea>
                     </div>
                     <div class="mb-3">
-                        <label for="mainCategoryImage" class="form-label">Category Image</label>
+                        <label for="mainCategoryImage" class="form-label">{% translate "Category Image" %}</label>
                         <input type="file" class="form-control" id="mainCategoryImage" name="image" accept="image/*">
-                        <div class="form-text">Upload an image for this category (JPG, PNG, GIF - Max: 5MB)</div>
+                        <div class="form-text">{% translate "Upload an image for this category (JPG, PNG, GIF - Max: 5MB)" %}</div>
                     </div>
                     <div class="mb-3">
-                        <label for="mainCategoryRestaurant" class="form-label">Restaurant/Branch</label>
+                        <label for="mainCategoryRestaurant" class="form-label">{% translate "Restaurant/Branch" %}</label>
                         <select class="form-select" id="mainCategoryRestaurant" name="restaurant_id" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
                             {% if view_all_restaurants %}
-                                <option value="">Select Restaurant/Branch</option>
+                                <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}">
-                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 {% endfor %}
                             {% elif current_restaurant %}
                                 <option value="{{ current_restaurant.id }}" selected>
-                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
                             {% else %}
-                                <option value="">No Restaurant Available</option>
+                                <option value="">{% translate "No Restaurant Available" %}</option>
                             {% endif %}
                         </select>
                         {% if current_restaurant and not view_all_restaurants %}
-                        <div class="form-text">Category will be assigned to: {{ current_restaurant.name }}</div>
+                        <div class="form-text">{% blocktranslate with name=current_restaurant.name %}Category will be assigned to: {{ name }}{% endblocktranslate %}</div>
                         {% endif %}
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="mainCategoryActive" name="is_active" checked>
                             <label class="form-check-label" for="mainCategoryActive">
-                                Active Category
+                                {% translate "Active Category" %}
                             </label>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i>Add Category
+                        <i class="fas fa-plus me-1"></i>{% translate "Add Category" %}
                     </button>
                 </div>
             </form>
@@ -531,53 +532,53 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>Edit Main Category
+                    <i class="fas fa-edit me-2"></i>{% translate "Edit Main Category" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="editMainCategoryForm" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="modal-body">
                     <input type="hidden" id="editMainCategoryId" name="category_id">
                     <div class="mb-3">
-                        <label for="editMainCategoryName" class="form-label">Category Name</label>
+                        <label for="editMainCategoryName" class="form-label">{% translate "Category Name" %}</label>
                         <input type="text" class="form-control" id="editMainCategoryName" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editMainCategoryDescription" class="form-label">Description</label>
+                        <label for="editMainCategoryDescription" class="form-label">{% translate "Description" %}</label>
                         <textarea class="form-control" id="editMainCategoryDescription" name="description" rows="3"></textarea>
                     </div>
                     <div class="mb-3">
-                        <label for="editMainCategoryImage" class="form-label">Category Image</label>
+                        <label for="editMainCategoryImage" class="form-label">{% translate "Category Image" %}</label>
                         <input type="file" class="form-control" id="editMainCategoryImage" name="image" accept="image/*">
-                        <div class="form-text">Upload a new image to replace the current one (optional)</div>
+                        <div class="form-text">{% translate "Upload a new image to replace the current one (optional)" %}</div>
                         <div id="currentImagePreview" style="margin-top: 10px;"></div>
                     </div>
                     <div class="mb-3">
-                        <label for="editMainCategoryRestaurant" class="form-label">Restaurant/Branch</label>
+                        <label for="editMainCategoryRestaurant" class="form-label">{% translate "Restaurant/Branch" %}</label>
                         <select class="form-select" id="editMainCategoryRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
                             {% if view_all_restaurants %}
-                                <option value="">Select Restaurant/Branch</option>
+                                <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}">
-                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 {% endfor %}
                             {% elif current_restaurant %}
                                 <option value="{{ current_restaurant.id }}" selected>
-                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
                             {% else %}
-                                <option value="">No Restaurant Available</option>
+                                <option value="">{% translate "No Restaurant Available" %}</option>
                             {% endif %}
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-1"></i>Update Category
+                        <i class="fas fa-save me-1"></i>{% translate "Update Category" %}
                     </button>
                 </div>
             </form>
@@ -591,17 +592,17 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-folder-open me-2"></i>Add Subcategory
+                    <i class="fas fa-folder-open me-2"></i>{% translate "Add Subcategory" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="addSubCategoryForm">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="subCategoryMainCategory" class="form-label">Main Category</label>
+                        <label for="subCategoryMainCategory" class="form-label">{% translate "Main Category" %}</label>
                         <select class="form-select" id="subCategoryMainCategory" name="main_category" required>
-                            <option value="">Select Main Category</option>
+                            <option value="">{% translate "Select Main Category" %}</option>
                             {% for category in main_categories %}
                             {% if category.is_active %}
                             <option value="{{ category.id }}">{{ category.name }}</option>
@@ -610,26 +611,26 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="subCategoryName" class="form-label">Subcategory Name</label>
+                        <label for="subCategoryName" class="form-label">{% translate "Subcategory Name" %}</label>
                         <input type="text" class="form-control" id="subCategoryName" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="subCategoryDescription" class="form-label">Description</label>
+                        <label for="subCategoryDescription" class="form-label">{% translate "Description" %}</label>
                         <textarea class="form-control" id="subCategoryDescription" name="description" rows="3"></textarea>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="subCategoryActive" name="is_active" checked>
                             <label class="form-check-label" for="subCategoryActive">
-                                Active Subcategory
+                                {% translate "Active Subcategory" %}
                             </label>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i>Add Subcategory
+                        <i class="fas fa-plus me-1"></i>{% translate "Add Subcategory" %}
                     </button>
                 </div>
             </form>
@@ -643,18 +644,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>Edit Subcategory
+                    <i class="fas fa-edit me-2"></i>{% translate "Edit Subcategory" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="editSubCategoryForm">
                 {% csrf_token %}
                 <div class="modal-body">
                     <input type="hidden" id="editSubCategoryId" name="subcategory_id">
                     <div class="mb-3">
-                        <label for="editSubCategoryMainCategory" class="form-label">Main Category</label>
+                        <label for="editSubCategoryMainCategory" class="form-label">{% translate "Main Category" %}</label>
                         <select class="form-select" id="editSubCategoryMainCategory" name="main_category" required>
-                            <option value="">Select Main Category</option>
+                            <option value="">{% translate "Select Main Category" %}</option>
                             {% for category in main_categories %}
                             {% if category.is_active %}
                             <option value="{{ category.id }}">{{ category.name }}</option>
@@ -663,18 +664,18 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="editSubCategoryName" class="form-label">Subcategory Name</label>
+                        <label for="editSubCategoryName" class="form-label">{% translate "Subcategory Name" %}</label>
                         <input type="text" class="form-control" id="editSubCategoryName" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editSubCategoryDescription" class="form-label">Description</label>
+                        <label for="editSubCategoryDescription" class="form-label">{% translate "Description" %}</label>
                         <textarea class="form-control" id="editSubCategoryDescription" name="description" rows="3"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-1"></i>Update Subcategory
+                        <i class="fas fa-save me-1"></i>{% translate "Update Subcategory" %}
                     </button>
                 </div>
             </form>
@@ -685,6 +686,40 @@
 
 {% block extra_js %}
 <script>
+// Translated UI strings
+const CAT_I18N = {
+    opFailed: '{% translate 'Operation failed' as t_opFailed %}{{ t_opFailed|escapejs }}',
+    netErr: '{% translate 'Network error occurred' as t_netErr %}{{ t_netErr|escapejs }}',
+    noDesc: '{% translate 'No description provided' as t_noDesc %}{{ t_noDesc|escapejs }}',
+    delCat: '{% translate 'Are you sure you want to delete the category "{name}"?' as t_delCat %}{{ t_delCat|escapejs }}',
+    delCatWarn: '{% translate 'WARNING: This will also delete ALL subcategories and products in this category.' as t_delCatWarn %}{{ t_delCatWarn|escapejs }}',
+    noUndo: '{% translate 'This action cannot be undone.' as t_noUndo %}{{ t_noUndo|escapejs }}',
+    delCatFail: '{% translate 'Failed to delete category' as t_delCatFail %}{{ t_delCatFail|escapejs }}',
+    delSub: '{% translate 'Are you sure you want to delete the subcategory "{name}"?' as t_delSub %}{{ t_delSub|escapejs }}',
+    delSubWarn: '{% translate 'WARNING: This will also delete ALL products in this subcategory.' as t_delSubWarn %}{{ t_delSubWarn|escapejs }}',
+    delSubFail: '{% translate 'Failed to delete subcategory' as t_delSubFail %}{{ t_delSubFail|escapejs }}',
+    deactCat: '{% translate 'Are you sure you want to deactivate this category?' as t_deactCat %}{{ t_deactCat|escapejs }}',
+    actCat: '{% translate 'Are you sure you want to activate this category?' as t_actCat %}{{ t_actCat|escapejs }}',
+    catStatusFail: '{% translate 'Failed to update category status' as t_catStatusFail %}{{ t_catStatusFail|escapejs }}',
+    deactSub: '{% translate 'Are you sure you want to deactivate this subcategory?' as t_deactSub %}{{ t_deactSub|escapejs }}',
+    actSub: '{% translate 'Are you sure you want to activate this subcategory?' as t_actSub %}{{ t_actSub|escapejs }}',
+    subStatusFail: '{% translate 'Failed to update subcategory status' as t_subStatusFail %}{{ t_subStatusFail|escapejs }}',
+    mainAdded: '{% translate 'Main category added successfully' as t_mainAdded %}{{ t_mainAdded|escapejs }}',
+    mainUpdated: '{% translate 'Main category updated successfully' as t_mainUpdated %}{{ t_mainUpdated|escapejs }}',
+    subAdded: '{% translate 'Subcategory added successfully' as t_subAdded %}{{ t_subAdded|escapejs }}',
+    subUpdated: '{% translate 'Subcategory updated successfully' as t_subUpdated %}{{ t_subUpdated|escapejs }}',
+    noCatSel: '{% translate 'No categories selected' as t_noCatSel %}{{ t_noCatSel|escapejs }}',
+    bulkCat1: '{% translate 'Are you sure you want to delete 1 main category?' as t_bulkCat1 %}{{ t_bulkCat1|escapejs }}',
+    bulkCatN: '{% translate 'Are you sure you want to delete {count} main categories?' as t_bulkCatN %}{{ t_bulkCatN|escapejs }}',
+    bulkCatWarn: '{% translate 'WARNING: This will also delete ALL subcategories and products in these categories.' as t_bulkCatWarn %}{{ t_bulkCatWarn|escapejs }}',
+    delCatsFail: '{% translate 'Failed to delete categories' as t_delCatsFail %}{{ t_delCatsFail|escapejs }}',
+    noSubSel: '{% translate 'No subcategories selected' as t_noSubSel %}{{ t_noSubSel|escapejs }}',
+    bulkSub1: '{% translate 'Are you sure you want to delete 1 subcategory?' as t_bulkSub1 %}{{ t_bulkSub1|escapejs }}',
+    bulkSubN: '{% translate 'Are you sure you want to delete {count} subcategories?' as t_bulkSubN %}{{ t_bulkSubN|escapejs }}',
+    bulkSubWarn: '{% translate 'WARNING: This will also delete ALL products in these subcategories.' as t_bulkSubWarn %}{{ t_bulkSubWarn|escapejs }}',
+    delSubsFail: '{% translate 'Failed to delete subcategories' as t_delSubsFail %}{{ t_delSubsFail|escapejs }}',
+};
+
 // Prevent multiple submissions and handle events properly
 let isProcessing = false;
 
@@ -762,13 +797,13 @@ function submitForm(form, url, successMessage, redirectOnSuccess = true) {
             }
             return true;
         } else {
-            showAlert(data.message || 'Operation failed', 'danger');
+            showAlert(data.message || CAT_I18N.opFailed, 'danger');
             return false;
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('Network error occurred', 'danger');
+        showAlert(CAT_I18N.netErr, 'danger');
         return false;
     });
 }
@@ -778,17 +813,13 @@ function editMainCategory(categoryId) {
     const row = document.querySelector(`[data-category-id="${categoryId}"]`);
     if (row) {
         const nameElement = row.querySelector('.fw-semibold');
-        const descElement = row.querySelector('.text-muted');
-        
+        const descElement = row.querySelector('.cat-desc');
+
         document.getElementById('editMainCategoryId').value = categoryId;
         document.getElementById('editMainCategoryName').value = nameElement ? nameElement.textContent.trim() : '';
-        
-        // Handle description - filter out "No description provided"
-        let description = '';
-        if (descElement && descElement.textContent.trim() !== 'No description provided') {
-            description = descElement.textContent.trim();
-        }
-        document.getElementById('editMainCategoryDescription').value = description;
+
+        // Full saved description (the table only shows the first words); empty when there is none
+        document.getElementById('editMainCategoryDescription').value = descElement ? (descElement.dataset.description || '') : '';
         
         // Set restaurant dropdown value if category has a restaurant
         const restaurantId = row.getAttribute('data-restaurant-id');
@@ -809,18 +840,14 @@ function editSubcategory(subcategoryId) {
     const row = document.querySelector(`[data-subcategory-id="${subcategoryId}"]`);
     if (row) {
         const nameElement = row.querySelector('.fw-semibold');
-        const descElement = row.querySelector('.text-muted');
+        const descElement = row.querySelector('.cat-desc');
         const mainCategoryElement = row.querySelector('.badge.bg-primary');
-        
+
         document.getElementById('editSubCategoryId').value = subcategoryId;
         document.getElementById('editSubCategoryName').value = nameElement ? nameElement.textContent.trim() : '';
-        
-        // Handle description
-        let description = '';
-        if (descElement && descElement.textContent.trim() !== 'No description provided') {
-            description = descElement.textContent.trim();
-        }
-        document.getElementById('editSubCategoryDescription').value = description;
+
+        // Full saved description (the table only shows the first words); empty when there is none
+        document.getElementById('editSubCategoryDescription').value = descElement ? (descElement.dataset.description || '') : '';
         
         // Set main category - match by name to value
         if (mainCategoryElement) {
@@ -842,7 +869,7 @@ function editSubcategory(subcategoryId) {
 
 function deleteMainCategory(categoryId, categoryName) {
     executeOnce(() => {
-        if (confirm(`Are you sure you want to delete the category "${categoryName}"?\n\nWARNING: This will also delete ALL subcategories and products in this category.\nThis action cannot be undone.`)) {
+        if (confirm(CAT_I18N.delCat.replace('{name}', categoryName) + '\n\n' + CAT_I18N.delCatWarn + '\n' + CAT_I18N.noUndo)) {
             fetch(`/admin-panel/categories/delete-main/${categoryId}/`, {
                 method: 'POST',
                 headers: {
@@ -860,12 +887,12 @@ function deleteMainCategory(categoryId, categoryName) {
                         categoryRow.remove();
                     }
                 } else {
-                    showAlert(data.message || 'Failed to delete category', 'danger');
+                    showAlert(data.message || CAT_I18N.delCatFail, 'danger');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showAlert('Failed to delete category', 'danger');
+                showAlert(CAT_I18N.delCatFail, 'danger');
             });
         }
     });
@@ -873,7 +900,7 @@ function deleteMainCategory(categoryId, categoryName) {
 
 function deleteSubcategory(subcategoryId, subcategoryName) {
     executeOnce(() => {
-        if (confirm(`Are you sure you want to delete the subcategory "${subcategoryName}"?\n\nWARNING: This will also delete ALL products in this subcategory.\nThis action cannot be undone.`)) {
+        if (confirm(CAT_I18N.delSub.replace('{name}', subcategoryName) + '\n\n' + CAT_I18N.delSubWarn + '\n' + CAT_I18N.noUndo)) {
             fetch(`/admin-panel/categories/delete-sub/${subcategoryId}/`, {
                 method: 'POST',
                 headers: {
@@ -891,12 +918,12 @@ function deleteSubcategory(subcategoryId, subcategoryName) {
                         subcategoryRow.remove();
                     }
                 } else {
-                    showAlert(data.message || 'Failed to delete subcategory', 'danger');
+                    showAlert(data.message || CAT_I18N.delSubFail, 'danger');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showAlert('Failed to delete subcategory', 'danger');
+                showAlert(CAT_I18N.delSubFail, 'danger');
             });
         }
     });
@@ -906,7 +933,7 @@ function toggleMainCategory(categoryId, isActive) {
     executeOnce(() => {
         const action = isActive ? 'deactivate' : 'activate';
         
-        if (confirm(`Are you sure you want to ${action} this category?`)) {
+        if (confirm(isActive ? CAT_I18N.deactCat : CAT_I18N.actCat)) {
             fetch(`/admin-panel/categories/toggle-main/${categoryId}/`, {
                 method: 'POST',
                 headers: {
@@ -922,12 +949,12 @@ function toggleMainCategory(categoryId, isActive) {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert(data.message || 'Failed to update category status', 'danger');
+                    showAlert(data.message || CAT_I18N.catStatusFail, 'danger');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showAlert('Failed to update category status', 'danger');
+                showAlert(CAT_I18N.catStatusFail, 'danger');
             });
         }
     });
@@ -937,7 +964,7 @@ function toggleSubcategory(subcategoryId, isActive) {
     executeOnce(() => {
         const action = isActive ? 'deactivate' : 'activate';
         
-        if (confirm(`Are you sure you want to ${action} this subcategory?`)) {
+        if (confirm(isActive ? CAT_I18N.deactSub : CAT_I18N.actSub)) {
             fetch(`/admin-panel/categories/toggle-sub/${subcategoryId}/`, {
                 method: 'POST',
                 headers: {
@@ -953,12 +980,12 @@ function toggleSubcategory(subcategoryId, isActive) {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert(data.message || 'Failed to update subcategory status', 'danger');
+                    showAlert(data.message || CAT_I18N.subStatusFail, 'danger');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showAlert('Failed to update subcategory status', 'danger');
+                showAlert(CAT_I18N.subStatusFail, 'danger');
             });
         }
     });
@@ -1033,7 +1060,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addMainCategoryForm.addEventListener('submit', function(e) {
             e.preventDefault();
             if (!isProcessing) {
-                submitForm(this, '/admin-panel/categories/add-main/', 'Main category added successfully');
+                submitForm(this, '/admin-panel/categories/add-main/', CAT_I18N.mainAdded);
             }
         });
     }
@@ -1044,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (!isProcessing) {
                 const categoryId = document.getElementById('editMainCategoryId').value;
-                submitForm(this, `/admin-panel/categories/edit-main/${categoryId}/`, 'Main category updated successfully');
+                submitForm(this, `/admin-panel/categories/edit-main/${categoryId}/`, CAT_I18N.mainUpdated);
             }
         });
     }
@@ -1054,7 +1081,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addSubCategoryForm.addEventListener('submit', function(e) {
             e.preventDefault();
             if (!isProcessing) {
-                submitForm(this, '/admin-panel/categories/add-sub/', 'Subcategory added successfully');
+                submitForm(this, '/admin-panel/categories/add-sub/', CAT_I18N.subAdded);
             }
         });
     }
@@ -1065,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (!isProcessing) {
                 const subcategoryId = document.getElementById('editSubCategoryId').value;
-                submitForm(this, `/admin-panel/categories/edit-sub/${subcategoryId}/`, 'Subcategory updated successfully');
+                submitForm(this, `/admin-panel/categories/edit-sub/${subcategoryId}/`, CAT_I18N.subUpdated);
             }
         });
     }
@@ -1191,11 +1218,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const categoryIds = Array.from(checkedBoxes).map(cb => cb.value);
                 
                 if (categoryIds.length === 0) {
-                    showAlert('No categories selected', 'warning');
+                    showAlert(CAT_I18N.noCatSel, 'warning');
                     return;
                 }
 
-                const confirmMessage = `Are you sure you want to delete ${categoryIds.length} main categor${categoryIds.length === 1 ? 'y' : 'ies'}?\n\nWARNING: This will also delete ALL subcategories and products in these categories.\nThis action cannot be undone.`;
+                const confirmMessage = (categoryIds.length === 1 ? CAT_I18N.bulkCat1 : CAT_I18N.bulkCatN.replace('{count}', categoryIds.length)) + '\n\n' + CAT_I18N.bulkCatWarn + '\n' + CAT_I18N.noUndo;
                 
                 if (confirm(confirmMessage)) {
                     fetch('/admin-panel/categories/bulk-delete-main/', {
@@ -1225,12 +1252,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 selectAllMainCategories.indeterminate = false;
                             }
                         } else {
-                            showAlert(data.message || 'Failed to delete categories', 'danger');
+                            showAlert(data.message || CAT_I18N.delCatsFail, 'danger');
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        showAlert('Failed to delete categories', 'danger');
+                        showAlert(CAT_I18N.delCatsFail, 'danger');
                     });
                 }
             });
@@ -1290,11 +1317,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const subcategoryIds = Array.from(checkedBoxes).map(cb => cb.value);
                 
                 if (subcategoryIds.length === 0) {
-                    showAlert('No subcategories selected', 'warning');
+                    showAlert(CAT_I18N.noSubSel, 'warning');
                     return;
                 }
 
-                const confirmMessage = `Are you sure you want to delete ${subcategoryIds.length} subcategor${subcategoryIds.length === 1 ? 'y' : 'ies'}?\n\nWARNING: This will also delete ALL products in these subcategories.\nThis action cannot be undone.`;
+                const confirmMessage = (subcategoryIds.length === 1 ? CAT_I18N.bulkSub1 : CAT_I18N.bulkSubN.replace('{count}', subcategoryIds.length)) + '\n\n' + CAT_I18N.bulkSubWarn + '\n' + CAT_I18N.noUndo;
                 
                 if (confirm(confirmMessage)) {
                     fetch('/admin-panel/categories/bulk-delete-sub/', {
@@ -1324,12 +1351,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 selectAllSubcategories.indeterminate = false;
                             }
                         } else {
-                            showAlert(data.message || 'Failed to delete subcategories', 'danger');
+                            showAlert(data.message || CAT_I18N.delSubsFail, 'danger');
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        showAlert('Failed to delete subcategories', 'danger');
+                        showAlert(CAT_I18N.delSubsFail, 'danger');
                     });
                 }
             });

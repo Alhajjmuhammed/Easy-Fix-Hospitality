@@ -1,7 +1,7 @@
 {% extends "admin_panel/base.html" %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Web Check-In / Check-Out{% endblock %}
+{% block title %}{% translate "Web Check-In / Check-Out" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -89,7 +89,7 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
-                <i class="bi bi-person-check me-2" style="color: var(--accent-color);"></i>My Attendance
+                <i class="bi bi-person-check me-2" style="color: var(--accent-color);"></i>{% translate "My Attendance" %}
             </h4>
             <small class="text-muted">
                 {{ today|date:"l, N j, Y" }}
@@ -99,10 +99,10 @@
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a href="{% url 'attendance:my' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-clock-history me-1"></i>My History
+                <i class="bi bi-clock-history me-1"></i>{% translate "My History" %}
             </a>
             <a href="{% url 'attendance:dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                <i class="bi bi-speedometer2 me-1"></i>{% translate "Dashboard" %}
             </a>
         </div>
     </div>
@@ -121,15 +121,15 @@
                     <div class="status-icon-ring not-checked-in">
                         <i class="bi bi-door-open"></i>
                     </div>
-                    <h5 class="fw-bold mb-1" style="color: var(--primary-color);">Not Checked In</h5>
-                    <p class="text-muted small mb-4">You have not checked in today.</p>
+                    <h5 class="fw-bold mb-1" style="color: var(--primary-color);">{% translate "Not Checked In" %}</h5>
+                    <p class="text-muted small mb-4">{% translate "You have not checked in today." %}</p>
                     {% if can_web_checkin %}
                     <form method="post">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="check_in">
                         <button type="submit" class="btn btn-checkin w-100"
                                 style="background-color: var(--success-color); color: #fff;">
-                            <i class="bi bi-box-arrow-in-right me-2"></i>Check In Now
+                            <i class="bi bi-box-arrow-in-right me-2"></i>{% translate "Check In Now" %}
                         </button>
                     </form>
                     {% else %}
@@ -146,14 +146,14 @@
                                 <div style="position:absolute;bottom:12px;right:12px;width:28px;height:28px;border-bottom:3px solid #fff;border-right:3px solid #fff;border-radius:0 0 3px 0;"></div>
                             </div>
                         </div>
-                        <p class="text-muted small mb-3">Point your camera at the restaurant QR code</p>
+                        <p class="text-muted small mb-3">{% translate "Point your camera at the restaurant QR code" %}</p>
                         <div id="qr-status" class="mb-2" style="min-height:1.5rem;font-weight:600;"></div>
                         <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
                             <i class="bi bi-camera-video-off me-2"></i>
-                            <span id="qr-cam-error-msg">Camera not available.</span>
+                            <span id="qr-cam-error-msg">{% translate "Camera not available." %}</span>
                             <div class="mt-2">
                                 <button id="qr-retry-btn" type="button" class="btn btn-sm btn-warning" onclick="window._qrRetry && window._qrRetry()">
-                                    <i class="bi bi-arrow-clockwise me-1"></i>Try Camera Again
+                                    <i class="bi bi-arrow-clockwise me-1"></i>{% translate "Try Camera Again" %}
                                 </button>
                             </div>
                         </div>
@@ -168,24 +168,24 @@
                     <div class="mb-3">
                         <span class="badge px-3 py-2" style="background-color: var(--success-color); font-size: 0.9rem;">
                             <i class="bi bi-check-circle me-1"></i>
-                            Checked In at {{ record.check_in|date:"H:i" }}
+                            {% blocktranslate with time=record.check_in|date:"H:i" %}Checked In at {{ time }}{% endblocktranslate %}
                         </span>
                     </div>
                     {% if record.is_late %}
                     <div class="mb-3">
                         <span class="badge bg-warning text-dark px-3 py-2">
-                            <i class="bi bi-clock-history me-1"></i>Late Arrival
+                            <i class="bi bi-clock-history me-1"></i>{% translate "Late Arrival" %}
                         </span>
                     </div>
                     {% endif %}
-                    <p class="text-muted small mb-4">You are currently on the clock. Scan the QR code to check out.</p>
+                    <p class="text-muted small mb-4">{% translate "You are currently on the clock. Scan the QR code to check out." %}</p>
                     {% if can_web_checkin %}
                     <form method="post">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="check_out">
                         <button type="submit" class="btn btn-checkin w-100"
                                 style="background-color: var(--danger-color); color: #fff;">
-                            <i class="bi bi-box-arrow-right me-2"></i>Check Out Now
+                            <i class="bi bi-box-arrow-right me-2"></i>{% translate "Check Out Now" %}
                         </button>
                     </form>
                     {% else %}
@@ -201,14 +201,14 @@
                                 <div style="position:absolute;bottom:12px;right:12px;width:28px;height:28px;border-bottom:3px solid #fff;border-right:3px solid #fff;border-radius:0 0 3px 0;"></div>
                             </div>
                         </div>
-                        <p class="text-muted small mb-3">Point your camera at the restaurant QR code to check out</p>
+                        <p class="text-muted small mb-3">{% translate "Point your camera at the restaurant QR code to check out" %}</p>
                         <div id="qr-status" class="mb-2" style="min-height:1.5rem;font-weight:600;"></div>
                         <div id="qr-cam-error" class="alert alert-warning d-none text-start" style="border-radius:10px;font-size:0.88rem;">
                             <i class="bi bi-camera-video-off me-2"></i>
-                            <span id="qr-cam-error-msg">Camera not available.</span>
+                            <span id="qr-cam-error-msg">{% translate "Camera not available." %}</span>
                             <div class="mt-2">
                                 <button id="qr-retry-btn" type="button" class="btn btn-sm btn-warning" onclick="window._qrRetry && window._qrRetry()">
-                                    <i class="bi bi-arrow-clockwise me-1"></i>Try Camera Again
+                                    <i class="bi bi-arrow-clockwise me-1"></i>{% translate "Try Camera Again" %}
                                 </button>
                             </div>
                         </div>
@@ -220,36 +220,36 @@
                     <div class="status-icon-ring checked-out">
                         <i class="bi bi-calendar2-check-fill"></i>
                     </div>
-                    <h5 class="fw-bold mb-3" style="color: var(--primary-color);">Shift Complete</h5>
+                    <h5 class="fw-bold mb-3" style="color: var(--primary-color);">{% translate "Shift Complete" %}</h5>
                     <div class="row g-3 mb-3 text-start">
                         <div class="col-6">
-                            <div class="time-label">Check In</div>
+                            <div class="time-label">{% translate "Check In" %}</div>
                             <div class="time-big">{{ record.check_in|date:"H:i" }}</div>
                         </div>
                         <div class="col-6">
-                            <div class="time-label">Check Out</div>
+                            <div class="time-label">{% translate "Check Out" %}</div>
                             <div class="time-big">{{ record.check_out|date:"H:i" }}</div>
                         </div>
                     </div>
                     {% if record.work_minutes %}
                     <div class="mb-3">
-                        <div class="time-label">Total Hours</div>
-                        <div class="hours-display" id="hoursDisplay">{{ record.work_minutes }} min</div>
+                        <div class="time-label">{% translate "Total Hours" %}</div>
+                        <div class="hours-display" id="hoursDisplay">{% blocktranslate with n=record.work_minutes %}{{ n }} min{% endblocktranslate %}</div>
                     </div>
                     {% endif %}
                     <div class="d-flex justify-content-center gap-2 flex-wrap">
                         {% if record.is_late %}
                         <span class="badge bg-warning text-dark px-3 py-2">
-                            <i class="bi bi-clock-history me-1"></i>Late
+                            <i class="bi bi-clock-history me-1"></i>{% translate "Late" %}
                         </span>
                         {% else %}
                         <span class="badge bg-success px-3 py-2">
-                            <i class="bi bi-check-circle me-1"></i>On Time
+                            <i class="bi bi-check-circle me-1"></i>{% translate "On Time" %}
                         </span>
                         {% endif %}
                         {% if record.is_overtime %}
                         <span class="badge bg-danger px-3 py-2">
-                            <i class="bi bi-lightning me-1"></i>Overtime
+                            <i class="bi bi-lightning me-1"></i>{% translate "Overtime" %}
                         </span>
                         {% endif %}
                     </div>
@@ -263,23 +263,23 @@
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-bottom py-2">
                     <h6 class="mb-0 fw-semibold" style="color: var(--primary-color); font-size: 0.9rem;">
-                        <i class="bi bi-clock me-2" style="color: var(--accent-color);"></i>Current Shift
+                        <i class="bi bi-clock me-2" style="color: var(--accent-color);"></i>{% translate "Current Shift" %}
                     </h6>
                 </div>
                 <div class="card-body py-3">
                     <div class="fw-bold mb-2">{{ shift.name }}</div>
                     <div class="shift-time-pair">
                         <div class="shift-time-item">
-                            <span class="time-label">Start</span>
+                            <span class="time-label">{% translate "Start" context "shift start time" %}</span>
                             <span class="fw-semibold" style="font-family: 'Courier New', monospace;">{{ shift.start_time|time:"H:i" }}</span>
                         </div>
                         <div class="shift-time-item">
-                            <span class="time-label">End</span>
+                            <span class="time-label">{% translate "End" %}</span>
                             <span class="fw-semibold" style="font-family: 'Courier New', monospace;">{{ shift.end_time|time:"H:i" }}</span>
                         </div>
                         <div class="shift-time-item">
-                            <span class="time-label">Grace</span>
-                            <span class="fw-semibold">{{ shift.grace_minutes }} min</span>
+                            <span class="time-label">{% translate "Grace" %}</span>
+                            <span class="fw-semibold">{% blocktranslate with n=shift.grace_minutes %}{{ n }} min{% endblocktranslate %}</span>
                         </div>
                     </div>
                 </div>
@@ -288,7 +288,7 @@
 
             <div class="text-center">
                 <a href="{% url 'attendance:my' %}" class="text-decoration-none text-muted small">
-                    <i class="bi bi-clock-history me-1"></i>View My Attendance History
+                    <i class="bi bi-clock-history me-1"></i>{% translate "View My Attendance History" %}
                 </a>
             </div>
 
@@ -296,6 +296,13 @@
     </div>
 </div>
 
+{% translate "QR detected — recording..." as t_qr_detected %}
+{% translate "Could not record attendance." as t_could_not_record %}
+{% translate "Network error. Please try again." as t_network_error %}
+{% translate "Camera requires HTTPS. Open <strong>https://hospitality.easyfixsoft.com</strong> — not http://." as t_cam_https %}
+{% translate "Camera access blocked. Tap the <strong>camera icon</strong> in your browser address bar, set it to <strong>Allow</strong>, then tap <em>Try Camera Again</em> below." as t_cam_denied %}
+{% translate "Could not load QR scanner. Please check your internet connection and tap Try Camera Again." as t_cam_cdnfail %}
+{% translate "Camera not available. Tap Try Camera Again, or check that no other app is using your camera." as t_cam_unavailable %}
 <script>
 {% if record and record.work_minutes %}
 (function() {
@@ -406,7 +413,7 @@
     function submitToken(token) {
         if (submitted) return;
         submitted = true;
-        setStatus('QR detected — recording...', '#1565C0');
+        setStatus("{{ t_qr_detected|escapejs }}", '#1565C0');
         fetch(QR_SCAN_URL, {
             method: 'POST',
             headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -418,12 +425,12 @@
                 setStatus('✓ ' + data.message, '#2E7D32');
                 setTimeout(function() { window.location.reload(); }, 1500);
             } else {
-                setStatus(data.message || data.error || 'Could not record attendance.', '#c0392b');
+                setStatus(data.message || data.error || "{{ t_could_not_record|escapejs }}", '#c0392b');
                 setTimeout(function() { scanning = true; submitted = false; startCamera(); }, 3000);
             }
         })
         .catch(function() {
-            setStatus('Network error. Please try again.', '#c0392b');
+            setStatus("{{ t_network_error|escapejs }}", '#c0392b');
             setTimeout(function() { scanning = true; submitted = false; startCamera(); }, 3000);
         });
     }
@@ -435,13 +442,13 @@
             var msgEl = document.getElementById('qr-cam-error-msg');
             if (msgEl) {
                 if (!window.isSecureContext) {
-                    msgEl.innerHTML = 'Camera requires HTTPS. Open <strong>https://hospitality.easyfixsoft.com</strong> — not http://.';
+                    msgEl.innerHTML = "{{ t_cam_https|escapejs }}";
                 } else if (reason === 'denied') {
-                    msgEl.innerHTML = 'Camera access blocked. Tap the <strong>camera icon</strong> in your browser address bar, set it to <strong>Allow</strong>, then tap <em>Try Camera Again</em> below.';
+                    msgEl.innerHTML = "{{ t_cam_denied|escapejs }}";
                 } else if (reason === 'cdnfail') {
-                    msgEl.textContent = 'Could not load QR scanner. Please check your internet connection and tap Try Camera Again.';
+                    msgEl.textContent = "{{ t_cam_cdnfail|escapejs }}";
                 } else {
-                    msgEl.textContent = 'Camera not available. Tap Try Camera Again, or check that no other app is using your camera.';
+                    msgEl.textContent = "{{ t_cam_unavailable|escapejs }}";
                 }
             }
         }

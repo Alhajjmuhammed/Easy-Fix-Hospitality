@@ -1,19 +1,20 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Promotion Preview - Restaurant System{% endblock %}
+{% block title %}{% translate "Promotion Preview" %} - {% translate "Restaurant System" %}{% endblock %}
 
 {% block page_title %}{{ promotion.name }}{% endblock %}
-{% block page_description %}Preview promotion details and affected products{% endblock %}
+{% block page_description %}{% translate "Preview promotion details and affected products" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-end mb-4">
     <div class="btn-group">
         <a href="{% url 'restaurant:edit_promotion' promotion.id %}" class="btn btn-outline-primary">
-            <i class="fas fa-edit"></i> Edit
+            <i class="fas fa-edit"></i> {% translate "Edit" %}
         </a>
         <a href="{% url 'restaurant:manage_promotions' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i> Back
+            <i class="fas fa-arrow-left"></i> {% translate "Back" %}
         </a>
     </div>
 </div>
@@ -24,15 +25,15 @@
         <div class="card">
             <div class="card-header {% if promotion.is_currently_active %}bg-success text-white{% else %}bg-primary text-white{% endif %}">
                 <h5 class="mb-0">
-                    <i class="fas fa-clock"></i> Promotion Details
+                    <i class="fas fa-clock"></i> {% translate "Promotion Details" %}
                     {% if promotion.is_currently_active %}
-                        <span class="badge bg-warning ms-2">LIVE NOW</span>
+                        <span class="badge bg-warning ms-2">{% translate "LIVE NOW" %}</span>
                     {% endif %}
                 </h5>
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <div class="display-4 text-center text-primary">{{ promotion.discount_percentage }}% OFF</div>
+                    <div class="display-4 text-center text-primary">{% blocktranslate with pct=promotion.discount_percentage %}{{ pct }}% OFF{% endblocktranslate %}</div>
                 </div>
                 
                 {% if promotion.description %}
@@ -42,11 +43,11 @@
                 
                 <div class="row">
                     <div class="col-6">
-                        <strong>Time:</strong><br>
+                        <strong>{% translate "Time:" %}</strong><br>
                         <code>{{ promotion.start_time|time:"H:i" }} - {{ promotion.end_time|time:"H:i" }}</code>
                     </div>
                     <div class="col-6">
-                        <strong>Days:</strong><br>
+                        <strong>{% translate "Days:" %}</strong><br>
                         <small class="text-primary">{{ promotion.get_days_display }}</small>
                     </div>
                 </div>
@@ -54,21 +55,21 @@
                 <hr>
                 
                 <div class="d-flex justify-content-between align-items-center">
-                    <span><strong>Status:</strong></span>
+                    <span><strong>{% translate "Status:" %}</strong></span>
                     <span class="badge {% if promotion.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                        {% if promotion.is_active %}Active{% else %}Inactive{% endif %}
+                        {% if promotion.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %}
                     </span>
                 </div>
                 
                 <div class="d-flex justify-content-between align-items-center mt-2">
-                    <span><strong>Products:</strong></span>
-                    <span class="badge bg-info">{{ affected_count }} affected</span>
+                    <span><strong>{% translate "Products:" %}</strong></span>
+                    <span class="badge bg-info">{% blocktranslate with n=affected_count %}{{ n }} affected{% endblocktranslate %}</span>
                 </div>
                 
                 <div class="mt-3">
                     <small class="text-muted">
-                        <strong>Created:</strong> {{ promotion.created_at|date:"M d, Y H:i" }}<br>
-                        <strong>Updated:</strong> {{ promotion.updated_at|date:"M d, Y H:i" }}
+                        <strong>{% translate "Created:" %}</strong> {{ promotion.created_at|date:"M d, Y H:i" }}<br>
+                        <strong>{% translate "Updated:" %}</strong> {{ promotion.updated_at|date:"M d, Y H:i" }}
                     </small>
                 </div>
             </div>
@@ -80,7 +81,7 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="fas fa-utensils"></i> Affected Products ({{ affected_count }})
+                    <i class="fas fa-utensils"></i> {% blocktranslate with n=affected_count %}Affected Products ({{ n }}){% endblocktranslate %}
                 </h5>
             </div>
             <div class="card-body">
@@ -89,11 +90,11 @@
                         <table class="table table-hover">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Product</th>
-                                    <th>Category</th>
-                                    <th>Original Price</th>
-                                    <th>Promotional Price</th>
-                                    <th>Savings</th>
+                                    <th>{% translate "Product" %}</th>
+                                    <th>{% translate "Category" %}</th>
+                                    <th>{% translate "Original Price" %}</th>
+                                    <th>{% translate "Promotional Price" %}</th>
+                                    <th>{% translate "Savings" %}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -107,7 +108,7 @@
                                             <div>
                                                 <strong>{{ product.name }}</strong>
                                                 {% if product.has_active_promotion %}
-                                                    <span class="badge bg-warning ms-1">ON SALE</span>
+                                                    <span class="badge bg-warning ms-1">{% translate "ON SALE" %}</span>
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -137,10 +138,10 @@
                 {% else %}
                     <div class="text-center py-5">
                         <i class="fas fa-utensils display-1 text-muted"></i>
-                        <h5 class="mt-3">No Products Found</h5>
-                        <p class="text-muted">This promotion doesn't currently affect any products.</p>
+                        <h5 class="mt-3">{% translate "No Products Found" %}</h5>
+                        <p class="text-muted">{% translate "This promotion doesn't currently affect any products." %}</p>
                         <a href="{% url 'restaurant:edit_promotion' promotion.id %}" class="btn btn-primary">
-                            <i class="fas fa-edit"></i> Edit Promotion
+                            <i class="fas fa-edit"></i> {% translate "Edit Promotion" %}
                         </a>
                     </div>
                 {% endif %}

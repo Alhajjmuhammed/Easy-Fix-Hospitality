@@ -1,6 +1,7 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Sales Forecast{% endblock %}
+{% block title %}{% translate "Sales Forecast" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -19,14 +20,14 @@
 <div class="container-fluid">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
-            <h1 class="h3 mb-0"><i class="fas fa-chart-line me-2"></i>Sales Forecast</h1>
-            <div class="small text-muted">Based on your last {{ days_of_history }} day{{ days_of_history|pluralize }} of orders (up to 8 weeks). Recent weeks count more.</div>
+            <h1 class="h3 mb-0"><i class="fas fa-chart-line me-2"></i>{% translate "Sales Forecast" %}</h1>
+            <div class="small text-muted">{% blocktranslate count counter=days_of_history %}Based on your last {{ counter }} day of orders (up to 8 weeks). Recent weeks count more.{% plural %}Based on your last {{ counter }} days of orders (up to 8 weeks). Recent weeks count more.{% endblocktranslate %}</div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary" href="{% url 'reports:dashboard' %}"><i class="fas fa-chart-bar me-1"></i>Sales reports</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'reports:dashboard' %}"><i class="fas fa-chart-bar me-1"></i>{% translate "Sales reports" %}</a>
     </div>
 
     {% if not enough_history %}
-    <div class="alert alert-info small">The forecast gets reliable after about 2 weeks of orders. Numbers below are a first guess.</div>
+    <div class="alert alert-info small">{% translate "The forecast gets reliable after about 2 weeks of orders. Numbers below are a first guess." %}</div>
     {% endif %}
 
     <div class="row g-3">
@@ -34,20 +35,20 @@
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-baseline mb-2">
-                        <h6 class="fw-bold mb-0">Expected sales — next 7 days</h6>
-                        <div class="small text-muted">Total {{ currency_symbol }}{{ week_total|floatformat:0 }}
-                            {% if trend_percent %} · trend {% if trend_percent > 0 %}+{% endif %}{{ trend_percent }}%{% endif %}</div>
+                        <h6 class="fw-bold mb-0">{% translate "Expected sales — next 7 days" %}</h6>
+                        <div class="small text-muted">{% translate "Total" %} {{ currency_symbol }}{{ week_total|floatformat:0 }}
+                            {% if trend_percent %} · {% translate "trend" %} {% if trend_percent > 0 %}+{% endif %}{{ trend_percent }}%{% endif %}</div>
                     </div>
                     <table class="table table-sm align-middle mb-0">
                         <tbody>
                         {% for f in forecast %}
                         <tr class="{% if f.is_today %}fc-today{% endif %}">
-                            <td style="width:5.5rem" class="small fw-semibold">{% if f.is_today %}Today{% else %}{{ f.weekday }} {{ f.date|date:"j M" }}{% endif %}</td>
+                            <td style="width:5.5rem" class="small fw-semibold">{% if f.is_today %}{% translate "Today" %}{% else %}{{ f.weekday }} {{ f.date|date:"j M" }}{% endif %}</td>
                             <td><div class="fc-bar" style="width: {{ f.bar }}%"></div></td>
                             <td class="text-end small text-nowrap" style="width:9rem">
                                 <span class="fw-semibold">{{ currency_symbol }}{{ f.revenue|floatformat:0 }}</span>
-                                <span class="text-muted">· {{ f.orders }} order{{ f.orders|pluralize }}</span>
-                                {% if f.samples %}<div class="text-muted" style="font-size:.7rem">usually {{ f.low|floatformat:0 }}–{{ f.high|floatformat:0 }}</div>{% endif %}
+                                <span class="text-muted">· {% blocktranslate count counter=f.orders %}{{ counter }} order{% plural %}{{ counter }} orders{% endblocktranslate %}</span>
+                                {% if f.samples %}<div class="text-muted" style="font-size:.7rem">{% blocktranslate with low=f.low|floatformat:0 high=f.high|floatformat:0 %}usually {{ low }}–{{ high }}{% endblocktranslate %}</div>{% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -59,15 +60,15 @@
         <div class="col-lg-5">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-2">Dishes on the move <span class="small text-muted fw-normal">(last 14 days vs the 14 before)</span></h6>
+                    <h6 class="fw-bold mb-2">{% translate "Dishes on the move" %} <span class="small text-muted fw-normal">{% translate "(last 14 days vs the 14 before)" %}</span></h6>
                     <div class="row">
                         <div class="col-6">
-                            <div class="small fw-semibold text-success mb-1"><i class="fas fa-arrow-up me-1"></i>Rising</div>
-                            {% for m in rising %}<div class="small d-flex justify-content-between"><span class="text-truncate me-1">{{ m.name }}</span><span class="text-success">{% if m.new %}new{% else %}+{{ m.change }}%{% endif %}</span></div>
+                            <div class="small fw-semibold text-success mb-1"><i class="fas fa-arrow-up me-1"></i>{% translate "Rising" %}</div>
+                            {% for m in rising %}<div class="small d-flex justify-content-between"><span class="text-truncate me-1">{{ m.name }}</span><span class="text-success">{% if m.new %}{% translate "new" %}{% else %}+{{ m.change }}%{% endif %}</span></div>
                             {% empty %}<div class="small text-muted">—</div>{% endfor %}
                         </div>
                         <div class="col-6">
-                            <div class="small fw-semibold text-danger mb-1"><i class="fas fa-arrow-down me-1"></i>Falling</div>
+                            <div class="small fw-semibold text-danger mb-1"><i class="fas fa-arrow-down me-1"></i>{% translate "Falling" %}</div>
                             {% for m in falling %}<div class="small d-flex justify-content-between"><span class="text-truncate me-1">{{ m.name }}</span><span class="text-danger">{{ m.change }}%</span></div>
                             {% empty %}<div class="small text-muted">—</div>{% endfor %}
                         </div>
@@ -79,20 +80,20 @@
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1">Busy hours <span class="small text-muted fw-normal">(average orders per hour)</span></h6>
-                    {% if top_slots %}<div class="small text-muted mb-2">Busiest: {% for s in top_slots %}{{ s.weekday }} {{ s.hour }}:00 (~{{ s.avg }}){% if not forloop.last %}, {% endif %}{% endfor %} — plan the roster around these.</div>{% endif %}
+                    <h6 class="fw-bold mb-1">{% translate "Busy hours" %} <span class="small text-muted fw-normal">{% translate "(average orders per hour)" %}</span></h6>
+                    {% if top_slots %}<div class="small text-muted mb-2">{% translate "Busiest:" %} {% for s in top_slots %}{{ s.weekday }} {{ s.hour }}:00 (~{{ s.avg }}){% if not forloop.last %}, {% endif %}{% endfor %} — {% translate "plan the roster around these." %}</div>{% endif %}
                     {% if active_hours %}
                     <div class="table-responsive">
                         <table class="heat">
                             <thead><tr><th></th>{% for h in active_hours %}<th class="small fw-normal text-muted text-center">{{ h }}</th>{% endfor %}</tr></thead>
                             <tbody>
                             {% for row in heatmap %}
-                            <tr><th class="small pe-2">{{ row.weekday }}</th>{% for c in row.cells %}<td class="l{{ c.level }}" title="{{ row.weekday }} {{ c.hour }}:00 — about {{ c.avg }} orders">{% if c.avg %}{{ c.avg|floatformat:"-1" }}{% endif %}</td>{% endfor %}</tr>
+                            <tr><th class="small pe-2">{{ row.weekday }}</th>{% for c in row.cells %}<td class="l{{ c.level }}" title="{% blocktranslate with day=row.weekday hour=c.hour avg=c.avg %}{{ day }} {{ hour }}:00 — about {{ avg }} orders{% endblocktranslate %}">{% if c.avg %}{{ c.avg|floatformat:"-1" }}{% endif %}</td>{% endfor %}</tr>
                             {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    {% else %}<div class="small text-muted">No orders yet.</div>{% endif %}
+                    {% else %}<div class="small text-muted">{% translate "No orders yet." %}</div>{% endif %}
                 </div>
             </div>
         </div>
@@ -101,16 +102,16 @@
             <div class="card shadow-sm border-0">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                        <h6 class="fw-bold mb-0">Ingredients to buy for the next 7 days</h6>
+                        <h6 class="fw-bold mb-0">{% translate "Ingredients to buy for the next 7 days" %}</h6>
                         {% if shopping and can_order %}
-                        <a class="btn btn-sm btn-primary" href="{% url 'inventory:po_new' %}?prefill={{ prefill|urlencode }}"><i class="fas fa-file-invoice me-1"></i>Make a purchase order</a>
+                        <a class="btn btn-sm btn-primary" href="{% url 'inventory:po_new' %}?prefill={{ prefill|urlencode }}"><i class="fas fa-file-invoice me-1"></i>{% translate "Make a purchase order" %}</a>
                         {% endif %}
                     </div>
-                    <p class="small text-muted">From your recipes and the expected dish sales above, compared with what is in stock (keeping each item's low-stock level).</p>
+                    <p class="small text-muted">{% translate "From your recipes and the expected dish sales above, compared with what is in stock (keeping each item's low-stock level)." %}</p>
                     {% if shopping %}
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
-                            <thead class="table-light"><tr><th>Ingredient</th><th class="text-end">Expected use</th><th class="text-end">In stock</th><th class="text-end">Buy</th><th class="text-end">Est. cost</th></tr></thead>
+                            <thead class="table-light"><tr><th>{% translate "Ingredient" %}</th><th class="text-end">{% translate "Expected use" %}</th><th class="text-end">{% translate "In stock" %}</th><th class="text-end">{% translate "Buy" %}</th><th class="text-end">{% translate "Est. cost" %}</th></tr></thead>
                             <tbody>
                             {% for r in shopping %}
                             <tr><td>{{ r.item.name }}</td><td class="text-end">{{ r.need }} {{ r.item.unit }}</td><td class="text-end {% if r.stock <= 0 %}text-danger{% endif %}">{{ r.stock }}</td>
@@ -120,7 +121,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="small text-muted">Nothing to buy — or no recipes yet. Add recipes under Inventory → Recipes to get a shopping list.</div>
+                    <div class="small text-muted">{% translate "Nothing to buy — or no recipes yet. Add recipes under Inventory → Recipes to get a shopping list." %}</div>
                     {% endif %}
                 </div>
             </div>

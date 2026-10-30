@@ -1,5 +1,6 @@
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -222,46 +223,46 @@
 <body>
     <div class="print-buttons no-print">
         <button class="print-btn" onclick="window.print()">
-            🖨️ Print BOT
+            🖨️ {% translate "Print" %} BOT
         </button>
         <button class="print-btn back-btn" onclick="window.location.href='{% url 'orders:bar_dashboard' %}'">
-            ← Back to Bar Dashboard
+            ← {% translate "Back to Bar Dashboard" %}
         </button>
     </div>
 
     <div class="bot-container">
         <!-- Header -->
         <div class="bot-header">
-            <div class="bot-title">BAR ORDER TICKET</div>
+            <div class="bot-title">{% translate "BAR ORDER TICKET" %}</div>
             <div class="restaurant-name">{{ restaurant_name|upper }}</div>
-            <span class="station-badge">BAR STATION</span>
+            <span class="station-badge">{% translate "BAR STATION" %}</span>
         </div>
 
         <!-- Order Information -->
         <div class="bot-info">
             <div class="bot-info-row">
-                <span class="bot-info-label">Order #:</span>
+                <span class="bot-info-label">{% translate "Order #:" %}</span>
                 <span>{{ order.order_number }}</span>
             </div>
             <div class="bot-info-row">
-                <span class="bot-info-label">Table:</span>
+                <span class="bot-info-label">{% translate "Table:" %}</span>
                 <span>{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
             </div>
             <div class="bot-info-row">
-                <span class="bot-info-label">Customer:</span>
+                <span class="bot-info-label">{% translate "Customer:" %}</span>
                 <span>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</span>
             </div>
             <div class="bot-info-row">
-                <span class="bot-info-label">Status:</span>
+                <span class="bot-info-label">{% translate "Status:" %}</span>
                 <span>{{ order.get_status_display|upper }}</span>
             </div>
             <div class="bot-info-row">
-                <span class="bot-info-label">Order Time:</span>
+                <span class="bot-info-label">{% translate "Order Time:" %}</span>
                 <span>{{ order.created_at|date:"d/m/Y H:i" }}</span>
             </div>
             {% if order.confirmed_by %}
             <div class="bot-info-row">
-                <span class="bot-info-label">Confirmed By:</span>
+                <span class="bot-info-label">{% translate "Confirmed By:" %}</span>
                 <span>{{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</span>
             </div>
             {% endif %}
@@ -271,7 +272,7 @@
 
         <!-- Bar Items -->
         <div class="bot-items">
-            <div class="bot-items-title">BAR ITEMS</div>
+            <div class="bot-items-title">{% translate "BAR ITEMS" %}</div>
             {% for item in order.order_items.all %}
                 {% if item.product.station == 'bar' %}
                     <div class="bot-item">
@@ -291,7 +292,7 @@
         {% if order.display_instructions %}
         <div class="bot-divider"></div>
         <div class="special-instructions">
-            <div class="special-instructions-title">⚠️ SPECIAL INSTRUCTIONS</div>
+            <div class="special-instructions-title">⚠️ {% translate "SPECIAL INSTRUCTIONS" %}</div>
             {{ order.display_instructions }}
         </div>
         {% endif %}
@@ -300,10 +301,10 @@
 
         <!-- Footer -->
         <div class="bot-footer">
-            <div>BAR STATION - PRIORITY ORDER</div>
-            <div class="bot-time">Printed: {{ now|date:"d/m/Y H:i:s" }}</div>
+            <div>{% translate "BAR STATION - PRIORITY ORDER" %}</div>
+            <div class="bot-time">{% blocktranslate with time=now|date:"d/m/Y H:i:s" %}Printed: {{ time }}{% endblocktranslate %}</div>
             <div style="margin-top: 10px; font-size: 10px;">
-                Thank you for your service! 🍹
+                {% translate "Thank you for your service!" %} 🍹
             </div>
         </div>
     </div>

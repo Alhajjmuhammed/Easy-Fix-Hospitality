@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}{{ display_name }} - Access{% endblock %}
+{% block title %}{{ display_name }} - {% translate "Access" %}{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -20,27 +21,27 @@
                     <!-- Welcome Message -->
                     <div class="alert alert-info mb-4">
                         <i class="bi bi-qr-code"></i>
-                        <strong>QR Code Detected!</strong><br>
-                        You've accessed {{ display_name }} via QR code.
+                        <strong>{% translate "QR Code Detected!" %}</strong><br>
+                        {% blocktranslate with name=display_name %}You've accessed {{ name }} via QR code.{% endblocktranslate %}
                     </div>
 
                     <!-- Action Buttons -->
                     <div class="d-grid gap-2">
                         <!-- Login Button -->
                         <a href="{% url 'accounts:login' %}?next=/r/{{ qr_code }}/" class="btn btn-primary btn-lg">
-                            <i class="bi bi-box-arrow-in-right"></i> Login to Order
+                            <i class="bi bi-box-arrow-in-right"></i> {% translate "Login to Order" %}
                         </a>
                         
                         <!-- Register Button -->
                         <a href="{% url 'accounts:customer_register' qr_code %}" class="btn btn-outline-primary btn-lg">
-                            <i class="bi bi-person-plus"></i> Create Account
+                            <i class="bi bi-person-plus"></i> {% translate "Create Account" %}
                         </a>
                         
                         <!-- Guest Access (if applicable) -->
                         <hr class="my-3">
                         <p class="text-muted small">
                             <i class="bi bi-info-circle"></i>
-                            Please login or register to place an order
+                            {% translate "Please login or register to place an order" %}
                         </p>
                     </div>
 

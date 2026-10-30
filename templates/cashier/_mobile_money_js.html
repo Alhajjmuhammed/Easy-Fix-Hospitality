@@ -1,3 +1,19 @@
+{% load i18n %}
+{% translate "Mobile money" as t_mm_title %}
+{% translate "Phone number" as t_mm_phone %}
+{% translate "Customer mobile money number" as t_mm_phone_label %}
+{% translate "Mobile network" as t_mm_network %}
+{% translate "Send payment request" as t_mm_send %}
+{% translate "M-Pesa takes whole amounts only." as t_mm_whole %}
+{% translate "The customer must open this link to approve:" as t_mm_open_link %}
+{% translate "Request sent to {phone}. Waiting for the customer to enter their PIN…" as t_mm_sent %}
+{% translate "Still not confirmed. It will be recorded automatically if the customer pays." as t_mm_not_confirmed %}
+{% translate "Paid, but more than was due: {message}" as t_mm_overpaid %}
+{% translate "Paid — receipt {receipt}." as t_mm_paid_receipt %}
+{% translate "Paid." as t_mm_paid %}
+{% translate "You can try again." as t_mm_try_again %}
+{% translate "Sending…" as t_mm_sending %}
+{% translate "Connection error. Please try again." as t_mm_conn_error %}
 <script>
 /* Mobile money box: phone (+ network) → send PIN prompt → follow the status until paid / failed.
    mountMobileMoney(container, {startUrl, statusUrl: id => url, amount, currencySymbol, onPaid}) */
@@ -18,29 +34,29 @@ function mountMobileMoney(container, opts) {
             const box = el('div', 'border rounded p-2 small');
             const title = el('div', 'fw-semibold mb-1');
             title.innerHTML = '<i class="fas fa-mobile-alt me-1"></i>';
-            title.appendChild(document.createTextNode('Mobile money (' + info.provider + ')'));
+            title.appendChild(document.createTextNode("{{ t_mm_title|escapejs }}" + ' (' + info.provider + ')'));
             box.appendChild(title);
             const row = el('div', 'd-flex gap-1 flex-wrap align-items-center');
             const phone = el('input', 'form-control form-control-sm');
-            phone.type = 'tel'; phone.style.maxWidth = '170px'; phone.placeholder = 'Phone number';
-            phone.setAttribute('aria-label', 'Customer mobile money number');
+            phone.type = 'tel'; phone.style.maxWidth = '170px'; phone.placeholder = "{{ t_mm_phone|escapejs }}";
+            phone.setAttribute('aria-label', "{{ t_mm_phone_label|escapejs }}");
             phone.value = info.customer_phone || '';
             row.appendChild(phone);
             let network = null;
             if (info.networks && info.networks.length) {
                 network = el('select', 'form-select form-select-sm');
                 network.style.maxWidth = '120px';
-                network.setAttribute('aria-label', 'Mobile network');
+                network.setAttribute('aria-label', "{{ t_mm_network|escapejs }}");
                 info.networks.forEach(n => { const o = el('option', '', n); o.value = n; network.appendChild(o); });
                 row.appendChild(network);
             }
-            const btn = el('button', 'btn btn-sm btn-success', 'Send payment request');
+            const btn = el('button', 'btn btn-sm btn-success', "{{ t_mm_send|escapejs }}");
             btn.type = 'button';
             row.appendChild(btn);
             box.appendChild(row);
             const status = el('div', 'mt-1');
             box.appendChild(status);
-            if (info.whole_amounts_only) box.appendChild(el('div', 'text-muted', 'M-Pesa takes whole amounts only.'));
+            if (info.whole_amounts_only) box.appendChild(el('div', 'text-muted', "{{ t_mm_whole|escapejs }}"));
             container.appendChild(box);
 
             const show = (text, cls) => { status.className = 'mt-1 ' + (cls || ''); status.textContent = text; };
@@ -48,20 +64,20 @@ function mountMobileMoney(container, opts) {
                 const startedAt = Date.now();
                 if (charge.redirect_url) {
                     status.innerHTML = '';
-                    status.appendChild(el('div', '', 'The customer must open this link to approve:'));
+                    status.appendChild(el('div', '', "{{ t_mm_open_link|escapejs }}"));
                     const a = el('a', '', charge.redirect_url);
                     a.href = charge.redirect_url; a.target = '_blank'; a.rel = 'noopener';
                     status.appendChild(a);
                 } else if (charge.warning) {
                     show(charge.warning, 'text-warning');
                 } else {
-                    show('Request sent to ' + charge.phone + '. Waiting for the customer to enter their PIN…', 'text-primary');
+                    show("{{ t_mm_sent|escapejs }}".replace('{phone}', () => charge.phone), 'text-primary');
                 }
                 const poll = () => {
                     if (stopped) return;
                     if (Date.now() - startedAt > 25 * 60 * 1000) {     // stop following; the server keeps checking
                         btn.disabled = false;
-                        show('Still not confirmed. It will be recorded automatically if the customer pays.', 'text-warning');
+                        show("{{ t_mm_not_confirmed|escapejs }}", 'text-warning');
                         return;
                     }
                     fetch(opts.statusUrl(charge.id), { credentials: 'same-origin' })
@@ -75,15 +91,15 @@ function mountMobileMoney(container, opts) {
                             btn.disabled = false;
                             if (c.status === 'successful') {
                                 if (c.needs_refund) {
-                                    show('Paid, but more than was due: ' + c.message, 'text-danger fw-semibold');
+                                    show("{{ t_mm_overpaid|escapejs }}".replace('{message}', () => c.message), 'text-danger fw-semibold');
                                     return;                    // let the cashier read it: no automatic reload
                                 }
-                                show('Paid' + (c.receipt ? ' — receipt ' + c.receipt : '') + '.', 'text-success fw-semibold');
+                                show(c.receipt ? "{{ t_mm_paid_receipt|escapejs }}".replace('{receipt}', () => c.receipt) : "{{ t_mm_paid|escapejs }}", 'text-success fw-semibold');
                                 if (opts.onPaid) opts.onPaid(c);
                             } else if (c.status === 'unknown') {
                                 show(c.status_display + '.', 'text-warning');
                             } else {
-                                show(c.status_display + (c.message ? ': ' + c.message : '') + '. You can try again.', 'text-danger');
+                                show(c.status_display + (c.message ? ': ' + c.message : '') + '. ' + "{{ t_mm_try_again|escapejs }}", 'text-danger');
                             }
                         })
                         .catch(() => { if (!stopped) timer = setTimeout(poll, 6000); else { btn.disabled = false; } });
@@ -96,7 +112,7 @@ function mountMobileMoney(container, opts) {
                 btn.disabled = true;
                 clearTimeout(timer);
                 stopped = false;
-                show('Sending…', 'text-muted');
+                show("{{ t_mm_sending|escapejs }}", 'text-muted');
                 fetch(opts.startUrl, {
                     method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
@@ -107,7 +123,7 @@ function mountMobileMoney(container, opts) {
                     if (res.error) { show(res.error, 'text-danger'); btn.disabled = false; return; }
                     follow(res);
                 })
-                .catch(() => { show('Connection error. Please try again.', 'text-danger'); btn.disabled = false; });
+                .catch(() => { show("{{ t_mm_conn_error|escapejs }}", 'text-danger'); btn.disabled = false; });
             };
         })
         .catch(() => { /* mobile money is optional */ });

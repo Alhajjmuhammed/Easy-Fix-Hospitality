@@ -1,7 +1,7 @@
 {% extends base_template %}
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 
-{% block title %}Track Order #{{ order.order_number }}{% endblock %}
+{% block title %}{% blocktranslate with n=order.order_number %}Track Order #{{ n }}{% endblocktranslate %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -157,14 +157,14 @@
 <!-- Breadcrumb -->
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb" style="font-size:.82rem;">
-        <li class="breadcrumb-item"><a href="{% url 'orders:my_orders' %}">My Orders</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'orders:my_orders' %}">{% translate "My Orders" %}</a></li>
         <li class="breadcrumb-item active">#{{ order.order_number }}</li>
     </ol>
 </nav>
 
 <!-- Hero banner -->
 <div class="track-hero {% if order.status == 'cancelled' %}cancelled{% elif ot == 'delivery' %}delivery{% elif ot == 'pickup' %}pickup{% else %}dine-in{% endif %}">
-    <div class="order-num">Order Number</div>
+    <div class="order-num">{% translate "Order Number" %}</div>
     <h2>#{{ order.order_number }}</h2>
     <div class="d-flex align-items-center gap-3 flex-wrap mt-2">
         <span class="status-hero-badge">
@@ -174,9 +174,9 @@
             {{ order.get_status_display }}
         </span>
         <span class="status-hero-badge" style="background:rgba(255,255,255,.15)">
-            {% if ot == 'delivery' %}<i class="bi bi-bicycle me-1"></i>Delivery
-            {% elif ot == 'pickup' %}<i class="bi bi-bag-check me-1"></i>Pickup
-            {% else %}<i class="bi bi-table me-1"></i>Dine-In
+            {% if ot == 'delivery' %}<i class="bi bi-bicycle me-1"></i>{% translate "Delivery" %}
+            {% elif ot == 'pickup' %}<i class="bi bi-bag-check me-1"></i>{% translate "Pickup" %}
+            {% else %}<i class="bi bi-table me-1"></i>{% translate "Dine-In" %}
             {% endif %}
         </span>
         <small style="opacity:.7;font-size:.78rem;">{{ order.created_at|date:"M d, Y · H:i" }}</small>
@@ -191,9 +191,9 @@
 
 {% if is_cancelled %}
 <div class="cancelled-banner mb-3">
-    <strong><i class="bi bi-x-circle-fill me-2"></i>Order Cancelled</strong>
+    <strong><i class="bi bi-x-circle-fill me-2"></i>{% translate "Order Cancelled" %}</strong>
     {% if order.reason_if_cancelled %}
-    <p class="mb-0 mt-1 small">Reason: {{ order.reason_if_cancelled }}</p>
+    <p class="mb-0 mt-1 small">{% translate "Reason:" %} {{ order.reason_if_cancelled }}</p>
     {% endif %}
 </div>
 {% endif %}
@@ -201,7 +201,7 @@
 {% if can_pay_mobile %}
 <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
     <div class="card-body">
-        <div class="fw-semibold mb-2"><i class="bi bi-phone me-1"></i>Pay now from your phone</div>
+        <div class="fw-semibold mb-2"><i class="bi bi-phone me-1"></i>{% translate "Pay now from your phone" %}</div>
         <div id="customerMobileMoney"></div>
     </div>
 </div>
@@ -220,26 +220,26 @@ document.addEventListener('DOMContentLoaded', function () {
 {% if can_rate %}
 <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
     <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div><strong><i class="bi bi-star-fill me-1" style="color:#f5a623"></i>How was your order?</strong>
-            <div class="small text-muted">Your rating helps the restaurant improve.</div></div>
-        <a class="btn btn-warning fw-semibold" href="{% url 'orders:rate_order' order.id %}">Rate your order</a>
+        <div><strong><i class="bi bi-star-fill me-1" style="color:#f5a623"></i>{% translate "How was your order?" %}</strong>
+            <div class="small text-muted">{% translate "Your rating helps the restaurant improve." %}</div></div>
+        <a class="btn btn-warning fw-semibold" href="{% url 'orders:rate_order' order.id %}">{% translate "Rate your order" %}</a>
     </div>
 </div>
 {% elif rating %}
 <div class="card border-0 shadow-sm mb-3" style="border-radius:16px;">
     <div class="card-body">
-        <div class="fw-semibold mb-1">{% if user.is_customer %}Your rating{% else %}Customer rating{% endif %}</div>
-        <div style="color:#f5a623" aria-label="{{ rating.food_stars }} out of 5 stars for the food">
+        <div class="fw-semibold mb-1">{% if user.is_customer %}{% translate "Your rating" %}{% else %}{% translate "Customer rating" %}{% endif %}</div>
+        <div style="color:#f5a623" aria-label="{% blocktranslate with n=rating.food_stars %}{{ n }} out of 5 stars for the food{% endblocktranslate %}">
             {% for i in "12345" %}<i class="bi bi-star{% if forloop.counter <= rating.food_stars %}-fill{% endif %}"></i>{% endfor %}
-            <span class="text-muted small ms-1">food</span>
+            <span class="text-muted small ms-1">{% translate "food" %}</span>
             {% if rating.delivery_stars %}
             <span class="ms-3">{% for i in "12345" %}<i class="bi bi-star{% if forloop.counter <= rating.delivery_stars %}-fill{% endif %}"></i>{% endfor %}</span>
-            <span class="text-muted small ms-1">delivery</span>
+            <span class="text-muted small ms-1">{% translate "delivery" %}</span>
             {% endif %}
         </div>
         {% if rating.comment %}<div class="small mt-1">“{{ rating.comment }}”</div>{% endif %}
         {% if rating.reply %}
-        <div class="mt-2 p-2 rounded small" style="background:#f1f8ff"><strong>Reply from the restaurant:</strong> {{ rating.reply|linebreaksbr }}</div>
+        <div class="mt-2 p-2 rounded small" style="background:#f1f8ff"><strong>{% translate "Reply from the restaurant:" %}</strong> {{ rating.reply|linebreaksbr }}</div>
         {% endif %}
     </div>
 </div>
@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {% if not is_cancelled %}
         <div class="card border-0 shadow-sm mb-4" style="border-radius:16px;">
             <div class="card-body pb-3">
-                <h6 class="fw-bold mb-0"><i class="bi bi-clock-history me-2" style="color:#d63384"></i>Order Progress</h6>
+                <h6 class="fw-bold mb-0"><i class="bi bi-clock-history me-2" style="color:#d63384"></i>{% translate "Order Progress" %}</h6>
 
                 <div class="stepper {% if ot == 'delivery' %}delivery{% elif ot == 'pickup' %}pickup{% else %}dine-in{% endif %}">
                     {% for step in status_progress %}
@@ -288,25 +288,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 {% if order.status == 'ready' and ot == 'dine-in' %}
                 <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
-                    <i class="bi bi-bell-fill me-2"></i><strong>Your order is ready!</strong> A staff member will bring it to your table shortly.
+                    <i class="bi bi-bell-fill me-2"></i><strong>{% translate "Your order is ready!" %}</strong> {% translate "A staff member will bring it to your table shortly." %}
                 </div>
                 {% elif order.status == 'ready' and ot == 'pickup' %}
                 <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
-                    <i class="bi bi-bag-check-fill me-2"></i><strong>Ready for pickup!</strong> Please collect your order at the counter.
+                    <i class="bi bi-bag-check-fill me-2"></i><strong>{% translate "Ready for pickup!" %}</strong> {% translate "Please collect your order at the counter." %}
                 </div>
                 {% elif order.status == 'ready' and ot == 'delivery' %}
                 <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
-                    <i class="bi bi-bicycle me-2"></i><strong>Out for delivery!</strong> Your order is on the way.
+                    <i class="bi bi-bicycle me-2"></i><strong>{% translate "Out for delivery!" %}</strong> {% translate "Your order is on the way." %}
                 </div>
                 {% elif order.status == 'delivered' and ot == 'delivery' %}
                 <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
-                    <i class="bi bi-check-circle-fill me-2"></i><strong>Delivered!</strong> Enjoy your meal.
+                    <i class="bi bi-check-circle-fill me-2"></i><strong>{% translate "Delivered!" %}</strong> {% translate "Enjoy your meal." %}
                 </div>
                 {% elif order.status == 'served' %}
                 <div class="alert alert-success mb-0 mt-3 py-2 rounded-3">
                     <i class="bi bi-check-circle-fill me-2"></i>
-                    {% if ot == 'pickup' %}<strong>Picked up!</strong> Thank you for your order.
-                    {% else %}<strong>Served!</strong> Thank you for dining with us. Enjoy your meal!{% endif %}
+                    {% if ot == 'pickup' %}<strong>{% translate "Picked up!" %}</strong> {% translate "Thank you for your order." %}
+                    {% else %}<strong>{% translate "Served!" %}</strong> {% translate "Thank you for dining with us. Enjoy your meal!" %}{% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -322,19 +322,19 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="map-rider-bar">
                 <span class="map-ws-dot" id="map-ws-dot"></span>
                 <i class="bi bi-bicycle"></i>
-                <span id="map-rider-label">Connecting to rider…</span>
+                <span id="map-rider-label">{% translate "Connecting to rider…" %}</span>
             </div>
             <div style="position:relative;">
                 <div id="delivery-map"></div>
                 <div id="map-placeholder" style="position:absolute;inset:0;background:#f1f8e9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:#558b2f;z-index:500;pointer-events:none;">
                     <i class="bi bi-bicycle" style="font-size:2.5rem;opacity:.4;"></i>
-                    <span style="font-size:.9rem;font-weight:600;">Waiting for rider location…</span>
-                    <small style="opacity:.65;font-size:.75rem;">Map appears once the rider starts moving</small>
+                    <span style="font-size:.9rem;font-weight:600;">{% translate "Waiting for rider location…" %}</span>
+                    <small style="opacity:.65;font-size:.75rem;">{% translate "Map appears once the rider starts moving" %}</small>
                 </div>
                 <div id="map-delivered-overlay" style="position:absolute;inset:0;background:rgba(27,94,32,.9);display:{% if order.status == 'delivered' %}flex{% else %}none{% endif %};flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;z-index:1000;gap:.4rem;pointer-events:none;">
                     <i class="bi bi-check-circle-fill" style="font-size:2.5rem;"></i>
-                    <strong style="font-size:1.15rem;">Order Delivered!</strong>
-                    <small style="opacity:.85;">Your order has arrived. Enjoy!</small>
+                    <strong style="font-size:1.15rem;">{% translate "Order Delivered!" %}</strong>
+                    <small style="opacity:.85;">{% translate "Your order has arrived. Enjoy!" %}</small>
                 </div>
             </div>
         </div>
@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <!-- Order items -->
         <div class="card border-0 shadow-sm" style="border-radius:16px;">
             <div class="card-body">
-                <h6 class="fw-bold mb-3"><i class="bi bi-basket me-2" style="color:#d63384"></i>Order Items</h6>
+                <h6 class="fw-bold mb-3"><i class="bi bi-basket me-2" style="color:#d63384"></i>{% translate "Order Items" %}</h6>
                 {% for item in order.order_items.all %}
                 <div class="item-row">
                     <span class="item-qty">×{{ item.quantity }}</span>
@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 {% endfor %}
                 <div class="d-flex justify-content-between align-items-center pt-3 mt-1 border-top">
-                    <span class="fw-bold">Total</span>
+                    <span class="fw-bold">{% translate "Total" %}</span>
                     <span class="fw-bold fs-5" style="color:#198754">{% currency_symbol %}{{ order.total_amount }}</span>
                 </div>
             </div>
@@ -371,61 +371,61 @@ document.addEventListener('DOMContentLoaded', function () {
         <!-- Order info -->
         <div class="card border-0 shadow-sm mb-4" style="border-radius:16px;">
             <div class="card-body">
-                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2" style="color:#d63384"></i>Order Info</h6>
+                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2" style="color:#d63384"></i>{% translate "Order Info" %}</h6>
 
                 {% if ot == 'delivery' %}
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-bicycle me-1"></i>Type</span>
-                    <span class="info-val text-success">Delivery</span>
+                    <span class="info-label"><i class="bi bi-bicycle me-1"></i>{% translate "Type" %}</span>
+                    <span class="info-val text-success">{% translate "Delivery" %}</span>
                 </div>
                 {% if order.delivery_address %}
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-geo-alt me-1"></i>Address</span>
+                    <span class="info-label"><i class="bi bi-geo-alt me-1"></i>{% translate "Address" %}</span>
                     <span class="info-val" style="max-width:60%;word-break:break-word;">{{ order.delivery_address }}</span>
                 </div>
                 {% endif %}
                 {% if order.delivery_phone %}
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-telephone me-1"></i>Phone</span>
+                    <span class="info-label"><i class="bi bi-telephone me-1"></i>{% translate "Phone" %}</span>
                     <span class="info-val">{{ order.delivery_phone }}</span>
                 </div>
                 {% endif %}
                 {% elif ot == 'pickup' %}
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-bag-check me-1"></i>Type</span>
-                    <span class="info-val" style="color:#1565c0">Pickup</span>
+                    <span class="info-label"><i class="bi bi-bag-check me-1"></i>{% translate "Type" %}</span>
+                    <span class="info-val" style="color:#1565c0">{% translate "Pickup" %}</span>
                 </div>
                 {% else %}
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-table me-1"></i>Table</span>
+                    <span class="info-label"><i class="bi bi-table me-1"></i>{% translate "Table" %}</span>
                     <span class="info-val">{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}—{% endif %}</span>
                 </div>
                 {% endif %}
 
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-bag me-1"></i>Items</span>
+                    <span class="info-label"><i class="bi bi-bag me-1"></i>{% translate "Items" %}</span>
                     <span class="info-val">{{ order.get_total_products }}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-cash me-1"></i>Total</span>
+                    <span class="info-label"><i class="bi bi-cash me-1"></i>{% translate "Total" %}</span>
                     <span class="info-val" style="color:#198754">{% currency_symbol %}{{ order.total_amount }}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label"><i class="bi bi-credit-card me-1"></i>Payment</span>
+                    <span class="info-label"><i class="bi bi-credit-card me-1"></i>{% translate "Payment" %}</span>
                     <span class="info-val">
                         {% if order.payment_status == 'paid' %}
-                        <span class="badge" style="background:#d1e7dd;color:#0a3622;">Paid</span>
+                        <span class="badge" style="background:#d1e7dd;color:#0a3622;">{% translate "Paid" %}</span>
                         {% elif order.payment_status == 'partial' %}
-                        <span class="badge bg-info">Partial</span>
+                        <span class="badge bg-info">{% translate "Partial" %}</span>
                         {% else %}
-                        <span class="badge" style="background:#fff3cd;color:#856404;">Pending</span>
+                        <span class="badge" style="background:#fff3cd;color:#856404;">{% translate "Pending" %}</span>
                         {% endif %}
                     </span>
                 </div>
 
                 {% if order.display_instructions %}
                 <div class="mt-3 p-3" style="background:#f8f9fa;border-radius:10px;border-left:3px solid #d63384">
-                    <small class="text-muted fw-bold d-block mb-1">Special Instructions</small>
+                    <small class="text-muted fw-bold d-block mb-1">{% translate "Special Instructions" %}</small>
                     <small>{{ order.display_instructions }}</small>
                 </div>
                 {% endif %}
@@ -435,48 +435,49 @@ document.addEventListener('DOMContentLoaded', function () {
         <!-- Quick actions -->
         <div class="card border-0 shadow-sm" style="border-radius:16px;">
             <div class="card-body">
-                <h6 class="fw-bold mb-3"><i class="bi bi-lightning me-2" style="color:#d63384"></i>Actions</h6>
+                <h6 class="fw-bold mb-3"><i class="bi bi-lightning me-2" style="color:#d63384"></i>{% translate "Actions" %}</h6>
                 <div class="action-grid">
 
                     <a href="{% url 'orders:my_orders' %}" class="btn btn-outline-secondary rounded-pill">
-                        <i class="bi bi-arrow-left me-1"></i>My Orders
+                        <i class="bi bi-arrow-left me-1"></i>{% translate "My Orders" %}
                     </a>
 
                     {% if order.payment_status == 'paid' %}
                     <a href="{% url 'orders:view_receipt' order.id %}" class="btn btn-success rounded-pill">
-                        <i class="bi bi-receipt me-1"></i>View Receipt
+                        <i class="bi bi-receipt me-1"></i>{% translate "View Receipt" %}
                     </a>
                     {% endif %}
 
                     {% if order.status == 'pending' %}
+                    {% blocktranslate with n=order.order_number asvar t_cancel_q %}Cancel order #{{ n }}?{% endblocktranslate %}
                     <a href="{% url 'orders:customer_cancel_order' order.id %}" class="btn btn-outline-danger rounded-pill"
-                       onclick="return confirm('Cancel order #{{ order.order_number }}?')">
-                        <i class="bi bi-x-circle me-1"></i>Cancel Order
+                       onclick="return confirm('{{ t_cancel_q|escapejs }}')">
+                        <i class="bi bi-x-circle me-1"></i>{% translate "Cancel Order" %}
                     </a>
                     {% endif %}
 
                     {% if order.status == 'served' and order.payment_status != 'paid' and not is_remote_order and order.table_info %}
                         {% if pending_bill_request %}
                         <button class="btn btn-secondary rounded-pill" disabled>
-                            <i class="bi bi-clock me-1"></i>Bill Requested
+                            <i class="bi bi-clock me-1"></i>{% translate "Bill Requested" %}
                         </button>
                         <small class="text-muted text-center" style="font-size:.75rem;">
-                            Requested {{ pending_bill_request.created_at|timesince }} ago. Staff will bring your bill.
+                            {% blocktranslate with t=pending_bill_request.created_at|timesince %}Requested {{ t }} ago. Staff will bring your bill.{% endblocktranslate %}
                         </small>
                         {% else %}
                         <a href="{% url 'orders:request_bill' order.table_info.id %}" class="btn btn-warning rounded-pill">
-                            <i class="bi bi-receipt me-1"></i>Request Bill
+                            <i class="bi bi-receipt me-1"></i>{% translate "Request Bill" %}
                         </a>
                         {% endif %}
                     {% endif %}
 
                     {% if ot == 'delivery' or ot == 'pickup' %}
                     <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-primary rounded-pill">
-                        <i class="bi bi-bicycle me-1"></i>Order Again
+                        <i class="bi bi-bicycle me-1"></i>{% translate "Order Again" %}
                     </a>
                     {% else %}
                     <a href="{% url 'orders:scan_qr' %}" class="btn btn-outline-primary rounded-pill">
-                        <i class="bi bi-plus-circle me-1"></i>New Dine-In Order
+                        <i class="bi bi-plus-circle me-1"></i>{% translate "New Dine-In Order" %}
                     </a>
                     {% endif %}
 
@@ -496,6 +497,9 @@ document.addEventListener('DOMContentLoaded', function () {
 {% if order.status == 'out_for_delivery' or order.status == 'delivered' %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLcE=" crossorigin="anonymous"></script>
+{% translate "Rider" as t_rider %}
+{% translate "Delivery address" as t_delivery_address %}
+{% translate "Order delivered!" as t_order_delivered %}
 <script>
 (function () {
   'use strict';
@@ -533,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function () {
       riderMarker.setLatLng([lat, lng]);
     } else {
       riderMarker = L.marker([lat, lng], { icon: riderIcon })
-        .bindTooltip('Rider', { permanent: false }).addTo(map);
+        .bindTooltip("{{ t_rider|escapejs }}", { permanent: false }).addTo(map);
     }
     if (!hasCoords) {
       hasCoords = true;
@@ -549,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function placeDestination(lat, lng, address) {
     if (lat == null || lng == null || destMarker) return;
     destMarker = L.marker([lat, lng], { icon: destIcon })
-      .bindTooltip(address || 'Delivery address', { permanent: false }).addTo(map);
+      .bindTooltip(address || "{{ t_delivery_address|escapejs }}", { permanent: false }).addTo(map);
     if (riderMarker) {
       map.fitBounds(L.latLngBounds(riderMarker.getLatLng(), destMarker.getLatLng()), { padding: [40, 40] });
     } else {
@@ -560,7 +564,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function markDelivered() {
     if (deliveredEl) deliveredEl.style.display = 'flex';
     if (wsDot) wsDot.classList.add('disconnected');
-    if (riderLabel) riderLabel.textContent = '✅ Order delivered!';
+    if (riderLabel) riderLabel.textContent = '✅ ' + "{{ t_order_delivered|escapejs }}";
   }
 
   /* ── REST fallback ───────────────────────────────────────────── */
@@ -578,7 +582,7 @@ document.addEventListener('DOMContentLoaded', function () {
             placeDestination(parseFloat(a.delivery_lat), parseFloat(a.delivery_lng), a.delivery_address);
           }
           if (a.rider && riderLabel && a.status !== 'delivered') {
-            riderLabel.textContent = (a.rider.name || 'Rider') + (a.rider.vehicle_display ? '  ·  ' + a.rider.vehicle_display : '');
+            riderLabel.textContent = (a.rider.name || "{{ t_rider|escapejs }}") + (a.rider.vehicle_display ? '  ·  ' + a.rider.vehicle_display : '');
           }
           if (a.status === 'delivered') markDelivered();
         }

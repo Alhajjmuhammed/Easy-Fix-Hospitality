@@ -1,8 +1,9 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}Cashier Reports - {{ request.user.get_full_name }}{% endblock %}
+{% block title %}{% translate "Cashier Reports" %} - {{ request.user.get_full_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -19,9 +20,9 @@
     <div class="row mb-4">
         <div class="col-12">
             <h2 class="mb-0" style="color: #2c5282;">
-                <i class="bi bi-graph-up"></i> Restaurant Sales Report
+                <i class="bi bi-graph-up"></i> {% translate "Restaurant Sales Report" %}
             </h2>
-            <p class="text-muted">View all orders from your restaurant</p>
+            <p class="text-muted">{% translate "View all orders from your restaurant" %}</p>
         </div>
     </div>
 
@@ -31,7 +32,7 @@
             <div class="card text-white" style="background-color: #2c5282; border: none; border-radius: 0;">
                 <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
-                        <i class="bi bi-currency-dollar"></i> Total Amount
+                        <i class="bi bi-currency-dollar"></i> {% translate "Total Amount" %}
                     </h6>
                     <h3 class="mb-0 stat-card-h3">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</h3>
                 </div>
@@ -41,7 +42,7 @@
             <div class="card text-white" style="background-color: #28a745; border: none; border-radius: 0;">
                 <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
-                        <i class="bi bi-check-circle"></i> Paid Amount
+                        <i class="bi bi-check-circle"></i> {% translate "Paid Amount" %}
                     </h6>
                     <h3 class="mb-0 stat-card-h3">{% currency_symbol %}{{ paid_amount|floatformat:2 }}</h3>
                 </div>
@@ -51,7 +52,7 @@
             <div class="card text-white" style="background-color: #dc3545; border: none; border-radius: 0;">
                 <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
-                        <i class="bi bi-exclamation-circle"></i> Unpaid Amount
+                        <i class="bi bi-exclamation-circle"></i> {% translate "Unpaid Amount" %}
                     </h6>
                     <h3 class="mb-0 stat-card-h3">{% currency_symbol %}{{ unpaid_amount|floatformat:2 }}</h3>
                 </div>
@@ -61,7 +62,7 @@
             <div class="card text-white" style="background-color: #2c5282; border: none; border-radius: 0;">
                 <div class="card-body stat-card-body">
                     <h6 class="card-title mb-2">
-                        <i class="bi bi-receipt"></i> Total Orders
+                        <i class="bi bi-receipt"></i> {% translate "Total Orders" %}
                     </h6>
                     <h3 class="mb-0 stat-card-h3">{{ total_orders }}</h3>
                 </div>
@@ -72,25 +73,25 @@
     <!-- Filters Section -->
     <div class="card mb-4" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 0;">
         <div class="card-header" style="background-color: #2c5282; color: white;">
-            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filter Reports</h5>
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> {% translate "Filter Reports" %}</h5>
         </div>
         <div class="card-body">
             <form method="get" action="{% url 'cashier:cashier_reports' %}">
                 <div class="row g-3">
                     <!-- Period Filter -->
                     <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Period</label>
+                        <label class="form-label fw-bold">{% translate "Period" %}</label>
                         <select name="period" class="form-select">
-                            <option value="today" {% if filters.period == 'today' %}selected{% endif %}>Today</option>
-                            <option value="weekly" {% if filters.period == 'weekly' %}selected{% endif %}>This Week</option>
+                            <option value="today" {% if filters.period == 'today' %}selected{% endif %}>{% translate "Today" %}</option>
+                            <option value="weekly" {% if filters.period == 'weekly' %}selected{% endif %}>{% translate "This Week" %}</option>
                         </select>
                     </div>
 
                     <!-- Category Filter -->
                     <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Category</label>
+                        <label class="form-label fw-bold">{% translate "Category" %}</label>
                         <select name="category_id" class="form-select">
-                            <option value="all">All Categories</option>
+                            <option value="all">{% translate "All Categories" %}</option>
                             {% for category in categories %}
                             <option value="{{ category.id }}" {% if filters.category_id == category.id|stringformat:"s" %}selected{% endif %}>
                                 {{ category.name }}
@@ -101,9 +102,9 @@
 
                     <!-- Sub Category Filter -->
                     <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Sub Category</label>
+                        <label class="form-label fw-bold">{% translate "Sub Category" %}</label>
                         <select name="subcategory_id" class="form-select">
-                            <option value="all">All Sub Categories</option>
+                            <option value="all">{% translate "All Sub Categories" %}</option>
                             {% for subcategory in subcategories %}
                             <option value="{{ subcategory.id }}" {% if filters.subcategory_id == subcategory.id|stringformat:"s" %}selected{% endif %}>
                                 {{ subcategory.name }}
@@ -114,12 +115,12 @@
 
                     <!-- Station Filter -->
                     <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Station</label>
+                        <label class="form-label fw-bold">{% translate "Station" %}</label>
                         <select name="station_filter" class="form-select">
-                            <option value="all">All Stations</option>
+                            <option value="all">{% translate "All Stations" %}</option>
                             {% for value, label in station_choices %}
                             <option value="{{ value }}" {% if filters.station_filter == value %}selected{% endif %}>
-                                {{ label }}
+                                {% translate label %}
                             </option>
                             {% endfor %}
                         </select>
@@ -127,38 +128,38 @@
 
                     <!-- Payment Status Filter -->
                     <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Payment Status</label>
+                        <label class="form-label fw-bold">{% translate "Payment Status" %}</label>
                         <select name="payment_status" class="form-select">
-                            <option value="all">All Status</option>
-                            <option value="paid" {% if filters.payment_status == 'paid' %}selected{% endif %}>Paid</option>
-                            <option value="partial" {% if filters.payment_status == 'partial' %}selected{% endif %}>Partial</option>
-                            <option value="unpaid" {% if filters.payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                            <option value="all">{% translate "All Status" %}</option>
+                            <option value="paid" {% if filters.payment_status == 'paid' %}selected{% endif %}>{% translate "Paid" %}</option>
+                            <option value="partial" {% if filters.payment_status == 'partial' %}selected{% endif %}>{% translate "Partial" %}</option>
+                            <option value="unpaid" {% if filters.payment_status == 'unpaid' %}selected{% endif %}>{% translate "Unpaid" %}</option>
                         </select>
                     </div>
 
                     <!-- Staff Role Filter -->
                     <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Filter by Role</label>
+                        <label class="form-label fw-bold">{% translate "Filter by Role" %}</label>
                         <select name="staff_role" class="form-select">
-                            <option value="all" {% if filters.staff_role == 'all' %}selected{% endif %}>All Roles</option>
-                            <option value="customer_care" {% if filters.staff_role == 'customer_care' %}selected{% endif %}>Customer Care</option>
-                            <option value="cashier" {% if filters.staff_role == 'cashier' %}selected{% endif %}>Cashier</option>
+                            <option value="all" {% if filters.staff_role == 'all' %}selected{% endif %}>{% translate "All Roles" %}</option>
+                            <option value="customer_care" {% if filters.staff_role == 'customer_care' %}selected{% endif %}>{% translate "Customer Care" %}</option>
+                            <option value="cashier" {% if filters.staff_role == 'cashier' %}selected{% endif %}>{% translate "Cashier" %}</option>
                         </select>
                     </div>
 
                     <!-- Staff Filter -->
                     <div class="col-6 col-md-3">
-                        <label class="form-label fw-bold">Filter by Staff</label>
+                        <label class="form-label fw-bold">{% translate "Filter by Staff" %}</label>
                         <select name="staff" class="form-select">
-                            <option value="all">All Staff</option>
-                            <optgroup label="Customer Care">
+                            <option value="all">{% translate "All Staff" %}</option>
+                            <optgroup label="{% translate "Customer Care" %}">
                                 {% for cc_user in customer_care_users %}
                                 <option value="{{ cc_user.id }}" {% if filters.staff == cc_user.id|stringformat:"s" %}selected{% endif %}>
                                     {{ cc_user.get_full_name|default:cc_user.username }}
                                 </option>
                                 {% endfor %}
                             </optgroup>
-                            <optgroup label="Cashiers">
+                            <optgroup label="{% translate "Cashiers" %}">
                                 {% for cashier in cashier_users %}
                                 <option value="{{ cashier.id }}" {% if filters.staff == cashier.id|stringformat:"s" %}selected{% endif %}>
                                     {{ cashier.get_full_name|default:cashier.username }}
@@ -171,7 +172,7 @@
                     <!-- Filter Button -->
                     <div class="col-6 col-md-3 d-flex align-items-end">
                         <button type="submit" class="btn w-100" style="background-color: #2c5282; color: white;">
-                            <i class="bi bi-search"></i> Apply Filters
+                            <i class="bi bi-search"></i> {% translate "Apply Filters" %}
                         </button>
                     </div>
                 </div>
@@ -185,11 +186,11 @@
             <div class="d-flex gap-2">
                 <a href="{% url 'cashier:cashier_reports' %}?export=csv&period={{ filters.period }}&payment_status={{ filters.payment_status }}&category_id={{ filters.category_id }}&subcategory_id={{ filters.subcategory_id }}&station_filter={{ filters.station_filter }}&customer_care={{ filters.customer_care }}" 
                    class="btn btn-success">
-                    <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+                    <i class="bi bi-file-earmark-spreadsheet"></i> {% translate "Export CSV" %}
                 </a>
                 <a href="{% url 'cashier:cashier_reports' %}?export=pdf&period={{ filters.period }}&payment_status={{ filters.payment_status }}&category_id={{ filters.category_id }}&subcategory_id={{ filters.subcategory_id }}&station_filter={{ filters.station_filter }}&customer_care={{ filters.customer_care }}" 
                    class="btn btn-danger">
-                    <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                    <i class="bi bi-file-earmark-pdf"></i> {% translate "Export PDF" %}
                 </a>
             </div>
         </div>
@@ -198,7 +199,7 @@
     <!-- Orders Table -->
     <div class="card" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 0;">
         <div class="card-header" style="background-color: #2c5282; color: white;">
-            <h5 class="mb-0"><i class="bi bi-table"></i> Order Details</h5>
+            <h5 class="mb-0"><i class="bi bi-table"></i> {% translate "Order Details" %}</h5>
         </div>
         <div class="card-body p-0">
             {% if orders %}
@@ -206,18 +207,18 @@
                 <table class="table table-hover mb-0">
                     <thead style="background-color: #f8f9fa;">
                         <tr>
-                            <th>SN</th>
-                            <th>Order #</th>
-                            <th>Date & Time</th>
-                            <th>Table</th>
-                            <th>Items</th>
-                            <th>Category</th>
-                            <th>SubCategory</th>
-                            <th>Station</th>
-                            <th>Ordered By</th>
-                            <th>Paid By</th>
-                            <th>Total Amount</th>
-                            <th>Payment</th>
+                            <th>{% translate "SN" %}</th>
+                            <th>{% translate "Order #" %}</th>
+                            <th>{% translate "Date & Time" %}</th>
+                            <th>{% translate "Table" %}</th>
+                            <th>{% translate "Items" %}</th>
+                            <th>{% translate "Category" %}</th>
+                            <th>{% translate "SubCategory" %}</th>
+                            <th>{% translate "Station" %}</th>
+                            <th>{% translate "Ordered By" %}</th>
+                            <th>{% translate "Paid By" %}</th>
+                            <th>{% translate "Total Amount" %}</th>
+                            <th>{% translate "Payment" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -251,7 +252,7 @@
                             </td>
                             <td>
                                 {% for item in order.order_items.all %}
-                                    {{ item.product.get_station_display }}{% if not forloop.last %}, {% endif %}
+                                    {% translate item.product.get_station_display %}{% if not forloop.last %}, {% endif %}
                                 {% endfor %}
                             </td>
                             <td>
@@ -273,11 +274,11 @@
                             </td>
                             <td>
                                 {% if order.payment_status == 'paid' %}
-                                <span class="badge bg-success">Paid</span>
+                                <span class="badge bg-success">{% translate "Paid" %}</span>
                                 {% elif order.payment_status == 'partial' %}
-                                <span class="badge bg-warning">Partial</span>
+                                <span class="badge bg-warning">{% translate "Partial" %}</span>
                                 {% else %}
-                                <span class="badge bg-danger">Unpaid</span>
+                                <span class="badge bg-danger">{% translate "Unpaid" %}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -288,7 +289,7 @@
             {% else %}
             <div class="text-center py-5">
                 <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
-                <p class="text-muted mt-3">No orders found for the selected filters.</p>
+                <p class="text-muted mt-3">{% translate "No orders found for the selected filters." %}</p>
             </div>
             {% endif %}
         </div>

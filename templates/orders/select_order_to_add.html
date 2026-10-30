@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Select Order - Table {{ table.tbl_no }}{% endblock %}
+{% block title %}{% translate "Select Order" %} - {% blocktranslate with no=table.tbl_no %}Table {{ no }}{% endblocktranslate %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -194,8 +195,8 @@
 <div class="container order-selection-container">
     <!-- Table Header -->
     <div class="table-header">
-        <h3><i class="fas fa-utensils"></i> Table {{ table.tbl_no }}</h3>
-        <p class="mb-0">Select which order to add items to</p>
+        <h3><i class="fas fa-utensils"></i> {% blocktranslate with no=table.tbl_no %}Table {{ no }}{% endblocktranslate %}</h3>
+        <p class="mb-0">{% translate "Select which order to add items to" %}</p>
     </div>
 
     <form method="post" id="orderSelectionForm">
@@ -225,7 +226,7 @@
                 <div class="order-details">
                     <div class="order-info-item">
                         <i class="fas fa-shopping-bag"></i>
-                        <span>{{ order.order_items.all|length }} item{{ order.order_items.all|length|pluralize }}</span>
+                        <span>{% blocktranslate count n=order.order_items.all|length %}{{ n }} item{% plural %}{{ n }} items{% endblocktranslate %}</span>
                     </div>
                     <div class="order-info-item">
                         <i class="fas fa-dollar-sign"></i>
@@ -233,7 +234,7 @@
                     </div>
                     <div class="order-info-item">
                         <i class="fas fa-clock"></i>
-                        <span>{{ order.created_at|timesince }} ago</span>
+                        <span>{% blocktranslate with t=order.created_at|timesince %}{{ t }} ago{% endblocktranslate %}</span>
                     </div>
                 </div>
             </div>
@@ -243,15 +244,16 @@
         <!-- Action Buttons -->
         <div class="action-buttons">
             <a href="{% url 'orders:choose_order_action' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back
+                <i class="fas fa-arrow-left"></i> {% translate "Back" %}
             </a>
             <button type="submit" class="btn btn-continue" id="continueBtn" disabled>
-                <i class="fas fa-arrow-right"></i> Continue to Menu
+                <i class="fas fa-arrow-right"></i> {% translate "Continue to Menu" %}
             </button>
         </div>
     </form>
 </div>
 
+{% translate "Please select an order" as t_select_order %}
 <script>
 let selectedOrderId = null;
 
@@ -273,7 +275,7 @@ function selectOrder(orderId) {
 document.getElementById('orderSelectionForm').addEventListener('submit', function(e) {
     if (!selectedOrderId) {
         e.preventDefault();
-        alert('Please select an order');
+        alert('{{ t_select_order|escapejs }}');
     } else {
         // Store order ID in session for adding items
         sessionStorage.setItem('add_to_order_id', selectedOrderId);

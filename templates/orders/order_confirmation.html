@@ -1,7 +1,8 @@
 {% extends base_template %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Order Confirmed - Restaurant System{% endblock %}
+{% block title %}{% translate "Order Confirmed" %} - Restaurant System{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -12,22 +13,22 @@
                     <i class="bi bi-check-circle display-1"></i>
                 </div>
 
-                <h2 class="text-success mb-3">Order Confirmed!</h2>
-                <p class="lead mb-4">Thank you for your order. We're preparing it now.</p>
+                <h2 class="text-success mb-3">{% translate "Order Confirmed!" %}</h2>
+                <p class="lead mb-4">{% translate "Thank you for your order. We're preparing it now." %}</p>
 
                 <div class="card bg-light mb-4">
                     <div class="card-body">
-                        <h5>Order Details</h5>
-                        <p class="mb-1"><strong>Order Number:</strong> {{ order.order_number }}</p>
+                        <h5>{% translate "Order Details" %}</h5>
+                        <p class="mb-1"><strong>{% translate "Order Number" %}:</strong> {{ order.order_number }}</p>
                         {% if order.order_type == 'delivery' %}
-                        <p class="mb-1"><strong>Type:</strong> <i class="bi bi-bicycle me-1"></i>Delivery{% if order.delivery_address %} — {{ order.delivery_address }}{% endif %}</p>
+                        <p class="mb-1"><strong>{% translate "Type" %}:</strong> <i class="bi bi-bicycle me-1"></i>{% translate "Delivery" %}{% if order.delivery_address %} — {{ order.delivery_address }}{% endif %}</p>
                         {% elif order.order_type == 'pickup' %}
-                        <p class="mb-1"><strong>Type:</strong> <i class="bi bi-bag-check me-1"></i>Pickup</p>
+                        <p class="mb-1"><strong>{% translate "Type" %}:</strong> <i class="bi bi-bag-check me-1"></i>{% translate "Pickup" %}</p>
                         {% else %}
-                        <p class="mb-1"><strong>Table:</strong> {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}—{% endif %}</p>
+                        <p class="mb-1"><strong>{% translate "Table" %}:</strong> {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}—{% endif %}</p>
                         {% endif %}
-                        <p class="mb-1"><strong>Total:</strong> {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</p>
-                        <p class="mb-0"><strong>Status:</strong>
+                        <p class="mb-1"><strong>{% translate "Total" %}:</strong> {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</p>
+                        <p class="mb-0"><strong>{% translate "Status" %}:</strong>
                             <span class="badge bg-warning">{{ order.get_status_display }}</span>
                         </p>
                     </div>
@@ -36,24 +37,24 @@
                 <div class="d-grid gap-2">
                     {% if order.order_type == 'delivery' or order.order_type == 'pickup' %}
                     <a href="{% url 'restaurant:home' %}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-house-fill me-1"></i> Back to Home
+                        <i class="bi bi-house-fill me-1"></i> {% translate "Back to Home" %}
                     </a>
                     {% else %}
                     <a href="{% url 'orders:select_table' %}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-arrow-left-circle"></i> Back to Tables
+                        <i class="bi bi-arrow-left-circle"></i> {% translate "Back to Tables" %}
                     </a>
                     {% endif %}
                     <a href="{% url 'orders:my_orders' %}" class="btn btn-outline-primary">
-                        <i class="bi bi-list-ul"></i> View My Orders
+                        <i class="bi bi-list-ul"></i> {% translate "View My Orders" %}
                     </a>
                     {% if has_kitchen_items %}
                         <a href="{% url 'orders:print_kot' order.id %}" class="btn btn-success" target="_blank">
-                            <i class="bi bi-printer"></i> Print Kitchen Order Ticket (KOT)
+                            <i class="bi bi-printer"></i> {% translate "Print Kitchen Order Ticket (KOT)" %}
                         </a>
                     {% endif %}
                     {% if has_bar_items %}
                         <a href="{% url 'orders:print_bot' order.id %}" class="btn btn-info text-white" target="_blank">
-                            <i class="bi bi-printer"></i> Print Bar Order Ticket (BOT)
+                            <i class="bi bi-printer"></i> {% translate "Print Bar Order Ticket (BOT)" %}
                         </a>
                     {% endif %}
                 </div>
@@ -61,7 +62,7 @@
                 <div class="mt-4">
                     <small class="text-muted">
                         <i class="bi bi-clock"></i>
-                        Estimated preparation time: 15-30 minutes
+                        {% translate "Estimated preparation time: 15-30 minutes" %}
                     </small>
                 </div>
             </div>
@@ -69,6 +70,7 @@
     </div>
 </div>
 
+{% translate "Please allow pop-ups to automatically print Kitchen Order Ticket (KOT)" as t_popup_kot %}{% translate "Please allow pop-ups to automatically print Bar Order Ticket (BOT)" as t_popup_bot %}
 <script>
     {% if order.order_type == 'delivery' or order.order_type == 'pickup' %}
     setTimeout(function() {
@@ -89,7 +91,7 @@
             'width=800,height=900,scrollbars=yes,resizable=yes'
         );
         if (!kotWindow) {
-            alert('Please allow pop-ups to automatically print Kitchen Order Ticket (KOT)');
+            alert("{{ t_popup_kot|escapejs }}");
         }
         {% endif %}
 
@@ -101,7 +103,7 @@
                 'width=800,height=900,scrollbars=yes,resizable=yes'
             );
             if (!botWindow) {
-                alert('Please allow pop-ups to automatically print Bar Order Ticket (BOT)');
+                alert("{{ t_popup_bot|escapejs }}");
             }
         }, 300);
         {% endif %}

@@ -1,8 +1,9 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}All Orders - Branch Monitoring{% endblock %}
+{% block title %}{% translate "All Orders" %} - {% translate "Branch Monitoring" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -182,17 +183,17 @@
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4">
         <div>
             <h2 class="h3 mb-1">
-                <i class="fas fa-shopping-cart text-primary"></i> All Orders
+                <i class="fas fa-shopping-cart text-primary"></i> {% translate "All Orders" %}
             </h2>
-            <p class="text-muted mb-0">Monitor orders across all branch locations</p>
+            <p class="text-muted mb-0">{% translate "Monitor orders across all branch locations" %}</p>
         </div>
         
         <div class="d-flex gap-2 mt-3 mt-lg-0">
             <button class="btn btn-outline-success" onclick="exportOrders()">
-                <i class="fas fa-download"></i> Export
+                <i class="fas fa-download"></i> {% translate "Export" %}
             </button>
             <button class="btn btn-outline-primary" onclick="refreshOrders()">
-                <i class="fas fa-sync-alt"></i> Refresh
+                <i class="fas fa-sync-alt"></i> {% translate "Refresh" %}
             </button>
         </div>
     </div>
@@ -202,33 +203,33 @@
         <form method="GET" id="filterForm">
             <div class="row">
                 <div class="col-lg-3 col-md-6 mb-3">
-                    <label for="date_from" class="form-label">From Date</label>
+                    <label for="date_from" class="form-label">{% translate "From Date" %}</label>
                     <input type="date" class="form-control" id="date_from" name="date_from" 
                            value="{{ date_from|date:'Y-m-d' }}">
                 </div>
                 
                 <div class="col-lg-3 col-md-6 mb-3">
-                    <label for="date_to" class="form-label">To Date</label>
+                    <label for="date_to" class="form-label">{% translate "To Date" %}</label>
                     <input type="date" class="form-control" id="date_to" name="date_to" 
                            value="{{ date_to|date:'Y-m-d' }}">
                 </div>
                 
                 <div class="col-lg-2 col-md-6 mb-3">
-                    <label for="status" class="form-label">Status</label>
+                    <label for="status" class="form-label">{% translate "Status" %}</label>
                     <select class="form-control" id="status" name="status">
-                        <option value="">All Statuses</option>
-                        <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
-                        <option value="preparing" {% if status == 'preparing' %}selected{% endif %}>Preparing</option>
-                        <option value="ready" {% if status == 'ready' %}selected{% endif %}>Ready</option>
-                        <option value="delivered" {% if status == 'delivered' %}selected{% endif %}>Delivered</option>
-                        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                        <option value="">{% translate "All Statuses" %}</option>
+                        <option value="pending" {% if status == 'pending' %}selected{% endif %}>{% translate "Pending" %}</option>
+                        <option value="preparing" {% if status == 'preparing' %}selected{% endif %}>{% translate "Preparing" %}</option>
+                        <option value="ready" {% if status == 'ready' %}selected{% endif %}>{% translate "Ready" %}</option>
+                        <option value="delivered" {% if status == 'delivered' %}selected{% endif %}>{% translate "Delivered" %}</option>
+                        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>{% translate "Cancelled" %}</option>
                     </select>
                 </div>
                 
                 <div class="col-lg-2 col-md-6 mb-3">
-                    <label for="branch" class="form-label">Branch</label>
+                    <label for="branch" class="form-label">{% translate "Branch" %}</label>
                     <select class="form-control" id="branch" name="branch">
-                        <option value="">All Branches</option>
+                        <option value="">{% translate "All Branches" %}</option>
                         {% for branch in branches %}
                             <option value="{{ branch.id }}" {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
                                 {{ branch.name }}
@@ -240,17 +241,17 @@
                 <div class="col-lg-2 col-md-12 mb-3">
                     <label class="form-label">&nbsp;</label>
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter"></i> Filter
+                        <i class="fas fa-filter"></i> {% translate "Filter" %}
                     </button>
                 </div>
             </div>
             
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label for="search" class="form-label">Search Orders</label>
+                    <label for="search" class="form-label">{% translate "Search Orders" %}</label>
                     <div class="input-group">
                         <input type="text" class="form-control" id="search" name="search" 
-                               placeholder="Search by order number, customer name..." value="{{ search }}">
+                               placeholder="{% translate "Search by order number, customer name..." %}" value="{{ search }}">
                         <button type="submit" class="btn btn-outline-secondary">
                             <i class="fas fa-search"></i>
                         </button>
@@ -258,7 +259,7 @@
                 </div>
                 
                 <div class="col-md-3 mb-3">
-                    <label for="per_page" class="form-label">Orders per page</label>
+                    <label for="per_page" class="form-label">{% translate "Orders per page" %}</label>
                     <select class="form-control" id="per_page" name="per_page">
                         <option value="25" {% if per_page == "25" %}selected{% endif %}>25</option>
                         <option value="50" {% if per_page == "50" %}selected{% endif %}>50</option>
@@ -267,12 +268,12 @@
                 </div>
                 
                 <div class="col-md-3 mb-3">
-                    <label for="sort_by" class="form-label">Sort by</label>
+                    <label for="sort_by" class="form-label">{% translate "Sort by" %}</label>
                     <select class="form-control" id="sort_by" name="sort_by">
-                        <option value="-created_at" {% if sort_by == "-created_at" %}selected{% endif %}>Newest First</option>
-                        <option value="created_at" {% if sort_by == "created_at" %}selected{% endif %}>Oldest First</option>
-                        <option value="-total" {% if sort_by == "-total" %}selected{% endif %}>Highest Value</option>
-                        <option value="total" {% if sort_by == "total" %}selected{% endif %}>Lowest Value</option>
+                        <option value="-created_at" {% if sort_by == "-created_at" %}selected{% endif %}>{% translate "Newest First" %}</option>
+                        <option value="created_at" {% if sort_by == "created_at" %}selected{% endif %}>{% translate "Oldest First" %}</option>
+                        <option value="-total" {% if sort_by == "-total" %}selected{% endif %}>{% translate "Highest Value" %}</option>
+                        <option value="total" {% if sort_by == "total" %}selected{% endif %}>{% translate "Lowest Value" %}</option>
                     </select>
                 </div>
             </div>
@@ -283,23 +284,23 @@
     <div class="summary-stats">
         <div class="stat-card">
             <div class="stat-value text-primary">{{ total_orders }}</div>
-            <div class="stat-label">Total Orders</div>
+            <div class="stat-label">{% translate "Total Orders" %}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value text-success">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</div>
-            <div class="stat-label">Total Revenue</div>
+            <div class="stat-label">{% translate "Total Revenue" %}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value text-info">{% currency_symbol %}{{ average_order_value|floatformat:2 }}</div>
-            <div class="stat-label">Avg Order Value</div>
+            <div class="stat-label">{% translate "Avg Order Value" %}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value text-warning">{{ pending_orders }}</div>
-            <div class="stat-label">Pending Orders</div>
+            <div class="stat-label">{% translate "Pending Orders" %}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value text-danger">{{ cancelled_orders }}</div>
-            <div class="stat-label">Cancelled Orders</div>
+            <div class="stat-label">{% translate "Cancelled Orders" %}</div>
         </div>
     </div>
 
@@ -307,23 +308,23 @@
     <div class="order-card">
         <div class="order-header">
             <h5 class="mb-0">
-                <i class="fas fa-list"></i> Order Details
+                <i class="fas fa-list"></i> {% translate "Order Details" %}
             </h5>
-            <small>Showing {{ orders.start_index }} - {{ orders.end_index }} of {{ orders.paginator.count }} orders</small>
+            <small>{% blocktranslate with start=orders.start_index end=orders.end_index total=orders.paginator.count %}Showing {{ start }} - {{ end }} of {{ total }} orders{% endblocktranslate %}</small>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover orders-table mb-0">
                     <thead>
                         <tr>
-                            <th>Order #</th>
-                            <th>Branch</th>
-                            <th>Customer</th>
-                            <th>Items</th>
-                            <th>Total</th>
-                            <th>Status</th>
-                            <th>Date</th>
-                            <th>Actions</th>
+                            <th>{% translate "Order #" %}</th>
+                            <th>{% translate "Branch" %}</th>
+                            <th>{% translate "Customer" %}</th>
+                            <th>{% translate "Items" %}</th>
+                            <th>{% translate "Total" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th>{% translate "Date" %}</th>
+                            <th>{% translate "Actions" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -332,7 +333,7 @@
                             <td>
                                 <strong>#{{ order.id|stringformat:"05d" }}</strong>
                                 {% if order.table_info %}
-                                    <br><small class="text-muted">Table: {{ order.table_info.tbl_no }}</small>
+                                    <br><small class="text-muted">{% translate "Table:" %} {{ order.table_info.tbl_no }}</small>
                                 {% endif %}
                             </td>
                             <td>
@@ -358,7 +359,7 @@
                                         </div>
                                     </div>
                                 {% else %}
-                                    <span class="text-muted">Walk-in Customer</span>
+                                    <span class="text-muted">{% translate "Walk-in Customer" %}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -367,7 +368,7 @@
                                         <div>{{ item.quantity }}x {{ item.product.name }}</div>
                                     {% endfor %}
                                     {% if order.orderitem_set.all|length > 2 %}
-                                        <small class="text-muted">+{{ order.orderitem_set.all|length|add:"-2" }} more...</small>
+                                        <small class="text-muted">{% blocktranslate with n=order.orderitem_set.all|length|add:"-2" %}+{{ n }} more...{% endblocktranslate %}</small>
                                     {% endif %}
                                 </div>
                             </td>
@@ -376,12 +377,12 @@
                                     {% currency_symbol %}{{ order.total|floatformat:2 }}
                                 </div>
                                 {% if order.payment_method %}
-                                    <small class="text-muted">{{ order.payment_method|title }}</small>
+                                    <small class="text-muted">{% translate order.payment_method|title %}</small>
                                 {% endif %}
                             </td>
                             <td>
                                 <span class="order-status status-{{ order.status|lower }}">
-                                    {{ order.get_status_display }}
+                                    {% translate order.get_status_display %}
                                 </span>
                             </td>
                             <td>
@@ -392,11 +393,11 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-primary" onclick="viewOrderDetails({{ order.id }})" title="View Details">
+                                    <button class="btn btn-outline-primary" onclick="viewOrderDetails({{ order.id }})" title="{% translate "View Details" %}">
                                         <i class="fas fa-eye"></i>
                                     </button>
                                     {% if order.status != 'delivered' and order.status != 'cancelled' %}
-                                        <button class="btn btn-outline-info" onclick="trackOrder({{ order.id }})" title="Track Order">
+                                        <button class="btn btn-outline-info" onclick="trackOrder({{ order.id }})" title="{% translate "Track Order" %}">
                                             <i class="fas fa-truck"></i>
                                         </button>
                                     {% endif %}
@@ -408,8 +409,8 @@
                             <td colspan="8" class="text-center py-5">
                                 <div class="text-muted">
                                     <i class="fas fa-shopping-cart fa-3x mb-3"></i>
-                                    <h5>No Orders Found</h5>
-                                    <p>No orders match your current filter criteria.</p>
+                                    <h5>{% translate "No Orders Found" %}</h5>
+                                    <p>{% translate "No orders match your current filter criteria." %}</p>
                                 </div>
                             </td>
                         </tr>
@@ -423,7 +424,7 @@
     <!-- Pagination -->
     {% if orders.has_other_pages %}
     <div class="pagination-wrapper">
-        <nav aria-label="Order pagination">
+        <nav aria-label="{% translate "Order pagination" %}">
             <ul class="pagination justify-content-center mb-0">
                 {% if orders.has_previous %}
                     <li class="page-item">
@@ -457,7 +458,7 @@
         
         <div class="text-center mt-3">
             <small class="text-muted">
-                Showing {{ orders.start_index }} - {{ orders.end_index }} of {{ orders.paginator.count }} total orders
+                {% blocktranslate with start=orders.start_index end=orders.end_index total=orders.paginator.count %}Showing {{ start }} - {{ end }} of {{ total }} total orders{% endblocktranslate %}
             </small>
         </div>
     </div>
@@ -470,7 +471,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-receipt"></i> Order Details
+                    <i class="fas fa-receipt"></i> {% translate "Order Details" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -483,6 +484,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% autoescape off %}{% translate "Error loading order details" as t_load_error %}{% translate "Order tracking feature coming soon for order #{id}" as t_tracking %}{% endautoescape %}
 <script>
 $(document).ready(function() {
     // Auto-submit form when filters change
@@ -506,13 +508,13 @@ function viewOrderDetails(orderId) {
         $('#orderDetailsContent').html(data);
         $('#orderDetailsModal').modal('show');
     }).fail(function() {
-        alert('Error loading order details');
+        alert("{{ t_load_error|escapejs }}");
     });
 }
 
 function trackOrder(orderId) {
     // Implementation for order tracking
-    alert('Order tracking feature coming soon for order #' + orderId);
+    alert("{{ t_tracking|escapejs }}".replace('{id}', () => orderId));
 }
 
 function exportOrders() {

@@ -1,6 +1,7 @@
 {% extends "admin_panel/base.html" %}
+{% load i18n %}
 
-{% block title %}Attendance Calendar - {{ month_name }}{% endblock %}
+{% block title %}{% translate "Attendance Calendar" %} - {{ month_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -138,24 +139,24 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <a href="{% url 'attendance:dashboard' %}" class="text-decoration-none text-muted small me-2">
-                <i class="bi bi-arrow-left me-1"></i>Attendance
+                <i class="bi bi-arrow-left me-1"></i>{% translate "Attendance" %}
             </a>
             <h4 class="mb-0 fw-bold d-inline-block" style="color: var(--primary-color);">
-                <i class="bi bi-calendar3 me-2" style="color: var(--accent-color);"></i>Attendance Calendar
+                <i class="bi bi-calendar3 me-2" style="color: var(--accent-color);"></i>{% translate "Attendance Calendar" %}
             </h4>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <a href="{% url 'attendance:reports' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-bar-chart-line me-1"></i>Reports
+                <i class="bi bi-bar-chart-line me-1"></i>{% translate "Reports" %}
             </a>
             <div class="cal-nav ms-2">
                 <a href="{% url 'attendance:calendar' %}?year={{ prev_year }}&month={{ prev_month }}"
-                   title="Previous month">
+                   title="{% translate "Previous month" %}">
                     <i class="bi bi-chevron-left"></i>
                 </a>
                 <span class="cal-month-label">{{ month_name }}</span>
                 <a href="{% url 'attendance:calendar' %}?year={{ next_year }}&month={{ next_month }}"
-                   title="Next month">
+                   title="{% translate "Next month" %}">
                     <i class="bi bi-chevron-right"></i>
                 </a>
             </div>
@@ -169,13 +170,13 @@
 
             <!-- Day Headers -->
             <div class="calendar-grid mb-1">
-                <div class="cal-day-header">Mon</div>
-                <div class="cal-day-header">Tue</div>
-                <div class="cal-day-header">Wed</div>
-                <div class="cal-day-header">Thu</div>
-                <div class="cal-day-header">Fri</div>
-                <div class="cal-day-header">Sat</div>
-                <div class="cal-day-header">Sun</div>
+                <div class="cal-day-header">{% translate "Mon" %}</div>
+                <div class="cal-day-header">{% translate "Tue" %}</div>
+                <div class="cal-day-header">{% translate "Wed" %}</div>
+                <div class="cal-day-header">{% translate "Thu" %}</div>
+                <div class="cal-day-header">{% translate "Fri" %}</div>
+                <div class="cal-day-header">{% translate "Sat" %}</div>
+                <div class="cal-day-header">{% translate "Sun" %}</div>
             </div>
 
             <!-- Weeks -->
@@ -185,7 +186,7 @@
                 <div class="cal-day{% if not day.in_month %} out-of-month{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.in_month and day.total > 0 %} has-records{% endif %}"
                      {% if day.in_month and day.total > 0 %}
                      onclick="window.location='{% url 'attendance:day_detail' %}?date={{ day.date|date:"Y-m-d" }}'"
-                     title="View records for {{ day.date|date:"N j, Y" }}"
+                     title="{% blocktranslate with date=day.date|date:"N j, Y" %}View records for {{ date }}{% endblocktranslate %}"
                      {% endif %}>
                     <div class="cal-date-num">{{ day.date.day }}</div>
                     {% if day.in_month and day.total > 0 %}
@@ -195,9 +196,9 @@
                             {{ day.present }}
                         </span>
                         {% if day.late > 0 %}
-                        <span title="{{ day.late }} late" style="display:inline-flex;align-items:center;font-size:0.72rem;color:var(--danger-color);">
+                        <span title="{% blocktranslate with n=day.late %}{{ n }} late{% endblocktranslate %}" style="display:inline-flex;align-items:center;font-size:0.72rem;color:var(--danger-color);">
                             <span class="cal-late-dot"></span>
-                            <span class="ms-1">{{ day.late }}L</span>
+                            <span class="ms-1">{% blocktranslate with n=day.late context "late count, short" %}{{ n }}L{% endblocktranslate %}</span>
                         </span>
                         {% endif %}
                     </div>
@@ -209,13 +210,13 @@
 
             <!-- Legend -->
             <div class="d-flex flex-wrap gap-3 mt-3 pt-2 border-top" style="font-size: 0.78rem; color: #6c757d;">
-                <span><span class="cal-present-badge me-1"><i class="bi bi-person-check" style="font-size:0.7rem;"></i> N</span> Present count</span>
-                <span><span class="cal-late-dot me-1"></span> Late arrivals</span>
+                <span><span class="cal-present-badge me-1"><i class="bi bi-person-check" style="font-size:0.7rem;"></i> N</span> {% translate "Present count" %}</span>
+                <span><span class="cal-late-dot me-1"></span> {% translate "Late arrivals" %}</span>
                 <span>
                     <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--accent-color);border-radius:3px;vertical-align:middle;"></span>
-                    Today
+                    {% translate "Today" %}
                 </span>
-                <span class="fst-italic">Click a day with records to view details</span>
+                <span class="fst-italic">{% translate "Click a day with records to view details" %}</span>
             </div>
         </div>
     </div>

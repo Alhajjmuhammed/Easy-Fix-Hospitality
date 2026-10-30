@@ -1,6 +1,7 @@
 {% extends "admin_panel/base.html" %}
+{% load i18n %}
 
-{% block title %}Weekly Roster{% endblock %}
+{% block title %}{% translate "Weekly Roster" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -33,21 +34,25 @@
 {% endblock %}
 
 {% block content %}
+{% translate "Fill the empty days of this week from last week? Days you already filled are kept." as t_copy_q %}
+{% translate "Move this week back to draft? Staff will no longer see it until you publish again." as t_unpub_q %}
+{% translate "Publish this week? Every rostered staff member will be notified." as t_pub_q %}
+{% translate "Please save your changes first." as t_save_first %}
 <div class="content-header">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <a href="{% url 'attendance:dashboard' %}" class="text-decoration-none text-muted small me-2 no-print">
-                <i class="bi bi-arrow-left me-1"></i>Attendance
+                <i class="bi bi-arrow-left me-1"></i>{% translate "Attendance" %}
             </a>
             <h4 class="mb-0 fw-bold d-inline-block" style="color: var(--primary-color);">
-                <i class="bi bi-calendar-week me-2" style="color: var(--accent-color);"></i>Weekly Roster
+                <i class="bi bi-calendar-week me-2" style="color: var(--accent-color);"></i>{% translate "Weekly Roster" %}
             </h4>
             <div class="small text-muted mt-1">
-                Week of {{ start|date:"D j M Y" }}
+                {% blocktranslate with start=start|date:"D j M Y" %}Week of {{ start }}{% endblocktranslate %}
                 {% if week.is_published %}
-                    <span class="badge bg-success ms-1">Published</span>
+                    <span class="badge bg-success ms-1">{% translate "Published" %}</span>
                 {% else %}
-                    <span class="badge bg-secondary ms-1">Draft – staff can't see it yet</span>
+                    <span class="badge bg-secondary ms-1">{% translate "Draft – staff can't see it yet" %}</span>
                 {% endif %}
             </div>
         </div>
@@ -55,7 +60,7 @@
             {% if teams|length > 1 %}
             <form method="get" class="d-inline">
                 <input type="hidden" name="week" value="{{ start|date:'Y-m-d' }}">
-                <select name="team" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Restaurant">
+                <select name="team" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{% translate "Restaurant" %}">
                     {% for t, label in teams %}
                     <option value="{{ t.id }}" {% if t.id == team.id %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
@@ -63,15 +68,15 @@
             </form>
             {% endif %}
             <div class="btn-group btn-group-sm">
-                <a class="btn btn-outline-secondary" href="?team={{ team.id }}&week={{ prev_week }}" title="Previous week"><i class="bi bi-chevron-left"></i></a>
-                <a class="btn btn-outline-secondary" href="?team={{ team.id }}&week={{ this_week }}">This week</a>
-                <a class="btn btn-outline-secondary" href="?team={{ team.id }}&week={{ next_week }}" title="Next week"><i class="bi bi-chevron-right"></i></a>
+                <a class="btn btn-outline-secondary" href="?team={{ team.id }}&week={{ prev_week }}" title="{% translate "Previous week" %}"><i class="bi bi-chevron-left"></i></a>
+                <a class="btn btn-outline-secondary" href="?team={{ team.id }}&week={{ this_week }}">{% translate "This week" %}</a>
+                <a class="btn btn-outline-secondary" href="?team={{ team.id }}&week={{ next_week }}" title="{% translate "Next week" %}"><i class="bi bi-chevron-right"></i></a>
             </div>
             <a class="btn btn-sm btn-outline-secondary" href="?team={{ team.id }}&week={{ start|date:'Y-m-d' }}&export=csv">
                 <i class="bi bi-download me-1"></i>CSV
             </a>
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i>Print
+                <i class="bi bi-printer me-1"></i>{% translate "Print" %}
             </button>
         </div>
     </div>
@@ -81,8 +86,8 @@
     {% if not shifts and can_edit %}
     <div class="alert alert-info no-print">
         <i class="bi bi-info-circle me-1"></i>
-        Create your shifts first (for example Morning 08:00–16:00), then put staff on them here.
-        <a href="{% url 'attendance:shifts' %}" class="alert-link">Manage shifts</a>
+        {% translate "Create your shifts first (for example Morning 08:00–16:00), then put staff on them here." %}
+        <a href="{% url 'attendance:shifts' %}" class="alert-link">{% translate "Manage shifts" %}</a>
     </div>
     {% endif %}
 
@@ -99,11 +104,11 @@
                     <table class="table roster-table mb-0">
                         <thead>
                             <tr>
-                                <th class="staff-col ps-3">Staff</th>
+                                <th class="staff-col ps-3">{% translate "Staff" context "group" %}</th>
                                 {% for d in days %}
                                 <th class="{% if d == today %}today-col{% endif %}">{{ d|date:"D" }}<br><span class="fw-normal">{{ d|date:"j M" }}</span></th>
                                 {% endfor %}
-                                <th>Hours</th>
+                                <th>{% translate "Hours" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -111,24 +116,24 @@
                             <tr>
                                 <td class="staff-col ps-3">
                                     <div class="fw-semibold">{{ row.user.get_full_name|default:row.user.username }}</div>
-                                    <div class="small text-muted">{{ row.user.role.name|default:"—"|title }}{% if not row.user.is_active %} · inactive{% endif %}</div>
+                                    <div class="small text-muted">{{ row.user.role.name|default:"—"|title }}{% if not row.user.is_active %} · {% translate "inactive" %}{% endif %}</div>
                                 </td>
                                 {% for cell in row.cells %}
                                 <td>
                                     {% if cell.elsewhere %}
-                                    <div class="cell-view text-muted small" title="This day is planned on another restaurant's roster">Other restaurant</div>
+                                    <div class="cell-view text-muted small" title="{% translate "This day is planned on another restaurant's roster" %}">{% translate "Other restaurant" %}</div>
                                     {% elif can_edit %}
                                     <select class="form-select roster-cell kind-{{ cell.entry.kind|default:'none' }}"
                                             name="c_{{ row.user.id }}_{{ forloop.counter0 }}" data-row="{{ row.user.id }}"
                                             data-initial="{{ cell.value }}"
                                             aria-label="{{ row.user.username }} {{ cell.date|date:'D j M' }}">
-                                        {% if cell.value == 'keep' %}<option value="keep" selected>Shift removed</option>{% endif %}
+                                        {% if cell.value == 'keep' %}<option value="keep" selected>{% translate "Shift removed" %}</option>{% endif %}
                                         <option value="" {% if cell.value == '' %}selected{% endif %}>—</option>
                                         {% for s in shifts %}
                                         <option value="shift:{{ s.id }}" data-min="{{ s.minutes }}" {% if cell.entry.kind == 'shift' and cell.entry.shift_id == s.id %}selected{% endif %}>{{ s.name }} {{ s.start|time:"H:i" }}–{{ s.end|time:"H:i" }}</option>
                                         {% endfor %}
-                                        <option value="off" {% if cell.value == 'off' %}selected{% endif %}>Day off</option>
-                                        <option value="leave" {% if cell.value == 'leave' %}selected{% endif %}>On leave</option>
+                                        <option value="off" {% if cell.value == 'off' %}selected{% endif %}>{% translate "Day off" %}</option>
+                                        <option value="leave" {% if cell.value == 'leave' %}selected{% endif %}>{% translate "On leave" %}</option>
                                     </select>
                                     {% else %}
                                         {% if cell.entry %}
@@ -137,7 +142,7 @@
                                                 <div class="time-mono">{{ cell.entry.shift.start_time|time:"H:i" }}–{{ cell.entry.shift.end_time|time:"H:i" }}</div>
                                                 <div class="small text-muted">{{ cell.entry.shift.name }}</div>
                                             {% elif cell.entry.kind == 'shift' %}
-                                                <span class="small text-muted">Shift removed</span>
+                                                <span class="small text-muted">{% translate "Shift removed" %}</span>
                                             {% else %}
                                                 {{ cell.entry.get_kind_display }}
                                             {% endif %}
@@ -152,7 +157,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="small text-muted">
-                                <td class="staff-col ps-3">Staff on shift</td>
+                                <td class="staff-col ps-3">{% translate "Staff on shift" %}</td>
                                 {% for n in day_counts %}<td>{{ n }}</td>{% endfor %}
                                 <td class="hours-col">{{ total_hours }}</td>
                             </tr>
@@ -165,31 +170,31 @@
         {% if can_edit %}
         <div class="d-flex flex-wrap gap-2 mt-3 no-print">
             <button type="submit" class="btn" style="background-color: var(--accent-color); color: #fff;">
-                <i class="bi bi-check-circle me-1"></i>Save roster
+                <i class="bi bi-check-circle me-1"></i>{% translate "Save roster" %}
             </button>
             <button type="submit" class="btn btn-outline-secondary" formnovalidate
-                    onclick="return submitAction('copy_last', 'Fill the empty days of this week from last week? Days you already filled are kept.');">
-                <i class="bi bi-files me-1"></i>Copy last week
+                    onclick="return submitAction('copy_last', '{{ t_copy_q|escapejs }}');">
+                <i class="bi bi-files me-1"></i>{% translate "Copy last week" %}
             </button>
             {% if week.is_published %}
             <button type="submit" class="btn btn-outline-danger ms-auto"
-                    onclick="return submitAction('unpublish', 'Move this week back to draft? Staff will no longer see it until you publish again.');">
-                <i class="bi bi-eye-slash me-1"></i>Back to draft
+                    onclick="return submitAction('unpublish', '{{ t_unpub_q|escapejs }}');">
+                <i class="bi bi-eye-slash me-1"></i>{% translate "Back to draft" %}
             </button>
             {% else %}
             <button type="submit" class="btn btn-success ms-auto"
-                    onclick="return submitAction('publish', 'Publish this week? Every rostered staff member will be notified.');">
-                <i class="bi bi-send me-1"></i>Publish to staff
+                    onclick="return submitAction('publish', '{{ t_pub_q|escapejs }}');">
+                <i class="bi bi-send me-1"></i>{% translate "Publish to staff" %}
             </button>
             {% endif %}
         </div>
         <p class="small text-muted mt-2 no-print">
             {% if week.is_published %}
-            This week is published: saved changes are shown to staff straight away and the affected staff are notified.
+            {% translate "This week is published: saved changes are shown to staff straight away and the affected staff are notified." %}
             {% else %}
-            Save as often as you like. Staff see the week and are notified only when you publish it.
+            {% translate "Save as often as you like. Staff see the week and are notified only when you publish it." %}
             {% endif %}
-            Attendance uses the published roster to decide if someone is late.
+            {% translate "Attendance uses the published roster to decide if someone is late." %}
         </p>
         {% endif %}
     </form>
@@ -197,7 +202,7 @@
     <div class="card border-0 shadow-sm">
         <div class="card-body text-center py-5 text-muted">
             <i class="bi bi-people display-5 mb-2 d-block" style="opacity: 0.3;"></i>
-            <p class="mb-0">No active staff to put on the roster yet.</p>
+            <p class="mb-0">{% translate "No active staff to put on the roster yet." %}</p>
         </div>
     </div>
     {% endif %}
@@ -237,7 +242,7 @@
 
     window.submitAction = function (action, question) {
         if (dirty) {
-            alert('Please save your changes first.');
+            alert('{{ t_save_first|escapejs }}');
             return false;
         }
         if (!confirm(question)) return false;

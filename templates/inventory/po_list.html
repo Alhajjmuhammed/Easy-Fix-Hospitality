@@ -1,13 +1,14 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Purchase Orders{% endblock %}
+{% block title %}{% translate "Purchase Orders" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <h1 class="h3 mb-0"><i class="fas fa-file-invoice me-2"></i>Purchase Orders</h1>
+        <h1 class="h3 mb-0"><i class="fas fa-file-invoice me-2"></i>{% translate "Purchase Orders" %}</h1>
         {% if can_manage %}
-        <a href="{% url 'inventory:po_new' %}" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>New Order</a>
+        <a href="{% url 'inventory:po_new' %}" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>{% translate "New Order" %}</a>
         {% endif %}
     </div>
     {% include 'inventory/_purchasing_nav.html' %}
@@ -15,28 +16,28 @@
     <div class="row g-3 mb-3">
         <div class="col-md-4">
             <div class="card shadow-sm border-0"><div class="card-body">
-                <div class="small text-uppercase text-muted fw-semibold">We owe suppliers</div>
+                <div class="small text-uppercase text-muted fw-semibold">{% translate "We owe suppliers" %}</div>
                 <div class="h4 mb-0 fw-bold {% if total_owed %}text-danger{% endif %}">{{ currency_symbol }}{{ total_owed|floatformat:2 }}</div>
-                <div class="small text-muted">For goods already delivered, minus payments</div>
+                <div class="small text-muted">{% translate "For goods already delivered, minus payments" %}</div>
             </div></div>
         </div>
     </div>
 
     <form method="get" class="d-flex flex-wrap gap-2 mb-3">
-        <select name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="Status">
-            <option value="">All statuses</option>
-            <option value="open" {% if filter_status == 'open' %}selected{% endif %}>Open (not finished)</option>
+        <select name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="{% translate "Status" %}">
+            <option value="">{% translate "All statuses" %}</option>
+            <option value="open" {% if filter_status == 'open' %}selected{% endif %}>{% translate "Open (not finished)" %}</option>
             {% for k, label in status_choices %}<option value="{{ k }}" {% if filter_status == k %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
-        <select name="supplier" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="Supplier">
-            <option value="">All suppliers</option>
+        <select name="supplier" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="{% translate "Supplier" %}">
+            <option value="">{% translate "All suppliers" %}</option>
             {% for s in suppliers %}<option value="{{ s.id }}" {% if filter_supplier == s.id|stringformat:'s' %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
         </select>
-        <select name="payment" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="Payment">
-            <option value="">Any payment</option>
-            <option value="unpaid" {% if filter_payment == 'unpaid' %}selected{% endif %}>Unpaid</option>
-            <option value="partly_paid" {% if filter_payment == 'partly_paid' %}selected{% endif %}>Partly paid</option>
-            <option value="paid" {% if filter_payment == 'paid' %}selected{% endif %}>Paid</option>
+        <select name="payment" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="{% translate "Payment" %}">
+            <option value="">{% translate "Any payment" %}</option>
+            <option value="unpaid" {% if filter_payment == 'unpaid' %}selected{% endif %}>{% translate "Unpaid" %}</option>
+            <option value="partly_paid" {% if filter_payment == 'partly_paid' %}selected{% endif %}>{% translate "Partly paid" %}</option>
+            <option value="paid" {% if filter_payment == 'paid' %}selected{% endif %}>{% translate "Paid" %}</option>
         </select>
     </form>
 
@@ -46,14 +47,14 @@
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
-                        <tr><th class="ps-3">Order</th><th>Supplier</th><th>Date</th><th>Status</th><th class="text-end">Total</th><th>Payment</th><th class="text-end pe-3">Owed</th></tr>
+                        <tr><th class="ps-3">{% translate "Order" %}</th><th>{% translate "Supplier" %}</th><th>{% translate "Date" %}</th><th>{% translate "Status" %}</th><th class="text-end">{% translate "Total" %}</th><th>{% translate "Payment" %}</th><th class="text-end pe-3">{% translate "Owed" %}</th></tr>
                     </thead>
                     <tbody>
                         {% for o in orders %}
                         <tr style="cursor:pointer" onclick="location.href='{% url 'inventory:po_detail' o.pk %}'">
                             <td class="ps-3 fw-semibold"><a href="{% url 'inventory:po_detail' o.pk %}">{{ o.code }}</a></td>
                             <td>{{ o.supplier.name }}</td>
-                            <td class="small">{{ o.order_date|date:"j M Y" }}{% if o.expected_date %}<div class="text-muted">due {{ o.expected_date|date:"j M" }}</div>{% endif %}</td>
+                            <td class="small">{{ o.order_date|date:"j M Y" }}{% if o.expected_date %}<div class="text-muted">{% blocktranslate with date=o.expected_date|date:"j M" %}due {{ date }}{% endblocktranslate %}</div>{% endif %}</td>
                             <td>{% include 'inventory/_po_status.html' with status=o.status label=o.get_status_display %}</td>
                             <td class="text-end">{{ currency_symbol }}{{ o.ordered_total|floatformat:2 }}</td>
                             <td>{% if o.status != 'cancelled' %}{% include 'inventory/_po_payment.html' with ps=o.payment_status label=o.get_payment_status_display %}{% endif %}</td>
@@ -66,7 +67,7 @@
             {% else %}
             <div class="text-center text-muted py-5">
                 <i class="fas fa-file-invoice fa-3x mb-3" style="opacity:.3"></i>
-                <p class="mb-0">No purchase orders{% if filter_status or filter_supplier or filter_payment %} match these filters{% endif %}.</p>
+                <p class="mb-0">{% if filter_status or filter_supplier or filter_payment %}{% translate "No purchase orders match these filters." %}{% else %}{% translate "No purchase orders." %}{% endif %}</p>
             </div>
             {% endif %}
         </div>

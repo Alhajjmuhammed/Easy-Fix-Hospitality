@@ -1,11 +1,12 @@
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 <!DOCTYPE html>
-<html lang="en">
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt - {{ order.order_number }}</title>
+    <title>{% translate "Receipt" %} - {{ order.order_number }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         /* Print optimizations */
@@ -257,10 +258,10 @@
         <div class="receipt-container">
             <!-- Restaurant Header -->
             <div class="receipt-header">
-                <div class="receipt-title">{{ user.get_restaurant_name|default:"Restaurant Name" }}</div>
-                <div>{{ user.restaurant_description|default:"Quality Food & Service" }}</div>
+                <div class="receipt-title">{{ user.get_restaurant_name|default:_("Restaurant Name") }}</div>
+                <div>{{ user.restaurant_description|default:_("Quality Food & Service") }}</div>
                 {% if user.phone_number %}
-                <div>Tel: {{ user.phone_number }}</div>
+                <div>{% translate "Tel:" %} {{ user.phone_number }}</div>
                 {% endif %}
                 {% if user.address %}
                 <div>{{ user.address }}</div>
@@ -269,31 +270,31 @@
             
             <!-- Receipt Info -->
             <div class="receipt-info">
-                <div class="receipt-number">RECEIPT #{{ payment.id|stringformat:"06d" }}</div>
-                <div>Order: {{ order.order_number }}</div>
-                <div>Date: {{ payment.created_at|date:"M d, Y" }}</div>
-                <div>Time: {{ payment.created_at|date:"H:i" }}</div>
-                <div>{% if order.table_info %}Table: {{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</div>
+                <div class="receipt-number">{% translate "RECEIPT" %} #{{ payment.id|stringformat:"06d" }}</div>
+                <div>{% translate "Order:" %} {{ order.order_number }}</div>
+                <div>{% translate "Date:" %} {{ payment.created_at|date:"M d, Y" }}</div>
+                <div>{% translate "Time:" %} {{ payment.created_at|date:"H:i" }}</div>
+                <div>{% if order.table_info %}{% translate "Table:" %} {{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</div>
                 <div>
                     {% if user.is_customer_care %}
-                        Customer Care: {{ user.first_name }} {{ user.last_name }}
+                        {% translate "Customer Care:" %} {{ user.first_name }} {{ user.last_name }}
                     {% elif user.is_owner %}
-                        Owner: {{ user.first_name }} {{ user.last_name }}
+                        {% translate "Owner:" %} {{ user.first_name }} {{ user.last_name }}
                     {% else %}
-                        Processed by: {{ user.first_name }} {{ user.last_name }}
+                        {% translate "Processed by:" %} {{ user.first_name }} {{ user.last_name }}
                     {% endif %}
                 </div>
             </div>
             
             <!-- Order Items -->
             <div class="receipt-items">
-                <div style="font-weight: bold; margin-bottom: 5px;">ITEMS:</div>
+                <div style="font-weight: bold; margin-bottom: 5px;">{% translate "ITEMS:" %}</div>
                 {% for item in order.order_items.all %}
                     <div class="item-row">
                         <div class="item-name">
                             {{ item.quantity }}x {{ item.product.name }}
                             {% if item.product.has_active_promotion %}
-                            <br><small>  (Happy Hour {{ item.product.get_active_promotion.discount_percentage|floatformat:0 }}% off)</small>
+                            <br><small>  {% blocktranslate with pct=item.product.get_active_promotion.discount_percentage|floatformat:0 %}(Happy Hour {{ pct }}% off){% endblocktranslate %}</small>
                             {% endif %}
                         </div>
                         <div class="item-price">{% currency_symbol %}{{ item.get_total_price|floatformat:2 }}</div>
@@ -304,54 +305,54 @@
             <!-- Totals -->
             <div class="receipt-totals">
                 <div class="total-row">
-                    <div>Subtotal:</div>
+                    <div>{% translate "Subtotal:" %}</div>
                     <div>{% currency_symbol %}{{ order.get_subtotal|floatformat:2 }}</div>
                 </div>
                 {% if order.get_total_discount > 0 %}
                 <div class="total-row text-danger">
-                    <div><strong>Discount:</strong></div>
+                    <div><strong>{% translate "Discount:" %}</strong></div>
                     <div><strong>-{% currency_symbol %}{{ order.get_total_discount|floatformat:2 }}</strong></div>
                 </div>
                 {% endif %}
                 <div class="total-row">
-                    <div>Tax ({{ order.tax_rate|floatformat:1 }}%):</div>
+                    <div>{% blocktranslate with rate=order.tax_rate|floatformat:1 %}Tax ({{ rate }}%):{% endblocktranslate %}</div>
                     <div>{% currency_symbol %}{{ order.get_tax_amount|floatformat:2 }}</div>
                 </div>
                 {% if order.delivery_fee > 0 %}
                 <div class="total-row">
-                    <div>Delivery fee:</div>
+                    <div>{% translate "Delivery fee:" %}</div>
                     <div>{% currency_symbol %}{{ order.delivery_fee|floatformat:2 }}</div>
                 </div>
                 {% endif %}
                 <div class="total-row grand-total">
-                    <div>TOTAL:</div>
+                    <div>{% translate "TOTAL:" %}</div>
                     <div>{% currency_symbol %}{{ order.get_total|floatformat:2 }}</div>
                 </div>
             </div>
             
             <!-- Footer -->
             <div style="text-align: center; margin-top: 8px; font-size: 12px;">
-                <div style="font-weight: bold;">Thank you for dining with us!</div>
-                <div>Please come again</div>
+                <div style="font-weight: bold;">{% translate "Thank you for dining with us!" %}</div>
+                <div>{% translate "Please come again" %}</div>
             </div>
         </div>
         
         <!-- Print Buttons -->
         <div class="print-buttons no-print">
             <button type="button" class="btn btn-primary me-2" onclick="window.print()">
-                <i class="fas fa-print"></i> Print Receipt
+                <i class="fas fa-print"></i> {% translate "Print Receipt" %}
             </button>
             {% whatsapp_receipt_url order as wa_url %}
             {% if wa_url %}
             <a href="{{ wa_url }}" target="_blank" rel="noopener" class="btn btn-success me-2">
-                <i class="fab fa-whatsapp"></i> Share on WhatsApp
+                <i class="fab fa-whatsapp"></i> {% translate "Share on WhatsApp" %}
             </a>
             {% endif %}
             <a href="{% url 'orders:customer_care_payments' %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Payments
+                <i class="fas fa-arrow-left"></i> {% translate "Back to Payments" %}
             </a>
             <a href="{% url 'orders:customer_care_reprint_receipt' payment.id %}" class="btn btn-info ms-2">
-                <i class="fas fa-copy"></i> Reprint
+                <i class="fas fa-copy"></i> {% translate "Reprint" %}
             </a>
         </div>
     </div>

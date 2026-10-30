@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load i18n %}
 
-{% block title %}{{ event.title }} - Event Details{% endblock %}
+{% block title %}{{ event.title }} - {% translate "Event Details" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -93,7 +94,7 @@
             <div class="d-flex flex-wrap gap-3 align-items-center" style="font-size: 1rem;">
                 <span><i class="fas fa-calendar me-1"></i>{{ event.event_date|date:"M d, Y" }}</span>
                 <span><i class="fas fa-clock me-1"></i>{{ event.start_time|time:"H:i" }}{% if event.end_time %} - {{ event.end_time|time:"H:i" }}{% endif %}</span>
-                <span><i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX</span>
+                <span><i class="fas fa-users me-1"></i>{{ event.total_pax }} {% translate "PAX" %}</span>
                 <span><i class="fas fa-shapes me-1"></i>{{ event.get_event_type_display }}</span>
                 <span class="badge bg-{{ event.get_status_color }} px-3 py-2">{{ event.get_status_display }}</span>
             </div>
@@ -106,43 +107,43 @@
             <div class="detail-card">
                 <div class="detail-card-title">
                     <i class="fas fa-info-circle"></i>
-                    Event Information
+                    {% translate "Event Information" %}
                 </div>
                 <div class="info-grid">
                     <div class="info-item">
-                        <span class="info-label">Contact Name</span>
+                        <span class="info-label">{% translate "Contact Name" %}</span>
                         <span class="info-value">{{ event.contact_name }}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Phone</span>
+                        <span class="info-label">{% translate "Phone" %}</span>
                         <span class="info-value"><i class="fas fa-phone me-1 text-primary"></i>{{ event.contact_phone }}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Email</span>
+                        <span class="info-label">{% translate "Email" %}</span>
                         <span class="info-value">
                             {% if event.contact_email %}
                             <i class="fas fa-envelope me-1 text-primary"></i>{{ event.contact_email }}
                             {% else %}
-                            <span class="text-muted">Not provided</span>
+                            <span class="text-muted">{% translate "Not provided" %}</span>
                             {% endif %}
                         </span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Created</span>
+                        <span class="info-label">{% translate "Created" %}</span>
                         <span class="info-value">{{ event.created_at|date:"M d, Y H:i" }}</span>
                     </div>
                 </div>
                 {% if event.description %}
                 <hr class="my-2">
                 <div>
-                    <span class="info-label">Description</span>
+                    <span class="info-label">{% translate "Description" %}</span>
                     <p class="mb-0 mt-1">{{ event.description }}</p>
                 </div>
                 {% endif %}
                 {% if event.special_requirements %}
                 <hr class="my-2">
                 <div>
-                    <span class="info-label">Special Requirements</span>
+                    <span class="info-label">{% translate "Special Requirements" %}</span>
                     <p class="mb-0 mt-1">{{ event.special_requirements }}</p>
                 </div>
                 {% endif %}
@@ -152,7 +153,7 @@
             <div class="detail-card">
                 <div class="detail-card-title">
                     <i class="fas fa-tasks"></i>
-                    Change Status
+                    {% translate "Change Status" %}
                 </div>
                 <div class="status-actions">
                     {% for value, label in event.EVENT_STATUS_CHOICES %}
@@ -169,16 +170,16 @@
         <div class="col-lg-5">
             <!-- Price Summary -->
             <div class="price-card">
-                <div class="small opacity-75">Total Value</div>
+                <div class="small opacity-75">{% translate "Total Value" %}</div>
                 <div class="main-price">{{ currency_symbol }}{{ event.total_amount|floatformat:2 }}</div>
-                <div class="small">{{ event.total_pax }} PAX × {{ currency_symbol }}{{ event.price_per_pax|floatformat:2 }}</div>
+                <div class="small">{{ event.total_pax }} {% translate "PAX" %} × {{ currency_symbol }}{{ event.price_per_pax|floatformat:2 }}</div>
                 <div class="payment-progress mt-2">
                     <div class="payment-progress-bar" style="width: {{ event.payment_percentage }}%"></div>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small>{{ event.payment_percentage|floatformat:0 }}% Paid</small>
+                    <small>{% blocktranslate with pct=event.payment_percentage|floatformat:0 %}{{ pct }}% Paid{% endblocktranslate %}</small>
                     <span class="badge bg-{{ event.get_payment_status_color }}">
-                        {% if event.payment_status == 'fully_paid' %}Paid{% elif event.payment_status == 'partially_paid' %}Partial{% elif event.payment_status == 'deposit_paid' %}Deposit{% else %}{{ event.get_payment_status_display }}{% endif %}
+                        {% if event.payment_status == 'fully_paid' %}{% translate "Paid" %}{% elif event.payment_status == 'partially_paid' %}{% translate "Partial" %}{% elif event.payment_status == 'deposit_paid' %}{% translate "Deposit" %}{% else %}{{ event.get_payment_status_display }}{% endif %}
                     </span>
                 </div>
             </div>
@@ -187,31 +188,31 @@
             <div class="detail-card">
                 <div class="detail-card-title">
                     <i class="fas fa-credit-card"></i>
-                    Payment Details
+                    {% translate "Payment Details" %}
                 </div>
                 <div class="info-grid">
                     <div class="info-item">
-                        <span class="info-label">Paid</span>
+                        <span class="info-label">{% translate "Paid" %}</span>
                         <span class="info-value text-success fw-bold">{{ currency_symbol }}{{ event.amount_paid|floatformat:2 }}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Balance</span>
+                        <span class="info-label">{% translate "Balance" %}</span>
                         <span class="info-value {% if event.balance_due > 0 %}text-danger{% else %}text-success{% endif %} fw-bold">
                             {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}
                         </span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Deposit</span>
+                        <span class="info-label">{% translate "Deposit" %}</span>
                         <span class="info-value">{{ currency_symbol }}{{ event.deposit_amount|floatformat:2 }}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Created</span>
+                        <span class="info-label">{% translate "Created" %}</span>
                         <span class="info-value">{{ event.created_at|date:"M d, Y" }}</span>
                     </div>
                 </div>
                 {% if event.balance_due > 0 %}
                 <button class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                    <i class="fas fa-plus me-1"></i>Record Payment
+                    <i class="fas fa-plus me-1"></i>{% translate "Record Payment" %}
                 </button>
                 {% endif %}
             </div>
@@ -220,17 +221,17 @@
             <div class="detail-card">
                 <div class="detail-card-title">
                     <i class="fas fa-tools"></i>
-                    Actions
+                    {% translate "Actions" %}
                 </div>
                 <div class="d-grid gap-2">
                     <a href="{% url 'restaurant:edit_event' event.id %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-edit me-1"></i>Edit Event
+                        <i class="fas fa-edit me-1"></i>{% translate "Edit Event" %}
                     </a>
                     <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete()">
-                        <i class="fas fa-trash me-1"></i>Delete Event
+                        <i class="fas fa-trash me-1"></i>{% translate "Delete Event" %}
                     </button>
                     <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i>Back
+                        <i class="fas fa-arrow-left me-1"></i>{% translate "Back" %}
                     </a>
                 </div>
             </div>
@@ -244,31 +245,31 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-dollar-sign text-success me-2"></i>Record Payment
+                    <i class="fas fa-dollar-sign text-success me-2"></i>{% translate "Record Payment" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label">Payment Amount</label>
+                    <label class="form-label">{% translate "Payment Amount" %}</label>
                     <div class="input-group">
                         <span class="input-group-text">{{ currency_symbol }}</span>
                         <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0.01" 
                                max="{{ event.balance_due }}" placeholder="0.00">
                     </div>
-                    <div class="form-text">Balance due: {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}</div>
+                    <div class="form-text">{% translate "Balance due:" %} {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}</div>
                 </div>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="isDeposit">
                     <label class="form-check-label" for="isDeposit">
-                        This is a deposit payment
+                        {% translate "This is a deposit payment" %}
                     </label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-success" onclick="recordPayment()">
-                    <i class="fas fa-check me-1"></i>Record Payment
+                    <i class="fas fa-check me-1"></i>{% translate "Record Payment" %}
                 </button>
             </div>
         </div>
@@ -281,18 +282,18 @@
         <div class="modal-content">
             <div class="modal-header border-0">
                 <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>Delete Event
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>{% translate "Delete Event" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete <strong>{{ event.title }}</strong>?</p>
-                <p class="text-muted small mb-0">This action cannot be undone.</p>
+                <p>{% blocktranslate with title=event.title %}Are you sure you want to delete <strong>{{ title }}</strong>?{% endblocktranslate %}</p>
+                <p class="text-muted small mb-0">{% translate "This action cannot be undone." %}</p>
             </div>
             <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <a href="{% url 'restaurant:delete_event' event.id %}" class="btn btn-danger">
-                    <i class="fas fa-trash me-1"></i>Delete
+                    <i class="fas fa-trash me-1"></i>{% translate "Delete" %}
                 </a>
             </div>
         </div>
@@ -301,6 +302,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Error updating status" as t_err_status %}{% translate "Please enter a valid payment amount" as t_valid_amount %}{% translate "Session expired. Please refresh the page and try again." as t_session %}{% translate "Error recording payment" as t_err_record %}{% translate "Connection error. Please refresh the page and try again." as t_conn %}
 <script>
 function updateStatus(newStatus) {
     fetch('{% url "restaurant:update_event_status" event.id %}', {
@@ -316,10 +318,10 @@ function updateStatus(newStatus) {
         if (data.success) {
             location.reload();
         } else {
-            alert(data.message || 'Error updating status');
+            alert(data.message || "{{ t_err_status|escapejs }}");
         }
     })
-    .catch(() => alert('Error updating status'));
+    .catch(() => alert("{{ t_err_status|escapejs }}"));
 }
 
 function recordPayment() {
@@ -327,7 +329,7 @@ function recordPayment() {
     const isDeposit = document.getElementById('isDeposit').checked;
     
     if (!amount || parseFloat(amount) <= 0) {
-        alert('Please enter a valid payment amount');
+        alert("{{ t_valid_amount|escapejs }}");
         return;
     }
     
@@ -341,7 +343,7 @@ function recordPayment() {
     })
     .then(response => {
         if (response.status === 403) {
-            alert('Session expired. Please refresh the page and try again.');
+            alert("{{ t_session|escapejs }}");
             location.reload();
             return null;
         }
@@ -352,10 +354,10 @@ function recordPayment() {
         if (data.success) {
             location.reload();
         } else {
-            alert(data.message || 'Error recording payment');
+            alert(data.message || "{{ t_err_record|escapejs }}");
         }
     })
-    .catch(() => alert('Connection error. Please refresh the page and try again.'));
+    .catch(() => alert("{{ t_conn|escapejs }}"));
 }
 
 function confirmDelete() {

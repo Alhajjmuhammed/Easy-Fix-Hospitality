@@ -1,7 +1,8 @@
 {% extends base_template %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Cart - Restaurant System{% endblock %}
+{% block title %}{% translate "Cart" %} - Restaurant System{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -149,17 +150,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 cart-header">
     <div>
-        <h2><i class="bi bi-cart3"></i> Your Cart</h2>
+        <h2><i class="bi bi-cart3"></i> {% translate "Your Cart" %}</h2>
         {% if order_type == 'delivery' %}
-        <p class="text-muted mb-0"><i class="bi bi-bicycle me-1"></i>Delivery order{% if delivery_address %} — {{ delivery_address|truncatechars:40 }}{% endif %}</p>
+        <p class="text-muted mb-0"><i class="bi bi-bicycle me-1"></i>{% translate "Delivery order" %}{% if delivery_address %} — {{ delivery_address|truncatechars:40 }}{% endif %}</p>
         {% elif order_type == 'pickup' %}
-        <p class="text-muted mb-0"><i class="bi bi-bag-check me-1"></i>Pickup order</p>
+        <p class="text-muted mb-0"><i class="bi bi-bag-check me-1"></i>{% translate "Pickup order" %}</p>
         {% else %}
-        <p class="text-muted mb-0">Table {{ table_number }}</p>
+        <p class="text-muted mb-0">{% blocktranslate with n=table_number %}Table {{ n }}{% endblocktranslate %}</p>
         {% endif %}
     </div>
     <a href="{% url 'restaurant:menu' %}" class="btn btn-outline-primary">
-        <i class="bi bi-arrow-left"></i> Continue Shopping
+        <i class="bi bi-arrow-left"></i> {% translate "Continue Shopping" %}
     </a>
 </div>
 
@@ -182,13 +183,13 @@
                             {% if item.has_promotion %}
                                 <p class="text-muted mb-2">
                                     <span class="text-decoration-line-through text-danger">{% currency_symbol %}{{ item.original_price|floatformat:2 }}</span>
-                                    <span class="text-success fw-bold">{% currency_symbol %}{{ item.price|floatformat:2 }}</span> each
+                                    <span class="text-success fw-bold">{% currency_symbol %}{{ item.price|floatformat:2 }}</span> {% translate "each" %}
                                     <span class="badge bg-warning text-dark ms-1 happy-hour-badge-mobile">
-                                        <i class="bi bi-clock"></i> Happy Hour
+                                        <i class="bi bi-clock"></i> {% translate "Happy Hour" %}
                                     </span>
                                 </p>
                             {% else %}
-                                <p class="text-muted mb-2">{% currency_symbol %}{{ item.price|floatformat:2 }} each</p>
+                                <p class="text-muted mb-2">{% currency_symbol %}{{ item.price|floatformat:2 }} {% translate "each" %}</p>
                             {% endif %}
                             
                             <div class="d-flex align-items-center gap-3 cart-item-controls">
@@ -199,7 +200,7 @@
                                 </div>
                                 
                                 <button class="btn btn-outline-danger btn-sm remove-item" data-product-id="{{ item.product_id }}">
-                                    <i class="bi bi-trash"></i> Remove
+                                    <i class="bi bi-trash"></i> {% translate "Remove" %}
                                 </button>
                             </div>
                         </div>
@@ -216,44 +217,44 @@
     <div class="col-md-4">
         <div class="card order-summary-mobile">
             <div class="card-header">
-                <h5 class="mb-0">Order Summary</h5>
+                <h5 class="mb-0">{% translate "Order Summary" %}</h5>
             </div>
             <div class="card-body">
                 <div class="d-flex justify-content-between mb-3">
-                    <span>Subtotal:</span>
+                    <span>{% translate "Subtotal" %}:</span>
                     <span id="cart-total">{% currency_symbol %}{{ cart_total|floatformat:2 }}</span>
                 </div>
 
                 <div class="d-flex justify-content-between mb-3">
-                    <span>Tax ({{ tax_percentage|floatformat:"-2" }}%):</span>
+                    <span>{% blocktranslate with rate=tax_percentage|floatformat:"-2" %}Tax ({{ rate }}%){% endblocktranslate %}:</span>
                     <span id="tax-amount">{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
                 </div>
 
                 {% if show_delivery_fee %}
                 <div class="d-flex justify-content-between mb-3">
-                    <span>Delivery fee:</span>
-                    <span id="delivery-fee">{% if delivery_fee > 0 %}{% currency_symbol %}{{ delivery_fee|floatformat:2 }}{% else %}Free{% endif %}</span>
+                    <span>{% translate "Delivery fee" %}:</span>
+                    <span id="delivery-fee">{% if delivery_fee > 0 %}{% currency_symbol %}{{ delivery_fee|floatformat:2 }}{% else %}{% translate "Free" %}{% endif %}</span>
                 </div>
                 {% if free_delivery_minimum %}
-                <div class="small text-muted mb-3">Free delivery for orders from {% currency_symbol %}{{ free_delivery_minimum|floatformat:2 }}</div>
+                <div class="small text-muted mb-3">{% translate "Free delivery for orders from" %} {% currency_symbol %}{{ free_delivery_minimum|floatformat:2 }}</div>
                 {% endif %}
                 {% endif %}
 
                 <hr>
 
                 <div class="d-flex justify-content-between mb-3">
-                    <strong>Total:</strong>
+                    <strong>{% translate "Total" %}:</strong>
                     <strong id="final-total">{% currency_symbol %}{{ final_total|floatformat:2 }}</strong>
                 </div>
 
                 <div class="d-grid">
                     {% if user.is_authenticated %}
                         <a href="{% url 'orders:place_order' %}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-check-circle"></i> Place Order
+                            <i class="bi bi-check-circle"></i> {% translate "Place Order" %}
                         </a>
                     {% else %}
                         <a href="{% url 'accounts:login' %}?next={% url 'orders:place_order' %}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-person-circle"></i> Login to Order
+                            <i class="bi bi-person-circle"></i> {% translate "Login to Order" %}
                         </a>
                     {% endif %}
                 </div>
@@ -264,7 +265,13 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Free" as t_free %}{% translate "An error occurred. Please try again." as t_error %}{% translate "Are you sure you want to remove this item from your cart?" as t_confirm_remove %}
 <script>
+const T = {
+    free: "{{ t_free|escapejs }}",
+    error: "{{ t_error|escapejs }}",
+    confirmRemove: "{{ t_confirm_remove|escapejs }}"
+};
 // Get dynamic tax rate from template context
 const TAX_RATE = {{ tax_rate|stringformat:"f" }};  // 0 is a valid rate — no fallback
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
@@ -281,7 +288,7 @@ function updateTotals(cartTotal) {
     document.getElementById('cart-total').textContent = `${CURRENCY_SYMBOL}${cartTotal.toFixed(2)}`;
     document.getElementById('tax-amount').textContent = `${CURRENCY_SYMBOL}${tax.toFixed(2)}`;
     const feeEl = document.getElementById('delivery-fee');
-    if (feeEl) feeEl.textContent = fee > 0 ? `${CURRENCY_SYMBOL}${fee.toFixed(2)}` : 'Free';
+    if (feeEl) feeEl.textContent = fee > 0 ? `${CURRENCY_SYMBOL}${fee.toFixed(2)}` : T.free;
     document.getElementById('final-total').textContent = `${CURRENCY_SYMBOL}${(cartTotal + fee + tax).toFixed(2)}`;
 }
 
@@ -320,12 +327,12 @@ function updateQuantity(productId, newQuantity) {
         }
     })
     .catch(error => {
-        showToast('An error occurred. Please try again.', 'error');
+        showToast(T.error, 'error');
     });
 }
 
 function removeFromCart(productId) {
-    if (!confirm('Are you sure you want to remove this item from your cart?')) {
+    if (!confirm(T.confirmRemove)) {
         return;
     }
     
@@ -358,7 +365,7 @@ function removeFromCart(productId) {
         }
     })
     .catch(error => {
-        showToast('An error occurred. Please try again.', 'error');
+        showToast(T.error, 'error');
     });
 }
 

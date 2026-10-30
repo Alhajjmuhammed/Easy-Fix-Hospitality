@@ -1,8 +1,9 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}Branch Reports{% endblock %}
+{% block title %}{% translate "Branch Reports" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -151,20 +152,20 @@
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mb-4">
         <div>
             <h2 class="h3 mb-1">
-                <i class="fas fa-chart-bar text-primary"></i> Branch Reports
+                <i class="fas fa-chart-bar text-primary"></i> {% translate "Branch Reports" %}
             </h2>
-            <p class="text-muted mb-0">Comprehensive performance analysis across all branch locations</p>
+            <p class="text-muted mb-0">{% translate "Comprehensive performance analysis across all branch locations" %}</p>
         </div>
         
         <div class="export-buttons mt-3 mt-lg-0">
             <button class="btn btn-outline-success" onclick="exportToExcel()">
-                <i class="fas fa-file-excel"></i> Export Excel
+                <i class="fas fa-file-excel"></i> {% translate "Export Excel" %}
             </button>
             <button class="btn btn-outline-danger" onclick="exportToPDF()">
-                <i class="fas fa-file-pdf"></i> Export PDF
+                <i class="fas fa-file-pdf"></i> {% translate "Export PDF" %}
             </button>
             <button class="btn btn-outline-primary" onclick="printReport()">
-                <i class="fas fa-print"></i> Print
+                <i class="fas fa-print"></i> {% translate "Print" %}
             </button>
         </div>
     </div>
@@ -174,27 +175,27 @@
         <form method="GET" id="filterForm">
             <div class="row align-items-end">
                 <div class="col-md-3 mb-3">
-                    <label for="date_from" class="form-label">From Date</label>
+                    <label for="date_from" class="form-label">{% translate "From Date" %}</label>
                     <input type="date" class="form-control" id="date_from" name="date_from" 
                            value="{{ date_from|date:'Y-m-d' }}">
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label for="date_to" class="form-label">To Date</label>
+                    <label for="date_to" class="form-label">{% translate "To Date" %}</label>
                     <input type="date" class="form-control" id="date_to" name="date_to" 
                            value="{{ date_to|date:'Y-m-d' }}">
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label for="report_type" class="form-label">Report Type</label>
+                    <label for="report_type" class="form-label">{% translate "Report Type" %}</label>
                     <select class="form-control" id="report_type" name="report_type">
-                        <option value="daily" {% if report_type == 'daily' %}selected{% endif %}>Daily</option>
-                        <option value="weekly" {% if report_type == 'weekly' %}selected{% endif %}>Weekly</option>
-                        <option value="monthly" {% if report_type == 'monthly' %}selected{% endif %}>Monthly</option>
-                        <option value="custom" {% if report_type == 'custom' %}selected{% endif %}>Custom Range</option>
+                        <option value="daily" {% if report_type == 'daily' %}selected{% endif %}>{% translate "Daily" %}</option>
+                        <option value="weekly" {% if report_type == 'weekly' %}selected{% endif %}>{% translate "Weekly" %}</option>
+                        <option value="monthly" {% if report_type == 'monthly' %}selected{% endif %}>{% translate "Monthly" %}</option>
+                        <option value="custom" {% if report_type == 'custom' %}selected{% endif %}>{% translate "Custom Range" %}</option>
                     </select>
                 </div>
                 <div class="col-md-3 mb-3">
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter"></i> Apply Filters
+                        <i class="fas fa-filter"></i> {% translate "Apply Filters" %}
                     </button>
                 </div>
             </div>
@@ -205,26 +206,26 @@
     <div class="summary-stats">
         <div class="stat-card">
             <div class="stat-value text-primary">{% currency_symbol %}{{ total_revenue|floatformat:0 }}</div>
-            <div class="stat-label">Total Revenue</div>
+            <div class="stat-label">{% translate "Total Revenue" %}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value text-success">{{ total_orders }}</div>
-            <div class="stat-label">Total Orders</div>
+            <div class="stat-label">{% translate "Total Orders" %}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value text-info">{{ active_branches }}</div>
-            <div class="stat-label">Active Branches</div>
+            <div class="stat-label">{% translate "Active Branches" %}</div>
         </div>
         <div class="stat-card">
             <div class="stat-value text-warning">{% currency_symbol %}{{ average_order_value|floatformat:2 }}</div>
-            <div class="stat-label">Avg Order Value</div>
+            <div class="stat-label">{% translate "Avg Order Value" %}</div>
         </div>
     </div>
 
     <!-- Performance Chart -->
     <div class="chart-container">
         <h5 class="mb-3">
-            <i class="fas fa-chart-line text-primary"></i> Revenue Trends
+            <i class="fas fa-chart-line text-primary"></i> {% translate "Revenue Trends" %}
         </h5>
         <canvas id="revenueChart"></canvas>
     </div>
@@ -233,23 +234,23 @@
     <div class="report-card">
         <div class="card-header">
             <h5 class="mb-0">
-                <i class="fas fa-store"></i> Branch Performance Analysis
+                <i class="fas fa-store"></i> {% translate "Branch Performance Analysis" %}
             </h5>
-            <small>Period: {{ date_from|date:'M j, Y' }} - {{ date_to|date:'M j, Y' }}</small>
+            <small>{% translate "Period:" %} {{ date_from|date:'M j, Y' }} - {{ date_to|date:'M j, Y' }}</small>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover branch-performance-table mb-0">
                     <thead>
                         <tr>
-                            <th>Branch</th>
-                            <th>Manager</th>
-                            <th>Total Orders</th>
-                            <th>Revenue</th>
-                            <th>Avg Order Value</th>
-                            <th>Performance</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>{% translate "Branch" %}</th>
+                            <th>{% translate "Manager" %}</th>
+                            <th>{% translate "Total Orders" %}</th>
+                            <th>{% translate "Revenue" %}</th>
+                            <th>{% translate "Avg Order Value" %}</th>
+                            <th>{% translate "Performance" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th>{% translate "Actions" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -276,7 +277,7 @@
                                         </div>
                                     </div>
                                 {% else %}
-                                    <span class="text-muted">No assigned manager</span>
+                                    <span class="text-muted">{% translate "No assigned manager" %}</span>
                                 {% endif %}
                             </td>
                             <td class="performance-metric">
@@ -290,32 +291,32 @@
                             </td>
                             <td class="performance-metric">
                                 {% if branch.performance_score >= 80 %}
-                                    <span class="badge bg-success">Excellent</span>
+                                    <span class="badge bg-success">{% translate "Excellent" %}</span>
                                 {% elif branch.performance_score >= 60 %}
-                                    <span class="badge bg-warning">Good</span>
+                                    <span class="badge bg-warning">{% translate "Good" %}</span>
                                 {% elif branch.performance_score >= 40 %}
-                                    <span class="badge bg-secondary">Average</span>
+                                    <span class="badge bg-secondary">{% translate "Average" %}</span>
                                 {% else %}
-                                    <span class="badge bg-danger">Needs Attention</span>
+                                    <span class="badge bg-danger">{% translate "Needs Attention" %}</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if branch.is_active %}
                                     <span class="badge bg-success">
-                                        <i class="fas fa-check"></i> Active
+                                        <i class="fas fa-check"></i> {% translate "Active" %}
                                     </span>
                                 {% else %}
                                     <span class="badge bg-danger">
-                                        <i class="fas fa-times"></i> Inactive
+                                        <i class="fas fa-times"></i> {% translate "Inactive" %}
                                     </span>
                                 {% endif %}
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'admin_panel:branch_detail' branch.id %}" class="btn btn-outline-primary" title="View Details">
+                                    <a href="{% url 'admin_panel:branch_detail' branch.id %}" class="btn btn-outline-primary" title="{% translate "View Details" %}">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <button class="btn btn-outline-info" onclick="viewBranchChart({{ branch.id }})" title="View Chart">
+                                    <button class="btn btn-outline-info" onclick="viewBranchChart({{ branch.id }})" title="{% translate "View Chart" %}">
                                         <i class="fas fa-chart-line"></i>
                                     </button>
                                 </div>
@@ -326,8 +327,8 @@
                             <td colspan="8" class="text-center py-5">
                                 <div class="text-muted">
                                     <i class="fas fa-store fa-3x mb-3"></i>
-                                    <h5>No Branch Data Available</h5>
-                                    <p>No branches found for the selected period.</p>
+                                    <h5>{% translate "No Branch Data Available" %}</h5>
+                                    <p>{% translate "No branches found for the selected period." %}</p>
                                 </div>
                             </td>
                         </tr>
@@ -344,6 +345,8 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% translate "Total Revenue" as t_total_revenue %}
+{% translate "Branch chart feature coming soon for branch ID:" as t_chart_soon %}
 <script>
 // Currency symbol for JavaScript
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
@@ -360,7 +363,7 @@ $(document).ready(function() {
             labels: chartLabels,
             datasets: [
                 {
-                    label: 'Total Revenue',
+                    label: "{{ t_total_revenue|escapejs }}",
                     data: chartData,
                     borderColor: 'rgb(75, 192, 192)',
                     backgroundColor: 'rgba(75, 192, 192, 0.1)',
@@ -418,7 +421,7 @@ function printReport() {
 
 function viewBranchChart(branchId) {
     // Implementation for individual branch chart modal
-    alert('Branch chart feature coming soon for branch ID: ' + branchId);
+    alert("{{ t_chart_soon|escapejs }}" + ' ' + branchId);
 }
 </script>
 {% endblock %}

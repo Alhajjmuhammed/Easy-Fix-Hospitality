@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load i18n %}
 
-{% block title %}{{ action }} Event - Event Menu{% endblock %}
+{% block title %}{% if action == 'Add' %}{% translate "Add Event" %}{% else %}{% translate "Edit Event" %}{% endif %} - {% translate "Event Menu" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -55,17 +56,17 @@
         <div>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item"><a href="{% url 'restaurant:manage_events' %}">Events</a></li>
-                    <li class="breadcrumb-item active">{{ action }} Event</li>
+                    <li class="breadcrumb-item"><a href="{% url 'restaurant:manage_events' %}">{% translate "Events" %}</a></li>
+                    <li class="breadcrumb-item active">{% if action == 'Add' %}{% translate "Add Event" %}{% else %}{% translate "Edit Event" %}{% endif %}</li>
                 </ol>
             </nav>
             <h2 class="mb-0">
                 <i class="fas fa-{% if action == 'Add' %}plus{% else %}edit{% endif %} text-primary me-2"></i>
-                {{ action }} Event
+                {% if action == 'Add' %}{% translate "Add Event" %}{% else %}{% translate "Edit Event" %}{% endif %}
             </h2>
         </div>
         <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Back to Events
+            <i class="fas fa-arrow-left me-1"></i> {% translate "Back to Events" %}
         </a>
     </div>
 
@@ -78,23 +79,23 @@
                 <div class="form-section">
                     <div class="form-section-title">
                         <i class="fas fa-info-circle"></i>
-                        Event Details
+                        {% translate "Event Details" %}
                     </div>
                     
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label required-label">Event Title</label>
+                            <label class="form-label required-label">{% translate "Event Title" %}</label>
                             {{ form.title }}
                             {% if form.title.errors %}
                             <div class="text-danger small">{{ form.title.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label required-label">Event Type</label>
+                            <label class="form-label required-label">{% translate "Event Type" %}</label>
                             {{ form.event_type }}
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Description</label>
+                            <label class="form-label">{% translate "Description" %}</label>
                             {{ form.description }}
                         </div>
                     </div>
@@ -104,26 +105,26 @@
                 <div class="form-section">
                     <div class="form-section-title">
                         <i class="fas fa-calendar"></i>
-                        Date & Time
+                        {% translate "Date & Time" %}
                     </div>
                     
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label required-label">Event Date</label>
+                            <label class="form-label required-label">{% translate "Event Date" %}</label>
                             {{ form.event_date }}
                             {% if form.event_date.errors %}
                             <div class="text-danger small">{{ form.event_date.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label required-label">Start Time</label>
+                            <label class="form-label required-label">{% translate "Start Time" %}</label>
                             {{ form.start_time }}
                             {% if form.start_time.errors %}
                             <div class="text-danger small">{{ form.start_time.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">End Time</label>
+                            <label class="form-label">{% translate "End Time" %}</label>
                             {{ form.end_time }}
                         </div>
                     </div>
@@ -133,19 +134,19 @@
                 <div class="form-section">
                     <div class="form-section-title">
                         <i class="fas fa-users"></i>
-                        Guests & Pricing
+                        {% translate "Guests & Pricing" %}
                     </div>
                     
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label required-label">Total PAX (Number of Guests)</label>
+                            <label class="form-label required-label">{% translate "Total PAX (Number of Guests)" %}</label>
                             {{ form.total_pax }}
                             {% if form.total_pax.errors %}
                             <div class="text-danger small">{{ form.total_pax.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label required-label">Price per PAX</label>
+                            <label class="form-label required-label">{% translate "Price per PAX" %}</label>
                             <div class="input-group">
                                 <span class="input-group-text">{{ currency_symbol }}</span>
                                 {{ form.price_per_pax }}
@@ -155,14 +156,14 @@
                             {% endif %}
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label required-label">Contact Name</label>
+                            <label class="form-label required-label">{% translate "Contact Name" %}</label>
                             {{ form.contact_name }}
                             {% if form.contact_name.errors %}
                             <div class="text-danger small">{{ form.contact_name.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label required-label">Contact Phone</label>
+                            <label class="form-label required-label">{% translate "Contact Phone" %}</label>
                             {{ form.contact_phone }}
                             {% if form.contact_phone.errors %}
                             <div class="text-danger small">{{ form.contact_phone.errors.0 }}</div>
@@ -176,10 +177,10 @@
             <div class="col-lg-4">
                 <!-- Price Preview -->
                 <div class="price-preview mb-4">
-                    <div class="total-label">Estimated Total</div>
+                    <div class="total-label">{% translate "Estimated Total" %}</div>
                     <div class="total-value" id="totalPreview">{{ currency_symbol }}0.00</div>
                     <div class="mt-2 small">
-                        <span id="paxPreview">0</span> guests × {{ currency_symbol }}<span id="pricePreview">0.00</span>
+                        <span id="paxPreview">0</span> {% translate "guests" %} × {{ currency_symbol }}<span id="pricePreview">0.00</span>
                     </div>
                 </div>
 
@@ -188,18 +189,18 @@
                 <div class="form-section">
                     <div class="form-section-title">
                         <i class="fas fa-receipt"></i>
-                        Payment Summary
+                        {% translate "Payment Summary" %}
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Total Amount:</span>
+                        <span>{% translate "Total Amount:" %}</span>
                         <strong>{{ currency_symbol }}{{ event.total_amount|floatformat:2 }}</strong>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Amount Paid:</span>
+                        <span>{% translate "Amount Paid:" %}</span>
                         <span class="text-success">{{ currency_symbol }}{{ event.amount_paid|floatformat:2 }}</span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Balance Due:</span>
+                        <span>{% translate "Balance Due:" %}</span>
                         <span class="{% if event.balance_due > 0 %}text-danger{% else %}text-success{% endif %}">
                             {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}
                         </span>
@@ -217,10 +218,10 @@
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-primary btn-lg">
                         <i class="fas fa-save me-2"></i>
-                        {% if action == 'Add' %}Create Event{% else %}Save Changes{% endif %}
+                        {% if action == 'Add' %}{% translate "Create Event" %}{% else %}{% translate "Save Changes" %}{% endif %}
                     </button>
                     <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary">
-                        Cancel
+                        {% translate "Cancel" %}
                     </a>
                 </div>
             </div>

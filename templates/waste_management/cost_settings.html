@@ -1,15 +1,16 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}Waste Cost Settings{% endblock %}
+{% block title %}{% translate "Waste Cost Settings" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <h1 class="h3 mb-4">Food Waste Cost Settings</h1>
-            <p class="text-muted mb-4">Configure cost percentages for accurate waste cost calculations. These settings help track the true cost impact of food waste.</p>
+            <h1 class="h3 mb-4">{% translate "Food Waste Cost Settings" %}</h1>
+            <p class="text-muted mb-4">{% translate "Configure cost percentages for accurate waste cost calculations. These settings help track the true cost impact of food waste." %}</p>
         </div>
     </div>
 
@@ -19,8 +20,8 @@
             <div class="card">
                 <div class="card-body text-center">
                     <h3 class="text-primary">{{ current_settings.ingredient_cost_percentage }}%</h3>
-                    <p class="mb-0">Ingredient Cost</p>
-                    <small class="text-muted">of menu price</small>
+                    <p class="mb-0">{% translate "Ingredient Cost" %}</p>
+                    <small class="text-muted">{% translate "of menu price" %}</small>
                 </div>
             </div>
         </div>
@@ -28,8 +29,8 @@
             <div class="card">
                 <div class="card-body text-center">
                     <h3 class="text-info">{{ current_settings.labor_cost_percentage }}%</h3>
-                    <p class="mb-0">Labor Cost</p>
-                    <small class="text-muted">of menu price</small>
+                    <p class="mb-0">{% translate "Labor Cost" %}</p>
+                    <small class="text-muted">{% translate "of menu price" %}</small>
                 </div>
             </div>
         </div>
@@ -37,8 +38,8 @@
             <div class="card">
                 <div class="card-body text-center">
                     <h3 class="text-warning">{{ current_settings.overhead_cost_percentage }}%</h3>
-                    <p class="mb-0">Overhead Cost</p>
-                    <small class="text-muted">of menu price</small>
+                    <p class="mb-0">{% translate "Overhead Cost" %}</p>
+                    <small class="text-muted">{% translate "of menu price" %}</small>
                 </div>
             </div>
         </div>
@@ -49,7 +50,7 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Update Cost Settings</h5>
+                    <h5 class="mb-0">{% translate "Update Cost Settings" %}</h5>
                 </div>
                 <div class="card-body">
                     <form method="post">
@@ -58,8 +59,8 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="ingredient_cost_percentage" class="form-label">
-                                        Ingredient Cost Percentage
-                                        <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" title="Percentage of menu price representing ingredient costs"></i>
+                                        {% translate "Ingredient Cost Percentage" %}
+                                        <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" title="{% translate "Percentage of menu price representing ingredient costs" %}"></i>
                                     </label>
                                     <div class="input-group">
                                         <input type="number" 
@@ -73,14 +74,14 @@
                                                required>
                                         <span class="input-group-text">%</span>
                                     </div>
-                                    <div class="form-text">Typical range: 25-35% for restaurants</div>
+                                    <div class="form-text">{% translate "Typical range: 25-35% for restaurants" %}</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="labor_cost_percentage" class="form-label">
-                                        Labor Cost Percentage
-                                        <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" title="Percentage of menu price representing labor costs for preparation"></i>
+                                        {% translate "Labor Cost Percentage" %}
+                                        <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" title="{% translate "Percentage of menu price representing labor costs for preparation" %}"></i>
                                     </label>
                                     <div class="input-group">
                                         <input type="number" 
@@ -94,7 +95,7 @@
                                                required>
                                         <span class="input-group-text">%</span>
                                     </div>
-                                    <div class="form-text">Typical range: 20-30% for restaurants</div>
+                                    <div class="form-text">{% translate "Typical range: 20-30% for restaurants" %}</div>
                                 </div>
                             </div>
                         </div>
@@ -102,8 +103,8 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="overhead_cost_percentage" class="form-label">
-                                        Overhead Cost Percentage
-                                        <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" title="Percentage of menu price representing overhead costs (utilities, rent, etc.)"></i>
+                                        {% translate "Overhead Cost Percentage" %}
+                                        <i class="fas fa-info-circle text-info" data-bs-toggle="tooltip" title="{% translate "Percentage of menu price representing overhead costs (utilities, rent, etc.)" %}"></i>
                                     </label>
                                     <div class="input-group">
                                         <input type="number" 
@@ -117,12 +118,12 @@
                                                required>
                                         <span class="input-group-text">%</span>
                                     </div>
-                                    <div class="form-text">Typical range: 10-20% for restaurants</div>
+                                    <div class="form-text">{% translate "Typical range: 10-20% for restaurants" %}</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Total Cost Percentage</label>
+                                    <label class="form-label">{% translate "Total Cost Percentage" %}</label>
                                     <div class="input-group">
                                         <input type="text" 
                                                class="form-control" 
@@ -131,17 +132,17 @@
                                                value="{{ current_settings.ingredient_cost_percentage|add:current_settings.labor_cost_percentage|add:current_settings.overhead_cost_percentage }}">
                                         <span class="input-group-text">%</span>
                                     </div>
-                                    <div class="form-text text-warning">Should typically be 55-85% of menu price</div>
+                                    <div class="form-text text-warning">{% translate "Should typically be 55-85% of menu price" %}</div>
                                 </div>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Update Settings
+                                    <i class="fas fa-save"></i> {% translate "Update Settings" %}
                                 </button>
                                 <a href="{% url 'waste_management:dashboard' %}" class="btn btn-secondary">
-                                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                                    <i class="fas fa-arrow-left"></i> {% translate "Back to Dashboard" %}
                                 </a>
                             </div>
                         </div>
@@ -154,11 +155,11 @@
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Cost Calculation Example</h5>
+                    <h5 class="mb-0">{% translate "Cost Calculation Example" %}</h5>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <label class="form-label">Sample Menu Item Price</label>
+                        <label class="form-label">{% translate "Sample Menu Item Price" %}</label>
                         <div class="input-group">
                             <span class="input-group-text">{% currency_symbol %}</span>
                             <input type="number" class="form-control" id="sample_price" value="15.00" step="0.01">
@@ -167,22 +168,22 @@
                     
                     <div class="card bg-light">
                         <div class="card-body">
-                            <h6 class="card-title">Waste Cost Breakdown:</h6>
+                            <h6 class="card-title">{% translate "Waste Cost Breakdown:" %}</h6>
                             <table class="table table-sm table-borderless mb-0">
                                 <tr>
-                                    <td>Ingredient Cost:</td>
+                                    <td>{% translate "Ingredient Cost:" %}</td>
                                     <td class="text-end">{% currency_symbol %}<span id="calc_ingredient">{{ current_settings.ingredient_cost_percentage|floatformat:1 }}</span></td>
                                 </tr>
                                 <tr>
-                                    <td>Labor Cost:</td>
+                                    <td>{% translate "Labor Cost:" %}</td>
                                     <td class="text-end">{% currency_symbol %}<span id="calc_labor">{{ current_settings.labor_cost_percentage|floatformat:1 }}</span></td>
                                 </tr>
                                 <tr>
-                                    <td>Overhead Cost:</td>
+                                    <td>{% translate "Overhead Cost:" %}</td>
                                     <td class="text-end">{% currency_symbol %}<span id="calc_overhead">{{ current_settings.overhead_cost_percentage|floatformat:1 }}</span></td>
                                 </tr>
                                 <tr class="border-top">
-                                    <td><strong>Total Waste Cost:</strong></td>
+                                    <td><strong>{% translate "Total Waste Cost:" %}</strong></td>
                                     <td class="text-end"><strong>{% currency_symbol %}<span id="calc_total">0.00</span></strong></td>
                                 </tr>
                             </table>
@@ -191,7 +192,7 @@
                     
                     <div class="mt-3">
                         <small class="text-muted">
-                            This shows how much each wasted item of this price would cost your business.
+                            {% translate "This shows how much each wasted item of this price would cost your business." %}
                         </small>
                     </div>
                 </div>
@@ -200,7 +201,7 @@
             <!-- Recent Changes Log -->
             <div class="card mt-3">
                 <div class="card-header">
-                    <h6 class="mb-0">Recent Changes</h6>
+                    <h6 class="mb-0">{% translate "Recent Changes" %}</h6>
                 </div>
                 <div class="card-body">
                     {% if recent_changes %}
@@ -208,12 +209,12 @@
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div>
                                 <small class="text-muted">{{ change.updated_at|date:"M d, Y H:i" }}</small><br>
-                                <small>Updated by {{ change.updated_by.get_full_name|default:change.updated_by.username }}</small>
+                                <small>{% blocktranslate with name=change.updated_by.get_full_name|default:change.updated_by.username %}Updated by {{ name }}{% endblocktranslate %}</small>
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <small class="text-muted">No recent changes</small>
+                        <small class="text-muted">{% translate "No recent changes" %}</small>
                     {% endif %}
                 </div>
             </div>
@@ -225,42 +226,42 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Guidelines for Setting Cost Percentages</h5>
+                    <h5 class="mb-0">{% translate "Guidelines for Setting Cost Percentages" %}</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4">
-                            <h6 class="text-primary">Ingredient Costs</h6>
+                            <h6 class="text-primary">{% translate "Ingredient Costs" %}</h6>
                             <ul class="list-unstyled">
-                                <li>• Raw food ingredients</li>
-                                <li>• Beverages and condiments</li>
-                                <li>• Packaging materials</li>
-                                <li>• Typical range: 25-35%</li>
+                                <li>• {% translate "Raw food ingredients" %}</li>
+                                <li>• {% translate "Beverages and condiments" %}</li>
+                                <li>• {% translate "Packaging materials" %}</li>
+                                <li>• {% translate "Typical range: 25-35%" %}</li>
                             </ul>
                         </div>
                         <div class="col-md-4">
-                            <h6 class="text-info">Labor Costs</h6>
+                            <h6 class="text-info">{% translate "Labor Costs" %}</h6>
                             <ul class="list-unstyled">
-                                <li>• Kitchen staff wages</li>
-                                <li>• Preparation time</li>
-                                <li>• Benefits and taxes</li>
-                                <li>• Typical range: 20-30%</li>
+                                <li>• {% translate "Kitchen staff wages" %}</li>
+                                <li>• {% translate "Preparation time" %}</li>
+                                <li>• {% translate "Benefits and taxes" %}</li>
+                                <li>• {% translate "Typical range: 20-30%" %}</li>
                             </ul>
                         </div>
                         <div class="col-md-4">
-                            <h6 class="text-warning">Overhead Costs</h6>
+                            <h6 class="text-warning">{% translate "Overhead Costs" %}</h6>
                             <ul class="list-unstyled">
-                                <li>• Utilities (gas, electricity)</li>
-                                <li>• Equipment depreciation</li>
-                                <li>• Rent allocation</li>
-                                <li>• Typical range: 10-20%</li>
+                                <li>• {% translate "Utilities (gas, electricity)" %}</li>
+                                <li>• {% translate "Equipment depreciation" %}</li>
+                                <li>• {% translate "Rent allocation" %}</li>
+                                <li>• {% translate "Typical range: 10-20%" %}</li>
                             </ul>
                         </div>
                     </div>
                     
                     <div class="alert alert-info mt-3">
                         <i class="fas fa-lightbulb"></i>
-                        <strong>Tip:</strong> Review and update these percentages quarterly to ensure accurate waste cost tracking. Consider seasonal variations in ingredient costs and operational efficiency improvements.
+                        <strong>{% translate "Tip:" %}</strong> {% translate "Review and update these percentages quarterly to ensure accurate waste cost tracking. Consider seasonal variations in ingredient costs and operational efficiency improvements." %}
                     </div>
                 </div>
             </div>

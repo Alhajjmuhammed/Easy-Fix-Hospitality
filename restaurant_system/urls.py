@@ -10,6 +10,7 @@ from django.shortcuts import render
 from django.db import connection
 import os
 from accounts.views import qr_code_access
+from restaurant_system.language_views import set_language
 
 
 @require_GET
@@ -53,6 +54,7 @@ urlpatterns = [
     path('', RedirectView.as_view(url='/accounts/login/', permanent=False), name='root'),
     path('service-worker.js', service_worker, name='service_worker'),
     path('health-check/', health_check, name='health_check'),
+    path('language/', set_language, name='set_language'),  # English / Kiswahili switch
     # Security endpoints
     path('rate-limited/', rate_limited_view, name='rate_limited'),
     # QR Code access - short URLs for restaurant access

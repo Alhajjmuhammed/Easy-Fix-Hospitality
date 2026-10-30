@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Restaurant Unavailable - {{ display_name|default:"Restaurant" }}{% endblock %}
+{% block title %}{% translate "Restaurant Unavailable" %} - {{ display_name|default:_("Restaurant") }}{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -8,12 +9,12 @@
         <div class="col-md-8">
             <div class="card shadow">
                 <div class="card-header bg-warning text-dark text-center">
-                    <h4><i class="fas fa-store-slash"></i> Restaurant Temporarily Unavailable</h4>
+                    <h4><i class="fas fa-store-slash"></i> {% translate "Restaurant Temporarily Unavailable" %}</h4>
                 </div>
                 <div class="card-body text-center">
                     <div class="mb-4">
                         <i class="fas fa-exclamation-triangle fa-5x text-warning mb-3"></i>
-                        <h5 class="text-dark">{{ display_name|default:"Restaurant" }}</h5>
+                        <h5 class="text-dark">{{ display_name|default:_("Restaurant") }}</h5>
                         {% if restaurant.address %}
                             <p class="text-muted">
                                 <i class="fas fa-map-marker-alt"></i> {{ restaurant.address }}
@@ -28,15 +29,15 @@
                     </div>
                     
                     <div class="alert alert-info">
-                        <p class="mb-2"><strong>What you can do:</strong></p>
+                        <p class="mb-2"><strong>{% translate "What you can do:" %}</strong></p>
                         <ul class="list-unstyled">
-                            <li><i class="fas fa-clock text-primary"></i> Try again later</li>
-                            <li><i class="fas fa-phone text-primary"></i> Contact the restaurant directly</li>
+                            <li><i class="fas fa-clock text-primary"></i> {% translate "Try again later" %}</li>
+                            <li><i class="fas fa-phone text-primary"></i> {% translate "Contact the restaurant directly" %}</li>
                             {% if restaurant.phone_number %}
-                                <li><i class="fas fa-mobile-alt text-primary"></i> Call: {{ restaurant.phone_number }}</li>
+                                <li><i class="fas fa-mobile-alt text-primary"></i> {% translate "Call:" %} {{ restaurant.phone_number }}</li>
                             {% endif %}
                             {% if restaurant.email %}
-                                <li><i class="fas fa-envelope text-primary"></i> Email: {{ restaurant.email }}</li>
+                                <li><i class="fas fa-envelope text-primary"></i> {% translate "Email:" %} {{ restaurant.email }}</li>
                             {% endif %}
                         </ul>
                     </div>
@@ -45,16 +46,14 @@
                         <div class="alert alert-secondary">
                             <small>
                                 <i class="fas fa-info-circle"></i>
-                                This restaurant's online ordering system is temporarily offline. 
-                                Normal service will resume once their subscription is renewed.
+                                {% translate "This restaurant's online ordering system is temporarily offline. Normal service will resume once their subscription is renewed." %}
                             </small>
                         </div>
                     {% elif subscription_status == 'blocked' %}
                         <div class="alert alert-secondary">
                             <small>
                                 <i class="fas fa-info-circle"></i>
-                                This restaurant's online ordering is temporarily suspended. 
-                                Please contact them directly for ordering options.
+                                {% translate "This restaurant's online ordering is temporarily suspended. Please contact them directly for ordering options." %}
                             </small>
                         </div>
                     {% endif %}
@@ -62,23 +61,23 @@
                     <div class="mt-4">
                         <p class="text-muted">
                             <i class="fas fa-shield-alt"></i>
-                            Thank you for your understanding. We apologize for any inconvenience.
+                            {% translate "Thank you for your understanding. We apologize for any inconvenience." %}
                         </p>
                     </div>
                     
                     <div class="mt-4">
                         <a href="{% url 'accounts:login' %}" class="btn btn-primary me-2">
-                            <i class="fas fa-home"></i> Go to Login
+                            <i class="fas fa-home"></i> {% translate "Go to Login" %}
                         </a>
                         <button onclick="history.back()" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Go Back
+                            <i class="fas fa-arrow-left"></i> {% translate "Go Back" %}
                         </button>
                     </div>
                 </div>
                 <div class="card-footer text-center text-muted">
                     <small>
                         <i class="fas fa-qrcode"></i> 
-                        QR Code: {{ qr_code }}
+                        {% translate "QR Code:" %} {{ qr_code }}
                     </small>
                     <br>
                     <small>
@@ -141,12 +140,13 @@
 }
 </style>
 
+{% translate "Try Again" as t_try_again %}
 <script>
 // Optional: Auto-refresh after some time for temporary issues
 setTimeout(function() {
     const refreshButton = document.createElement('button');
     refreshButton.className = 'btn btn-outline-primary btn-sm mt-3';
-    refreshButton.innerHTML = '<i class="fas fa-sync"></i> Try Again';
+    refreshButton.innerHTML = '<i class="fas fa-sync"></i> ' + "{{ t_try_again|escapejs }}";
     refreshButton.onclick = () => window.location.reload();
     
     const cardBody = document.querySelector('.card-body');

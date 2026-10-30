@@ -1,6 +1,7 @@
 {% extends base_template %}
+{% load i18n %}
 
-{% block title %}Select Table - {{ restaurant_name }}{% endblock %}
+{% block title %}{% translate "Select Table" %} - {{ restaurant_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -116,13 +117,13 @@
                 <div class="mb-3">
                     <i class="bi bi-table display-1 text-primary"></i>
                 </div>
-                <h2 class="mb-3">Welcome{% if restaurant %} to {{ restaurant.restaurant_name }}{% endif %}!</h2>
+                <h2 class="mb-3">{% if restaurant %}{% blocktranslate with name=restaurant.restaurant_name %}Welcome to {{ name }}!{% endblocktranslate %}{% else %}{% translate "Welcome!" %}{% endif %}</h2>
                 {% if restaurant %}
                     <div class="alert alert-success d-inline-block">
-                        <i class="bi bi-qr-code"></i> Restaurant selected via QR code
+                        <i class="bi bi-qr-code"></i> {% translate "Restaurant selected via QR code" %}
                     </div>
                 {% endif %}
-                <p class="text-muted h5">Please select your table to start ordering</p>
+                <p class="text-muted h5">{% translate "Please select your table to start ordering" %}</p>
             </div>
 
             {% if available_tables %}
@@ -143,14 +144,14 @@
                                         <div class="table-number">{{ table.tbl_no }}</div>
                                         <div class="table-status">
                                             {% if table.is_truly_available %}
-                                                Available
+                                                {% translate "Available" %}
                                             {% else %}
-                                                Occupied
+                                                {% translate "Occupied" %}
                                             {% endif %}
                                         </div>
                                         {% if table.capacity %}
                                             <small class="text-muted d-block mt-1">
-                                                <i class="bi bi-people"></i> {{ table.capacity }} seats
+                                                <i class="bi bi-people"></i> {% blocktranslate with n=table.capacity %}{{ n }} seats{% endblocktranslate %}
                                             </small>
                                         {% endif %}
                                     </div>
@@ -166,11 +167,11 @@
                         <div class="d-flex gap-4 text-center">
                             <div>
                                 <i class="bi bi-check-circle text-success fs-4"></i>
-                                <div><small class="text-muted">Available</small></div>
+                                <div><small class="text-muted">{% translate "Available" %}</small></div>
                             </div>
                             <div>
                                 <i class="bi bi-x-circle text-danger fs-4"></i>
-                                <div><small class="text-muted">Occupied</small></div>
+                                <div><small class="text-muted">{% translate "Occupied" %}</small></div>
                             </div>
                         </div>
                     </div>
@@ -180,11 +181,11 @@
                 <!-- No Tables Available -->
                 <div class="text-center py-5">
                     <i class="bi bi-exclamation-triangle display-1 text-warning mb-3"></i>
-                    <h4>No Tables Available</h4>
-                    <p class="text-muted">Please contact our staff for assistance.</p>
+                    <h4>{% translate "No Tables Available" %}</h4>
+                    <p class="text-muted">{% translate "Please contact our staff for assistance." %}</p>
                     {% if restaurant %}
                         <a href="{% url 'restaurant:home' %}" class="btn btn-outline-primary">
-                            <i class="bi bi-arrow-left"></i> Back to Restaurant
+                            <i class="bi bi-arrow-left"></i> {% translate "Back to Restaurant" %}
                         </a>
                     {% endif %}
                 </div>
@@ -194,7 +195,7 @@
             <div class="text-center mt-4">
                 <small class="text-muted">
                     <i class="bi bi-info-circle"></i>
-                    Can't find your table? Ask our staff for assistance.
+                    {% translate "Can't find your table? Ask our staff for assistance." %}
                 </small>
             </div>
         </div>
@@ -207,7 +208,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="bi bi-table text-primary"></i> Confirm Table Selection
+                    <i class="bi bi-table text-primary"></i> {% translate "Confirm Table Selection" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -215,17 +216,17 @@
                 <div class="mb-3">
                     <i class="bi bi-table display-1 text-primary"></i>
                 </div>
-                <h4>Table <span id="confirmTableNumber"></span></h4>
+                <h4>{% translate "Table" %} <span id="confirmTableNumber"></span></h4>
                 
                 <!-- Available table message -->
                 <p class="text-muted" id="availableMessage" style="display: none;">
-                    You've selected this table for your order. Continue to browse the menu?
+                    {% translate "You've selected this table for your order. Continue to browse the menu?" %}
                 </p>
                 
                 <!-- Occupied table options -->
                 <div id="occupiedOptions" style="display: none;">
                     <div class="alert alert-info mb-4">
-                        <i class="bi bi-info-circle"></i> This table is currently occupied
+                        <i class="bi bi-info-circle"></i> {% translate "This table is currently occupied" %}
                     </div>
                     
                     <div class="row g-3 mb-3">
@@ -235,8 +236,8 @@
                                     <div class="mb-3">
                                         <i class="bi bi-plus-circle display-4 text-success"></i>
                                     </div>
-                                    <h5 class="card-title">Add to Existing Order</h5>
-                                    <p class="card-text text-muted small">Same customer adding more items</p>
+                                    <h5 class="card-title">{% translate "Add to Existing Order" %}</h5>
+                                    <p class="card-text text-muted small">{% translate "Same customer adding more items" %}</p>
                                 </div>
                             </div>
                         </div>
@@ -246,8 +247,8 @@
                                     <div class="mb-3">
                                         <i class="bi bi-file-earmark-plus display-4 text-primary"></i>
                                     </div>
-                                    <h5 class="card-title">Create New Order</h5>
-                                    <p class="card-text text-muted small">Different customer at this table</p>
+                                    <h5 class="card-title">{% translate "Create New Order" %}</h5>
+                                    <p class="card-text text-muted small">{% translate "Different customer at this table" %}</p>
                                 </div>
                             </div>
                         </div>
@@ -260,17 +261,17 @@
                 <!-- Buttons for available tables -->
                 <div id="availableButtons" style="display: none;">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-arrow-left"></i> Go Back
+                        <i class="bi bi-arrow-left"></i> {% translate "Go Back" %}
                     </button>
                     <button type="button" class="btn btn-primary" onclick="confirmSelection()">
-                        <i class="bi bi-arrow-right-circle"></i> Continue
+                        <i class="bi bi-arrow-right-circle"></i> {% translate "Continue" %}
                     </button>
                 </div>
                 
                 <!-- Button for occupied tables -->
                 <div id="occupiedButtons" style="display: none;">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x"></i> Cancel
+                        <i class="bi bi-x"></i> {% translate "Cancel" %}
                     </button>
                 </div>
             </div>

@@ -1,4 +1,5 @@
 {% load static %}
+{% load i18n %}
 <style>
     .stat-card-embed {
         background: white;
@@ -102,16 +103,16 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">
             <i class="fas fa-chart-bar text-primary me-2"></i>
-            Event Analytics
+            {% translate "Event Analytics" %}
             <small class="text-muted ms-2" style="font-size: 0.75rem;">
                 {{ start_date|date:"M d" }} - {{ end_date|date:"M d, Y" }}
             </small>
         </h5>
         <div class="period-selector-embed btn-group btn-group-sm">
-            <a href="?embed=1&period=week" class="btn btn-outline-primary {% if period == 'week' %}active{% endif %}">Week</a>
-            <a href="?embed=1&period=month" class="btn btn-outline-primary {% if period == 'month' %}active{% endif %}">Month</a>
-            <a href="?embed=1&period=quarter" class="btn btn-outline-primary {% if period == 'quarter' %}active{% endif %}">Quarter</a>
-            <a href="?embed=1&period=year" class="btn btn-outline-primary {% if period == 'year' %}active{% endif %}">Year</a>
+            <a href="?embed=1&period=week" class="btn btn-outline-primary {% if period == 'week' %}active{% endif %}">{% translate "Week" %}</a>
+            <a href="?embed=1&period=month" class="btn btn-outline-primary {% if period == 'month' %}active{% endif %}">{% translate "Month" %}</a>
+            <a href="?embed=1&period=quarter" class="btn btn-outline-primary {% if period == 'quarter' %}active{% endif %}">{% translate "Quarter" %}</a>
+            <a href="?embed=1&period=year" class="btn btn-outline-primary {% if period == 'year' %}active{% endif %}">{% translate "Year" %}</a>
         </div>
     </div>
 
@@ -123,7 +124,7 @@
                     <i class="fas fa-calendar-check"></i>
                 </div>
                 <div class="stat-value-embed text-primary">{{ stats.total_events }}</div>
-                <div class="stat-label-embed">Total Events</div>
+                <div class="stat-label-embed">{% translate "Total Events" %}</div>
             </div>
         </div>
         <div class="col-md-2 col-4">
@@ -132,7 +133,7 @@
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div class="stat-value-embed text-success">{{ stats.completed_events }}</div>
-                <div class="stat-label-embed">Completed</div>
+                <div class="stat-label-embed">{% translate "Completed" %}</div>
             </div>
         </div>
         <div class="col-md-2 col-4">
@@ -141,7 +142,7 @@
                     <i class="fas fa-times-circle"></i>
                 </div>
                 <div class="stat-value-embed text-danger">{{ stats.cancelled_events }}</div>
-                <div class="stat-label-embed">Cancelled</div>
+                <div class="stat-label-embed">{% translate "Cancelled" %}</div>
             </div>
         </div>
         <div class="col-md-2 col-4">
@@ -150,7 +151,7 @@
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-value-embed text-info">{{ stats.total_pax|floatformat:0 }}</div>
-                <div class="stat-label-embed">Total Guests</div>
+                <div class="stat-label-embed">{% translate "Total Guests" %}</div>
             </div>
         </div>
         <div class="col-md-2 col-4">
@@ -159,7 +160,7 @@
                     <i class="fas fa-dollar-sign"></i>
                 </div>
                 <div class="stat-value-embed" style="color: white;">{{ currency_symbol }}{{ stats.total_revenue|floatformat:0 }}</div>
-                <div class="stat-label-embed" style="color: rgba(255,255,255,0.8);">Revenue</div>
+                <div class="stat-label-embed" style="color: rgba(255,255,255,0.8);">{% translate "Revenue" %}</div>
             </div>
         </div>
         <div class="col-md-2 col-4">
@@ -168,7 +169,7 @@
                     <i class="fas fa-exclamation-circle"></i>
                 </div>
                 <div class="stat-value-embed" style="color: white;">{{ stats.pending_payments }}</div>
-                <div class="stat-label-embed" style="color: rgba(255,255,255,0.8);">Pending</div>
+                <div class="stat-label-embed" style="color: rgba(255,255,255,0.8);">{% translate "Pending" %}</div>
             </div>
         </div>
     </div>
@@ -179,19 +180,19 @@
             <div class="report-card-embed">
                 <div class="report-card-title-embed">
                     <i class="fas fa-tags"></i>
-                    Events by Type
+                    {% translate "Events by Type" %}
                 </div>
                 {% if events_by_type %}
                 {% for item in events_by_type %}
                 <div class="type-bar-embed">
                     <span class="flex-grow-1 small fw-medium">{{ event_types|default_if_none:item.event_type }}</span>
                     <span class="badge bg-primary me-2">{{ item.count }}</span>
-                    <span class="text-muted small me-2">{{ item.total_pax|default:0 }} PAX</span>
+                    <span class="text-muted small me-2">{{ item.total_pax|default:0 }} {% translate "PAX" %}</span>
                     <span class="text-success small fw-bold">{{ currency_symbol }}{{ item.revenue|default:0|floatformat:0 }}</span>
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-muted text-center py-2 mb-0 small">No data available</p>
+                <p class="text-muted text-center py-2 mb-0 small">{% translate "No data available" %}</p>
                 {% endif %}
             </div>
         </div>
@@ -201,7 +202,7 @@
             <div class="report-card-embed">
                 <div class="report-card-title-embed">
                     <i class="fas fa-calendar-alt"></i>
-                    Upcoming Events
+                    {% translate "Upcoming Events" %}
                 </div>
                 {% if upcoming_events %}
                 {% for event in upcoming_events %}
@@ -213,14 +214,14 @@
                     <div class="flex-grow-1">
                         <div class="small fw-medium">{{ event.title }}</div>
                         <div class="text-muted" style="font-size: 0.7rem;">
-                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX
+                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} {% translate "PAX" %}
                         </div>
                     </div>
                     <span class="badge bg-{{ event.get_status_color }}">{{ event.get_status_display }}</span>
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-muted text-center py-2 mb-0 small">No upcoming events</p>
+                <p class="text-muted text-center py-2 mb-0 small">{% translate "No upcoming events" %}</p>
                 {% endif %}
             </div>
 
@@ -228,7 +229,7 @@
             <div class="report-card-embed">
                 <div class="report-card-title-embed">
                     <i class="fas fa-check-circle text-success"></i>
-                    Recently Completed
+                    {% translate "Recently Completed" %}
                 </div>
                 {% if recent_completed %}
                 {% for event in recent_completed %}
@@ -240,14 +241,14 @@
                     <div class="flex-grow-1">
                         <div class="small fw-medium">{{ event.title }}</div>
                         <div class="text-muted" style="font-size: 0.7rem;">
-                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX
+                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} {% translate "PAX" %}
                         </div>
                     </div>
                     <span class="text-success fw-bold small">{{ currency_symbol }}{{ event.amount_paid|floatformat:0 }}</span>
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-muted text-center py-2 mb-0 small">No completed events</p>
+                <p class="text-muted text-center py-2 mb-0 small">{% translate "No completed events" %}</p>
                 {% endif %}
             </div>
         </div>

@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Edit Branch - {{ restaurant.name }}{% endblock %}
+{% block title %}{% translate "Edit Branch" %} - {{ restaurant.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -125,9 +126,9 @@
                 </a>
                 <div>
                     <h2 class="h4 mb-1">
-                        <i class="fas fa-edit"></i> Edit Branch
+                        <i class="fas fa-edit"></i> {% translate "Edit Branch" %}
                     </h2>
-                    <p class="text-muted mb-0">Modify settings for "{{ restaurant.name }}"</p>
+                    <p class="text-muted mb-0">{% blocktranslate with name=restaurant.name %}Modify settings for "{{ name }}"{% endblocktranslate %}</p>
                 </div>
             </div>
 
@@ -137,17 +138,17 @@
                     <div class="me-3">
                         {% if restaurant.is_main_restaurant %}
                             <span class="badge bg-primary badge-lg">
-                                <i class="fas fa-star"></i> Main Restaurant
+                                <i class="fas fa-star"></i> {% translate "Main Restaurant" %}
                             </span>
                         {% else %}
                             <span class="badge bg-success badge-lg">
-                                <i class="fas fa-code-branch"></i> Branch
+                                <i class="fas fa-code-branch"></i> {% translate "Branch" %}
                             </span>
                         {% endif %}
                     </div>
                     <div>
-                        <strong>Created:</strong> {{ restaurant.created_at|date:"F d, Y" }} |
-                        <strong>Last Updated:</strong> {{ restaurant.updated_at|date:"F d, Y g:i A" }}
+                        <strong>{% translate "Created:" %}</strong> {{ restaurant.created_at|date:"F d, Y" }} |
+                        <strong>{% translate "Last Updated:" %}</strong> {{ restaurant.updated_at|date:"F d, Y g:i A" }}
                     </div>
                 </div>
             </div>
@@ -156,9 +157,9 @@
             <div class="card form-card">
                 <div class="form-header">
                     <h4 class="mb-1">
-                        <i class="fas fa-store"></i> Restaurant Details
+                        <i class="fas fa-store"></i> {% translate "Restaurant Details" %}
                     </h4>
-                    <p class="mb-0 opacity-75">Update information and settings for this location</p>
+                    <p class="mb-0 opacity-75">{% translate "Update information and settings for this location" %}</p>
                 </div>
                 
                 <div class="form-body">
@@ -169,124 +170,124 @@
                             <!-- Restaurant Name -->
                             <div class="col-md-12 mb-4">
                                 <label for="name" class="form-label">
-                                    Restaurant Name <span class="required">*</span>
+                                    {% translate "Restaurant Name" %} <span class="required">*</span>
                                 </label>
                                 <div class="icon-input">
                                     <i class="fas fa-store"></i>
                                     <input type="text" class="form-control" id="name" name="name" 
                                            value="{{ restaurant.name }}" required>
                                 </div>
-                                <div class="help-text">The display name for this restaurant location</div>
+                                <div class="help-text">{% translate "The display name for this restaurant location" %}</div>
                             </div>
 
                             <!-- Description -->
                             <div class="col-md-12 mb-4">
-                                <label for="description" class="form-label">Description</label>
+                                <label for="description" class="form-label">{% translate "Description" %}</label>
                                 <div class="icon-input">
                                     <i class="fas fa-info-circle"></i>
                                     <textarea class="form-control" id="description" name="description" rows="3"
-                                              placeholder="Brief description of this location...">{{ restaurant.description }}</textarea>
+                                              placeholder="{% translate 'Brief description of this location...' %}">{{ restaurant.description }}</textarea>
                                 </div>
-                                <div class="help-text">Optional description for this location</div>
+                                <div class="help-text">{% translate "Optional description for this location" %}</div>
                             </div>
 
                             <!-- Address -->
                             <div class="col-md-12 mb-4">
                                 <label for="address" class="form-label">
-                                    Address <span class="required">*</span>
+                                    {% translate "Address" %} <span class="required">*</span>
                                 </label>
                                 <div class="icon-input">
                                     <i class="fas fa-map-marker-alt"></i>
                                     <textarea class="form-control" id="address" name="address" rows="2" required>{{ restaurant.address }}</textarea>
                                 </div>
-                                <div class="help-text">Complete address including street, city, and postal code</div>
+                                <div class="help-text">{% translate "Complete address including street, city, and postal code" %}</div>
                             </div>
 
                             <!-- Branch Owner Information -->
                             {% if not restaurant.is_main_restaurant %}
                             <div class="col-md-12 mb-4">
                                 <h6 class="mb-3">
-                                    <i class="fas fa-user-tie"></i> Branch Owner Information
+                                    <i class="fas fa-user-tie"></i> {% translate "Branch Owner Information" %}
                                 </h6>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label for="branch_owner" class="form-label">Username</label>
+                                        <label for="branch_owner" class="form-label">{% translate "Username" %}</label>
                                         <div class="icon-input">
                                             <i class="fas fa-user"></i>
                                             <input type="text" class="form-control" id="branch_owner" name="branch_owner" 
                                                    value="{{ restaurant.branch_owner.username }}"
-                                                   placeholder="Enter username">
+                                                   placeholder="{% translate 'Enter username' %}">
                                         </div>
-                                        <div class="help-text">Username for login access</div>
+                                        <div class="help-text">{% translate "Username for login access" %}</div>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label for="branch_owner_email" class="form-label">Email Address</label>
+                                        <label for="branch_owner_email" class="form-label">{% translate "Email Address" %}</label>
                                         <div class="icon-input">
                                             <i class="fas fa-envelope"></i>
                                             <input type="email" class="form-control" id="branch_owner_email" name="branch_owner_email" 
                                                    value="{{ restaurant.branch_owner.email }}"
-                                                   placeholder="Enter email">
+                                                   placeholder="{% translate 'Enter email' %}">
                                         </div>
-                                        <div class="help-text">Email address for notifications</div>
+                                        <div class="help-text">{% translate "Email address for notifications" %}</div>
                                     </div>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label for="branch_owner_first_name" class="form-label">First Name</label>
+                                        <label for="branch_owner_first_name" class="form-label">{% translate "First Name" %}</label>
                                         <div class="icon-input">
                                             <i class="fas fa-user"></i>
                                             <input type="text" class="form-control" id="branch_owner_first_name" name="branch_owner_first_name" 
                                                    value="{{ restaurant.branch_owner.first_name }}"
-                                                   placeholder="Enter first name">
+                                                   placeholder="{% translate 'Enter first name' %}">
                                         </div>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label for="branch_owner_last_name" class="form-label">Last Name</label>
+                                        <label for="branch_owner_last_name" class="form-label">{% translate "Last Name" %}</label>
                                         <div class="icon-input">
                                             <i class="fas fa-user"></i>
                                             <input type="text" class="form-control" id="branch_owner_last_name" name="branch_owner_last_name" 
                                                    value="{{ restaurant.branch_owner.last_name }}"
-                                                   placeholder="Enter last name">
+                                                   placeholder="{% translate 'Enter last name' %}">
                                         </div>
                                     </div>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-12 mb-3">
-                                        <label for="new_password" class="form-label">New Password (Optional)</label>
+                                        <label for="new_password" class="form-label">{% translate "New Password (Optional)" %}</label>
                                         <div class="icon-input">
                                             <i class="fas fa-lock"></i>
                                             <input type="password" class="form-control" id="new_password" name="new_password" 
-                                                   placeholder="Enter new password (leave blank to keep current)">
+                                                   placeholder="{% translate 'Enter new password (leave blank to keep current)' %}">
                                         </div>
-                                        <div class="help-text">Leave blank to keep current password, or enter new password to change it</div>
+                                        <div class="help-text">{% translate "Leave blank to keep current password, or enter new password to change it" %}</div>
                                     </div>
                                 </div>
                                 <div class="alert alert-info mt-3">
                                     <i class="fas fa-info-circle"></i>
-                                    <strong>Current Owner:</strong> {{ restaurant.branch_owner.get_full_name|default:restaurant.branch_owner.username }} 
-                                    ({{ restaurant.branch_owner.email|default:"No email" }})
-                                    <br><small>Created: {{ restaurant.branch_owner.date_joined|date:"F d, Y" }}</small>
+                                    <strong>{% translate "Current Owner:" %}</strong> {{ restaurant.branch_owner.get_full_name|default:restaurant.branch_owner.username }} 
+                                    {% translate "No email" as t_no_email %}({{ restaurant.branch_owner.email|default:t_no_email }})
+                                    <br><small>{% translate "Created:" %} {{ restaurant.branch_owner.date_joined|date:"F d, Y" }}</small>
                                 </div>
                             </div>
                             {% endif %}
 
                             <!-- Tax Rate -->
                             <div class="col-md-6 mb-4">
-                                <label for="tax_rate" class="form-label">Tax Rate (%)</label>
+                                <label for="tax_rate" class="form-label">{% translate "Tax Rate" %} (%)</label>
                                 <div class="icon-input">
                                     <i class="fas fa-percentage"></i>
                                     <input type="number" class="form-control" id="tax_rate" name="tax_rate" 
                                            step="0.01" min="0" max="100" 
                                            value="{{ restaurant.tax_rate_percentage|floatformat:2 }}">
                                 </div>
-                                <div class="help-text">Percentage rate for tax calculations</div>
+                                <div class="help-text">{% translate "Percentage rate for tax calculations" %}</div>
                             </div>
                         </div>
 
                         <!-- Settings Section -->
                         <div class="settings-section">
                             <h5 class="mb-3">
-                                <i class="fas fa-cog"></i> Print Settings
+                                <i class="fas fa-cog"></i> {% translate "Print Settings" %}
                             </h5>
                             
                             <div class="row">
@@ -295,8 +296,8 @@
                                         <input class="form-check-input" type="checkbox" id="auto_print_kot" name="auto_print_kot"
                                                {% if restaurant.auto_print_kot %}checked{% endif %}>
                                         <label class="form-check-label" for="auto_print_kot">
-                                            <strong>Auto Print KOT</strong><br>
-                                            <small class="text-muted">Automatically print Kitchen Order Tickets</small>
+                                            <strong>{% translate "Auto Print KOT" %}</strong><br>
+                                            <small class="text-muted">{% translate "Automatically print Kitchen Order Tickets" %}</small>
                                         </label>
                                     </div>
                                 </div>
@@ -305,8 +306,8 @@
                                         <input class="form-check-input" type="checkbox" id="auto_print_bot" name="auto_print_bot"
                                                {% if restaurant.auto_print_bot %}checked{% endif %}>
                                         <label class="form-check-label" for="auto_print_bot">
-                                            <strong>Auto Print BOT</strong><br>
-                                            <small class="text-muted">Automatically print Bar Order Tickets</small>
+                                            <strong>{% translate "Auto Print BOT" %}</strong><br>
+                                            <small class="text-muted">{% translate "Automatically print Bar Order Tickets" %}</small>
                                         </label>
                                     </div>
                                 </div>
@@ -315,60 +316,60 @@
                             <hr>
 
                             <h6 class="mb-3">
-                                <i class="fas fa-print"></i> Printer Configuration
+                                <i class="fas fa-print"></i> {% translate "Printer Configuration" %}
                             </h6>
                             
                             <div class="row">
                                 <div class="col-md-4 mb-3">
-                                    <label for="kitchen_printer_name" class="form-label">Kitchen Printer</label>
+                                    <label for="kitchen_printer_name" class="form-label">{% translate "Kitchen Printer" %}</label>
                                     <input type="text" class="form-control" id="kitchen_printer_name" name="kitchen_printer_name" 
                                            value="{{ restaurant.kitchen_printer_name }}"
-                                           placeholder="Kitchen printer name">
+                                           placeholder="{% translate 'Kitchen printer name' %}">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="bar_printer_name" class="form-label">Bar Printer</label>
+                                    <label for="bar_printer_name" class="form-label">{% translate "Bar Printer" %}</label>
                                     <input type="text" class="form-control" id="bar_printer_name" name="bar_printer_name" 
                                            value="{{ restaurant.bar_printer_name }}"
-                                           placeholder="Bar printer name">
+                                           placeholder="{% translate 'Bar printer name' %}">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="receipt_printer_name" class="form-label">Receipt Printer</label>
+                                    <label for="receipt_printer_name" class="form-label">{% translate "Receipt Printer" %}</label>
                                     <input type="text" class="form-control" id="receipt_printer_name" name="receipt_printer_name" 
                                            value="{{ restaurant.receipt_printer_name }}"
-                                           placeholder="Receipt printer name">
+                                           placeholder="{% translate 'Receipt printer name' %}">
                                 </div>
                             </div>
                         </div>
 
                         <!-- Remote Ordering -->
                         <div class="mb-4">
-                            <h6 class="mb-3"><i class="fas fa-globe me-2"></i>Remote Ordering</h6>
+                            <h6 class="mb-3"><i class="fas fa-globe me-2"></i>{% translate "Remote Ordering" %}</h6>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="allow_remote_orders" name="allow_remote_orders"
                                        {% if restaurant.allow_remote_orders %}checked{% endif %}>
                                 <label class="form-check-label" for="allow_remote_orders">
-                                    <strong>Allow Orders from Anywhere</strong>
-                                    <small class="d-block text-muted">Customers can see this branch in the mobile app and place delivery or pickup orders without scanning a QR code.</small>
+                                    <strong>{% translate "Allow Orders from Anywhere" %}</strong>
+                                    <small class="d-block text-muted">{% translate "Customers can see this branch in the mobile app and place delivery or pickup orders without scanning a QR code." %}</small>
                                 </label>
                             </div>
                             <div class="row g-3 mt-2">
                                 <div class="col-md-6">
-                                    <label for="delivery_fee" class="form-label">Delivery fee</label>
+                                    <label for="delivery_fee" class="form-label">{% translate "Delivery fee" %}</label>
                                     <input type="number" class="form-control" id="delivery_fee" name="delivery_fee"
                                            min="0" step="0.01" value="{{ restaurant.delivery_fee|stringformat:'s' }}">
-                                    <small class="text-muted">Added to every delivery order from this branch. Use 0 for no fee.</small>
+                                    <small class="text-muted">{% translate "Added to every delivery order from this branch. Use 0 for no fee." %}</small>
                                 </div>
                                 <div class="col-md-6">
-                                    <label for="free_delivery_minimum" class="form-label">Free delivery from (optional)</label>
+                                    <label for="free_delivery_minimum" class="form-label">{% translate "Free delivery from (optional)" %}</label>
                                     <input type="number" class="form-control" id="free_delivery_minimum" name="free_delivery_minimum"
-                                           min="0" step="0.01" placeholder="Leave empty to always charge"
+                                           min="0" step="0.01" placeholder="{% translate 'Leave empty to always charge' %}"
                                            value="{% if restaurant.free_delivery_minimum is not None %}{{ restaurant.free_delivery_minimum|stringformat:'s' }}{% endif %}">
                                 </div>
                                 <div class="col-12">
                                     <div class="form-check form-switch">
                                         <input class="form-check-input" type="checkbox" id="delivery_fee_taxable" name="delivery_fee_taxable"
                                                {% if restaurant.delivery_fee_taxable %}checked{% endif %}>
-                                        <label class="form-check-label" for="delivery_fee_taxable">Charge tax on the delivery fee</label>
+                                        <label class="form-check-label" for="delivery_fee_taxable">{% translate "Charge tax on the delivery fee" %}</label>
                                     </div>
                                 </div>
                             </div>
@@ -378,16 +379,16 @@
                                     <div class="form-check form-switch">
                                         <input class="form-check-input" type="checkbox" id="reservations_enabled" name="reservations_enabled"
                                                {% if restaurant.reservations_enabled %}checked{% endif %}>
-                                        <label class="form-check-label" for="reservations_enabled"><strong>Accept table reservations</strong></label>
+                                        <label class="form-check-label" for="reservations_enabled"><strong>{% translate "Accept table reservations" %}</strong></label>
                                     </div>
                                     <div class="form-check form-switch mt-2">
                                         <input class="form-check-input" type="checkbox" id="reservations_auto_confirm" name="reservations_auto_confirm"
                                                {% if restaurant.reservations_auto_confirm %}checked{% endif %}>
-                                        <label class="form-check-label" for="reservations_auto_confirm">Confirm bookings automatically</label>
+                                        <label class="form-check-label" for="reservations_auto_confirm">{% translate "Confirm bookings automatically" %}</label>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label for="reservation_duration_minutes" class="form-label">Booking length (minutes)</label>
+                                    <label for="reservation_duration_minutes" class="form-label">{% translate "Booking length (minutes)" %}</label>
                                     <input type="number" class="form-control" id="reservation_duration_minutes" name="reservation_duration_minutes"
                                            min="15" max="720" step="15" value="{{ restaurant.reservation_duration_minutes }}">
                                 </div>
@@ -398,10 +399,10 @@
                         <!-- Submit Buttons -->
                         <div class="d-flex justify-content-end mt-4">
                             <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-secondary mr-3">
-                                <i class="fas fa-times"></i> Cancel
+                                <i class="fas fa-times"></i> {% translate "Cancel" %}
                             </a>
                             <button type="submit" class="btn btn-primary" id="submitBtn">
-                                <i class="fas fa-save"></i> Save Changes
+                                <i class="fas fa-save"></i> {% translate "Save Changes" %}
                             </button>
                         </div>
                     </form>
@@ -412,14 +413,13 @@
             {% if not restaurant.is_main_restaurant %}
             <div class="danger-zone">
                 <h6>
-                    <i class="fas fa-exclamation-triangle"></i> Danger Zone
+                    <i class="fas fa-exclamation-triangle"></i> {% translate "Danger Zone" %}
                 </h6>
                 <p class="mb-3">
-                    Once you delete this branch, there is no going back. Please be certain.
-                    All data associated with this branch will be permanently deleted.
+                    {% translate "Once you delete this branch, there is no going back. Please be certain. All data associated with this branch will be permanently deleted." %}
                 </p>
                 <button type="button" class="btn btn-outline-danger" onclick="showDeleteConfirmation()">
-                    <i class="fas fa-trash"></i> Delete This Branch
+                    <i class="fas fa-trash"></i> {% translate "Delete This Branch" %}
                 </button>
             </div>
             {% endif %}
@@ -434,31 +434,31 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title text-danger">
-                    <i class="fas fa-exclamation-triangle"></i> Delete Branch
+                    <i class="fas fa-exclamation-triangle"></i> {% translate "Delete Branch" %}
                 </h5>
                 <button type="button" class="close" data-dismiss="modal">
                     <span>&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete the branch "<strong>{{ restaurant.name }}</strong>"?</p>
+                <p>{% translate "Are you sure you want to delete the branch" %} "<strong>{{ restaurant.name }}</strong>"?</p>
                 <div class="alert alert-danger">
-                    <strong>Warning:</strong> This action cannot be undone. All data associated with this branch including:
+                    <strong>{% translate "Warning:" %}</strong> {% translate "This action cannot be undone. All data associated with this branch including:" %}
                     <ul class="mb-0 mt-2">
-                        <li>Orders and order history</li>
-                        <li>Tables and categories</li>
-                        <li>Products and pricing</li>
-                        <li>Reports and analytics</li>
+                        <li>{% translate "Orders and order history" %}</li>
+                        <li>{% translate "Tables and categories" %}</li>
+                        <li>{% translate "Products and pricing" %}</li>
+                        <li>{% translate "Reports and analytics" %}</li>
                     </ul>
-                    will be permanently deleted.
+                    {% translate "will be permanently deleted." %}
                 </div>
-                <p>Type <strong>DELETE</strong> to confirm:</p>
-                <input type="text" class="form-control" id="deleteConfirmInput" placeholder="Type DELETE to confirm">
+                <p>{% translate "Type <strong>DELETE</strong> to confirm:" %}</p>
+                <input type="text" class="form-control" id="deleteConfirmInput" placeholder="{% translate 'Type DELETE to confirm' %}">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteBtn" disabled>
-                    Delete Branch Forever
+                    {% translate "Delete Branch Forever" %}
                 </button>
             </div>
         </div>
@@ -471,6 +471,12 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "This field is required." as t_required %}
+{% translate "Please enter a valid tax rate between 0 and 100." as t_tax_invalid %}
+{% translate "Saving Changes..." as t_saving_changes %}
+{% translate "Redirecting..." as t_redirecting %}
+{% translate "Error:" as t_error_prefix %}
+{% translate "An error occurred while deleting the branch." as t_err_delete %}
 <script>
 $(document).ready(function() {
     // Form validation
@@ -485,7 +491,7 @@ $(document).ready(function() {
                 isValid = false;
                 field.addClass('is-invalid');
                 if (!field.siblings('.invalid-feedback').length) {
-                    field.after('<div class="invalid-feedback">This field is required.</div>');
+                    field.after('<div class="invalid-feedback">' + "{{ t_required|escapejs }}" + '</div>');
                 }
             } else {
                 field.removeClass('is-invalid');
@@ -499,7 +505,7 @@ $(document).ready(function() {
             isValid = false;
             $('#tax_rate').addClass('is-invalid');
             if (!$('#tax_rate').siblings('.invalid-feedback').length) {
-                $('#tax_rate').after('<div class="invalid-feedback">Please enter a valid tax rate between 0 and 100.</div>');
+                $('#tax_rate').after('<div class="invalid-feedback">' + "{{ t_tax_invalid|escapejs }}" + '</div>');
             }
         }
         
@@ -509,7 +515,7 @@ $(document).ready(function() {
         }
         
         // Disable submit button to prevent double submission
-        $('#submitBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving Changes...');
+        $('#submitBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> ' + "{{ t_saving_changes|escapejs }}");
     });
     
     // Clear validation errors on input
@@ -550,7 +556,7 @@ $('#confirmDeleteBtn').click(function() {
                 
                 // Show success message and redirect
                 $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-                    data.message + ' Redirecting...' +
+                    data.message + ' ' + "{{ t_redirecting|escapejs }}" +
                     '<button type="button" class="close" data-dismiss="alert">' +
                     '<span>&times;</span></button></div>')
                     .prependTo('.container-fluid');
@@ -559,11 +565,11 @@ $('#confirmDeleteBtn').click(function() {
                     window.location.href = '{% url "admin_panel:manage_branches" %}';
                 }, 2000);
             } else {
-                alert('Error: ' + data.error);
+                alert("{{ t_error_prefix|escapejs }}" + ' ' + data.error);
             }
         },
         error: function() {
-            alert('An error occurred while deleting the branch.');
+            alert("{{ t_err_delete|escapejs }}");
         }
     });
 });

@@ -1,65 +1,67 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Recipe – {{ product.name }}{% endblock %}
+{% block title %}{% blocktranslate with name=product.name %}Recipe – {{ name }}{% endblocktranslate %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
             <h1 class="h3 mb-0"><i class="fas fa-utensils me-2"></i>{{ product.name }}</h1>
-            <div class="small text-muted">Ingredients for <strong>one serving</strong>, in each item's own unit. Price {{ currency_symbol }}{{ product.price|floatformat:2 }}.</div>
+            <div class="small text-muted">{% blocktranslate with currency=currency_symbol price=product.price|floatformat:2 %}Ingredients for <strong>one serving</strong>, in each item's own unit. Price {{ currency }}{{ price }}.{% endblocktranslate %}</div>
         </div>
         {% if cost is not None %}
         <div class="text-end">
-            <div class="small text-muted">Food cost (saved recipe)</div>
-            <div class="h5 mb-0">{{ currency_symbol }}{{ cost|floatformat:2 }}{% if margin is not None %} · <span class="{% if margin < 30 %}text-danger{% elif margin < 60 %}text-warning{% else %}text-success{% endif %}">{{ margin }}% margin</span>{% endif %}</div>
-            {% if not complete %}<div class="small text-warning">Some ingredients have no cost price in inventory</div>{% endif %}
+            <div class="small text-muted">{% translate "Food cost (saved recipe)" %}</div>
+            <div class="h5 mb-0">{{ currency_symbol }}{{ cost|floatformat:2 }}{% if margin is not None %} · <span class="{% if margin < 30 %}text-danger{% elif margin < 60 %}text-warning{% else %}text-success{% endif %}">{% blocktranslate with margin=margin %}{{ margin }}% margin{% endblocktranslate %}</span>{% endif %}</div>
+            {% if not complete %}<div class="small text-warning">{% translate "Some ingredients have no cost price in inventory" %}</div>{% endif %}
         </div>
         {% endif %}
     </div>
     {% include 'inventory/_purchasing_nav.html' %}
 
     {% if not items %}
-    <div class="alert alert-info">Add your ingredients as inventory items first. <a class="alert-link" href="{% url 'inventory:items' %}">Manage items</a></div>
+    <div class="alert alert-info">{% translate "Add your ingredients as inventory items first." %} <a class="alert-link" href="{% url 'inventory:items' %}">{% translate "Manage items" %}</a></div>
     {% else %}
     <form method="post" id="recipeForm">
         {% csrf_token %}
         <div class="card shadow-sm border-0 mb-3"><div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table align-middle mb-0" id="lines">
-                    <thead class="table-light"><tr><th class="ps-3" style="min-width:240px">Ingredient</th><th style="width:170px">Quantity per serving</th><th class="text-end" style="width:140px">Cost</th>{% if can_manage %}<th style="width:50px"></th>{% endif %}</tr></thead>
+                    <thead class="table-light"><tr><th class="ps-3" style="min-width:240px">{% translate "Ingredient" %}</th><th style="width:170px">{% translate "Quantity per serving" %}</th><th class="text-end" style="width:140px">{% translate "Cost" %}</th>{% if can_manage %}<th style="width:50px"></th>{% endif %}</tr></thead>
                     <tbody>
                         {% for item_id, qty in lines %}
                         <tr class="rc-line">
                             <td class="ps-3">
-                                <select name="item_id" class="form-select form-select-sm item-select" aria-label="Ingredient" {% if not can_manage %}disabled{% endif %}>
-                                    <option value="">Choose ingredient…</option>
+                                <select name="item_id" class="form-select form-select-sm item-select" aria-label="{% translate "Ingredient" %}" {% if not can_manage %}disabled{% endif %}>
+                                    <option value="">{% translate "Choose ingredient…" %}</option>
                                     {% for it in items %}<option value="{{ it.id }}" data-price="{{ it.unit_price|default_if_none:'' }}" data-unit="{{ it.unit }}" {% if item_id == it.id|stringformat:'s' %}selected{% endif %}>{{ it.name }}{% if it.unit %} ({{ it.unit }}){% endif %}</option>{% endfor %}
                                 </select>
                             </td>
-                            <td><div class="input-group input-group-sm"><input name="quantity" class="form-control qty" inputmode="decimal" value="{{ qty }}" aria-label="Quantity" {% if not can_manage %}disabled{% endif %}><span class="input-group-text unit">&nbsp;</span></div></td>
+                            <td><div class="input-group input-group-sm"><input name="quantity" class="form-control qty" inputmode="decimal" value="{{ qty }}" aria-label="{% translate "Quantity" %}" {% if not can_manage %}disabled{% endif %}><span class="input-group-text unit">&nbsp;</span></div></td>
                             <td class="text-end line-cost text-muted">—</td>
-                            {% if can_manage %}<td><button type="button" class="btn btn-sm btn-outline-danger remove-line" title="Remove"><i class="fas fa-times"></i></button></td>{% endif %}
+                            {% if can_manage %}<td><button type="button" class="btn btn-sm btn-outline-danger remove-line" title="{% translate "Remove" %}"><i class="fas fa-times"></i></button></td>{% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot><tr>
-                        <td class="ps-3">{% if can_manage %}<button type="button" class="btn btn-sm btn-outline-primary" id="addLine"><i class="fas fa-plus me-1"></i>Add ingredient</button>{% endif %}</td>
-                        <td class="text-end fw-semibold">Cost per serving</td><td class="text-end fw-bold" id="totalCost">—</td>{% if can_manage %}<td></td>{% endif %}
+                        <td class="ps-3">{% if can_manage %}<button type="button" class="btn btn-sm btn-outline-primary" id="addLine"><i class="fas fa-plus me-1"></i>{% translate "Add ingredient" %}</button>{% endif %}</td>
+                        <td class="text-end fw-semibold">{% translate "Cost per serving" %}</td><td class="text-end fw-bold" id="totalCost">—</td>{% if can_manage %}<td></td>{% endif %}
                     </tr></tfoot>
                 </table>
             </div>
         </div></div>
-        <p class="small text-muted">Tip: for small amounts use a small unit for the item (for example grams instead of kg), so stock stays accurate.</p>
+        <p class="small text-muted">{% translate "Tip: for small amounts use a small unit for the item (for example grams instead of kg), so stock stays accurate." %}</p>
         <div class="d-flex gap-2">
-            {% if can_manage %}<button class="btn btn-primary" id="saveBtn"><i class="fas fa-save me-1"></i>Save recipe</button>{% endif %}
-            <a class="btn btn-outline-secondary" href="{% url 'inventory:recipes' %}">Back</a>
+            {% if can_manage %}<button class="btn btn-primary" id="saveBtn"><i class="fas fa-save me-1"></i>{% translate "Save recipe" %}</button>{% endif %}
+            <a class="btn btn-outline-secondary" href="{% url 'inventory:recipes' %}">{% translate "Back" %}</a>
         </div>
     </form>
     {% endif %}
 </div>
 
 {% if items %}
+{% translate "no price" as t_no_price %}
 <script>
 (function () {
     var tbody = document.querySelector('#lines tbody');
@@ -72,7 +74,7 @@
             var sel = tr.querySelector('.item-select'), opt = sel.options[sel.selectedIndex];
             tr.querySelector('.unit').textContent = (opt && opt.dataset.unit) || ' ';
             var price = opt && opt.dataset.price, q = num(tr.querySelector('.qty').value), cell = tr.querySelector('.line-cost');
-            if (opt && opt.value && price === '') { missing = true; cell.textContent = 'no price'; return; }
+            if (opt && opt.value && price === '') { missing = true; cell.textContent = "{{ t_no_price|escapejs }}"; return; }
             var c = q * num(price);
             total += c;
             cell.textContent = c ? money(c) : '—';

@@ -1,5 +1,6 @@
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -229,48 +230,48 @@
 <body>
     <!-- Print Buttons (hidden when printing) -->
     <div class="print-buttons no-print">
-        <button class="print-btn" onclick="window.print()">🖨️ Print KOT</button>
-        <a href="{% url 'orders:select_table' %}" class="print-btn back-btn" style="text-decoration: none; display: inline-block;">← Back to Dashboard</a>
+        <button class="print-btn" onclick="window.print()">🖨️ {% translate "Print" %} KOT</button>
+        <a href="{% url 'orders:select_table' %}" class="print-btn back-btn" style="text-decoration: none; display: inline-block;">← {% translate "Back to Dashboard" %}</a>
     </div>
 
     <!-- KOT Container -->
     <div class="kot-container">
         <!-- Header -->
         <div class="kot-header">
-            <div class="kot-title">*** KITCHEN ORDER TICKET ***</div>
+            <div class="kot-title">*** {% translate "KITCHEN ORDER TICKET" %} ***</div>
             <div class="restaurant-name">{{ restaurant_name|upper }}</div>
         </div>
         
         <!-- Order Information -->
         <div class="kot-info">
             <div class="kot-info-row">
-                <span class="kot-info-label">Order #:</span>
+                <span class="kot-info-label">{% translate "Order #:" %}</span>
                 <span>{{ order.order_number }}</span>
             </div>
             <div class="kot-info-row">
-                <span class="kot-info-label">Table:</span>
+                <span class="kot-info-label">{% translate "Table:" %}</span>
                 <span>{{ order.table_info.tbl_no|default:order.get_order_type_display }}</span>
             </div>
             <div class="kot-info-row">
-                <span class="kot-info-label">Date:</span>
+                <span class="kot-info-label">{% translate "Date:" %}</span>
                 <span>{{ order.created_at|date:"d/m/Y" }}</span>
             </div>
             <div class="kot-info-row">
-                <span class="kot-info-label">Time:</span>
+                <span class="kot-info-label">{% translate "Time:" %}</span>
                 <span>{{ order.created_at|date:"h:i A" }}</span>
             </div>
             <div class="kot-info-row">
-                <span class="kot-info-label">Ordered By:</span>
+                <span class="kot-info-label">{% translate "Ordered By:" %}</span>
                 <span>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</span>
             </div>
             {% if order.entered_by %}
             <div class="kot-info-row">
-                <span class="kot-info-label">Entered By:</span>
-                <span>{{ order.entered_by.get_full_name|default:order.entered_by.username }} (Cashier)</span>
+                <span class="kot-info-label">{% translate "Entered By:" %}</span>
+                <span>{{ order.entered_by.get_full_name|default:order.entered_by.username }} ({% translate "Cashier" %})</span>
             </div>
             {% endif %}
             <div class="kot-info-row">
-                <span class="kot-info-label">Status:</span>
+                <span class="kot-info-label">{% translate "Status:" %}</span>
                 <span class="order-status">{{ order.get_status_display|upper }}</span>
             </div>
         </div>
@@ -279,7 +280,7 @@
         
         <!-- Items to Prepare -->
         <div class="kot-items">
-            <div class="kot-items-title">ITEMS TO PREPARE</div>
+            <div class="kot-items-title">{% translate "ITEMS TO PREPARE" %}</div>
             
             {% for item in order.order_items.all %}
                 {% if item.product.station == 'kitchen' %}
@@ -289,7 +290,7 @@
                     </div>
                     {% if item.special_notes %}
                     <div class="item-notes">
-                        ⚠ Note: {{ item.special_notes }}
+                        ⚠ {% translate "Note:" %} {{ item.special_notes }}
                     </div>
                     {% endif %}
                 </div>
@@ -302,7 +303,7 @@
         <!-- Special Instructions -->
         {% if order.display_instructions %}
         <div class="special-instructions">
-            <div class="special-instructions-title">⚠ SPECIAL INSTRUCTIONS:</div>
+            <div class="special-instructions-title">⚠ {% translate "SPECIAL INSTRUCTIONS" %}:</div>
             <div>{{ order.display_instructions }}</div>
         </div>
         {% endif %}
@@ -310,17 +311,17 @@
         <!-- Urgent Note for Pending Orders -->
         {% if order.status == 'pending' %}
         <div class="urgent-note">
-            🔥 NEW ORDER - PREPARE IMMEDIATELY 🔥
+            🔥 {% translate "NEW ORDER - PREPARE IMMEDIATELY" %} 🔥
         </div>
         {% endif %}
         
         <!-- Footer -->
         <div class="kot-footer">
-            <div>Total Items: {{ order.order_items.all|length }}</div>
-            <div>Total Quantity: {{ order.get_total_products }}</div>
-            <div class="kot-time">Printed: {{ now|date:"d/m/Y h:i A" }}</div>
+            <div>{% blocktranslate with n=order.order_items.all|length %}Total Items: {{ n }}{% endblocktranslate %}</div>
+            <div>{% blocktranslate with n=order.get_total_products %}Total Quantity: {{ n }}{% endblocktranslate %}</div>
+            <div class="kot-time">{% blocktranslate with time=now|date:"d/m/Y h:i A" %}Printed: {{ time }}{% endblocktranslate %}</div>
             <div style="margin-top: 10px; font-size: 10px;">
-                This is a kitchen copy only - Not for billing
+                {% translate "This is a kitchen copy only - Not for billing" %}
             </div>
         </div>
     </div>

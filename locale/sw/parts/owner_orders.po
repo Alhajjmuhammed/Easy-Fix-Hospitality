@@ -1,0 +1,497 @@
+msgid "Orders Management"
+msgstr "Usimamizi wa Oda"
+
+msgid "Manage restaurant orders and track order status"
+msgstr "Simamia oda za mgahawa na fuatilia hali ya oda"
+
+msgid "Total Orders:"
+msgstr "Jumla ya oda:"
+
+msgid "Manual Order Entry"
+msgstr "Kuingiza Oda kwa Mkono"
+
+msgid "Search Orders"
+msgstr "Tafuta Oda"
+
+msgid "Order#, Table, Customer..."
+msgstr "Namba ya oda, Meza, Mteja..."
+
+msgid "Press ESC to clear"
+msgstr "Bonyeza ESC kufuta"
+
+msgid "All Payment"
+msgstr "Malipo Yote"
+
+msgid "This Year"
+msgstr "Mwaka Huu"
+
+msgid "All Time"
+msgstr "Muda Wote"
+
+msgid "Showing %(counter)s order total"
+msgid_plural "Showing %(counter)s orders total"
+msgstr[0] "Inaonyesha jumla ya oda %(counter)s"
+msgstr[1] "Inaonyesha jumla ya oda %(counter)s"
+
+msgid "(filtered)"
+msgstr "(zimechujwa)"
+
+msgid "order(s) selected"
+msgstr "oda zimechaguliwa"
+
+msgid "Delivered"
+msgstr "Imefikishwa"
+
+msgid "Out for Delivery"
+msgstr "Iko njiani"
+
+msgid "Food Wasted"
+msgstr "Chakula kimepotea"
+
+msgid "Dine In"
+msgstr "Kula hapa"
+
+msgid "Select Customer"
+msgstr "Chagua Mteja"
+
+msgid "Add Order"
+msgstr "Ongeza Oda"
+
+msgid "Are you sure you want to delete"
+msgstr "Una uhakika unataka kufuta"
+
+msgid "Delete Order"
+msgstr "Futa Oda"
+
+msgid "Failed to load order details."
+msgstr "Imeshindikana kupakia maelezo ya oda."
+
+msgid "An error occurred while loading order details."
+msgstr "Hitilafu imetokea wakati wa kupakia maelezo ya oda."
+
+msgid "Are you sure you want to update this order status to \"{status}\"?"
+msgstr "Una uhakika unataka kubadilisha hali ya oda hii kuwa \"{status}\"?"
+
+msgid "Failed to update order status."
+msgstr "Imeshindikana kubadilisha hali ya oda."
+
+msgid "An error occurred while updating order status."
+msgstr "Hitilafu imetokea wakati wa kubadilisha hali ya oda."
+
+msgid "An error occurred while adding the order."
+msgstr "Hitilafu imetokea wakati wa kuongeza oda."
+
+msgid "Order #{number}"
+msgstr "Oda #{number}"
+
+msgid "Failed to delete order."
+msgstr "Imeshindikana kufuta oda."
+
+msgid "An error occurred while deleting the order."
+msgstr "Hitilafu imetokea wakati wa kufuta oda."
+
+msgid "(Occupied)"
+msgstr "(Ina wateja)"
+
+msgid "No tables found"
+msgstr "Hakuna meza zilizopatikana"
+
+msgid "No customers found"
+msgstr "Hakuna wateja waliopatikana"
+
+msgid "Please select at least one order to delete."
+msgstr "Tafadhali chagua angalau oda moja ya kufuta."
+
+msgid "Are you sure you want to delete {count} order(s)?"
+msgstr "Una uhakika unataka kufuta oda {count}?"
+
+msgid "Orders:"
+msgstr "Oda:"
+
+msgid "Failed to delete selected orders."
+msgstr "Imeshindikana kufuta oda zilizochaguliwa."
+
+msgid "An error occurred while deleting orders."
+msgstr "Hitilafu imetokea wakati wa kufuta oda."
+
+msgid "Select All"
+msgstr "Chagua Zote"
+
+msgctxt "noun"
+msgid "Order"
+msgstr "Oda"
+
+msgid "Mixed"
+msgstr "Mchanganyiko"
+
+msgid "Mark as Ready"
+msgstr "Weka Iko Tayari"
+
+msgid "Mark as Served"
+msgstr "Weka Imehudumiwa"
+
+msgid "%(status)s orders pagination"
+msgstr "Kurasa za oda (%(status)s)"
+
+msgid "Showing %(start)s to %(end)s of %(total)s orders"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya oda %(total)s"
+
+msgid "No %(status)s Orders"
+msgstr "Hakuna Oda (%(status)s)"
+
+msgid "%(status)s orders will appear here when available."
+msgstr "Oda (%(status)s) zitaonekana hapa zikipatikana."
+
+msgid "No Orders"
+msgstr "Hakuna Oda"
+
+msgid "Orders will appear here when available."
+msgstr "Oda zitaonekana hapa zikipatikana."
+
+msgid "Branch Monitoring"
+msgstr "Ufuatiliaji wa Matawi"
+
+msgid "Monitor orders across all branch locations"
+msgstr "Fuatilia oda katika matawi yote"
+
+msgid "Export"
+msgstr "Pakua"
+
+msgid "All Statuses"
+msgstr "Hali Zote"
+
+msgid "All Branches"
+msgstr "Matawi Yote"
+
+msgid "Search by order number, customer name..."
+msgstr "Tafuta kwa namba ya oda, jina la mteja..."
+
+msgid "Orders per page"
+msgstr "Oda kwa kila ukurasa"
+
+msgid "Sort by"
+msgstr "Panga kwa"
+
+msgid "Newest First"
+msgstr "Mpya Kwanza"
+
+msgid "Oldest First"
+msgstr "Za Zamani Kwanza"
+
+msgid "Highest Value"
+msgstr "Thamani ya Juu Kwanza"
+
+msgid "Lowest Value"
+msgstr "Thamani ya Chini Kwanza"
+
+msgid "Showing %(start)s - %(end)s of %(total)s orders"
+msgstr "Inaonyesha %(start)s - %(end)s kati ya oda %(total)s"
+
+msgid "+%(n)s more..."
+msgstr "+%(n)s zaidi..."
+
+msgid "Track Order"
+msgstr "Fuatilia Oda"
+
+msgid "No orders match your current filter criteria."
+msgstr "Hakuna oda zinazolingana na vichujio ulivyochagua."
+
+msgid "Order pagination"
+msgstr "Kurasa za oda"
+
+msgid "Showing %(start)s - %(end)s of %(total)s total orders"
+msgstr "Inaonyesha %(start)s - %(end)s kati ya jumla ya oda %(total)s"
+
+msgid "Order tracking feature coming soon for order #{id}"
+msgstr "Kipengele cha kufuatilia oda kinakuja hivi karibuni (oda #{id})"
+
+msgid "(Capacity: %(n)s)"
+msgstr "(Uwezo: watu %(n)s)"
+
+msgid "(Cashier)"
+msgstr "(Keshia)"
+
+msgid "Payment Status:"
+msgstr "Hali ya Malipo:"
+
+msgid "Timestamps"
+msgstr "Nyakati"
+
+msgid "Updated:"
+msgstr "Ilisasishwa:"
+
+msgid "Cancellation Reason"
+msgstr "Sababu ya Kughairi"
+
+msgid "Quantity"
+msgstr "Idadi"
+
+msgid "Unit Price"
+msgstr "Bei ya Kimoja"
+
+msgid "Edit Order #%(number)s"
+msgstr "Hariri Oda #%(number)s"
+
+msgid "Back to Orders"
+msgstr "Rudi kwenye Oda"
+
+msgid "Table %(n)s (%(seats)s seats)"
+msgstr "Meza %(n)s (viti %(seats)s)"
+
+msgid "Any special instructions..."
+msgstr "Maelekezo yoyote maalum..."
+
+msgid "Update Order"
+msgstr "Sasisha Oda"
+
+msgid "View Full Order"
+msgstr "Tazama Oda Kamili"
+
+msgid "Created"
+msgstr "Iliundwa"
+
+msgid "Current Status"
+msgstr "Hali ya Sasa"
+
+msgid "Qty:"
+msgstr "Idadi:"
+
+msgid "No items in this order."
+msgstr "Hakuna bidhaa kwenye oda hii."
+
+msgid "An error occurred while updating the order."
+msgstr "Hitilafu imetokea wakati wa kusasisha oda."
+
+msgid "Quantity:"
+msgstr "Idadi:"
+
+msgid "Total Cost:"
+msgstr "Gharama Jumla:"
+
+msgid "An error occurred while recording waste."
+msgstr "Hitilafu imetokea wakati wa kurekodi upotevu."
+
+msgid "New Order #{number}"
+msgstr "Oda Mpya #{number}"
+
+msgid "Click to refresh"
+msgstr "Bofya kuonyesha upya"
+
+msgid "Filter by Role"
+msgstr "Chuja kwa Jukumu"
+
+msgid "Filter by Staff"
+msgstr "Chuja kwa Mfanyakazi"
+
+msgid "All Staff"
+msgstr "Wafanyakazi Wote"
+
+msgid "Cashiers"
+msgstr "Makeshia"
+
+msgid "%(counter)s item"
+msgid_plural "%(counter)s items"
+msgstr[0] "bidhaa %(counter)s"
+msgstr[1] "bidhaa %(counter)s"
+
+msgid "+ %(n)s more..."
+msgstr "+ %(n)s zaidi..."
+
+msgid "History"
+msgstr "Historia"
+
+msgid "No orders found"
+msgstr "Hakuna oda zilizopatikana"
+
+msgid "No orders match your current filters."
+msgstr "Hakuna oda zinazolingana na vichujio vyako."
+
+msgid "Payment History"
+msgstr "Historia ya Malipo"
+
+msgid "Reason for cancellation:"
+msgstr "Sababu ya kughairi:"
+
+msgid "Enter reason..."
+msgstr "Andika sababu..."
+
+msgctxt "transfer order from table"
+msgid "from"
+msgstr "kutoka"
+
+msgid "Print bill for order #{number}?"
+msgstr "Chapisha bili ya oda #{number}?"
+
+msgid "Balance Due:"
+msgstr "Kiasi Kinachodaiwa:"
+
+msgid "Payment Amount"
+msgstr "Kiasi cha Malipo"
+
+msgid "Payment Method"
+msgstr "Njia ya Malipo"
+
+msgid "Digital Payment"
+msgstr "Malipo ya Kidijitali"
+
+msgid "Voucher"
+msgstr "Vocha"
+
+msgid "Reference Number (Optional)"
+msgstr "Namba ya Kumbukumbu (si lazima)"
+
+msgid "Transaction ref, check #, etc."
+msgstr "Namba ya muamala, hundi n.k."
+
+msgid "Additional notes..."
+msgstr "Maelezo ya ziada..."
+
+msgid "Split Bill - Select Individual Items"
+msgstr "Gawanya Bili - Chagua Bidhaa Moja Moja"
+
+msgid "Select Items to Pay:"
+msgstr "Chagua Bidhaa za Kulipia:"
+
+msgid "Item"
+msgstr "Bidhaa"
+
+msgid "Remaining"
+msgstr "Zilizobaki"
+
+msgid "Pay Qty"
+msgstr "Idadi ya Kulipia"
+
+msgid "Error loading payment form"
+msgstr "Imeshindikana kupakia fomu ya malipo"
+
+msgid "Loyalty points"
+msgstr "Pointi za uaminifu"
+
+msgid "{points} points, worth {amount}"
+msgstr "pointi {points}, zenye thamani ya {amount}"
+
+msgid "Customer's code"
+msgstr "Msimbo wa mteja"
+
+msgid "Customer's points code"
+msgstr "Msimbo wa pointi za mteja"
+
+msgid "Pay {amount} with {points} points"
+msgstr "Lipa {amount} kwa pointi {points}"
+
+msgid "The customer finds the code in their app or on the web under 'My Points'."
+msgstr "Mteja anapata namba hii kwenye programu yake au kwenye tovuti chini ya 'Pointi Zangu'."
+
+msgid "Points can be used from {points} points. This order will earn points when fully paid."
+msgstr "Pointi zinaweza kutumika kuanzia pointi {points}. Oda hii itapata pointi ikilipwa yote."
+
+msgid "Registered customer? Enter their phone number so they earn points."
+msgstr "Mteja aliyesajiliwa? Weka namba yake ya simu ili apate pointi."
+
+msgid "Customer phone"
+msgstr "Simu ya mteja"
+
+msgid "Link"
+msgstr "Unganisha"
+
+msgid "Connection error."
+msgstr "Hitilafu ya mtandao."
+
+msgid "VOIDED"
+msgstr "IMEBATILISHWA"
+
+msgid "ACTIVE"
+msgstr "HAI"
+
+msgid "Void"
+msgstr "Batilisha"
+
+msgid "Error loading payment history"
+msgstr "Imeshindikana kupakia historia ya malipo"
+
+msgid "Enter reason for voiding this payment:"
+msgstr "Andika sababu ya kubatilisha malipo haya:"
+
+msgid "Refund method (cash/card/digital/voucher):"
+msgstr "Njia ya kurudisha pesa (andika: cash/card/digital/voucher):"
+
+msgid "Error voiding payment"
+msgstr "Imeshindikana kubatilisha malipo"
+
+msgid "Error cancelling order"
+msgstr "Imeshindikana kughairi oda"
+
+msgid "Your session has expired. Please log in again."
+msgstr "Muda wa kuingia umekwisha. Tafadhali ingia tena."
+
+msgid "Too many requests. Please wait a moment and try again."
+msgstr "Maombi ni mengi mno. Tafadhali subiri kidogo kisha ujaribu tena."
+
+msgid "Access denied. Please refresh the page and try again."
+msgstr "Huna ruhusa. Tafadhali onyesha ukurasa upya kisha ujaribu tena."
+
+msgid "Select a product..."
+msgstr "Chagua bidhaa..."
+
+msgid "Reason"
+msgstr "Sababu"
+
+msgid "Select reason..."
+msgstr "Chagua sababu..."
+
+msgid "Recent Records"
+msgstr "Rekodi za Karibuni"
+
+msgid "Your recent waste records will appear here..."
+msgstr "Rekodi zako za karibuni za upotevu zitaonekana hapa..."
+
+msgid "Waste recorded successfully!"
+msgstr "Upotevu umerekodiwa!"
+
+msgid "OK"
+msgstr "Sawa"
+
+msgid "Orders you have created"
+msgstr "Oda ulizoweka"
+
+msgid "Are you sure you want to cancel {item}?"
+msgstr "Una uhakika unataka kughairi {item}?"
+
+msgid "An error occurred while canceling the item."
+msgstr "Hitilafu imetokea wakati wa kughairi bidhaa."
+
+msgid "Quality Food & Service"
+msgstr "Chakula Bora na Huduma Bora"
+
+msgid "Cashier:"
+msgstr "Keshia:"
+
+msgid "Back to Cashier"
+msgstr "Rudi kwa Keshia"
+
+msgid "Cashier Reports"
+msgstr "Ripoti za Keshia"
+
+msgid "Restaurant Sales Report"
+msgstr "Ripoti ya Mauzo ya Mgahawa"
+
+msgid "View all orders from your restaurant"
+msgstr "Tazama oda zote za mgahawa wako"
+
+msgid "Paid Amount"
+msgstr "Kiasi Kilicholipwa"
+
+msgid "Unpaid Amount"
+msgstr "Kiasi Kisicholipwa"
+
+msgid "Filter Reports"
+msgstr "Chuja Ripoti"
+
+msgid "SubCategory"
+msgstr "Kikundi"
+
+msgid "Paid By"
+msgstr "Imelipwa na"
+
+msgid "No orders found for the selected filters."
+msgstr "Hakuna oda kwa vichujio ulivyochagua."

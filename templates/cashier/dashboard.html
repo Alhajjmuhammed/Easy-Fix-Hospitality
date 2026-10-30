@@ -1,9 +1,10 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
 {% block title %}
-    {% if user.is_customer_care %}Payment Processing - Customer Care{% elif user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %}Payment Processing - Management{% else %}Cashier Dashboard{% endif %}
+    {% if user.is_customer_care %}{% translate "Payment Processing" %} - {% translate "Customer Care" %}{% elif user.is_owner or user.is_main_owner or user.is_branch_owner or user.is_manager %}{% translate "Payment Processing" %} - {% translate "Management" %}{% else %}{% translate "Cashier Dashboard" %}{% endif %}
 {% endblock %}
 
 {% block extra_css %}
@@ -74,6 +75,16 @@
 
 {% block extra_js %}
 {% include 'cashier/_mobile_money_js.html' %}
+{% autoescape off %}
+{% translate "Select Product" as t_select_product %}
+{% translate "Quantity:" as t_quantity_colon %}
+{% translate "Total Cost:" as t_total_cost_colon %}
+{% translate "Reason:" as t_reason_colon %}
+{% translate "An error occurred while recording waste." as t_waste_error %}
+{% translate "New Order #{number}" as t_new_order %}
+{% blocktranslate with n="{n}" asvar t_table_n %}Table {{ n }}{% endblocktranslate %}
+{% translate "Click to refresh" as t_click_refresh %}
+{% endautoescape %}
 <script>
     // Currency symbol for JavaScript
     const CURRENCY_SYMBOL = '{% currency_symbol %}';
@@ -96,7 +107,7 @@
     // Load products when waste modal is opened (override the base template function)
     function loadProductsForWaste() {
         const productSelect = document.getElementById('product');
-        productSelect.innerHTML = '<option value="">Select Product</option>';
+        productSelect.innerHTML = '<option value="">' + "{{ t_select_product|escapejs }}" + '</option>';
 
         wasteProducts.forEach(product => {
             const option = document.createElement('option');
@@ -146,9 +157,9 @@ $(document).ready(function() {
                 $('#wasteSuccessDetails').html(`
                     <div class="alert alert-light border text-start">
                         <strong>${data.waste_log.product_name}</strong><br>
-                        Quantity: ${data.waste_log.quantity_wasted}<br>
-                        Total Cost: ${CURRENCY_SYMBOL}${data.waste_log.total_cost.toFixed(2)}<br>
-                        Reason: ${data.waste_log.waste_reason}
+                        {{ t_quantity_colon|escapejs }} ${data.waste_log.quantity_wasted}<br>
+                        {{ t_total_cost_colon|escapejs }} ${CURRENCY_SYMBOL}${data.waste_log.total_cost.toFixed(2)}<br>
+                        {{ t_reason_colon|escapejs }} ${data.waste_log.waste_reason}
                     </div>
                 `);
                 $('#wasteRecordModal').modal('hide');
@@ -156,7 +167,7 @@ $(document).ready(function() {
                 $('#wasteRecordForm')[0].reset();
             },
             error: function(xhr) {
-                let errorMessage = "An error occurred while recording waste.";
+                let errorMessage = "{{ t_waste_error|escapejs }}";
                 if (xhr.responseJSON && xhr.responseJSON.error) {
                     errorMessage = xhr.responseJSON.error;
                 }
@@ -227,7 +238,7 @@ $(document).ready(function() {
             bar.onclick = function() { clearTimeout(_reloadTimer); window.location.reload(); };
             document.body.prepend(bar);
         }
-        bar.textContent = '🔔 New Order #' + (orderNum || '?') + (tableNum && tableNum !== 'N/A' ? ' · Table ' + tableNum : '') + ' — Click to refresh';
+        bar.textContent = '🔔 ' + "{{ t_new_order|escapejs }}".replace('{number}', () => (orderNum || '?')) + (tableNum && tableNum !== 'N/A' ? ' · ' + "{{ t_table_n|escapejs }}".replace('{n}', () => tableNum) : '') + ' — ' + "{{ t_click_refresh|escapejs }}";
         scheduleReload(5000);
     }
 
@@ -244,19 +255,19 @@ $(document).ready(function() {
             <div class="d-none d-md-flex justify-content-between align-items-center mb-4 desktop-header">
                 <h2 class="mb-0">
                     {% if user.is_customer_care %}
-                        � Payment Processing
+                        � {% translate "Payment Processing" %}
                     {% elif user.is_owner %}
-                        💰 Payment Management
+                        💰 {% translate "Payment Management" %}
                     {% else %}
-                        �💰 Cashier Dashboard
+                        �💰 {% translate "Cashier Dashboard" %}
                     {% endif %}
                 </h2>
                 <div class="d-flex gap-2">
                     <button class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
-                        <i class="fas fa-sync-alt"></i> Refresh
+                        <i class="fas fa-sync-alt"></i> {% translate "Refresh" %}
                     </button>
                     <a href="{% url 'cashier:receipt_management' %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-receipt"></i> Receipts
+                        <i class="fas fa-receipt"></i> {% translate "Receipts" %}
                     </a>
                 </div>
             </div>
@@ -264,37 +275,37 @@ $(document).ready(function() {
             <!-- Filters -->
             <div class="card mb-4" style="border-radius: 0;" id="filterCard">
                 <div class="card-header">
-                    <h5 class="mb-0">🔍 Filter Orders</h5>
+                    <h5 class="mb-0">🔍 {% translate "Filter Orders" %}</h5>
                 </div>
                 <div class="card-body">
                     <form method="GET" class="row g-3">
                         <div class="col-12 col-sm-6 col-lg-3">
-                            <label for="period" class="form-label">Period</label>
+                            <label for="period" class="form-label">{% translate "Period" %}</label>
                             <select name="period" id="period" class="form-select">
-                                <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
-                                <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>This Week</option>
+                                <option value="today" {% if period == 'today' %}selected{% endif %}>{% translate "Today" %}</option>
+                                <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>{% translate "This Week" %}</option>
                             </select>
                         </div>
                         <div class="col-12 col-sm-6 col-lg-3">
-                            <label for="staff_role" class="form-label">Filter by Role</label>
+                            <label for="staff_role" class="form-label">{% translate "Filter by Role" %}</label>
                             <select name="staff_role" id="staff_role" class="form-select">
-                                <option value="all" {% if staff_role == 'all' %}selected{% endif %}>All Roles</option>
-                                <option value="customer_care" {% if staff_role == 'customer_care' %}selected{% endif %}>Customer Care</option>
-                                <option value="cashier" {% if staff_role == 'cashier' %}selected{% endif %}>Cashier</option>
+                                <option value="all" {% if staff_role == 'all' %}selected{% endif %}>{% translate "All Roles" %}</option>
+                                <option value="customer_care" {% if staff_role == 'customer_care' %}selected{% endif %}>{% translate "Customer Care" %}</option>
+                                <option value="cashier" {% if staff_role == 'cashier' %}selected{% endif %}>{% translate "Cashier" %}</option>
                             </select>
                         </div>
                         <div class="col-12 col-sm-6 col-lg-3">
-                            <label for="staff" class="form-label">Filter by Staff</label>
+                            <label for="staff" class="form-label">{% translate "Filter by Staff" %}</label>
                             <select name="staff" id="staff" class="form-select">
-                                <option value="all">All Staff</option>
-                                <optgroup label="Customer Care">
+                                <option value="all">{% translate "All Staff" %}</option>
+                                <optgroup label="{% translate "Customer Care" %}">
                                     {% for cc_user in customer_care_users %}
                                         <option value="{{ cc_user.id }}" {% if staff_filter == cc_user.id|stringformat:"s" %}selected{% endif %}>
                                             {{ cc_user.get_full_name|default:cc_user.username }}
                                         </option>
                                     {% endfor %}
                                 </optgroup>
-                                <optgroup label="Cashiers">
+                                <optgroup label="{% translate "Cashiers" %}">
                                     {% for cashier in cashier_users %}
                                         <option value="{{ cashier.id }}" {% if staff_filter == cashier.id|stringformat:"s" %}selected{% endif %}>
                                             {{ cashier.get_full_name|default:cashier.username }}
@@ -304,30 +315,30 @@ $(document).ready(function() {
                             </select>
                         </div>
                         <div class="col-12 col-sm-6 col-lg-3">
-                            <label for="table" class="form-label">Table Number</label>
+                            <label for="table" class="form-label">{% translate "Table Number" %}</label>
                             <select name="table" id="table" class="form-select">
-                                <option value="">All Tables</option>
+                                <option value="">{% translate "All Tables" %}</option>
                                 {% for table in tables %}
                                     <option value="{{ table.tbl_no }}" {% if table_filter == table.tbl_no %}selected{% endif %}>
-                                        Table {{ table.tbl_no }}
+                                        {% blocktranslate with n=table.tbl_no %}Table {{ n }}{% endblocktranslate %}
                                     </option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="col-12 col-sm-6 col-lg-3">
-                            <label for="status" class="form-label">Payment Status</label>
+                            <label for="status" class="form-label">{% translate "Payment Status" %}</label>
                             <select name="status" id="status" class="form-select">
-                                <option value="">All Status</option>
+                                <option value="">{% translate "All Status" %}</option>
                                 {% for value, display in payment_status_choices %}
                                     <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
-                                        {{ display }}
+                                        {% translate display %}
                                     </option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="col-12 col-sm-6 col-lg-3 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary me-2">Filter</button>
-                            <a href="{% url 'cashier:dashboard' %}" class="btn btn-outline-secondary">Clear</a>
+                            <button type="submit" class="btn btn-primary me-2">{% translate "Filter" %}</button>
+                            <a href="{% url 'cashier:dashboard' %}" class="btn btn-outline-secondary">{% translate "Clear" %}</a>
                         </div>
                     </form>
                 </div>
@@ -336,8 +347,8 @@ $(document).ready(function() {
             <!-- Orders Table -->
             <div class="card" style="border-radius: 0;">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">📋 Orders</h5>
-                    <span class="badge bg-info">{{ orders|length }} order{{ orders|length|pluralize }}</span>
+                    <h5 class="mb-0">📋 {% translate "Orders" %}</h5>
+                    <span class="badge bg-info">{% blocktranslate count counter=orders|length %}{{ counter }} order{% plural %}{{ counter }} orders{% endblocktranslate %}</span>
                 </div>
                 <div class="card-body">
                     {% if orders %}
@@ -345,15 +356,15 @@ $(document).ready(function() {
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>SN</th>
-                                        <th>Order #</th>
-                                        <th>Table</th>
-                                        <th>Items</th>
-                                        <th>Total</th>
-                                        <th>Paid</th>
-                                        <th>Balance</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
+                                        <th>{% translate "SN" %}</th>
+                                        <th>{% translate "Order #" %}</th>
+                                        <th>{% translate "Table" %}</th>
+                                        <th>{% translate "Items" %}</th>
+                                        <th>{% translate "Total" %}</th>
+                                        <th>{% translate "Paid" %}</th>
+                                        <th>{% translate "Balance" %}</th>
+                                        <th>{% translate "Status" %}</th>
+                                        <th>{% translate "Actions" %}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -366,16 +377,16 @@ $(document).ready(function() {
                                                 <small class="text-muted">{{ order.created_at|date:"M d, H:i" }}</small>
                                             </td>
                                             <td>
-                                                <span class="badge bg-secondary">{% if order.table_info %}Table {{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
+                                                <span class="badge bg-secondary">{% if order.table_info %}{% blocktranslate with n=order.table_info.tbl_no %}Table {{ n }}{% endblocktranslate %}{% else %}{% translate order.get_order_type_display %}{% endif %}</span>
                                             </td>
                                             <td>
-                                                <span class="badge bg-info">{{ order.get_total_products }} item{{ order.get_total_products|pluralize }}</span>
+                                                <span class="badge bg-info">{% blocktranslate count counter=order.get_total_products %}{{ counter }} item{% plural %}{{ counter }} items{% endblocktranslate %}</span>
                                                 <div class="small text-muted mt-1">
                                                     {% for item in order.order_items.all|slice:":2" %}
                                                         {{ item.quantity }}x {{ item.product.name }}<br>
                                                     {% endfor %}
                                                     {% if order.order_items.all|length > 2 %}
-                                                        <span class="text-muted">+ {{ order.order_items.all|length|add:"-2" }} more...</span>
+                                                        <span class="text-muted">{% blocktranslate with n=order.order_items.all|length|add:"-2" %}+ {{ n }} more...{% endblocktranslate %}</span>
                                                     {% endif %}
                                                 </div>
                                             </td>
@@ -394,17 +405,17 @@ $(document).ready(function() {
                                             </td>
                                             <td>
                                                 {% if order.payment_status == 'paid' %}
-                                                    <span class="badge bg-success">Paid</span>
+                                                    <span class="badge bg-success">{% translate "Paid" %}</span>
                                                 {% elif order.payment_status == 'partial' %}
-                                                    <span class="badge bg-warning">Partial</span>
+                                                    <span class="badge bg-warning">{% translate "Partial" %}</span>
                                                 {% else %}
-                                                    <span class="badge bg-danger">Unpaid</span>
+                                                    <span class="badge bg-danger">{% translate "Unpaid" %}</span>
                                                 {% endif %}
                                                 <br>
                                                 {% if order.status == 'cancelled' %}
-                                                    <span class="badge bg-secondary mt-1">Cancelled</span>
+                                                    <span class="badge bg-secondary mt-1">{% translate "Cancelled" %}</span>
                                                 {% else %}
-                                                    <span class="badge bg-primary mt-1">{{ order.get_status_display }}</span>
+                                                    <span class="badge bg-primary mt-1">{% translate order.get_status_display %}</span>
                                                 {% endif %}
                                             </td>
                                             <td>
@@ -413,33 +424,33 @@ $(document).ready(function() {
                                                     {% if order.status != 'cancelled' and order.balance_due > 0 %}
                                                         {% if 'process_payments' in feats %}
                                                         <button type="button" class="btn btn-success btn-sm" onclick="processPayment({{ order.id }})">
-                                                            💳 Pay
+                                                            💳 {% translate "Pay" %}
                                                         </button>
                                                         {% endif %}
                                                         {% if 'view_receipts' in feats %}
                                                         <button type="button" class="btn btn-secondary btn-sm" onclick="printBill({{ order.id }}, '{{ order.order_number }}')">
-                                                            🧾 Print Bill
+                                                            🧾 {% translate "Print Bill" %}
                                                         </button>
                                                         {% endif %}
                                                     {% endif %}
 
                                                     {% if order.total_paid > 0 %}
                                                         <button type="button" class="btn btn-info btn-sm" onclick="viewPaymentHistory({{ order.id }})">
-                                                            📊 History
+                                                            📊 {% translate "History" %}
                                                         </button>
                                                     {% endif %}
 
                                                     {% if order.status != 'cancelled' and order.total_paid == 0 %}
                                                         {% if 'cancel_orders' in feats %}
                                                         <button type="button" class="btn btn-danger btn-sm" onclick="cancelOrder({{ order.id }})">
-                                                            ❌ Cancel
+                                                            ❌ {% translate "Cancel" %}
                                                         </button>
                                                         {% endif %}
                                                     {% endif %}
                                                     {% if order.status != 'cancelled' and order.payment_status != 'paid' and order.table_info %}
                                                         {% if 'transfer_orders' in feats %}
                                                         <button type="button" class="btn btn-warning btn-sm" onclick="openTransferModal({{ order.id }}, '{{ order.order_number|escapejs }}', '{{ order.table_info.tbl_no|escapejs }}')">
-                                                            🔄 Transfer
+                                                            🔄 {% translate "Transfer" %}
                                                         </button>
                                                         {% endif %}
                                                     {% endif %}
@@ -455,8 +466,8 @@ $(document).ready(function() {
                         <div class="text-center py-5">
                             <div class="text-muted">
                                 <i class="fas fa-receipt fa-3x mb-3"></i>
-                                <h5>No orders found</h5>
-                                <p>No orders match your current filters.</p>
+                                <h5>{% translate "No orders found" %}</h5>
+                                <p>{% translate "No orders match your current filters." %}</p>
                             </div>
                         </div>
                     {% endif %}
@@ -471,14 +482,14 @@ $(document).ready(function() {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">💳 Process Payment</h5>
+                <h5 class="modal-title">💳 {% translate "Process Payment" %}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div id="paymentModalContent">
                     <div class="text-center">
                         <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                            <span class="visually-hidden">{% translate "Loading..." %}</span>
                         </div>
                     </div>
                 </div>
@@ -492,14 +503,14 @@ $(document).ready(function() {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">📊 Payment History</h5>
+                <h5 class="modal-title">📊 {% translate "Payment History" %}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div id="historyModalContent">
                     <div class="text-center">
                         <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                            <span class="visually-hidden">{% translate "Loading..." %}</span>
                         </div>
                     </div>
                 </div>
@@ -513,19 +524,19 @@ $(document).ready(function() {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">❌ Cancel Order</h5>
+                <h5 class="modal-title">❌ {% translate "Cancel Order" %}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to cancel this order?</p>
+                <p>{% translate "Are you sure you want to cancel this order?" %}</p>
                 <div class="mb-3">
-                    <label for="cancelReason" class="form-label">Reason for cancellation:</label>
-                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="Enter reason..."></textarea>
+                    <label for="cancelReason" class="form-label">{% translate "Reason for cancellation:" %}</label>
+                    <textarea class="form-control" id="cancelReason" rows="3" placeholder="{% translate "Enter reason..." %}"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-danger" id="confirmCancel">Cancel Order</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Close" %}</button>
+                <button type="button" class="btn btn-danger" id="confirmCancel">{% translate "Cancel Order" %}</button>
             </div>
         </div>
     </div>
@@ -536,38 +547,104 @@ $(document).ready(function() {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">🔄 Transfer Order to Another Table</h5>
+                <h5 class="modal-title">🔄 {% translate "Transfer Order to Another Table" %}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-3">Transferring <strong id="transferOrderNumber"></strong> from <strong>Table <span id="transferFromTable"></span></strong>.</p>
+                <p class="mb-3">{% translate "Transferring" %} <strong id="transferOrderNumber"></strong> {% translate "from" context "transfer order from table" %} <strong>{% translate "Table" %} <span id="transferFromTable"></span></strong>.</p>
                 <div class="mb-3">
-                    <label for="transferTargetTable" class="form-label">Move to Table:</label>
+                    <label for="transferTargetTable" class="form-label">{% translate "Move to Table:" %}</label>
                     <select class="form-select" id="transferTargetTable">
-                        <option value="">-- Select destination table --</option>
+                        <option value="">{% translate "-- Select destination table --" %}</option>
                         {% for table in tables %}
-                            <option value="{{ table.id }}" data-available="{{ table.is_available|yesno:'true,false' }}">Table {{ table.tbl_no }}{% if not table.is_available %} (Occupied){% endif %}</option>
+                            <option value="{{ table.id }}" data-available="{{ table.is_available|yesno:'true,false' }}">{% blocktranslate with n=table.tbl_no %}Table {{ n }}{% endblocktranslate %}{% if not table.is_available %} {% translate "(Occupied)" %}{% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div id="transferOccupiedWarning" class="alert alert-warning d-none">
-                    ⚠️ This table is currently occupied. The order will still be transferred.
+                    ⚠️ {% translate "This table is currently occupied. The order will still be transferred." %}
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-warning" id="confirmTransfer">Transfer Order</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                <button type="button" class="btn btn-warning" id="confirmTransfer">{% translate "Transfer Order" %}</button>
             </div>
         </div>
     </div>
 </div>
 
+{% autoescape off %}
+{% translate "Print bill for order #{number}?" as t_print_bill_confirm %}
+{% translate "Error" as t_error %}
+{% translate "Bill print failed" as t_bill_failed %}
+{% translate "An error occurred while printing the bill" as t_bill_error %}
+{% translate "Order Details" as t_order_details %}
+{% translate "Order:" as t_order_colon %}
+{% translate "Table:" as t_table_colon %}
+{% translate "Total:" as t_total_colon %}
+{% translate "Balance Due:" as t_balance_due_colon %}
+{% translate "Payment Amount" as t_payment_amount %}
+{% translate "Payment Method" as t_payment_method %}
+{% translate "Cash" as t_cash %}
+{% translate "Card" as t_card %}
+{% translate "Digital Payment" as t_digital %}
+{% translate "Voucher" as t_voucher %}
+{% translate "Reference Number (Optional)" as t_reference_optional %}
+{% translate "Transaction ref, check #, etc." as t_reference_placeholder %}
+{% translate "Notes (Optional)" as t_notes_optional %}
+{% translate "Additional notes..." as t_additional_notes %}
+{% translate "Split Bill - Select Individual Items" as t_split_bill %}
+{% translate "Select Items to Pay:" as t_select_items %}
+{% translate "Item" as t_item %}
+{% translate "Price" as t_price %}
+{% translate "Remaining" as t_remaining %}
+{% translate "Pay Qty" as t_pay_qty %}
+{% translate "Amount" as t_amount %}
+{% translate "Cancel" as t_cancel %}
+{% translate "Process Payment" as t_process_payment %}
+{% translate "Error loading payment form" as t_payment_form_error %}
+{% translate "Loyalty points" as t_loyalty_points %}
+{% translate "{points} points, worth {amount}" as t_points_worth %}
+{% translate "Customer's code" as t_customer_code %}
+{% translate "Customer's points code" as t_customer_points_code %}
+{% translate "Pay {amount} with {points} points" as t_pay_with_points %}
+{% translate "The customer finds the code in their app or on the web under 'My Points'." as t_code_hint %}
+{% translate "Points can be used from {points} points. This order will earn points when fully paid." as t_points_min_hint %}
+{% translate "Registered customer? Enter their phone number so they earn points." as t_registered_hint %}
+{% translate "Customer phone" as t_customer_phone %}
+{% translate "Link" as t_link %}
+{% translate "Connection error." as t_connection_error %}
+{% translate "Payment processed successfully!" as t_payment_success %}
+{% translate "Payment processing failed. Please try again." as t_payment_failed %}
+{% translate "Connection error. Please refresh the page and try again." as t_connection_refresh %}
+{% translate "Date" as t_date %}
+{% translate "Method" as t_method %}
+{% translate "Processed By" as t_processed_by %}
+{% translate "Status" as t_status %}
+{% translate "Actions" as t_actions %}
+{% translate "VOIDED" as t_voided %}
+{% translate "ACTIVE" as t_active %}
+{% translate "Void" as t_void %}
+{% translate "Receipt" as t_receipt %}
+{% translate "View Receipt" as t_view_receipt %}
+{% translate "Error loading payment history" as t_history_error %}
+{% translate "Enter reason for voiding this payment:" as t_void_reason_prompt %}
+{% translate "Refund method (cash/card/digital/voucher):" as t_refund_method_prompt %}
+{% translate "Error voiding payment" as t_void_error %}
+{% translate "Error cancelling order" as t_cancel_error %}
+{% translate "Order #{number}" as t_order_n %}
+{% translate "Please select a destination table." as t_select_destination %}
+{% translate "Error transferring order" as t_transfer_error %}
+{% translate "Your session has expired. Please log in again." as t_session_expired %}
+{% translate "Too many requests. Please wait a moment and try again." as t_rate_limited %}
+{% translate "Access denied. Please refresh the page and try again." as t_access_denied %}
+{% endautoescape %}
 <script>
 let currentOrderId = null;
 let currentPaymentId = null;
 
 function printBill(orderId, orderNumber) {
-    if (!confirm(`Print bill for Order #${orderNumber}?`)) {
+    if (!confirm("{{ t_print_bill_confirm|escapejs }}".replace('{number}', () => orderNumber))) {
         return;
     }
     
@@ -584,15 +661,15 @@ function printBill(orderId, orderNumber) {
         if (data.success) {
             alert(data.message);
         } else if (data.error) {
-            alert('Error: ' + data.error);
+            alert("{{ t_error|escapejs }}" + ': ' + data.error);
         } else {
-            alert(data.message || 'Bill print failed');
+            alert(data.message || "{{ t_bill_failed|escapejs }}");
         }
     })
     .catch(error => {
         if (error.message === 'session_expired' || error.message === 'access_denied' || error.message === 'rate_limited') return;
         console.error('Error:', error);
-        alert('An error occurred while printing the bill');
+        alert("{{ t_bill_error|escapejs }}");
     });
 }
 
@@ -604,21 +681,21 @@ function processPayment(orderId) {
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert('Error: ' + data.error);
+                alert("{{ t_error|escapejs }}" + ': ' + data.error);
                 return;
             }
             
             document.getElementById('paymentModalContent').innerHTML = `
                 <div class="order-summary mb-4">
-                    <h6>Order Details</h6>
+                    <h6>{{ t_order_details|escapejs }}</h6>
                     <div class="row">
                         <div class="col-sm-6">
-                            <strong>Order:</strong> ${data.order_number}<br>
-                            <strong>Table:</strong> ${data.table_number}
+                            <strong>{{ t_order_colon|escapejs }}</strong> ${data.order_number}<br>
+                            <strong>{{ t_table_colon|escapejs }}</strong> ${data.table_number}
                         </div>
                         <div class="col-sm-6 text-end">
-                            <strong>Total:</strong> ${CURRENCY_SYMBOL}${data.total_amount}<br>
-                            <strong>Balance Due:</strong> <span class="text-danger">${CURRENCY_SYMBOL}${data.balance_due}</span>
+                            <strong>{{ t_total_colon|escapejs }}</strong> ${CURRENCY_SYMBOL}${data.total_amount}<br>
+                            <strong>{{ t_balance_due_colon|escapejs }}</strong> <span class="text-danger">${CURRENCY_SYMBOL}${data.balance_due}</span>
                         </div>
                     </div>
                 </div>
@@ -626,32 +703,32 @@ function processPayment(orderId) {
                 <form id="paymentForm">
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="paymentAmount" class="form-label">Payment Amount</label>
+                            <label for="paymentAmount" class="form-label">{{ t_payment_amount|escapejs }}</label>
                             <input type="number" class="form-control" id="paymentAmount" 
                                    step="0.01" min="0.01" max="${data.balance_due}" 
                                    value="${data.balance_due}" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="paymentMethod" class="form-label">Payment Method</label>
+                            <label for="paymentMethod" class="form-label">{{ t_payment_method|escapejs }}</label>
                             <select class="form-select" id="paymentMethod" required>
-                                <option value="cash">Cash</option>
-                                <option value="card">Card</option>
-                                <option value="digital">Digital Payment</option>
-                                <option value="voucher">Voucher</option>
+                                <option value="cash">{{ t_cash|escapejs }}</option>
+                                <option value="card">{{ t_card|escapejs }}</option>
+                                <option value="digital">{{ t_digital|escapejs }}</option>
+                                <option value="voucher">{{ t_voucher|escapejs }}</option>
                             </select>
                         </div>
                     </div>
                     
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="referenceNumber" class="form-label">Reference Number (Optional)</label>
+                            <label for="referenceNumber" class="form-label">{{ t_reference_optional|escapejs }}</label>
                             <input type="text" class="form-control" id="referenceNumber" 
-                                   placeholder="Transaction ref, check #, etc.">
+                                   placeholder="{{ t_reference_placeholder|escapejs }}">
                         </div>
                         <div class="col-md-6">
-                            <label for="paymentNotes" class="form-label">Notes (Optional)</label>
+                            <label for="paymentNotes" class="form-label">{{ t_notes_optional|escapejs }}</label>
                             <input type="text" class="form-control" id="paymentNotes" 
-                                   placeholder="Additional notes...">
+                                   placeholder="{{ t_additional_notes|escapejs }}">
                         </div>
                     </div>
                     
@@ -661,21 +738,21 @@ function processPayment(orderId) {
                     <div class="mb-3">
                         <label class="form-label">
                             <input type="checkbox" id="splitBill" onchange="toggleSplitBill()">
-                            Split Bill - Select Individual Items
+                            {{ t_split_bill|escapejs }}
                         </label>
                     </div>
                     
                     <div id="itemSelection" style="display: none;">
-                        <h6>Select Items to Pay:</h6>
+                        <h6>{{ t_select_items|escapejs }}</h6>
                         <div class="table-responsive">
                             <table class="table table-sm">
                                 <thead>
                                     <tr>
-                                        <th>Item</th>
-                                        <th>Price</th>
-                                        <th>Remaining</th>
-                                        <th>Pay Qty</th>
-                                        <th>Amount</th>
+                                        <th>{{ t_item|escapejs }}</th>
+                                        <th>{{ t_price|escapejs }}</th>
+                                        <th>{{ t_remaining|escapejs }}</th>
+                                        <th>{{ t_pay_qty|escapejs }}</th>
+                                        <th>{{ t_amount|escapejs }}</th>
                                     </tr>
                                 </thead>
                                 <tbody id="itemsTable">
@@ -699,8 +776,8 @@ function processPayment(orderId) {
                     </div>
                     
                     <div class="d-flex justify-content-between">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success">Process Payment</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t_cancel|escapejs }}</button>
+                        <button type="submit" class="btn btn-success">{{ t_process_payment|escapejs }}</button>
                     </div>
                 </form>
             `;
@@ -716,7 +793,7 @@ function processPayment(orderId) {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error loading payment form');
+            alert("{{ t_payment_form_error|escapejs }}");
         });
 }
 
@@ -731,14 +808,15 @@ function loadLoyalty(orderId, balanceDue, info) {
         box.className = 'border rounded p-2 small';
         const title = document.createElement('div');
         title.className = 'fw-semibold mb-1';
-        title.innerHTML = '<i class="fas fa-gift me-1"></i>Loyalty points';
+        title.innerHTML = '<i class="fas fa-gift me-1"></i>';
+        title.appendChild(document.createTextNode("{{ t_loyalty_points|escapejs }}"));
         box.appendChild(title);
         const method = document.getElementById('paymentMethod');
         let opt = method.querySelector('option[value="loyalty"]');
         if (d.customer) {
             const c = d.customer;
             const line = document.createElement('div');
-            line.textContent = `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}: ${c.points} points, worth ${CURRENCY_SYMBOL}${c.worth}`;
+            line.textContent = `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}: ` + "{{ t_points_worth|escapejs }}".replace('{points}', () => c.points).replace('{amount}', () => `${CURRENCY_SYMBOL}${c.worth}`);
             box.appendChild(line);
             const value = parseFloat(d.point_value);
             const usable = Math.min(balanceDue, parseFloat(c.worth));
@@ -747,7 +825,7 @@ function loadLoyalty(orderId, balanceDue, info) {
                 if (!opt) {
                     opt = document.createElement('option');
                     opt.value = 'loyalty';
-                    opt.textContent = 'Loyalty points';
+                    opt.textContent = "{{ t_loyalty_points|escapejs }}";
                     method.appendChild(opt);
                 }
                 const row = document.createElement('div');
@@ -758,12 +836,12 @@ function loadLoyalty(orderId, balanceDue, info) {
                 code.style.width = '140px';
                 code.inputMode = 'numeric';
                 code.maxLength = 6;
-                code.placeholder = "Customer's code";
-                code.setAttribute('aria-label', "Customer's points code");
+                code.placeholder = "{{ t_customer_code|escapejs }}";
+                code.setAttribute('aria-label', "{{ t_customer_points_code|escapejs }}");
                 const use = document.createElement('button');
                 use.type = 'button';
                 use.className = 'btn btn-sm btn-outline-success';
-                use.textContent = `Pay ${CURRENCY_SYMBOL}${usable.toFixed(2)} with ${needed} points`;
+                use.textContent = "{{ t_pay_with_points|escapejs }}".replace('{amount}', () => `${CURRENCY_SYMBOL}${usable.toFixed(2)}`).replace('{points}', () => needed);
                 use.onclick = () => {
                     method.value = 'loyalty';
                     document.getElementById('paymentAmount').value = usable.toFixed(2);
@@ -776,30 +854,30 @@ function loadLoyalty(orderId, balanceDue, info) {
                 box.appendChild(row);
                 const hint = document.createElement('div');
                 hint.className = 'text-muted';
-                hint.textContent = "The customer finds the code in their app or on the web under 'My Points'.";
+                hint.textContent = "{{ t_code_hint|escapejs }}";
                 box.appendChild(hint);
             } else {
                 const hint = document.createElement('div');
                 hint.className = 'text-muted';
-                hint.textContent = `Points can be used from ${d.min_redeem_points} points. This order will earn points when fully paid.`;
+                hint.textContent = "{{ t_points_min_hint|escapejs }}".replace('{points}', () => d.min_redeem_points);
                 box.appendChild(hint);
             }
         } else {
             const hint = document.createElement('div');
             hint.className = 'text-muted mb-1';
-            hint.textContent = 'Registered customer? Enter their phone number so they earn points.';
+            hint.textContent = "{{ t_registered_hint|escapejs }}";
             box.appendChild(hint);
             const row = document.createElement('div');
             row.className = 'd-flex gap-1';
             const phone = document.createElement('input');
             phone.type = 'tel';
             phone.className = 'form-control form-control-sm';
-            phone.placeholder = 'Customer phone';
-            phone.setAttribute('aria-label', 'Customer phone');
+            phone.placeholder = "{{ t_customer_phone|escapejs }}";
+            phone.setAttribute('aria-label', "{{ t_customer_phone|escapejs }}");
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn btn-sm btn-outline-primary';
-            btn.textContent = 'Link';
+            btn.textContent = "{{ t_link|escapejs }}";
             btn.onclick = () => {
                 btn.disabled = true;
                 fetch(`/cashier/order-loyalty/${orderId}/`, {
@@ -809,7 +887,7 @@ function loadLoyalty(orderId, balanceDue, info) {
                 })
                 .then(r => r.json())
                 .then(res => { if (res.error) { alert(res.error); btn.disabled = false; } else { render(res); } })
-                .catch(() => { alert('Connection error.'); btn.disabled = false; });
+                .catch(() => { alert("{{ t_connection_error|escapejs }}"); btn.disabled = false; });
             };
             row.appendChild(phone);
             row.appendChild(btn);
@@ -895,10 +973,10 @@ function submitPayment() {
     .then(data => {
         if (!data) return;
         if (data.success) {
-            alert('Payment processed successfully!');
+            alert("{{ t_payment_success|escapejs }}");
             location.reload();
         } else {
-            alert(data.error || 'Payment processing failed. Please try again.');
+            alert(data.error || "{{ t_payment_failed|escapejs }}");
             if (data.error && data.error.toLowerCase().includes('already fully paid')) {
                 location.reload();
             }
@@ -907,7 +985,7 @@ function submitPayment() {
     .catch(error => {
         if (error.message === 'session_expired' || error.message === 'access_denied' || error.message === 'rate_limited') return;
         console.error('Error:', error);
-        alert('Connection error. Please refresh the page and try again.');
+        alert("{{ t_connection_refresh|escapejs }}");
     });
 }
 
@@ -919,22 +997,22 @@ function viewPaymentHistory(orderId) {
         .then(data => {
             if (!data) return;
             if (data.error) {
-                alert('Error: ' + data.error);
+                alert("{{ t_error|escapejs }}" + ': ' + data.error);
                 return;
             }
             
             document.getElementById('historyModalContent').innerHTML = `
-                <h6>Order: ${data.order_number}</h6>
+                <h6>{{ t_order_colon|escapejs }} ${data.order_number}</h6>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Amount</th>
-                                <th>Method</th>
-                                <th>Processed By</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th>{{ t_date|escapejs }}</th>
+                                <th>{{ t_amount|escapejs }}</th>
+                                <th>{{ t_method|escapejs }}</th>
+                                <th>{{ t_processed_by|escapejs }}</th>
+                                <th>{{ t_status|escapejs }}</th>
+                                <th>{{ t_actions|escapejs }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -946,17 +1024,17 @@ function viewPaymentHistory(orderId) {
                                     <td>${payment.processed_by}</td>
                                     <td>
                                         ${payment.is_voided ? 
-                                            '<span class="badge bg-secondary">VOIDED</span>' : 
-                                            '<span class="badge bg-success">ACTIVE</span>'
+                                            '<span class="badge bg-secondary">' + "{{ t_voided|escapejs }}" + '</span>' : 
+                                            '<span class="badge bg-success">' + "{{ t_active|escapejs }}" + '</span>'
                                         }
                                     </td>
                                     <td>
                                         ${!payment.is_voided ?
                                             `<div class="btn-group btn-group-sm">
-                                                ${CAN_VOID ? `<button class="btn btn-danger" onclick="voidPayment(${payment.id}, ${payment.payment_method === 'loyalty'})">Void</button>` : ''}
-                                                ${CAN_PRINT_RECEIPT ? `<button class="btn btn-info" onclick="generateReceipt(${payment.id})">Receipt</button>` : ''}
+                                                ${CAN_VOID ? `<button class="btn btn-danger" onclick="voidPayment(${payment.id}, ${payment.payment_method === 'loyalty'})">{{ t_void|escapejs }}</button>` : ''}
+                                                ${CAN_PRINT_RECEIPT ? `<button class="btn btn-info" onclick="generateReceipt(${payment.id})">{{ t_receipt|escapejs }}</button>` : ''}
                                             </div>` :
-                                            `${CAN_PRINT_RECEIPT ? `<button class="btn btn-sm btn-secondary" onclick="generateReceipt(${payment.id})">View Receipt</button>` : ''}`
+                                            `${CAN_PRINT_RECEIPT ? `<button class="btn btn-sm btn-secondary" onclick="generateReceipt(${payment.id})">{{ t_view_receipt|escapejs }}</button>` : ''}`
                                         }
                                     </td>
                                 </tr>
@@ -971,16 +1049,16 @@ function viewPaymentHistory(orderId) {
         .catch(error => {
             if (error.message === 'session_expired' || error.message === 'access_denied' || error.message === 'rate_limited') return;
             console.error('Error:', error);
-            alert('Error loading payment history');
+            alert("{{ t_history_error|escapejs }}");
         });
 }
 
 function voidPayment(paymentId, isLoyalty) {
-    const reason = prompt('Enter reason for voiding this payment:');
+    const reason = prompt("{{ t_void_reason_prompt|escapejs }}");
     if (!reason) return;
 
     // Points payments: the points go back to the customer automatically — no money is refunded
-    const refundMethod = isLoyalty ? 'loyalty' : prompt('Refund method (cash/card/digital/voucher):', 'cash');
+    const refundMethod = isLoyalty ? 'loyalty' : prompt("{{ t_refund_method_prompt|escapejs }}", 'cash');
     if (!refundMethod) return;
     
     fetch(`/cashier/void-payment/${paymentId}/`, {
@@ -1001,13 +1079,13 @@ function voidPayment(paymentId, isLoyalty) {
             alert(data.message);
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            alert("{{ t_error|escapejs }}" + ': ' + data.error);
         }
     })
     .catch(error => {
         if (error.message === 'session_expired' || error.message === 'access_denied' || error.message === 'rate_limited') return;
         console.error('Error:', error);
-        alert('Error voiding payment');
+        alert("{{ t_void_error|escapejs }}");
     });
 }
 
@@ -1036,13 +1114,13 @@ function cancelOrder(orderId) {
                 alert(data.message);
                 location.reload();
             } else {
-                alert('Error: ' + data.error);
+                alert("{{ t_error|escapejs }}" + ': ' + data.error);
             }
         })
         .catch(error => {
             if (error.message === 'session_expired' || error.message === 'access_denied' || error.message === 'rate_limited') return;
             console.error('Error:', error);
-            alert('Error cancelling order');
+            alert("{{ t_cancel_error|escapejs }}");
         });
     };
 }
@@ -1056,7 +1134,7 @@ let transferOrderId = null;
 
 function openTransferModal(orderId, orderNumber, fromTable) {
     transferOrderId = orderId;
-    document.getElementById('transferOrderNumber').textContent = 'Order #' + orderNumber;
+    document.getElementById('transferOrderNumber').textContent = "{{ t_order_n|escapejs }}".replace('{number}', () => orderNumber);
     document.getElementById('transferFromTable').textContent = fromTable;
     document.getElementById('transferTargetTable').value = '';
     document.getElementById('transferOccupiedWarning').classList.add('d-none');
@@ -1077,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('confirmTransfer').addEventListener('click', function() {
         const targetTableId = document.getElementById('transferTargetTable').value;
         if (!targetTableId) {
-            alert('Please select a destination table.');
+            alert("{{ t_select_destination|escapejs }}");
             return;
         }
         fetch(`/cashier/transfer-table/${transferOrderId}/`, {
@@ -1095,29 +1173,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert(data.message);
                 location.reload();
             } else {
-                alert('Error: ' + data.error);
+                alert("{{ t_error|escapejs }}" + ': ' + data.error);
             }
         })
         .catch(error => {
             if (error.message === 'session_expired' || error.message === 'access_denied' || error.message === 'rate_limited') return;
             console.error('Error:', error);
-            alert('Error transferring order');
+            alert("{{ t_transfer_error|escapejs }}");
         });
     });
 });
 
 function handleCashierResponse(response) {
     if (response.status === 401) {
-        alert('Your session has expired. Please log in again.');
+        alert("{{ t_session_expired|escapejs }}");
         window.location.href = '/accounts/login/';
         throw new Error('session_expired');
     }
     if (response.status === 429) {
-        alert('Too many requests. Please wait a moment and try again.');
+        alert("{{ t_rate_limited|escapejs }}");
         throw new Error('rate_limited');
     }
     if (response.status === 403) {
-        alert('Access denied. Please refresh the page and try again.');
+        alert("{{ t_access_denied|escapejs }}");
         location.reload();
         throw new Error('access_denied');
     }
@@ -1154,9 +1232,9 @@ document.addEventListener('submit', function(e) {
         <div class="modal-content">
             <div class="modal-header bg-gradient-danger text-white">
                 <h5 class="modal-title" id="wasteRecordModalLabel">
-                    <i class="fas fa-trash-alt me-2"></i>Record Food Waste
+                    <i class="fas fa-trash-alt me-2"></i>{% translate "Record Food Waste" %}
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body">
                 <form id="wasteRecordForm">
@@ -1164,9 +1242,9 @@ document.addEventListener('submit', function(e) {
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="product" class="form-label">Product <span class="text-danger">*</span></label>
+                                <label for="product" class="form-label">{% translate "Product" %} <span class="text-danger">*</span></label>
                                 <select class="form-select" id="product" name="product" required>
-                                    <option value="">Select a product...</option>
+                                    <option value="">{% translate "Select a product..." %}</option>
                                     {% for product in waste_products %}
                                         <option value="{{ product.id }}">{{ product.name }} - {% currency_symbol %}{{ product.price }}</option>
                                     {% endfor %}
@@ -1175,7 +1253,7 @@ document.addEventListener('submit', function(e) {
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="quantity" class="form-label">Quantity Wasted <span class="text-danger">*</span></label>
+                                <label for="quantity" class="form-label">{% translate "Quantity Wasted" %} <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
                             </div>
                         </div>
@@ -1184,52 +1262,52 @@ document.addEventListener('submit', function(e) {
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="dash_waste_reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                                <label for="dash_waste_reason" class="form-label">{% translate "Reason" %} <span class="text-danger">*</span></label>
                                 <select class="form-select" id="dash_waste_reason" name="waste_reason" required>
-                                    <option value="">Select reason...</option>
-                                    <option value="customer_refused">Customer Refused</option>
-                                    <option value="customer_left">Customer Left Before Pickup</option>
-                                    <option value="wrong_order">Wrong Order Made</option>
-                                    <option value="quality_issue">Quality Issue</option>
-                                    <option value="kitchen_error">Kitchen Error</option>
-                                    <option value="overcooking">Overcooking</option>
-                                    <option value="undercooking">Undercooking</option>
-                                    <option value="contamination">Food Contamination</option>
-                                    <option value="other">Other Reason</option>
+                                    <option value="">{% translate "Select reason..." %}</option>
+                                    <option value="customer_refused">{% translate "Customer Refused" %}</option>
+                                    <option value="customer_left">{% translate "Customer Left Before Pickup" %}</option>
+                                    <option value="wrong_order">{% translate "Wrong Order Made" %}</option>
+                                    <option value="quality_issue">{% translate "Quality Issue" %}</option>
+                                    <option value="kitchen_error">{% translate "Kitchen Error" %}</option>
+                                    <option value="overcooking">{% translate "Overcooking" %}</option>
+                                    <option value="undercooking">{% translate "Undercooking" %}</option>
+                                    <option value="contamination">{% translate "Food Contamination" %}</option>
+                                    <option value="other">{% translate "Other Reason" %}</option>
                                 </select>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="disposal_method" class="form-label">Disposal Method</label>
+                                <label for="disposal_method" class="form-label">{% translate "Disposal Method" %}</label>
                                 <select class="form-select" id="disposal_method" name="disposal_method">
-                                    <option value="waste_bin">Waste Bin</option>
-                                    <option value="staff_meal">Staff Meal</option>
-                                    <option value="compost">Compost</option>
-                                    <option value="donated">Donated</option>
+                                    <option value="waste_bin">{% translate "Waste Bin" %}</option>
+                                    <option value="staff_meal">{% translate "Staff Meal" %}</option>
+                                    <option value="compost">{% translate "Compost" %}</option>
+                                    <option value="donated">{% translate "Donated" %}</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="notes" class="form-label">Notes (Optional)</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional details about the waste incident..."></textarea>
+                        <label for="notes" class="form-label">{% translate "Notes (Optional)" %}</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="{% translate "Additional details about the waste incident..." %}"></textarea>
                     </div>
                 </form>
                 
                 <!-- Recent Records -->
                 <div class="mt-4">
-                    <h6 class="border-bottom pb-2 mb-3">Recent Records</h6>
+                    <h6 class="border-bottom pb-2 mb-3">{% translate "Recent Records" %}</h6>
                     <div id="recentRecords">
-                        <p class="text-muted">Your recent waste records will appear here...</p>
+                        <p class="text-muted">{% translate "Your recent waste records will appear here..." %}</p>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Close" %}</button>
                 <button type="button" class="btn btn-danger" id="submitWasteForm">
-                    <i class="fas fa-save me-1"></i> Record Waste
+                    <i class="fas fa-save me-1"></i> {% translate "Record Waste" %}
                 </button>
             </div>
         </div>
@@ -1242,16 +1320,16 @@ document.addEventListener('submit', function(e) {
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">
-                    <i class="fas fa-check-circle me-2"></i>Success
+                    <i class="fas fa-check-circle me-2"></i>{% translate "Success" %}
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body text-center">
-                <p>Waste recorded successfully!</p>
+                <p>{% translate "Waste recorded successfully!" %}</p>
                 <div id="wasteSuccessDetails" class="mt-3"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">{% translate "OK" %}</button>
             </div>
         </div>
     </div>

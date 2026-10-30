@@ -1,5 +1,6 @@
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,9 +72,9 @@
         
         .SERVICE-header {
             text-align: center;
-            border-SERVICEtom: 2px dashed #1e90ff;
-            padding-SERVICEtom: 10px;
-            margin-SERVICEtom: 10px;
+            border-bottom: 2px dashed #1e90ff;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
         }
         
         .SERVICE-title {
@@ -127,17 +128,17 @@
         .SERVICE-item {
             margin: 8px 0;
             padding: 5px 0;
-            border-SERVICEtom: 1px dotted #ccc;
+            border-bottom: 1px dotted #ccc;
         }
         
         .SERVICE-item:last-child {
-            border-SERVICEtom: none;
+            border-bottom: none;
         }
         
         .item-qty-name {
             font-size: 16px;
             font-weight: bold;
-            margin-SERVICEtom: 3px;
+            margin-bottom: 3px;
         }
         
         .item-notes {
@@ -160,7 +161,7 @@
         .special-instructions-title {
             font-size: 16px;
             text-decoration: underline;
-            margin-SERVICEtom: 5px;
+            margin-bottom: 5px;
         }
         
         .SERVICE-footer {
@@ -222,46 +223,46 @@
 <body>
     <div class="print-buttons no-print">
         <button class="print-btn" onclick="window.print()">
-            🖨️ Print SERVICE
+            🖨️ {% translate "Print" %} SERVICE
         </button>
         <button class="print-btn back-btn" onclick="window.location.href='{% url 'orders:service_dashboard' %}'">
-            ← Back to Service Dashboard
+            ← {% translate "Back to Service Dashboard" %}
         </button>
     </div>
 
     <div class="SERVICE-container">
         <!-- Header -->
         <div class="SERVICE-header">
-            <div class="SERVICE-title">SERVICE ORDER TICKET</div>
+            <div class="SERVICE-title">{% translate "SERVICE ORDER TICKET" %}</div>
             <div class="restaurant-name">{{ restaurant_name|upper }}</div>
-            <span class="station-badge">SERVICE STATION</span>
+            <span class="station-badge">{% translate "SERVICE STATION" %}</span>
         </div>
 
         <!-- Order Information -->
         <div class="SERVICE-info">
             <div class="SERVICE-info-row">
-                <span class="SERVICE-info-label">Order #:</span>
+                <span class="SERVICE-info-label">{% translate "Order #:" %}</span>
                 <span>{{ order.order_number }}</span>
             </div>
             <div class="SERVICE-info-row">
-                <span class="SERVICE-info-label">Table:</span>
+                <span class="SERVICE-info-label">{% translate "Table:" %}</span>
                 <span>{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
             </div>
             <div class="SERVICE-info-row">
-                <span class="SERVICE-info-label">Customer:</span>
+                <span class="SERVICE-info-label">{% translate "Customer:" %}</span>
                 <span>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</span>
             </div>
             <div class="SERVICE-info-row">
-                <span class="SERVICE-info-label">Status:</span>
+                <span class="SERVICE-info-label">{% translate "Status:" %}</span>
                 <span>{{ order.get_status_display|upper }}</span>
             </div>
             <div class="SERVICE-info-row">
-                <span class="SERVICE-info-label">Order Time:</span>
+                <span class="SERVICE-info-label">{% translate "Order Time:" %}</span>
                 <span>{{ order.created_at|date:"d/m/Y H:i" }}</span>
             </div>
             {% if order.confirmed_by %}
             <div class="SERVICE-info-row">
-                <span class="SERVICE-info-label">Confirmed By:</span>
+                <span class="SERVICE-info-label">{% translate "Confirmed By:" %}</span>
                 <span>{{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</span>
             </div>
             {% endif %}
@@ -271,7 +272,7 @@
 
         <!-- Service Items -->
         <div class="SERVICE-items">
-            <div class="SERVICE-items-title">SERVICE ITEMS</div>
+            <div class="SERVICE-items-title">{% translate "SERVICE ITEMS" %}</div>
             {% for item in order.order_items.all %}
                 {% if item.product.station == 'service' %}
                     <div class="SERVICE-item">
@@ -291,7 +292,7 @@
         {% if order.display_instructions %}
         <div class="SERVICE-divider"></div>
         <div class="special-instructions">
-            <div class="special-instructions-title">⚠️ SPECIAL INSTRUCTIONS</div>
+            <div class="special-instructions-title">⚠️ {% translate "SPECIAL INSTRUCTIONS" %}</div>
             {{ order.display_instructions }}
         </div>
         {% endif %}
@@ -300,10 +301,10 @@
 
         <!-- Footer -->
         <div class="SERVICE-footer">
-            <div>SERVICE STATION - PRIORITY ORDER</div>
-            <div class="SERVICE-time">Printed: {{ now|date:"d/m/Y H:i:s" }}</div>
+            <div>{% translate "SERVICE STATION - PRIORITY ORDER" %}</div>
+            <div class="SERVICE-time">{% blocktranslate with time=now|date:"d/m/Y H:i:s" %}Printed: {{ time }}{% endblocktranslate %}</div>
             <div style="margin-top: 10px; font-size: 10px;">
-                Thank you for your service! 🛎️
+                {% translate "Thank you for your service!" %} 🛎️
             </div>
         </div>
     </div>

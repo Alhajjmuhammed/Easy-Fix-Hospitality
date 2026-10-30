@@ -1,10 +1,10 @@
 {% extends 'admin_panel/base.html' %}
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 
-{% block title %}Manage Products - Admin Panel{% endblock %}
+{% block title %}{% translate "Manage Products" %} - {% translate "Admin Panel" %}{% endblock %}
 
-{% block page_title %}Product Management{% endblock %}
-{% block page_description %}Manage your restaurant's menu items{% endblock %}
+{% block page_title %}{% translate "Product Management" %}{% endblock %}
+{% block page_description %}{% translate "Manage your restaurant's menu items" %}{% endblock %}
 
 {% block extra_head %}
 <!-- CSRF disabled for development -->
@@ -87,25 +87,25 @@
                 <!-- Search Input -->
                 <div class="col-12 col-sm-6 col-lg-4">
                     <label for="productSearch" class="form-label">
-                        <i class="fas fa-search"></i> Search Products
+                        <i class="fas fa-search"></i> {% translate "Search Products" %}
                     </label>
                     <div class="input-group">
                         <input type="text" class="form-control" id="productSearch" name="search" 
-                               value="{{ request.GET.search }}" placeholder="Search by product name...">
+                               value="{{ request.GET.search }}" placeholder="{% translate "Search by product name..." %}">
                         <span class="input-group-text">
                             <i class="fas fa-search"></i>
                         </span>
                     </div>
-                    <small class="text-muted">Press ESC to clear search</small>
+                    <small class="text-muted">{% translate "Press ESC to clear search" %}</small>
                 </div>
 
                 <!-- Restaurant Filter -->
                 <div class="col-12 col-sm-6 col-lg-3">
                     <label for="restaurantFilter" class="form-label">
-                        <i class="fas fa-building"></i> Restaurant
+                        <i class="fas fa-building"></i> {% translate "Restaurant" %}
                     </label>
                     <select class="form-select" id="restaurantFilter" name="restaurant">
-                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>{% translate "All Restaurants" %}</option>
                         {% for restaurant in accessible_restaurants %}
                         <option value="{{ restaurant.id }}" 
                             {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
@@ -120,10 +120,10 @@
                 <!-- Category Filter -->
                 <div class="col-12 col-sm-6 col-lg-3">
                     <label for="categoryFilter" class="form-label">
-                        <i class="fas fa-folder"></i> Category
+                        <i class="fas fa-folder"></i> {% translate "Category" %}
                     </label>
                     <select class="form-select" id="categoryFilter" name="category">
-                        <option value="">All Categories</option>
+                        <option value="">{% translate "All Categories" %}</option>
                         {% for category in all_main_categories %}
                         <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:'s' %}selected{% endif %}>
                             {{ category.name }}
@@ -135,7 +135,7 @@
                 <!-- Items Per Page -->
                 <div class="col-12 col-sm-6 col-lg-2">
                     <label for="perPageSelect" class="form-label">
-                        <i class="fas fa-list"></i> Per Page
+                        <i class="fas fa-list"></i> {% translate "Per Page" %}
                     </label>
                     <select class="form-select" id="perPageSelect" name="per_page">
                         <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
@@ -149,7 +149,7 @@
             <!-- Results Summary -->
             <div class="mt-3">
                 <div class="text-muted">
-                    Showing products by category
+                    {% translate "Showing products by category" %}
                 </div>
             </div>
         </form>
@@ -160,60 +160,60 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex gap-2">
         <button class="btn btn-primary btn-modern" data-bs-toggle="modal" data-bs-target="#addProductModal">
-            <i class="fas fa-plus me-2"></i>Add New Product
+            <i class="fas fa-plus me-2"></i>{% translate "Add New Product" %}
         </button>
         
         <!-- Bulk Actions (initially hidden) -->
         <div id="bulkActions" class="d-none">
             <button class="btn btn-danger btn-modern" id="bulkDeleteBtn">
-                <i class="fas fa-trash me-2"></i>Delete Selected (<span id="selectedCount">0</span>)
+                <i class="fas fa-trash me-2"></i>{% translate "Delete Selected" %} (<span id="selectedCount">0</span>)
             </button>
         </div>
         
         <!-- Import/Export Dropdown -->
         <div class="dropdown">
             <button class="btn btn-success btn-modern dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                <i class="fas fa-exchange-alt me-2"></i>Import/Export
+                <i class="fas fa-exchange-alt me-2"></i>{% translate "Import/Export" %}
             </button>
             <ul class="dropdown-menu">
-                <li><h6 class="dropdown-header">Import from File</h6></li>
+                <li><h6 class="dropdown-header">{% translate "Import from File" %}</h6></li>
                 <li>
                     <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importCsvModal">
-                        <i class="fas fa-file-csv me-2"></i>Import from CSV
+                        <i class="fas fa-file-csv me-2"></i>{% translate "Import from CSV" %}
                     </a>
                 </li>
                 <li>
                     <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
-                        <i class="fas fa-file-excel me-2"></i>Import from Excel
+                        <i class="fas fa-file-excel me-2"></i>{% translate "Import from Excel" %}
                     </a>
                 </li>
                 <li><hr class="dropdown-divider"></li>
-                <li><h6 class="dropdown-header">Export Products</h6></li>
+                <li><h6 class="dropdown-header">{% translate "Export Products" %}</h6></li>
                 <li>
                     <a class="dropdown-item" href="{% url 'admin_panel:export_products_csv' %}">
-                        <i class="fas fa-file-csv me-2"></i>Export to CSV
+                        <i class="fas fa-file-csv me-2"></i>{% translate "Export to CSV" %}
                     </a>
                 </li>
                 <li>
                     <a class="dropdown-item" href="{% url 'admin_panel:export_products_excel' %}">
-                        <i class="fas fa-file-excel me-2"></i>Export to Excel
+                        <i class="fas fa-file-excel me-2"></i>{% translate "Export to Excel" %}
                     </a>
                 </li>
                 <li>
                     <a class="dropdown-item" href="{% url 'admin_panel:export_products_pdf' %}">
-                        <i class="fas fa-file-pdf me-2"></i>Export to PDF
+                        <i class="fas fa-file-pdf me-2"></i>{% translate "Export to PDF" %}
                     </a>
                 </li>
                 <li><hr class="dropdown-divider"></li>
-                <li><h6 class="dropdown-header">Download Templates</h6></li>
+                <li><h6 class="dropdown-header">{% translate "Download Templates" %}</h6></li>
                 <li>
                     <a class="dropdown-item" href="{% url 'admin_panel:download_template_csv' %}">
-                        <i class="fas fa-download me-2"></i>CSV Template
+                        <i class="fas fa-download me-2"></i>{% translate "CSV Template" %}
                     </a>
                 </li>
                 <li>
                     <a class="dropdown-item" href="{% url 'admin_panel:download_template_excel' %}">
-                        <i class="fas fa-download me-2"></i>Excel Template
+                        <i class="fas fa-download me-2"></i>{% translate "Excel Template" %}
                     </a>
                 </li>
             </ul>
@@ -226,7 +226,7 @@
     <div class="card-header bg-white border-0 py-3">
         <h5 class="mb-0 fw-bold">
             <i class="fas fa-utensils me-2 text-primary"></i>
-            Products by Category
+            {% translate "Products by Category" %}
         </h5>
     </div>
     <div class="card-body p-0">
@@ -255,16 +255,16 @@
                                     <th style="width: 40px;">
                                         <input type="checkbox" id="selectAll-{{ category_data.category.id }}" class="form-check-input select-all-checkbox" data-category="{{ category_data.category.id }}">
                                     </th>
-                                    <th style="width: 40px; color: black;">SN</th>
-                                    <th style="width: 60px; color: black;">Image</th>
-                                    <th style="color: black;">Product Info</th>
-                                    <th style="width: 120px; color: black;">Sub Category</th>
-                                    <th style="width: 120px; color: black;">Restaurant/Branch</th>
-                                    <th style="width: 100px; color: black;">Station</th>
-                                    <th style="width: 80px; color: black;">Price</th>
-                                    <th style="width: 80px; color: black;">Stock</th>
-                                    <th style="width: 80px; color: black;">Status</th>
-                                    <th style="width: 120px; color: black;">Actions</th>
+                                    <th style="width: 40px; color: black;">{% translate "SN" %}</th>
+                                    <th style="width: 60px; color: black;">{% translate "Image" %}</th>
+                                    <th style="color: black;">{% translate "Product Info" %}</th>
+                                    <th style="width: 120px; color: black;">{% translate "Sub Category" %}</th>
+                                    <th style="width: 120px; color: black;">{% translate "Restaurant/Branch" %}</th>
+                                    <th style="width: 100px; color: black;">{% translate "Station" %}</th>
+                                    <th style="width: 80px; color: black;">{% translate "Price" %}</th>
+                                    <th style="width: 80px; color: black;">{% translate "Stock" %}</th>
+                                    <th style="width: 80px; color: black;">{% translate "Status" %}</th>
+                                    <th style="width: 120px; color: black;">{% translate "Actions" %}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -289,7 +289,7 @@
                                             <h6 class="mb-1 fw-bold" style="font-size: 0.9rem;">{{ product.name }}</h6>
                                             <p class="text-muted mb-0 small" style="font-size: 0.75rem;">{{ product.description|truncatechars:50 }}</p>
                                             <small class="text-info" style="font-size: 0.7rem;">
-                                                <i class="fas fa-clock me-1"></i>{{ product.preparation_time }} min
+                                                <i class="fas fa-clock me-1"></i>{% blocktranslate with minutes=product.preparation_time %}{{ minutes }} min{% endblocktranslate %}
                                             </small>
                                         </div>
                                     </td>
@@ -310,23 +310,23 @@
                                     <td>
                                         {% if product.station == 'kitchen' %}
                                             <span class="badge bg-info" style="font-size: 0.7rem;">
-                                                <i class="fas fa-utensils me-1"></i>Kitchen
+                                                <i class="fas fa-utensils me-1"></i>{% translate "Kitchen" %}
                                             </span>
                                         {% elif product.station == 'bar' %}
                                             <span class="badge bg-primary" style="font-size: 0.7rem;">
-                                                <i class="fas fa-cocktail me-1"></i>Bar
+                                                <i class="fas fa-cocktail me-1"></i>{% translate "Bar" %}
                                             </span>
                                         {% elif product.station == 'buffet' %}
                                             <span class="badge bg-warning" style="font-size: 0.7rem;">
-                                                <i class="fas fa-utensils me-1"></i>Buffet
+                                                <i class="fas fa-utensils me-1"></i>{% translate "Buffet" %}
                                             </span>
                                         {% elif product.station == 'service' %}
                                             <span class="badge bg-success" style="font-size: 0.7rem;">
-                                                <i class="fas fa-concierge-bell me-1"></i>Service
+                                                <i class="fas fa-concierge-bell me-1"></i>{% translate "Service" %}
                                             </span>
                                         {% else %}
                                             <span class="badge bg-secondary" style="font-size: 0.7rem;">
-                                                <i class="fas fa-question me-1"></i>N/A
+                                                <i class="fas fa-question me-1"></i>{% translate "N/A" %}
                                             </span>
                                         {% endif %}
                                     </td>
@@ -341,34 +341,34 @@
                                         {% elif product.available_in_stock > 0 %}
                                             <span class="badge bg-danger" style="font-size: 0.7rem;">{{ product.available_in_stock }}</span>
                                         {% else %}
-                                            <span class="badge bg-secondary" style="font-size: 0.7rem;">Out</span>
+                                            <span class="badge bg-secondary" style="font-size: 0.7rem;">{% translate "Out" %}</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if product.is_available %}
-                                            <span class="badge bg-success" style="font-size: 0.65rem;">Available</span>
+                                            <span class="badge bg-success" style="font-size: 0.65rem;">{% translate "Available" %}</span>
                                         {% else %}
-                                            <span class="badge bg-danger" style="font-size: 0.65rem;">Unavailable</span>
+                                            <span class="badge bg-danger" style="font-size: 0.65rem;">{% translate "Unavailable" %}</span>
                                         {% endif %}
                                     </td>
                                     <td class="product-actions">
                                         <div class="btn-group" role="group">
                                             <button class="btn btn-sm btn-outline-primary view-product-btn" 
                                                     data-product-id="{{ product.id }}"
-                                                    data-bs-toggle="tooltip" title="View Details"
+                                                    data-bs-toggle="tooltip" title="{% translate "View Details" %}"
                                                     style="padding: 0.2rem 0.4rem; font-size: 0.75rem;">
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                             <button class="btn btn-sm btn-outline-success edit-product-btn" 
                                                     data-product-id="{{ product.id }}"
-                                                    data-bs-toggle="tooltip" title="Edit Product"
+                                                    data-bs-toggle="tooltip" title="{% translate "Edit Product" %}"
                                                     style="padding: 0.2rem 0.4rem; font-size: 0.75rem;">
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                             <button class="btn btn-sm btn-outline-warning toggle-availability-btn" 
                                                     data-product-id="{{ product.id }}" 
                                                     data-available="{{ product.is_available|yesno:'false,true' }}"
-                                                    data-bs-toggle="tooltip" title="Toggle Availability"
+                                                    data-bs-toggle="tooltip" title="{% translate "Toggle Availability" %}"
                                                     style="padding: 0.2rem 0.4rem; font-size: 0.75rem;">
                                                 {% if product.is_available %}
                                                     <i class="fas fa-ban"></i>
@@ -379,7 +379,7 @@
                                             <button class="btn btn-sm btn-outline-danger delete-product-btn" 
                                                     data-product-id="{{ product.id }}" 
                                                     data-product-name="{{ product.name }}"
-                                                    data-bs-toggle="tooltip" title="Delete Product"
+                                                    data-bs-toggle="tooltip" title="{% translate "Delete Product" %}"
                                                     style="padding: 0.2rem 0.4rem; font-size: 0.75rem;">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -395,9 +395,9 @@
                     {% if category_data.products.has_other_pages %}
                     <div class="d-flex justify-content-between align-items-center mt-3 px-3 pb-3">
                         <div class="text-muted">
-                            Showing {{ category_data.products.start_index }} to {{ category_data.products.end_index }} of {{ category_data.products.paginator.count }} products
+                            {% blocktranslate with start=category_data.products.start_index end=category_data.products.end_index total=category_data.products.paginator.count %}Showing {{ start }} to {{ end }} of {{ total }} products{% endblocktranslate %}
                         </div>
-                        <nav aria-label="{{ category_data.category.name }} pagination">
+                        <nav aria-label="{% blocktranslate with name=category_data.category.name %}{{ name }} pagination{% endblocktranslate %}">
                             <ul class="pagination mb-0">
                                 {% if category_data.products.has_previous %}
                                     <li class="page-item">
@@ -449,10 +449,10 @@
 {% if not main_categories %}
     <div class="text-center py-5">
         <i class="fas fa-utensils text-muted" style="font-size: 4rem;"></i>
-        <h4 class="mt-3 text-muted">No Categories Found</h4>
-        <p class="text-muted">Start by adding categories and products to your menu.</p>
+        <h4 class="mt-3 text-muted">{% translate "No Categories Found" %}</h4>
+        <p class="text-muted">{% translate "Start by adding categories and products to your menu." %}</p>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
-            <i class="fas fa-plus me-2"></i>Add Your First Product
+            <i class="fas fa-plus me-2"></i>{% translate "Add Your First Product" %}
         </button>
     </div>
 {% endif %}
@@ -463,9 +463,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-plus-circle me-2"></i>Add New Product
+                    <i class="fas fa-plus-circle me-2"></i>{% translate "Add New Product" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="addProductForm" enctype="multipart/form-data">
                 {% csrf_token %}
@@ -475,80 +475,80 @@
                         <div class="col-md-8">
                             <div class="card">
                                 <div class="card-header bg-light">
-                                    <h6 class="mb-0 fw-bold">Product Information</h6>
+                                    <h6 class="mb-0 fw-bold">{% translate "Product Information" %}</h6>
                                 </div>
                                 <div class="card-body">
                                     <div class="row g-3">
                                         <div class="col-md-12">
-                                            <label for="productRestaurant" class="form-label">Restaurant/Branch *</label>
+                                            <label for="productRestaurant" class="form-label">{% translate "Restaurant/Branch" %} *</label>
                                             <select class="form-select" id="productRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
                                                 {% if view_all_restaurants %}
-                                                    <option value="">Select Restaurant/Branch</option>
+                                                    <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                                     {% for restaurant in accessible_restaurants %}
                                                     <option value="{{ restaurant.id }}">
-                                                        {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                                        {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                                     </option>
                                                     {% endfor %}
                                                 {% elif current_restaurant %}
                                                     <option value="{{ current_restaurant.id }}" selected>
-                                                        {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                                        {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                                     </option>
                                                     <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
                                                 {% else %}
-                                                    <option value="">No Restaurant Available</option>
+                                                    <option value="">{% translate "No Restaurant Available" %}</option>
                                                 {% endif %}
                                             </select>
                                         </div>
                                         <div class="col-md-12">
-                                            <label for="productName" class="form-label">Product Name *</label>
+                                            <label for="productName" class="form-label">{% translate "Product Name" %} *</label>
                                             <input type="text" class="form-control" id="productName" name="name" required>
                                         </div>
                                         <div class="col-md-12">
-                                            <label for="productDescription" class="form-label">Description *</label>
+                                            <label for="productDescription" class="form-label">{% translate "Description" %} *</label>
                                             <textarea class="form-control" id="productDescription" name="description" rows="3" required></textarea>
                                         </div>
                                         <div class="col-md-6">
-                                            <label for="productMainCategory" class="form-label">Main Category *</label>
+                                            <label for="productMainCategory" class="form-label">{% translate "Main Category" %} *</label>
                                             <select class="form-select" id="productMainCategory" name="main_category" required>
-                                                <option value="">Select Restaurant First</option>
+                                                <option value="">{% translate "Select Restaurant First" %}</option>
                                                 {% for category in all_main_categories %}
                                                 <option value="{{ category.id }}" data-restaurant-id="{{ category.restaurant.id|default:'' }}">{{ category.name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
                                         <div class="col-md-6">
-                                            <label for="productSubCategory" class="form-label">Sub Category *</label>
+                                            <label for="productSubCategory" class="form-label">{% translate "Sub Category" %} *</label>
                                             <select class="form-select" id="productSubCategory" name="sub_category" required>
-                                                <option value="">Select Main Category First</option>
+                                                <option value="">{% translate "Select Main Category First" %}</option>
                                             </select>
                                         </div>
                                         <div class="col-md-4">
-                                            <label for="productPrice" class="form-label">Price ($) *</label>
+                                            <label for="productPrice" class="form-label">{% translate "Price" %} ($) *</label>
                                             <input type="number" step="0.01" min="0.01" class="form-control" id="productPrice" name="price" required>
                                         </div>
                                         <div class="col-md-4">
-                                            <label for="productStock" class="form-label">Stock Quantity *</label>
+                                            <label for="productStock" class="form-label">{% translate "Stock Quantity" %} *</label>
                                             <input type="number" min="0" class="form-control" id="productStock" name="available_in_stock" required>
                                         </div>
                                         <div class="col-md-4">
-                                            <label for="productPrepTime" class="form-label">Prep Time (min)</label>
+                                            <label for="productPrepTime" class="form-label">{% translate "Prep Time (min)" %}</label>
                                             <input type="number" min="1" class="form-control" id="productPrepTime" name="preparation_time" value="15">
                                         </div>
                                         <div class="col-md-12">
-                                            <label for="productStation" class="form-label">Station *</label>
+                                            <label for="productStation" class="form-label">{% translate "Station" %} *</label>
                                             <select class="form-select" id="productStation" name="station" required>
-                                                <option value="kitchen">🍴 Kitchen</option>
-                                                <option value="bar">🍸 Bar</option>
-                                                <option value="buffet">🍽️ Buffet</option>
-                                                <option value="service">🛎️ Service</option>
+                                                <option value="kitchen">🍴 {% translate "Kitchen" %}</option>
+                                                <option value="bar">🍸 {% translate "Bar" %}</option>
+                                                <option value="buffet">🍽️ {% translate "Buffet" %}</option>
+                                                <option value="service">🛎️ {% translate "Service" %}</option>
                                             </select>
-                                            <div class="form-text">Assign this product to Kitchen, Bar, Buffet, or Service station</div>
+                                            <div class="form-text">{% translate "Assign this product to Kitchen, Bar, Buffet, or Service station" %}</div>
                                         </div>
                                         <div class="col-md-12">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="productAvailable" name="is_available" checked>
                                                 <label class="form-check-label" for="productAvailable">
-                                                    Product is available for ordering
+                                                    {% translate "Product is available for ordering" %}
                                                 </label>
                                             </div>
                                         </div>
@@ -561,17 +561,17 @@
                         <div class="col-md-4">
                             <div class="card">
                                 <div class="card-header bg-light">
-                                    <h6 class="mb-0 fw-bold">Product Image</h6>
+                                    <h6 class="mb-0 fw-bold">{% translate "Product Image" %}</h6>
                                 </div>
                                 <div class="card-body text-center">
                                     <div class="mb-3">
                                         <i class="fas fa-info-circle fa-3x text-info mb-3"></i>
-                                        <h6 class="fw-bold">Category Image Used</h6>
-                                        <p class="text-muted small mb-0">Products automatically use their category's image. To change the product image, upload an image when creating or editing the category.</p>
+                                        <h6 class="fw-bold">{% translate "Category Image Used" %}</h6>
+                                        <p class="text-muted small mb-0">{% translate "Products automatically use their category's image. To change the product image, upload an image when creating or editing the category." %}</p>
                                     </div>
                                     <div class="alert alert-info small mb-0">
                                         <i class="fas fa-lightbulb me-1"></i>
-                                        <strong>Tip:</strong> Go to Categories section to manage images for all products in that category.
+                                        <strong>{% translate "Tip:" %}</strong> {% translate "Go to Categories section to manage images for all products in that category." %}
                                     </div>
                                 </div>
                             </div>
@@ -580,10 +580,10 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-2"></i>Cancel
+                        <i class="fas fa-times me-2"></i>{% translate "Cancel" %}
                     </button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i>Add Product
+                        <i class="fas fa-save me-2"></i>{% translate "Add Product" %}
                     </button>
                 </div>
             </form>
@@ -597,9 +597,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>Edit Product
+                    <i class="fas fa-edit me-2"></i>{% translate "Edit Product" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body" id="editModalBody">
                 <!-- Content will be loaded dynamically -->
@@ -614,15 +614,15 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-eye me-2"></i>Product Details
+                    <i class="fas fa-eye me-2"></i>{% translate "Product Details" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body" id="viewModalBody">
                 <!-- Content will be loaded dynamically -->
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Close" %}</button>
             </div>
         </div>
     </div>
@@ -631,6 +631,36 @@
 
 {% block extra_js %}
 <script>
+// Translated UI strings (also used by the second script below)
+const PROD_I18N = {
+    opFailed: '{% translate 'Operation failed' as t_opFailed %}{{ t_opFailed|escapejs }}',
+    netErr: '{% translate 'Network error occurred' as t_netErr %}{{ t_netErr|escapejs }}',
+    loadDetailsFail: '{% translate 'Failed to load product details' as t_loadDetailsFail %}{{ t_loadDetailsFail|escapejs }}',
+    loadEditFail: '{% translate 'Failed to load product for editing' as t_loadEditFail %}{{ t_loadEditFail|escapejs }}',
+    confirmMakeUnavailable: '{% translate 'Are you sure you want to make this product unavailable?' as t_confirmMakeUnavailable %}{{ t_confirmMakeUnavailable|escapejs }}',
+    confirmMakeAvailable: '{% translate 'Are you sure you want to make this product available?' as t_confirmMakeAvailable %}{{ t_confirmMakeAvailable|escapejs }}',
+    availFail: '{% translate 'Failed to update product availability' as t_availFail %}{{ t_availFail|escapejs }}',
+    confirmDelete: '{% translate 'Are you sure you want to delete "{name}"?' as t_confirmDelete %}{{ t_confirmDelete|escapejs }}',
+    noUndo: '{% translate 'This action cannot be undone.' as t_noUndo %}{{ t_noUndo|escapejs }}',
+    deleteFail: '{% translate 'Failed to delete product' as t_deleteFail %}{{ t_deleteFail|escapejs }}',
+    loading: '{% translate 'Loading...' as t_loading %}{{ t_loading|escapejs }}',
+    selectSub: '{% translate 'Select Sub Category' as t_selectSub %}{{ t_selectSub|escapejs }}',
+    subLoadErr: '{% translate 'Error loading subcategories' as t_subLoadErr %}{{ t_subLoadErr|escapejs }}',
+    selectMainFirst: '{% translate 'Select Main Category First' as t_selectMainFirst %}{{ t_selectMainFirst|escapejs }}',
+    selectMain: '{% translate 'Select Main Category' as t_selectMain %}{{ t_selectMain|escapejs }}',
+    selectRestFirst: '{% translate 'Select Restaurant First' as t_selectRestFirst %}{{ t_selectRestFirst|escapejs }}',
+    adding: '{% translate 'Adding...' as t_adding %}{{ t_adding|escapejs }}',
+    added: '{% translate 'Product added successfully!' as t_added %}{{ t_added|escapejs }}',
+    addErr: '{% translate 'Error adding product' as t_addErr %}{{ t_addErr|escapejs }}',
+    deleting: '{% translate 'Deleting...' as t_deleting %}{{ t_deleting|escapejs }}',
+    error: '{% translate 'Error' as t_error %}{{ t_error|escapejs }}',
+    success: '{% translate 'Success' as t_success %}{{ t_success|escapejs }}',
+    noToken: '{% translate 'Security token not found. Please refresh the page.' as t_noToken %}{{ t_noToken|escapejs }}',
+    bulkDeleted: '{% translate 'Successfully deleted {count} product(s)' as t_bulkDeleted %}{{ t_bulkDeleted|escapejs }}',
+    bulkFail: '{% translate 'Failed to delete products' as t_bulkFail %}{{ t_bulkFail|escapejs }}',
+    bulkNetErr: '{% translate 'Network error occurred while deleting products' as t_bulkNetErr %}{{ t_bulkNetErr|escapejs }}',
+};
+
 // Prevent multiple submissions and handle events properly
 let isProcessing = false;
 
@@ -651,7 +681,7 @@ function showAlert(message, type = 'success') {
     alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1055; min-width: 300px;';
     alertDiv.innerHTML = `
         ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{% translate "Close" %}"></button>
     `;
     
     document.body.appendChild(alertDiv);
@@ -709,13 +739,13 @@ function submitForm(form, url, successMessage, redirectOnSuccess = true) {
             }
             return true;
         } else {
-            showAlert(data.message || 'Operation failed', 'danger');
+            showAlert(data.message || PROD_I18N.opFailed, 'danger');
             return false;
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('Network error occurred', 'danger');
+        showAlert(PROD_I18N.netErr, 'danger');
         return false;
     });
 }
@@ -736,12 +766,12 @@ function viewProduct(productId) {
                 const modal = new bootstrap.Modal(document.getElementById('viewProductModal'));
                 modal.show();
             } else {
-                showAlert(data.message || 'Failed to load product details', 'danger');
+                showAlert(data.message || PROD_I18N.loadDetailsFail, 'danger');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showAlert('Failed to load product details', 'danger');
+            showAlert(PROD_I18N.loadDetailsFail, 'danger');
         });
     });
 }
@@ -765,12 +795,12 @@ function editProduct(productId) {
                 const modal = new bootstrap.Modal(document.getElementById('editProductModal'));
                 modal.show();
             } else {
-                showAlert(data.message || 'Failed to load product for editing', 'danger');
+                showAlert(data.message || PROD_I18N.loadEditFail, 'danger');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showAlert('Failed to load product for editing', 'danger');
+            showAlert(PROD_I18N.loadEditFail, 'danger');
         });
     });
 }
@@ -780,7 +810,7 @@ function toggleAvailability(productId, isCurrentlyAvailable) {
         const action = isCurrentlyAvailable ? 'make unavailable' : 'make available';
         const newStatus = !isCurrentlyAvailable;
         
-        if (confirm(`Are you sure you want to ${action} this product?`)) {
+        if (confirm(isCurrentlyAvailable ? PROD_I18N.confirmMakeUnavailable : PROD_I18N.confirmMakeAvailable)) {
             fetch(`/admin-panel/products/${productId}/toggle-availability/`, {
                 method: 'POST',
                 headers: {
@@ -799,12 +829,12 @@ function toggleAvailability(productId, isCurrentlyAvailable) {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert(data.message || 'Failed to update product availability', 'danger');
+                    showAlert(data.message || PROD_I18N.availFail, 'danger');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showAlert('Failed to update product availability', 'danger');
+                showAlert(PROD_I18N.availFail, 'danger');
             });
         }
     });
@@ -812,7 +842,7 @@ function toggleAvailability(productId, isCurrentlyAvailable) {
 
 function deleteProduct(productId, productName) {
     executeOnce(() => {
-        if (confirm(`Are you sure you want to delete "${productName}"?\n\nThis action cannot be undone.`)) {
+        if (confirm(PROD_I18N.confirmDelete.replace('{name}', productName) + '\n\n' + PROD_I18N.noUndo)) {
             fetch(`/admin-panel/products/${productId}/delete/`, {
                 method: 'POST',
                 headers: {
@@ -832,12 +862,12 @@ function deleteProduct(productId, productName) {
                     // Update category tab counters
                     updateCategoryTabCounters();
                 } else {
-                    showAlert(data.message || 'Failed to delete product', 'danger');
+                    showAlert(data.message || PROD_I18N.deleteFail, 'danger');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showAlert('Failed to delete product', 'danger');
+                showAlert(PROD_I18N.deleteFail, 'danger');
             });
         }
     });
@@ -853,7 +883,7 @@ function initializeCategoryHandler(mainCategorySelectId, subCategorySelectId) {
             const mainCategoryId = this.value;
             
             // Clear subcategory options
-            subCategorySelect.innerHTML = '<option value="">Loading...</option>';
+            subCategorySelect.innerHTML = '<option value="">' + PROD_I18N.loading + '</option>';
             
             if (mainCategoryId) {
                 fetch(`/admin-panel/get-subcategories/${mainCategoryId}/`, {
@@ -864,7 +894,7 @@ function initializeCategoryHandler(mainCategorySelectId, subCategorySelectId) {
                 })
                 .then(response => response.json())
                 .then(data => {
-                    subCategorySelect.innerHTML = '<option value="">Select Sub Category</option>';
+                    subCategorySelect.innerHTML = '<option value="">' + PROD_I18N.selectSub + '</option>';
                     
                     if (data.success && data.subcategories) {
                         data.subcategories.forEach(subcategory => {
@@ -877,10 +907,10 @@ function initializeCategoryHandler(mainCategorySelectId, subCategorySelectId) {
                 })
                 .catch(error => {
                     console.error('Error loading subcategories:', error);
-                    subCategorySelect.innerHTML = '<option value="">Error loading subcategories</option>';
+                    subCategorySelect.innerHTML = '<option value="">' + PROD_I18N.subLoadErr + '</option>';
                 });
             } else {
-                subCategorySelect.innerHTML = '<option value="">Select Main Category First</option>';
+                subCategorySelect.innerHTML = '<option value="">' + PROD_I18N.selectMainFirst + '</option>';
             }
         });
     }
@@ -1000,64 +1030,64 @@ function updateCategoryTabCounters() {
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="importCsvModalLabel">
-                    <i class="fas fa-file-csv me-2"></i>Import Products from CSV
+                    <i class="fas fa-file-csv me-2"></i>{% translate "Import Products from CSV" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form action="{% url 'admin_panel:import_products_csv' %}" method="post" enctype="multipart/form-data">
                 <div class="modal-body">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label for="importCsvRestaurant" class="form-label">Restaurant/Branch *</label>
+                        <label for="importCsvRestaurant" class="form-label">{% translate "Restaurant/Branch" %} *</label>
                         <select class="form-select" id="importCsvRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %} required>
                             {% if view_all_restaurants %}
-                                <option value="">Select Restaurant/Branch</option>
+                                <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}">
-                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 {% endfor %}
                             {% elif current_restaurant %}
                                 <option value="{{ current_restaurant.id }}" selected>
-                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
                             {% else %}
-                                <option value="">No Restaurant Available</option>
+                                <option value="">{% translate "No Restaurant Available" %}</option>
                             {% endif %}
                         </select>
-                        <div class="form-text">Products will be imported to this restaurant</div>
+                        <div class="form-text">{% translate "Products will be imported to this restaurant" %}</div>
                     </div>
                     
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>CSV Format Requirements:</strong>
+                        <strong>{% translate "CSV Format Requirements:" %}</strong>
                         <ul class="mb-0 mt-2">
-                            <li>File must be in CSV format (.csv)</li>
-                            <li>Required columns: name, price, main_category</li>
-                            <li>Optional columns: description, sub_category, available_in_stock, is_available, preparation_time, station</li>
-                            <li>Station field: "kitchen", "bar", "buffet", or "service" (defaults to "kitchen" if not specified)</li>
-                            <li>Main category must already exist in your system</li>
-                            <li><strong>Update Behavior:</strong> Existing products will be updated, new products will be created</li>
+                            <li>{% translate "File must be in CSV format (.csv)" %}</li>
+                            <li>{% translate "Required columns:" %} name, price, main_category</li>
+                            <li>{% translate "Optional columns:" %} description, sub_category, available_in_stock, is_available, preparation_time, station</li>
+                            <li>{% blocktranslate %}Station field: "kitchen", "bar", "buffet", or "service" (defaults to "kitchen" if not specified){% endblocktranslate %}</li>
+                            <li>{% translate "Main category must already exist in your system" %}</li>
+                            <li><strong>{% translate "Update Behavior:" %}</strong> {% translate "Existing products will be updated, new products will be created" %}</li>
                         </ul>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="csv_file" class="form-label">Select CSV File</label>
+                        <label for="csv_file" class="form-label">{% translate "Select CSV File" %}</label>
                         <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
-                        <div class="form-text">Maximum file size: 10MB</div>
+                        <div class="form-text">{% translate "Maximum file size: 10MB" %}</div>
                     </div>
                     
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'admin_panel:download_template_csv' %}" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-download me-1"></i>Download CSV Template
+                            <i class="fas fa-download me-1"></i>{% translate "Download CSV Template" %}
                         </a>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-upload me-2"></i>Import CSV
+                        <i class="fas fa-upload me-2"></i>{% translate "Import CSV" %}
                     </button>
                 </div>
             </form>
@@ -1071,65 +1101,65 @@ function updateCategoryTabCounters() {
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="importExcelModalLabel">
-                    <i class="fas fa-file-excel me-2"></i>Import Products from Excel
+                    <i class="fas fa-file-excel me-2"></i>{% translate "Import Products from Excel" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form action="{% url 'admin_panel:import_products_excel' %}" method="post" enctype="multipart/form-data">
                 <div class="modal-body">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label for="importRestaurant" class="form-label">Restaurant/Branch *</label>
+                        <label for="importRestaurant" class="form-label">{% translate "Restaurant/Branch" %} *</label>
                         <select class="form-select" id="importRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %} required>
                             {% if view_all_restaurants %}
-                                <option value="">Select Restaurant/Branch</option>
+                                <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}">
-                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 {% endfor %}
                             {% elif current_restaurant %}
                                 <option value="{{ current_restaurant.id }}" selected>
-                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
                             {% else %}
-                                <option value="">No Restaurant Available</option>
+                                <option value="">{% translate "No Restaurant Available" %}</option>
                             {% endif %}
                         </select>
-                        <div class="form-text">Products will be imported to this restaurant</div>
+                        <div class="form-text">{% translate "Products will be imported to this restaurant" %}</div>
                     </div>
                     
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>Excel Format Requirements:</strong>
+                        <strong>{% translate "Excel Format Requirements:" %}</strong>
                         <ul class="mb-0 mt-2">
-                            <li>File must be in Excel format (.xlsx or .xls)</li>
-                            <li>Uses first sheet or sheet named "Products"</li>
-                            <li>Required columns: name, price, main_category</li>
-                            <li>Optional columns: description, sub_category, available_in_stock, is_available, preparation_time, station</li>
-                            <li>Station field: "kitchen", "bar", "buffet", or "service" (defaults to "kitchen" if not specified)</li>
-                            <li>Main category must already exist in your system</li>
-                            <li><strong>Update Behavior:</strong> Existing products will be updated, new products will be created</li>
+                            <li>{% translate "File must be in Excel format (.xlsx or .xls)" %}</li>
+                            <li>{% translate 'Uses first sheet or sheet named "Products"' %}</li>
+                            <li>{% translate "Required columns:" %} name, price, main_category</li>
+                            <li>{% translate "Optional columns:" %} description, sub_category, available_in_stock, is_available, preparation_time, station</li>
+                            <li>{% blocktranslate %}Station field: "kitchen", "bar", "buffet", or "service" (defaults to "kitchen" if not specified){% endblocktranslate %}</li>
+                            <li>{% translate "Main category must already exist in your system" %}</li>
+                            <li><strong>{% translate "Update Behavior:" %}</strong> {% translate "Existing products will be updated, new products will be created" %}</li>
                         </ul>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="excel_file" class="form-label">Select Excel File</label>
+                        <label for="excel_file" class="form-label">{% translate "Select Excel File" %}</label>
                         <input type="file" class="form-control" id="excel_file" name="excel_file" accept=".xlsx,.xls" required>
-                        <div class="form-text">Maximum file size: 10MB</div>
+                        <div class="form-text">{% translate "Maximum file size: 10MB" %}</div>
                     </div>
                     
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'admin_panel:download_template_excel' %}" class="btn btn-outline-success btn-sm">
-                            <i class="fas fa-download me-1"></i>Download Excel Template
+                            <i class="fas fa-download me-1"></i>{% translate "Download Excel Template" %}
                         </a>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-upload me-2"></i>Import Excel
+                        <i class="fas fa-upload me-2"></i>{% translate "Import Excel" %}
                     </button>
                 </div>
             </form>
@@ -1143,24 +1173,24 @@ function updateCategoryTabCounters() {
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title" id="bulkDeleteModalLabel">
-                    <i class="fas fa-exclamation-triangle me-2"></i>Confirm Bulk Delete
+                    <i class="fas fa-exclamation-triangle me-2"></i>{% translate "Confirm Bulk Delete" %}
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-warning">
                     <i class="fas fa-warning me-2"></i>
-                    <strong>Warning:</strong> This action cannot be undone!
+                    <strong>{% translate "Warning:" %}</strong> {% translate "This action cannot be undone!" %}
                 </div>
-                <p>Are you sure you want to delete the following <strong id="deleteCount">0</strong> product(s)?</p>
+                <p>{% blocktranslate %}Are you sure you want to delete the following <strong id="deleteCount">0</strong> product(s)?{% endblocktranslate %}</p>
                 <div id="productList" class="bg-light p-3 rounded max-height-200 overflow-auto">
                     <!-- Product list will be populated by JavaScript -->
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-danger" id="confirmBulkDelete">
-                    <i class="fas fa-trash me-2"></i>Delete Products
+                    <i class="fas fa-trash me-2"></i>{% translate "Delete Products" %}
                 </button>
             </div>
         </div>
@@ -1198,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', function() {
             options.forEach(option => {
                 if (option.value === '') {
                     option.style.display = '';
-                    option.textContent = selectedRestaurantId ? 'Select Main Category' : 'Select Restaurant First';
+                    option.textContent = selectedRestaurantId ? PROD_I18N.selectMain : PROD_I18N.selectRestFirst;
                     return;
                 }
                 
@@ -1214,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', function() {
             productMainCategory.value = '';
             const productSubCategory = document.getElementById('productSubCategory');
             if (productSubCategory) {
-                productSubCategory.innerHTML = '<option value="">Select Main Category First</option>';
+                productSubCategory.innerHTML = '<option value="">' + PROD_I18N.selectMainFirst + '</option>';
             }
         });
         
@@ -1239,7 +1269,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Show loading state
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Adding...';
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + PROD_I18N.adding;
             
             fetch('/admin-panel/products/add/', {
                 method: 'POST',
@@ -1257,22 +1287,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Reset form
                     addProductForm.reset();
-                    document.getElementById('productSubCategory').innerHTML = '<option value="">Select Main Category First</option>';
+                    document.getElementById('productSubCategory').innerHTML = '<option value="">' + PROD_I18N.selectMainFirst + '</option>';
                     
                     // Show success message
-                    showAlert('Product added successfully!', 'success');
+                    showAlert(PROD_I18N.added, 'success');
                     
                     // Reload page to show new product
                     setTimeout(() => {
                         window.location.reload();
                     }, 1000);
                 } else {
-                    showAlert(data.message || 'Error adding product', 'error');
+                    showAlert(data.message || PROD_I18N.addErr, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showAlert('Network error occurred', 'error');
+                showAlert(PROD_I18N.netErr, 'error');
             })
             .finally(() => {
                 // Reset button state
@@ -1402,7 +1432,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const originalText = button.innerHTML;
         
         // Show loading state
-        button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + PROD_I18N.deleting;
         button.disabled = true;
         
         // Prepare data
@@ -1414,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!csrfToken) {
             console.error('CSRF token not found');
-            showToast('Error', 'Security token not found. Please refresh the page.', 'error');
+            showToast(PROD_I18N.error, PROD_I18N.noToken, 'error');
             button.innerHTML = originalText;
             button.disabled = false;
             return;
@@ -1440,7 +1470,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 // Show success message first
-                showToast('Success', `Successfully deleted ${data.deleted_count} product(s)`, 'success');
+                showToast(PROD_I18N.success, PROD_I18N.bulkDeleted.replace('{count}', data.deleted_count), 'success');
                 
                 // Close modal
                 const modalInstance = bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal'));
@@ -1454,12 +1484,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 1500); // 1.5 second delay to show the success message
                 
             } else {
-                showToast('Error', data.error || 'Failed to delete products', 'error');
+                showToast(PROD_I18N.error, data.error || PROD_I18N.bulkFail, 'error');
             }
         })
         .catch(error => {
             console.error('Fetch error:', error);
-            showToast('Error', 'Network error occurred while deleting products', 'error');
+            showToast(PROD_I18N.error, PROD_I18N.bulkNetErr, 'error');
         })
         .finally(() => {
             // Reset button state

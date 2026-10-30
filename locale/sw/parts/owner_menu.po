@@ -1,0 +1,724 @@
+msgid "Manage Products"
+msgstr "Simamia Bidhaa"
+
+msgid "Product Management"
+msgstr "Usimamizi wa Bidhaa"
+
+msgid "Manage your restaurant's menu items"
+msgstr "Simamia bidhaa za menyu ya mgahawa wako"
+
+msgid "Search Products"
+msgstr "Tafuta Bidhaa"
+
+msgid "Search by product name..."
+msgstr "Tafuta kwa jina la bidhaa..."
+
+msgid "Press ESC to clear search"
+msgstr "Bonyeza ESC kufuta utafutaji"
+
+msgid "All Restaurants"
+msgstr "Migahawa Yote"
+
+msgid "All Categories"
+msgstr "Makundi Yote"
+
+msgid "Per Page"
+msgstr "Kwa Ukurasa"
+
+msgid "Showing products by category"
+msgstr "Bidhaa zinaonyeshwa kwa kundi"
+
+msgid "Add New Product"
+msgstr "Ongeza Bidhaa Mpya"
+
+msgid "Delete Selected"
+msgstr "Futa Zilizochaguliwa"
+
+msgid "Import/Export"
+msgstr "Leta/Hamisha"
+
+msgid "Import from File"
+msgstr "Leta kutoka Faili"
+
+msgid "Import from CSV"
+msgstr "Leta kutoka CSV"
+
+msgid "Import from Excel"
+msgstr "Leta kutoka Excel"
+
+msgid "Export Products"
+msgstr "Hamisha Bidhaa"
+
+msgid "Export to CSV"
+msgstr "Hamisha kwenda CSV"
+
+msgid "Export to Excel"
+msgstr "Hamisha kwenda Excel"
+
+msgid "Export to PDF"
+msgstr "Hamisha kwenda PDF"
+
+msgid "Download Templates"
+msgstr "Pakua Violezo"
+
+msgid "CSV Template"
+msgstr "Kiolezo cha CSV"
+
+msgid "Excel Template"
+msgstr "Kiolezo cha Excel"
+
+msgid "Products by Category"
+msgstr "Bidhaa kwa Kundi"
+
+msgid "SN"
+msgstr "Na."
+
+msgid "Image"
+msgstr "Picha"
+
+msgid "Product Info"
+msgstr "Taarifa za Bidhaa"
+
+msgid "Sub Category"
+msgstr "Kikundi"
+
+msgid "Restaurant/Branch"
+msgstr "Mgahawa/Tawi"
+
+msgid "Station"
+msgstr "Kituo"
+
+msgid "Price"
+msgstr "Bei"
+
+msgid "Stock"
+msgstr "Zilizopo"
+
+msgid "N/A"
+msgstr "Hakuna"
+
+msgid "Out"
+msgstr "Imeisha"
+
+msgid "View Details"
+msgstr "Tazama Maelezo"
+
+msgid "Edit Product"
+msgstr "Hariri Bidhaa"
+
+msgid "Toggle Availability"
+msgstr "Badilisha Upatikanaji"
+
+msgid "Delete Product"
+msgstr "Futa Bidhaa"
+
+msgid "No Categories Found"
+msgstr "Hakuna Makundi Yaliyopatikana"
+
+msgid "Start by adding categories and products to your menu."
+msgstr "Anza kwa kuongeza makundi na bidhaa kwenye menyu yako."
+
+msgid "Add Your First Product"
+msgstr "Ongeza Bidhaa Yako ya Kwanza"
+
+msgid "Product Information"
+msgstr "Taarifa za Bidhaa"
+
+msgid "Select Restaurant/Branch"
+msgstr "Chagua Mgahawa/Tawi"
+
+msgid "Main"
+msgstr "Kuu"
+
+msgid "Branch"
+msgstr "Tawi"
+
+msgid "No Restaurant Available"
+msgstr "Hakuna Mgahawa"
+
+msgid "Product Name"
+msgstr "Jina la Bidhaa"
+
+msgid "Description"
+msgstr "Maelezo"
+
+msgid "Main Category"
+msgstr "Kundi Kuu"
+
+msgid "Select Restaurant First"
+msgstr "Chagua Mgahawa Kwanza"
+
+msgid "Select Main Category First"
+msgstr "Chagua Kundi Kuu Kwanza"
+
+msgid "Stock Quantity"
+msgstr "Idadi Iliyopo"
+
+msgid "Prep Time (min)"
+msgstr "Muda wa Maandalizi (dak)"
+
+msgid "Assign this product to Kitchen, Bar, Buffet, or Service station"
+msgstr "Weka bidhaa hii kwenye kituo cha Jiko, Baa, Bufee au Huduma"
+
+msgid "Product is available for ordering"
+msgstr "Bidhaa inapatikana kwa kuagizwa"
+
+msgid "Product Image"
+msgstr "Picha ya Bidhaa"
+
+msgid "Category Image Used"
+msgstr "Picha ya Kundi Inatumika"
+
+msgid "Products automatically use their category's image. To change the product image, upload an image when creating or editing the category."
+msgstr "Bidhaa hutumia picha ya kundi lake moja kwa moja. Ili kubadilisha picha ya bidhaa, pakia picha unapounda au kuhariri kundi."
+
+msgid "Tip:"
+msgstr "Kidokezo:"
+
+msgid "Go to Categories section to manage images for all products in that category."
+msgstr "Nenda sehemu ya Makundi kusimamia picha za bidhaa zote katika kundi hilo."
+
+msgid "Add Product"
+msgstr "Ongeza Bidhaa"
+
+msgid "Product Details"
+msgstr "Maelezo ya Bidhaa"
+
+msgid "Operation failed"
+msgstr "Imeshindikana"
+
+msgid "Network error occurred"
+msgstr "Hitilafu ya mtandao imetokea"
+
+msgid "Failed to load product details"
+msgstr "Imeshindikana kupakia maelezo ya bidhaa"
+
+msgid "Failed to load product for editing"
+msgstr "Imeshindikana kupakia bidhaa kwa ajili ya kuhariri"
+
+msgid "Are you sure you want to make this product unavailable?"
+msgstr "Una uhakika unataka kufanya bidhaa hii isipatikane?"
+
+msgid "Are you sure you want to make this product available?"
+msgstr "Una uhakika unataka kufanya bidhaa hii ipatikane?"
+
+msgid "Failed to update product availability"
+msgstr "Imeshindikana kubadilisha upatikanaji wa bidhaa"
+
+msgid "Are you sure you want to delete \"{name}\"?"
+msgstr "Una uhakika unataka kufuta \"{name}\"?"
+
+msgid "This action cannot be undone."
+msgstr "Kitendo hiki hakiwezi kutenduliwa."
+
+msgid "Failed to delete product"
+msgstr "Imeshindikana kufuta bidhaa"
+
+msgid "Loading..."
+msgstr "Inapakia..."
+
+msgid "Select Sub Category"
+msgstr "Chagua Kikundi"
+
+msgid "Error loading subcategories"
+msgstr "Hitilafu kupakia vikundi"
+
+msgid "Select Main Category"
+msgstr "Chagua Kundi Kuu"
+
+msgid "Adding..."
+msgstr "Inaongeza..."
+
+msgid "Product added successfully!"
+msgstr "Bidhaa imeongezwa!"
+
+msgid "Error adding product"
+msgstr "Hitilafu kuongeza bidhaa"
+
+msgid "Deleting..."
+msgstr "Inafuta..."
+
+msgid "Error"
+msgstr "Hitilafu"
+
+msgid "Success"
+msgstr "Imefanikiwa"
+
+msgid "Security token not found. Please refresh the page."
+msgstr "Tokeni ya usalama haikupatikana. Tafadhali onyesha upya ukurasa."
+
+msgid "Successfully deleted {count} product(s)"
+msgstr "Bidhaa {count} zimefutwa"
+
+msgid "Failed to delete products"
+msgstr "Imeshindikana kufuta bidhaa"
+
+msgid "Network error occurred while deleting products"
+msgstr "Hitilafu ya mtandao wakati wa kufuta bidhaa"
+
+msgid "Import Products from CSV"
+msgstr "Leta Bidhaa kutoka CSV"
+
+msgid "Products will be imported to this restaurant"
+msgstr "Bidhaa zitaletwa kwenye mgahawa huu"
+
+msgid "CSV Format Requirements:"
+msgstr "Masharti ya Muundo wa CSV:"
+
+msgid "File must be in CSV format (.csv)"
+msgstr "Faili lazima liwe katika muundo wa CSV (.csv)"
+
+msgid "Required columns:"
+msgstr "Safu zinazohitajika:"
+
+msgid "Optional columns:"
+msgstr "Safu za hiari:"
+
+msgid "Main category must already exist in your system"
+msgstr "Kundi kuu lazima liwe tayari lipo kwenye mfumo wako"
+
+msgid "Update Behavior:"
+msgstr "Jinsi ya Kusasisha:"
+
+msgid "Existing products will be updated, new products will be created"
+msgstr "Bidhaa zilizopo zitasasishwa, bidhaa mpya zitaundwa"
+
+msgid "Select CSV File"
+msgstr "Chagua Faili la CSV"
+
+msgid "Maximum file size: 10MB"
+msgstr "Ukubwa wa juu wa faili: 10MB"
+
+msgid "Download CSV Template"
+msgstr "Pakua Kiolezo cha CSV"
+
+msgid "Import CSV"
+msgstr "Leta CSV"
+
+msgid "Import Products from Excel"
+msgstr "Leta Bidhaa kutoka Excel"
+
+msgid "Excel Format Requirements:"
+msgstr "Masharti ya Muundo wa Excel:"
+
+msgid "File must be in Excel format (.xlsx or .xls)"
+msgstr "Faili lazima liwe katika muundo wa Excel (.xlsx au .xls)"
+
+msgid "Uses first sheet or sheet named \"Products\""
+msgstr "Hutumia karatasi ya kwanza au karatasi yenye jina \"Products\""
+
+msgid "Select Excel File"
+msgstr "Chagua Faili la Excel"
+
+msgid "Download Excel Template"
+msgstr "Pakua Kiolezo cha Excel"
+
+msgid "Import Excel"
+msgstr "Leta Excel"
+
+msgid "Confirm Bulk Delete"
+msgstr "Thibitisha Kufuta kwa Wingi"
+
+msgid "Warning:"
+msgstr "Tahadhari:"
+
+msgid "This action cannot be undone!"
+msgstr "Kitendo hiki hakiwezi kutenduliwa!"
+
+msgid "Delete Products"
+msgstr "Futa Bidhaa"
+
+msgid "%(minutes)s min"
+msgstr "dak %(minutes)s"
+
+msgid "Showing %(start)s to %(end)s of %(total)s products"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya bidhaa %(total)s"
+
+msgid "%(name)s pagination"
+msgstr "Kurasa za %(name)s"
+
+msgid "Station field: \"kitchen\", \"bar\", \"buffet\", or \"service\" (defaults to \"kitchen\" if not specified)"
+msgstr "Safu ya station: \"kitchen\", \"bar\", \"buffet\" au \"service\" (isipojazwa itakuwa \"kitchen\")"
+
+msgid "Are you sure you want to delete the following <strong id=\"deleteCount\">0</strong> product(s)?"
+msgstr "Una uhakika unataka kufuta bidhaa <strong id=\"deleteCount\">0</strong> zifuatazo?"
+
+msgid "Categories Management"
+msgstr "Usimamizi wa Makundi"
+
+msgid "Manage menu categories and subcategories"
+msgstr "Simamia makundi na vikundi vya menyu"
+
+msgid "Main Categories"
+msgstr "Makundi Makuu"
+
+msgid "Subcategories"
+msgstr "Vikundi"
+
+msgid "Search Categories"
+msgstr "Tafuta Makundi"
+
+msgid "Search by category name..."
+msgstr "Tafuta kwa jina la kundi..."
+
+msgid "All Status"
+msgstr "Hali Zote"
+
+msgid "Add Main Category"
+msgstr "Ongeza Kundi Kuu"
+
+msgid "Edit Category"
+msgstr "Hariri Kundi"
+
+msgid "Deactivate"
+msgstr "Simamisha"
+
+msgid "Activate"
+msgstr "Washa"
+
+msgid "Delete Category"
+msgstr "Futa Kundi"
+
+msgid "No main categories found"
+msgstr "Hakuna makundi makuu yaliyopatikana"
+
+msgid "Categories pagination"
+msgstr "Kurasa za makundi"
+
+msgid "Add Subcategory"
+msgstr "Ongeza Kikundi"
+
+msgid "Search subcategories..."
+msgstr "Tafuta vikundi..."
+
+msgid "Subcategory"
+msgstr "Kikundi"
+
+msgid "Products"
+msgstr "Bidhaa"
+
+msgid "Edit Subcategory"
+msgstr "Hariri Kikundi"
+
+msgid "Delete Subcategory"
+msgstr "Futa Kikundi"
+
+msgid "No subcategories found"
+msgstr "Hakuna vikundi vilivyopatikana"
+
+msgid "Category Name"
+msgstr "Jina la Kundi"
+
+msgid "Category Image"
+msgstr "Picha ya Kundi"
+
+msgid "Upload an image for this category (JPG, PNG, GIF - Max: 5MB)"
+msgstr "Pakia picha ya kundi hili (JPG, PNG, GIF - Juu: 5MB)"
+
+msgid "Active Category"
+msgstr "Kundi Linatumika"
+
+msgid "Add Category"
+msgstr "Ongeza Kundi"
+
+msgid "Edit Main Category"
+msgstr "Hariri Kundi Kuu"
+
+msgid "Upload a new image to replace the current one (optional)"
+msgstr "Pakia picha mpya kubadilisha iliyopo (si lazima)"
+
+msgid "Update Category"
+msgstr "Sasisha Kundi"
+
+msgid "Subcategory Name"
+msgstr "Jina la Kikundi"
+
+msgid "Active Subcategory"
+msgstr "Kikundi Kinatumika"
+
+msgid "Update Subcategory"
+msgstr "Sasisha Kikundi"
+
+msgid "No description provided"
+msgstr "Hakuna maelezo"
+
+msgid "Are you sure you want to delete the category \"{name}\"?"
+msgstr "Una uhakika unataka kufuta kundi \"{name}\"?"
+
+msgid "WARNING: This will also delete ALL subcategories and products in this category."
+msgstr "TAHADHARI: Hii itafuta pia VIKUNDI na BIDHAA ZOTE katika kundi hili."
+
+msgid "Failed to delete category"
+msgstr "Imeshindikana kufuta kundi"
+
+msgid "Are you sure you want to delete the subcategory \"{name}\"?"
+msgstr "Una uhakika unataka kufuta kikundi \"{name}\"?"
+
+msgid "WARNING: This will also delete ALL products in this subcategory."
+msgstr "TAHADHARI: Hii itafuta pia BIDHAA ZOTE katika kikundi hiki."
+
+msgid "Failed to delete subcategory"
+msgstr "Imeshindikana kufuta kikundi"
+
+msgid "Are you sure you want to deactivate this category?"
+msgstr "Una uhakika unataka kusimamisha kundi hili?"
+
+msgid "Are you sure you want to activate this category?"
+msgstr "Una uhakika unataka kuwasha kundi hili?"
+
+msgid "Failed to update category status"
+msgstr "Imeshindikana kubadilisha hali ya kundi"
+
+msgid "Are you sure you want to deactivate this subcategory?"
+msgstr "Una uhakika unataka kusimamisha kikundi hiki?"
+
+msgid "Are you sure you want to activate this subcategory?"
+msgstr "Una uhakika unataka kuwasha kikundi hiki?"
+
+msgid "Failed to update subcategory status"
+msgstr "Imeshindikana kubadilisha hali ya kikundi"
+
+msgid "Main category added successfully"
+msgstr "Kundi kuu limeongezwa"
+
+msgid "Main category updated successfully"
+msgstr "Kundi kuu limesasishwa"
+
+msgid "Subcategory added successfully"
+msgstr "Kikundi kimeongezwa"
+
+msgid "Subcategory updated successfully"
+msgstr "Kikundi kimesasishwa"
+
+msgid "No categories selected"
+msgstr "Hakuna kundi lililochaguliwa"
+
+msgid "Are you sure you want to delete 1 main category?"
+msgstr "Una uhakika unataka kufuta kundi kuu 1?"
+
+msgid "Are you sure you want to delete {count} main categories?"
+msgstr "Una uhakika unataka kufuta makundi makuu {count}?"
+
+msgid "WARNING: This will also delete ALL subcategories and products in these categories."
+msgstr "TAHADHARI: Hii itafuta pia VIKUNDI na BIDHAA ZOTE katika makundi haya."
+
+msgid "Failed to delete categories"
+msgstr "Imeshindikana kufuta makundi"
+
+msgid "No subcategories selected"
+msgstr "Hakuna kikundi kilichochaguliwa"
+
+msgid "Are you sure you want to delete 1 subcategory?"
+msgstr "Una uhakika unataka kufuta kikundi 1?"
+
+msgid "Are you sure you want to delete {count} subcategories?"
+msgstr "Una uhakika unataka kufuta vikundi {count}?"
+
+msgid "WARNING: This will also delete ALL products in these subcategories."
+msgstr "TAHADHARI: Hii itafuta pia BIDHAA ZOTE katika vikundi hivi."
+
+msgid "Failed to delete subcategories"
+msgstr "Imeshindikana kufuta vikundi"
+
+msgid "Showing <strong>%(total)s</strong> categories total"
+msgstr "Jumla ya makundi <strong>%(total)s</strong> yanaonyeshwa"
+
+msgid "Showing %(start)s to %(end)s of %(total)s categories"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya makundi %(total)s"
+
+msgid "Category will be assigned to: %(name)s"
+msgstr "Kundi litawekwa kwenye: %(name)s"
+
+msgid "Preparation Time"
+msgstr "Muda wa Maandalizi"
+
+msgid "Added"
+msgstr "Iliongezwa"
+
+msgid "%(n)s units"
+msgstr "vipande %(n)s"
+
+msgid "%(n)s minutes"
+msgstr "dakika %(n)s"
+
+msgid "No category image set"
+msgstr "Kundi halina picha"
+
+msgid "Update Product"
+msgstr "Sasisha Bidhaa"
+
+msgid "Updating..."
+msgstr "Inasasisha..."
+
+msgid "Product images are managed at the category level. To change this image, edit the \"%(name)s\" category."
+msgstr "Picha za bidhaa husimamiwa kwenye ngazi ya kundi. Ili kubadilisha picha hii, hariri kundi la \"%(name)s\"."
+
+msgid "Tables Management"
+msgstr "Usimamizi wa Meza"
+
+msgid "Manage restaurant tables and seating arrangements"
+msgstr "Simamia meza za mgahawa na mpangilio wa viti"
+
+msgid "Add Table"
+msgstr "Ongeza Meza"
+
+msgid "Search Tables"
+msgstr "Tafuta Meza"
+
+msgid "Search by table number..."
+msgstr "Tafuta kwa namba ya meza..."
+
+msgid "Edit Table"
+msgstr "Hariri Meza"
+
+msgid "Mark as Occupied"
+msgstr "Weka Ina Wateja"
+
+msgid "Mark as Available"
+msgstr "Weka Iko Wazi"
+
+msgid "Delete Table"
+msgstr "Futa Meza"
+
+msgid "No Tables Found"
+msgstr "Hakuna Meza Zilizopatikana"
+
+msgid "Start by adding your first table to the restaurant."
+msgstr "Anza kwa kuongeza meza yako ya kwanza kwenye mgahawa."
+
+msgid "Add First Table"
+msgstr "Ongeza Meza ya Kwanza"
+
+msgid "Tables pagination"
+msgstr "Kurasa za meza"
+
+msgid "Add New Table"
+msgstr "Ongeza Meza Mpya"
+
+msgid "Table Number"
+msgstr "Namba ya Meza"
+
+msgid "e.g., T01, T02, 1, 2, etc."
+msgstr "mf., T01, T02, 1, 2, n.k."
+
+msgid "Enter table identifier (letters and numbers allowed)"
+msgstr "Weka kitambulisho cha meza (herufi na namba zinaruhusiwa)"
+
+msgid "Capacity"
+msgstr "Idadi ya Viti"
+
+msgid "Maximum number of people this table can accommodate"
+msgstr "Idadi ya juu ya watu ambao meza hii inaweza kuchukua"
+
+msgid "Table is available"
+msgstr "Meza iko wazi"
+
+msgid "Update Table"
+msgstr "Sasisha Meza"
+
+msgid "Confirm Delete"
+msgstr "Thibitisha Kufuta"
+
+msgid "An error occurred while adding the table."
+msgstr "Hitilafu imetokea wakati wa kuongeza meza."
+
+msgid "Failed to load table data."
+msgstr "Imeshindikana kupakia taarifa za meza."
+
+msgid "An error occurred while loading table data."
+msgstr "Hitilafu imetokea wakati wa kupakia taarifa za meza."
+
+msgid "An error occurred while updating the table."
+msgstr "Hitilafu imetokea wakati wa kusasisha meza."
+
+msgid "Failed to update table status."
+msgstr "Imeshindikana kubadilisha hali ya meza."
+
+msgid "An error occurred while updating table status."
+msgstr "Hitilafu imetokea wakati wa kubadilisha hali ya meza."
+
+msgid "Failed to delete table."
+msgstr "Imeshindikana kufuta meza."
+
+msgid "An error occurred while deleting the table."
+msgstr "Hitilafu imetokea wakati wa kufuta meza."
+
+msgid "Table %(number)s"
+msgstr "Meza %(number)s"
+
+msgid "Capacity: %(capacity)s"
+msgstr "Viti: %(capacity)s"
+
+msgid "Showing %(start)s to %(end)s of %(total)s tables"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya meza %(total)s"
+
+msgid "Table will be assigned to: %(name)s"
+msgstr "Meza itawekwa kwenye: %(name)s"
+
+msgid "Are you sure you want to delete <strong id=\"deleteTableInfo\"></strong>?"
+msgstr "Una uhakika unataka kufuta <strong id=\"deleteTableInfo\"></strong>?"
+
+msgid "QR Code Management"
+msgstr "Usimamizi wa QR"
+
+msgid "Regenerate ordering QR code? The old one will stop working."
+msgstr "Tengeneza upya QR ya kuagiza? Ya zamani itaacha kufanya kazi."
+
+msgid "Copied!"
+msgstr "Imenakiliwa!"
+
+msgid "Manage your restaurant's QR codes for customer access"
+msgstr "Simamia QR za mgahawa wako ambazo wateja hutumia"
+
+msgid "Ordering QR Code"
+msgstr "QR ya Kuagiza"
+
+msgid "Customer Self-Service (Login Required)"
+msgstr "Mteja Anajihudumia (Lazima Aingie)"
+
+msgid "Ordering QR"
+msgstr "QR ya Kuagiza"
+
+msgid "Scan to login and place orders"
+msgstr "Skani ili uingie na uweke oda"
+
+msgid "QR Code ID:"
+msgstr "Kitambulisho cha QR:"
+
+msgid "Full URL:"
+msgstr "Kiungo Kamili:"
+
+msgid "Print Ordering QR"
+msgstr "Chapisha QR ya Kuagiza"
+
+msgid "Regenerate"
+msgstr "Tengeneza Upya"
+
+msgid "Menu View QR Code"
+msgstr "QR ya Kuangalia Menyu"
+
+msgid "View-Only Menu (No Login, No Ordering)"
+msgstr "Menyu ya Kuangalia Tu (Bila Kuingia, Bila Kuagiza)"
+
+msgid "Menu View QR"
+msgstr "QR ya Kuangalia Menyu"
+
+msgid "Scan to view menu only (no ordering)"
+msgstr "Skani kuangalia menyu tu (bila kuagiza)"
+
+msgid "Menu QR not yet generated"
+msgstr "QR ya menyu bado haijatengenezwa"
+
+msgid "Menu QR Code ID:"
+msgstr "Kitambulisho cha QR ya Menyu:"
+
+msgid "Print Menu QR"
+msgstr "Chapisha QR ya Menyu"
+
+msgid "Menu QR code will be auto-generated"
+msgstr "QR ya menyu itatengenezwa yenyewe"
+
+msgid "Showing %(counter)s table total"
+msgid_plural "Showing %(counter)s tables total"
+msgstr[0] "Inaonyesha meza %(counter)s kwa jumla"
+msgstr[1] "Inaonyesha meza %(counter)s kwa jumla"

@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Edit Promotion - Restaurant System{% endblock %}
+{% block title %}{% translate "Edit Promotion" %} - {% translate "Restaurant System" %}{% endblock %}
 
-{% block page_title %}Edit Promotion: {{ promotion.name }}{% endblock %}
-{% block page_description %}Modify your Happy Hour promotion settings{% endblock %}
+{% block page_title %}{% blocktranslate with name=promotion.name %}Edit Promotion: {{ name }}{% endblocktranslate %}{% endblock %}
+{% block page_description %}{% translate "Modify your Happy Hour promotion settings" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -64,7 +65,7 @@
 {% block content %}
 <div class="d-flex justify-content-end mb-4">
     <a href="{% url 'restaurant:manage_promotions' %}" class="btn btn-outline-secondary">
-        <i class="fas fa-arrow-left"></i> Back to Promotions
+        <i class="fas fa-arrow-left"></i> {% translate "Back to Promotions" %}
     </a>
 </div>
 
@@ -72,7 +73,7 @@
 {% if promotion.is_currently_active %}
     <div class="alert alert-warning">
         <i class="fas fa-exclamation-triangle"></i>
-        <strong>Currently Active!</strong> This promotion is currently running. Changes will take effect immediately.
+        <strong>{% translate "Currently Active!" %}</strong> {% translate "This promotion is currently running. Changes will take effect immediately." %}
     </div>
 {% endif %}
 
@@ -83,7 +84,7 @@
             
             <!-- Basic Information Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-info-circle"></i> Basic Information</h4>
+                <h4 class="section-title"><i class="fas fa-info-circle"></i> {% translate "Basic Information" %}</h4>
                 
                 <div class="row">
                     <div class="col-md-8 mb-3">
@@ -106,23 +107,23 @@
                 <!-- Restaurant Selector (Only in All Restaurants Mode) -->
                 {% if view_all_restaurants %}
                     <div class="mb-3">
-                        <label for="restaurant" class="form-label">Restaurant/Branch</label>
+                        <label for="restaurant" class="form-label">{% translate "Restaurant/Branch" %}</label>
                         <select name="restaurant" id="restaurant" class="form-select" required>
-                            <option value="">Select Restaurant...</option>
+                            <option value="">{% translate "Select Restaurant..." %}</option>
                             {% for rest in accessible_restaurants %}
                                 <option value="{{ rest.id }}" {% if promotion_restaurant and rest.id == promotion_restaurant.id %}selected{% endif %}>
-                                    {{ rest.name }} {% if rest.is_main_restaurant %}(Main){% else %}(Branch){% endif %}
+                                    {{ rest.name }} {% if rest.is_main_restaurant %}{% translate "(Main)" %}{% else %}{% translate "(Branch)" %}{% endif %}
                                 </option>
                             {% endfor %}
                         </select>
-                        <small class="text-muted">Select which restaurant this promotion belongs to</small>
+                        <small class="text-muted">{% translate "Select which restaurant this promotion belongs to" %}</small>
                     </div>
                 {% else %}
                     <div class="mb-3">
-                        <label class="form-label">Restaurant/Branch</label>
-                        <input type="text" class="form-control" value="{{ current_restaurant.name }} {% if current_restaurant.is_main_restaurant %}(Main){% else %}(Branch){% endif %}" disabled>
+                        <label class="form-label">{% translate "Restaurant/Branch" %}</label>
+                        <input type="text" class="form-control" value="{{ current_restaurant.name }} {% if current_restaurant.is_main_restaurant %}{% translate "(Main)" %}{% else %}{% translate "(Branch)" %}{% endif %}" disabled>
                         <input type="hidden" name="restaurant" value="{{ current_restaurant.id }}">
-                        <small class="text-muted">Promotion will be assigned to: {{ current_restaurant.name }}</small>
+                        <small class="text-muted">{% blocktranslate with name=current_restaurant.name %}Promotion will be assigned to: {{ name }}{% endblocktranslate %}</small>
                     </div>
                 {% endif %}
                 
@@ -137,7 +138,7 @@
             
             <!-- Timing Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-clock"></i> Timing & Schedule</h4>
+                <h4 class="section-title"><i class="fas fa-clock"></i> {% translate "Timing & Schedule" %}</h4>
                 
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -158,7 +159,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label">Days of Week</label>
+                    <label class="form-label">{% translate "Days of Week" %}</label>
                     <div class="days-checkbox-container">
                         {% for choice in form.days_selection %}
                             <div class="day-checkbox">
@@ -175,13 +176,13 @@
             
             <!-- Target Products Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-bullseye"></i> Target Products</h4>
+                <h4 class="section-title"><i class="fas fa-bullseye"></i> {% translate "Target Products" %}</h4>
                 
                 <div class="row">
                     <!-- Specific Products -->
                     <div class="col-md-4">
                         <div class="target-section">
-                            <h6><i class="fas fa-utensils"></i> Specific Products</h6>
+                            <h6><i class="fas fa-utensils"></i> {% translate "Specific Products" %}</h6>
                             <div class="checkbox-grid">
                                 {% for choice in form.products %}
                                     <div class="form-check">
@@ -191,7 +192,7 @@
                                         </label>
                                     </div>
                                 {% empty %}
-                                    <p class="text-muted small">No products available</p>
+                                    <p class="text-muted small">{% translate "No products available" %}</p>
                                 {% endfor %}
                             </div>
                         </div>
@@ -200,7 +201,7 @@
                     <!-- Main Categories -->
                     <div class="col-md-4">
                         <div class="target-section">
-                            <h6><i class="fas fa-tags"></i> Main Categories</h6>
+                            <h6><i class="fas fa-tags"></i> {% translate "Main Categories" %}</h6>
                             <div class="checkbox-grid">
                                 {% for choice in form.main_categories %}
                                     <div class="form-check">
@@ -210,7 +211,7 @@
                                         </label>
                                     </div>
                                 {% empty %}
-                                    <p class="text-muted small">No categories available</p>
+                                    <p class="text-muted small">{% translate "No categories available" %}</p>
                                 {% endfor %}
                             </div>
                         </div>
@@ -219,7 +220,7 @@
                     <!-- Sub Categories -->
                     <div class="col-md-4">
                         <div class="target-section">
-                            <h6><i class="fas fa-tag"></i> Sub Categories</h6>
+                            <h6><i class="fas fa-tag"></i> {% translate "Sub Categories" %}</h6>
                             <div class="checkbox-grid">
                                 {% for choice in form.sub_categories %}
                                     <div class="form-check">
@@ -229,7 +230,7 @@
                                         </label>
                                     </div>
                                 {% empty %}
-                                    <p class="text-muted small">No subcategories available</p>
+                                    <p class="text-muted small">{% translate "No subcategories available" %}</p>
                                 {% endfor %}
                             </div>
                         </div>
@@ -245,7 +246,7 @@
             
             <!-- Status Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-toggle-on"></i> Status</h4>
+                <h4 class="section-title"><i class="fas fa-toggle-on"></i> {% translate "Status" %}</h4>
                 <div class="form-check">
                     {{ form.is_active }}
                     <label for="{{ form.is_active.id_for_label }}" class="form-check-label">
@@ -260,10 +261,10 @@
             <!-- Action Buttons -->
             <div class="d-flex justify-content-between">
                 <a href="{% url 'restaurant:delete_promotion' promotion.id %}" class="btn btn-danger">
-                    <i class="fas fa-trash"></i> Delete Promotion
+                    <i class="fas fa-trash"></i> {% translate "Delete Promotion" %}
                 </a>
                 <button type="submit" class="btn btn-primary btn-lg">
-                    <i class="fas fa-save"></i> Save Changes
+                    <i class="fas fa-save"></i> {% translate "Save Changes" %}
                 </button>
             </div>
         </form>
@@ -273,20 +274,20 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-info-circle"></i> Promotion Info</h6>
+                <h6 class="mb-0"><i class="fas fa-info-circle"></i> {% translate "Promotion Info" %}</h6>
             </div>
             <div class="card-body">
-                <p><strong>Created:</strong> {{ promotion.created_at|date:"M d, Y H:i" }}</p>
-                <p><strong>Last Updated:</strong> {{ promotion.updated_at|date:"M d, Y H:i" }}</p>
-                <p><strong>Products Affected:</strong> {{ promotion.get_affected_products_count }}</p>
-                <p><strong>Status:</strong> 
+                <p><strong>{% translate "Created:" %}</strong> {{ promotion.created_at|date:"M d, Y H:i" }}</p>
+                <p><strong>{% translate "Last Updated:" %}</strong> {{ promotion.updated_at|date:"M d, Y H:i" }}</p>
+                <p><strong>{% translate "Products Affected:" %}</strong> {{ promotion.get_affected_products_count }}</p>
+                <p><strong>{% translate "Status:" %}</strong> 
                     <span class="badge {% if promotion.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                        {% if promotion.is_active %}Active{% else %}Inactive{% endif %}
+                        {% if promotion.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %}
                     </span>
                 </p>
                 {% if promotion.is_currently_active %}
                     <div class="alert alert-warning small">
-                        <i class="fas fa-fire"></i> Currently running!
+                        <i class="fas fa-fire"></i> {% translate "Currently running!" %}
                     </div>
                 {% endif %}
             </div>
@@ -299,6 +300,7 @@
 {{ selected_products|json_script:"selected-products-data" }}
 {{ selected_main_categories|json_script:"selected-main-categories-data" }}
 {{ selected_sub_categories|json_script:"selected-sub-categories-data" }}
+{% translate "Loading..." as t_loading %}{% translate "No products available" as t_no_products %}{% translate "No categories available" as t_no_categories %}{% translate "No subcategories available" as t_no_subcategories %}{% translate "Error loading products:" as t_err_loading %}{% translate "Failed to load products. Please try again." as t_load_failed %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const restaurantSelect = document.querySelector('#restaurant');
@@ -333,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const firstGrid = document.querySelector('.checkbox-grid');
             if (firstGrid) {
                 document.querySelectorAll('.checkbox-grid').forEach(grid => {
-                    grid.innerHTML = '<p class="text-muted small">Loading...</p>';
+                    grid.innerHTML = '<p class="text-muted small">' + "{{ t_loading|escapejs }}" + '</p>';
                 });
             }
             
@@ -343,21 +345,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     if (data.success) {
                         // Update Products
-                        updateCheckboxList('products', data.products, 'No products available');
+                        updateCheckboxList('products', data.products, "{{ t_no_products|escapejs }}");
                         
                         // Update Main Categories
-                        updateCheckboxList('main_categories', data.main_categories, 'No categories available');
+                        updateCheckboxList('main_categories', data.main_categories, "{{ t_no_categories|escapejs }}");
                         
                         // Update Sub Categories
-                        updateCheckboxList('sub_categories', data.sub_categories, 'No subcategories available');
+                        updateCheckboxList('sub_categories', data.sub_categories, "{{ t_no_subcategories|escapejs }}");
                     } else {
                         console.error('Error loading products:', data.message);
-                        alert('Error loading products: ' + data.message);
+                        alert("{{ t_err_loading|escapejs }} " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Failed to load products. Please try again.');
+                    alert("{{ t_load_failed|escapejs }}");
                 });
         });
     }

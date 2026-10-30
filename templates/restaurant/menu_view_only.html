@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Menu - {{ display_name }}{% endblock %}
+{% block title %}{% translate "Menu" %} - {{ display_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -558,7 +559,7 @@
 <!-- Restaurant Header Info -->
 <div class="restaurant-info-card">
     {% if restaurant_obj.logo %}
-        <img src="{{ restaurant_obj.logo.url }}" alt="Restaurant Logo" class="restaurant-logo">
+        <img src="{{ restaurant_obj.logo.url }}" alt="{% translate 'Restaurant Logo' %}" class="restaurant-logo">
     {% endif %}
     <h1>
         <i class="fas fa-utensils"></i> {{ display_name }}
@@ -575,20 +576,20 @@
                 <i class="fas fa-wifi"></i>
             </div>
             <div class="wifi-details">
-                <div class="wifi-label">Free WiFi Available</div>
+                <div class="wifi-label">{% translate "Free WiFi Available" %}</div>
                 <div class="wifi-credentials">
                     <div class="wifi-item">
-                        <span class="wifi-key">Network:</span>
+                        <span class="wifi-key">{% translate "Network:" %}</span>
                         <span class="wifi-value" id="wifi-ssid">{{ restaurant_obj.wifi_ssid }}</span>
-                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_ssid }}', this)" title="Copy network name">
+                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_ssid }}', this)" title="{% translate 'Copy network name' %}">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
                     {% if restaurant_obj.wifi_password %}
                     <div class="wifi-item">
-                        <span class="wifi-key">Password:</span>
+                        <span class="wifi-key">{% translate "Password:" %}</span>
                         <span class="wifi-value" id="wifi-password">{{ restaurant_obj.wifi_password }}</span>
-                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_password }}', this)" title="Copy password">
+                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_password }}', this)" title="{% translate 'Copy password' %}">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
@@ -604,7 +605,7 @@
 <div class="view-only-banner">
     <div class="container">
         <i class="fas fa-eye"></i>
-        <strong>Menu View Only</strong> - Please call our staff to place your order
+        <strong>{% translate "Menu View Only" %}</strong> - {% translate "Please call our staff to place your order" %}
     </div>
 </div>
 
@@ -614,8 +615,8 @@
         <div class="d-flex align-items-center">
             <i class="fas fa-info-circle fa-2x me-3"></i>
             <div>
-                <h5 class="mb-1">How to Order</h5>
-                <p>Browse our menu below and call our staff to place your order. We're happy to assist you!</p>
+                <h5 class="mb-1">{% translate "How to Order" %}</h5>
+                <p>{% translate "Browse our menu below and call our staff to place your order. We're happy to assist you!" %}</p>
             </div>
         </div>
     </div>
@@ -665,7 +666,7 @@
                                     <div class="product-list-right">
                                         <span class="product-list-price">{{ currency_symbol }}{{ product.price|floatformat:2 }}</span>
                                         <span class="product-list-status {% if product.is_available %}available{% else %}unavailable{% endif %}">
-                                            {% if product.is_available %}Available{% else %}Unavailable{% endif %}
+                                            {% if product.is_available %}{% translate "Available" %}{% else %}{% translate "Unavailable" %}{% endif %}
                                         </span>
                                     </div>
                                 </div>
@@ -680,16 +681,16 @@
     {% else %}
         <div class="text-center py-5">
             <i class="fas fa-utensils fa-4x text-muted mb-3"></i>
-            <h3 class="text-muted">No Menu Available</h3>
-            <p class="text-muted">Please contact the restaurant staff for menu information.</p>
+            <h3 class="text-muted">{% translate "No Menu Available" %}</h3>
+            <p class="text-muted">{% translate "Please contact the restaurant staff for menu information." %}</p>
         </div>
     {% endif %}
 
     <!-- Footer Call to Action -->
     <div class="footer-cta">
         <i class="fas fa-concierge-bell"></i>
-        <h4>Ready to Order?</h4>
-        <p>Please call our staff to place your order. We look forward to serving you!</p>
+        <h4>{% translate "Ready to Order?" %}</h4>
+        <p>{% translate "Please call our staff to place your order. We look forward to serving you!" %}</p>
     </div>
 </div>
 {% endblock %}

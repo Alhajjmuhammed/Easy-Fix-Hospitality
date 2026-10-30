@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 
-{% block title %}Cancel Order - Restaurant System{% endblock %}
+{% block title %}{% translate "Cancel Order" %} - Restaurant System{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -9,35 +9,35 @@
         <div class="card shadow">
             <div class="card-header bg-warning text-white">
                 <h4 class="mb-0">
-                    <i class="bi bi-x-circle"></i> Cancel Order #{{ order.order_number }}
+                    <i class="bi bi-x-circle"></i> {% blocktranslate with n=order.order_number %}Cancel Order #{{ n }}{% endblocktranslate %}
                 </h4>
             </div>
             <div class="card-body">
                 {% if not can_cancel %}
                     <div class="alert alert-danger">
                         <i class="bi bi-exclamation-triangle"></i>
-                        <strong>Cannot Cancel Order</strong><br>
-                        This order has already been {{ order.get_status_display|lower }} by the kitchen and cannot be cancelled.
+                        <strong>{% translate "Cannot Cancel Order" %}</strong><br>
+                        {% blocktranslate with status=order.get_status_display|lower %}This order has already been {{ status }} by the kitchen and cannot be cancelled.{% endblocktranslate %}
                     </div>
                     <div class="text-center mt-4">
                         <a href="{% if is_customer_care %}{% url 'orders:customer_care_dashboard' %}{% else %}{% url 'orders:my_orders' %}{% endif %}" class="btn btn-primary">
-                            <i class="bi bi-arrow-left"></i> Back to {% if is_customer_care %}Dashboard{% else %}My Orders{% endif %}
+                            <i class="bi bi-arrow-left"></i> {% if is_customer_care %}{% translate "Back to Dashboard" %}{% else %}{% translate "Back to My Orders" %}{% endif %}
                         </a>
                     </div>
                 {% else %}
                     <!-- Order Details -->
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <h6 class="text-muted">Order Information</h6>
-                            <p><strong>Order Number:</strong> #{{ order.order_number }}</p>
-                            <p><strong>{% if order.table_info %}Table{% else %}Type{% endif %}:</strong> {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</p>
-                            <p><strong>Status:</strong> 
+                            <h6 class="text-muted">{% translate "Order Information" %}</h6>
+                            <p><strong>{% translate "Order Number:" %}</strong> #{{ order.order_number }}</p>
+                            <p><strong>{% if order.table_info %}{% translate "Table:" %}{% else %}{% translate "Type:" %}{% endif %}</strong> {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</p>
+                            <p><strong>{% translate "Status:" %}</strong>
                                 <span class="badge bg-warning">{{ order.get_status_display }}</span>
                             </p>
-                            <p><strong>Order Date:</strong> {{ order.created_at|date:"M d, Y H:i" }}</p>
+                            <p><strong>{% translate "Order Date:" %}</strong> {{ order.created_at|date:"M d, Y H:i" }}</p>
                         </div>
                         <div class="col-md-6">
-                            <h6 class="text-muted">Order Items</h6>
+                            <h6 class="text-muted">{% translate "Order Items" %}</h6>
                             {% for item in order.order_items.all %}
                                 <div class="d-flex justify-content-between">
                                     <span>{{ item.product.name }} ({{ item.quantity }}x)</span>
@@ -46,7 +46,7 @@
                             {% endfor %}
                             <hr>
                             <div class="d-flex justify-content-between">
-                                <strong>Total: {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
+                                <strong>{% translate "Total:" %} {% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                             </div>
                         </div>
                     </div>
@@ -56,27 +56,28 @@
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="reason" class="form-label">
-                                <strong>Reason for Cancellation</strong>
-                                <small class="text-muted">(optional)</small>
+                                <strong>{% translate "Reason for Cancellation" %}</strong>
+                                <small class="text-muted">{% translate "(optional)" %}</small>
                             </label>
-                            <textarea name="reason" id="reason" class="form-control" rows="3" 
-                                    placeholder="Please provide a reason for cancelling this order...">{% if is_customer_care %}Order cancelled by customer care staff{% else %}Changed mind / No longer needed{% endif %}</textarea>
+                            <textarea name="reason" id="reason" class="form-control" rows="3"
+                                    placeholder="{% translate 'Please provide a reason for cancelling this order...' %}">{% if is_customer_care %}Order cancelled by customer care staff{% else %}Changed mind / No longer needed{% endif %}</textarea>
                         </div>
 
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle"></i>
-                            <strong>Please Note:</strong><br>
-                            • Cancelling this order will restore the items back to inventory<br>
-                            • Once cancelled, this action cannot be undone<br>
-                            • You can only cancel orders that haven't been confirmed by the kitchen
+                            <strong>{% translate "Please Note:" %}</strong><br>
+                            • {% translate "Cancelling this order will restore the items back to inventory" %}<br>
+                            • {% translate "Once cancelled, this action cannot be undone" %}<br>
+                            • {% translate "You can only cancel orders that haven't been confirmed by the kitchen" %}
                         </div>
 
+                        {% translate "Are you sure you want to cancel this order? This action cannot be undone." as t_confirm_cancel %}
                         <div class="d-flex justify-content-between">
                             <a href="{% if is_customer_care %}{% url 'orders:customer_care_dashboard' %}{% else %}{% url 'orders:my_orders' %}{% endif %}" class="btn btn-secondary">
-                                <i class="bi bi-arrow-left"></i> Back to {% if is_customer_care %}Dashboard{% else %}My Orders{% endif %}
+                                <i class="bi bi-arrow-left"></i> {% if is_customer_care %}{% translate "Back to Dashboard" %}{% else %}{% translate "Back to My Orders" %}{% endif %}
                             </a>
-                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to cancel this order? This action cannot be undone.')">
-                                <i class="bi bi-x-circle"></i> Cancel Order
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('{{ t_confirm_cancel|escapejs }}')">
+                                <i class="bi bi-x-circle"></i> {% translate "Cancel Order" %}
                             </button>
                         </div>
                     </form>
@@ -86,12 +87,14 @@
     </div>
 </div>
 
+{% translate "Are you sure you want to cancel this order?" as t_cancel_q %}
+{% translate "This action cannot be undone and the items will be returned to inventory." as t_cancel_note %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('cancelForm');
     if (form) {
         form.addEventListener('submit', function(e) {
-            const confirmation = confirm('Are you sure you want to cancel this order?\n\nThis action cannot be undone and the items will be returned to inventory.');
+            const confirmation = confirm("{{ t_cancel_q|escapejs }}" + '\n\n' + "{{ t_cancel_note|escapejs }}");
             if (!confirmation) {
                 e.preventDefault();
             }

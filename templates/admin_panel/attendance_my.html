@@ -1,6 +1,7 @@
 {% extends "admin_panel/base.html" %}
+{% load i18n %}
 
-{% block title %}My Attendance History{% endblock %}
+{% block title %}{% translate "My Attendance History" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -82,22 +83,22 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
-                <i class="bi bi-clock-history me-2" style="color: var(--accent-color);"></i>My Attendance History
+                <i class="bi bi-clock-history me-2" style="color: var(--accent-color);"></i>{% translate "My Attendance History" %}
             </h4>
         </div>
         <div class="d-flex align-items-center gap-3 flex-wrap">
             <div class="month-nav">
-                <a href="{% url 'attendance:my' %}?year={{ prev_year }}&month={{ prev_month }}" title="Previous month">
+                <a href="{% url 'attendance:my' %}?year={{ prev_year }}&month={{ prev_month }}" title="{% translate "Previous month" %}">
                     <i class="bi bi-chevron-left"></i>
                 </a>
                 <span class="month-nav-label">{{ month_name }}</span>
-                <a href="{% url 'attendance:my' %}?year={{ next_year }}&month={{ next_month }}" title="Next month">
+                <a href="{% url 'attendance:my' %}?year={{ next_year }}&month={{ next_month }}" title="{% translate "Next month" %}">
                     <i class="bi bi-chevron-right"></i>
                 </a>
             </div>
             <a href="{% url 'attendance:web_checkin' %}" class="btn btn-sm"
                style="background-color: var(--accent-color); color: #fff;">
-                <i class="bi bi-box-arrow-in-right me-1"></i>Check In / Out
+                <i class="bi bi-box-arrow-in-right me-1"></i>{% translate "Check In / Out" %}
             </a>
         </div>
     </div>
@@ -110,17 +111,17 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <h6 class="fw-bold mb-3" style="color: var(--primary-color);">
-                <i class="bi bi-calendar-week me-2" style="color: var(--accent-color);"></i>My Upcoming Shifts
+                <i class="bi bi-calendar-week me-2" style="color: var(--accent-color);"></i>{% translate "My Upcoming Shifts" %}
             </h6>
             <div class="d-flex flex-wrap gap-2">
                 {% for e in upcoming_shifts %}
                 <div class="border rounded px-3 py-2 {% if e.date == today %}border-primary{% endif %}" style="min-width: 130px;">
-                    <div class="small fw-semibold">{{ e.date|date:"D j M" }}{% if e.date == today %} <span class="badge bg-primary" style="font-size: 0.65rem;">Today</span>{% endif %}</div>
+                    <div class="small fw-semibold">{{ e.date|date:"D j M" }}{% if e.date == today %} <span class="badge bg-primary" style="font-size: 0.65rem;">{% translate "Today" %}</span>{% endif %}</div>
                     {% if e.kind == 'shift' and e.shift %}
                     <div class="time-mono">{{ e.shift.start_time|time:"H:i" }}–{{ e.shift.end_time|time:"H:i" }}</div>
                     <div class="small text-muted">{{ e.shift.name }}</div>
                     {% elif e.kind == 'shift' %}
-                    <div class="small text-muted">Shift to be confirmed</div>
+                    <div class="small text-muted">{% translate "Shift to be confirmed" %}</div>
                     {% else %}
                     <div class="small text-muted">{{ e.get_kind_display }}</div>
                     {% endif %}
@@ -137,25 +138,25 @@
         <div class="col-6 col-md-3">
             <div class="card summary-stat text-center py-3">
                 <div class="stat-val" style="color: var(--primary-color);" id="totalDays">—</div>
-                <div class="stat-lbl">Total Days</div>
+                <div class="stat-lbl">{% translate "Total Days" %}</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card summary-stat text-center py-3">
                 <div class="stat-val" style="color: var(--success-color);" id="presentDays">—</div>
-                <div class="stat-lbl">Days Present</div>
+                <div class="stat-lbl">{% translate "Days Present" %}</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card summary-stat text-center py-3">
                 <div class="stat-val" style="color: var(--warning-color);" id="lateDays">—</div>
-                <div class="stat-lbl">Late Days</div>
+                <div class="stat-lbl">{% translate "Late Days" %}</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card summary-stat text-center py-3">
                 <div class="stat-val" style="color: var(--danger-color);" id="overtimeDays">—</div>
-                <div class="stat-lbl">Overtime Days</div>
+                <div class="stat-lbl">{% translate "Overtime Days" %}</div>
             </div>
         </div>
     </div>
@@ -169,13 +170,13 @@
                 <table class="table table-hover my-table mb-0" id="historyTable">
                     <thead>
                         <tr>
-                            <th class="ps-4">Date</th>
-                            <th>Day</th>
-                            <th>Shift</th>
-                            <th>Check In</th>
-                            <th>Check Out</th>
-                            <th>Hours</th>
-                            <th>Flags</th>
+                            <th class="ps-4">{% translate "Date" %}</th>
+                            <th>{% translate "Day" %}</th>
+                            <th>{% translate "Shift" %}</th>
+                            <th>{% translate "Check In" %}</th>
+                            <th>{% translate "Check Out" %}</th>
+                            <th>{% translate "Hours" %}</th>
+                            <th>{% translate "Flags" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -187,7 +188,7 @@
                             <td class="ps-4 fw-semibold">
                                 {{ record.date|date:"N j, Y" }}
                                 {% if record.date == today %}
-                                    <span class="badge bg-primary ms-1" style="font-size: 0.68rem; vertical-align: middle;">Today</span>
+                                    <span class="badge bg-primary ms-1" style="font-size: 0.68rem; vertical-align: middle;">{% translate "Today" %}</span>
                                 {% endif %}
                             </td>
                             <td class="text-muted">{{ record.date|date:"D" }}</td>
@@ -209,13 +210,13 @@
                                 {% if record.check_out %}
                                     <span class="time-mono">{{ record.check_out|date:"H:i" }}</span>
                                 {% else %}
-                                    <span class="text-muted fst-italic small">In progress</span>
+                                    <span class="text-muted fst-italic small">{% translate "In progress" %}</span>
                                 {% endif %}
                             </td>
                             <td class="hours-cell">
                                 {% if record.work_minutes %}
                                     <span class="hours-fmt" data-minutes="{{ record.work_minutes }}">
-                                        {{ record.work_minutes }} min
+                                        {% blocktranslate with n=record.work_minutes %}{{ n }} min{% endblocktranslate %}
                                     </span>
                                 {% else %}
                                     <span class="text-muted">—</span>
@@ -223,16 +224,16 @@
                             </td>
                             <td>
                                 {% if record.is_late %}
-                                    <span class="badge bg-warning text-dark me-1" title="Late by {{ record.late_minutes }} min">
-                                        <i class="bi bi-clock-history me-1"></i>Late
+                                    <span class="badge bg-warning text-dark me-1" title="{% blocktranslate with n=record.late_minutes %}Late by {{ n }} min{% endblocktranslate %}">
+                                        <i class="bi bi-clock-history me-1"></i>{% translate "Late" %}
                                         {% if record.late_minutes %}
                                             +{{ record.late_minutes }}m
                                         {% endif %}
                                     </span>
                                 {% endif %}
                                 {% if record.is_overtime %}
-                                    <span class="badge bg-danger" title="Overtime {{ record.overtime_minutes }} min">
-                                        <i class="bi bi-lightning me-1"></i>OT
+                                    <span class="badge bg-danger" title="{% blocktranslate with n=record.overtime_minutes %}Overtime {{ n }} min{% endblocktranslate %}">
+                                        <i class="bi bi-lightning me-1"></i>{% translate "OT" %}
                                         {% if record.overtime_minutes %}
                                             +{{ record.overtime_minutes }}m
                                         {% endif %}
@@ -240,7 +241,7 @@
                                 {% endif %}
                                 {% if not record.is_late and not record.is_overtime %}
                                     <span class="badge bg-success">
-                                        <i class="bi bi-check-circle me-1"></i>On Time
+                                        <i class="bi bi-check-circle me-1"></i>{% translate "On Time" %}
                                     </span>
                                 {% endif %}
                             </td>
@@ -252,11 +253,11 @@
             {% else %}
             <div class="text-center py-5 text-muted">
                 <i class="bi bi-calendar-x display-5 mb-3 d-block" style="opacity: 0.3;"></i>
-                <p class="mb-1 fw-semibold">No attendance records for {{ month_name }}.</p>
-                <p class="small mb-3">Records will appear here once you check in.</p>
+                <p class="mb-1 fw-semibold">{% blocktranslate %}No attendance records for {{ month_name }}.{% endblocktranslate %}</p>
+                <p class="small mb-3">{% translate "Records will appear here once you check in." %}</p>
                 <a href="{% url 'attendance:web_checkin' %}" class="btn btn-sm"
                    style="background-color: var(--accent-color); color: #fff;">
-                    <i class="bi bi-box-arrow-in-right me-1"></i>Check In Now
+                    <i class="bi bi-box-arrow-in-right me-1"></i>{% translate "Check In Now" %}
                 </a>
             </div>
             {% endif %}

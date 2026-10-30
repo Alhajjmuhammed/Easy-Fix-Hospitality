@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Add New Branch{% endblock %}
+{% block title %}{% translate "Add New Branch" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -535,11 +536,11 @@
             <div class="page-header">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
-                        <h1><i class="fas fa-plus me-2"></i>Add New Branch</h1>
-                        <p>Create a new branch location for your restaurant network</p>
+                        <h1><i class="fas fa-plus me-2"></i>{% translate "Add New Branch" %}</h1>
+                        <p>{% translate "Create a new branch location for your restaurant network" %}</p>
                     </div>
                     <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-light">
-                        <i class="fas fa-arrow-left me-1"></i>Back
+                        <i class="fas fa-arrow-left me-1"></i>{% translate "Back" %}
                     </a>
                 </div>
             </div>
@@ -556,28 +557,28 @@
                 <div class="col-12">
                     <div class="main-restaurant-info">
                         <h5 class="mb-3 text-primary">
-                            <i class="fas fa-building me-2"></i>Main Restaurant Details
+                            <i class="fas fa-building me-2"></i>{% translate "Main Restaurant Details" %}
                         </h5>
                         <div class="row g-3">
                     <div class="col-md-6">
                         <div class="mb-2">
-                            <strong>Restaurant Name:</strong><br>
+                            <strong>{% translate "Restaurant Name:" %}</strong><br>
                             <span class="text-muted">{{ main_restaurant.name }}</span>
                         </div>
                         <div class="mb-2">
-                            <strong>Owner:</strong><br>
+                            <strong>{% translate "Owner:" %}</strong><br>
                             <span class="text-muted">{{ main_restaurant.main_owner.username }}</span>
                         </div>
                     </div>
                     <div class="col-md-6">
                         {% if main_restaurant.address %}
                         <div class="mb-2">
-                            <strong>Address:</strong><br>
+                            <strong>{% translate "Address:" %}</strong><br>
                             <span class="text-muted">{{ main_restaurant.address }}</span>
                         </div>
                         {% endif %}
                         <div class="mb-2">
-                            <strong>Tax Rate:</strong><br>
+                            <strong>{% translate "Tax Rate:" %}</strong><br>
                             <span class="text-muted">{{ main_restaurant.tax_rate_percentage|floatformat:1 }}%</span>
                         </div>
                     </div>
@@ -594,7 +595,7 @@
                     </div>
                     <div class="flex-grow-1 ms-3">
                         <h4 class="alert-heading mb-3">
-                            <i class="fas fa-store"></i> Branch "{{ branch_name }}" Created Successfully!
+                            <i class="fas fa-store"></i> {% blocktranslate with name=branch_name %}Branch "{{ name }}" Created Successfully!{% endblocktranslate %}
                         </h4>
                         
                         <div class="row">
@@ -602,18 +603,18 @@
                                 <div class="card bg-light border-0 mb-3">
                                     <div class="card-header bg-primary text-white">
                                         <h6 class="mb-0">
-                                            <i class="fas fa-user-shield"></i> Branch Owner Login Credentials
+                                            <i class="fas fa-user-shield"></i> {% translate "Branch Owner Login Credentials" %}
                                         </h6>
                                     </div>
                                     <div class="card-body">
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label class="form-label fw-bold text-muted">Full Name:</label>
+                                                    <label class="form-label fw-bold text-muted">{% translate "Full Name:" %}</label>
                                                     <div class="h6">{{ branch_credentials.full_name }}</div>
                                                 </div>
                                                 <div class="mb-3">
-                                                    <label class="form-label fw-bold text-muted">Username:</label>
+                                                    <label class="form-label fw-bold text-muted">{% translate "Username:" %}</label>
                                                     <div class="input-group">
                                                         <input type="text" class="form-control fw-bold" value="{{ branch_credentials.username }}" readonly>
                                                         <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.username|escapejs }}', this)">
@@ -622,7 +623,7 @@
                                                     </div>
                                                 </div>
                                                 <div class="mb-3">
-                                                    <label class="form-label fw-bold text-muted">Email:</label>
+                                                    <label class="form-label fw-bold text-muted">{% translate "Email:" %}</label>
                                                     <div class="input-group">
                                                         <input type="text" class="form-control fw-bold" value="{{ branch_credentials.email }}" readonly>
                                                         <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.email|escapejs }}', this)">
@@ -633,7 +634,7 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label class="form-label fw-bold text-muted">Password:</label>
+                                                    <label class="form-label fw-bold text-muted">{% translate "Password:" %}</label>
                                                     <div class="input-group">
                                                         <input type="password" class="form-control fw-bold text-primary" id="branchCredPassword" value="{{ branch_credentials.password }}" readonly>
                                                         <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('{{ branch_credentials.password|escapejs }}', this)">
@@ -642,13 +643,13 @@
                                                     </div>
                                                 </div>
                                                 <div class="mb-3">
-                                                    <label class="form-label fw-bold text-muted">Role:</label>
+                                                    <label class="form-label fw-bold text-muted">{% translate "Role:" %}</label>
                                                     <div class="h6">
                                                         <span class="badge bg-info">{{ branch_credentials.role }}</span>
                                                     </div>
                                                 </div>
                                                 <div class="mb-3">
-                                                    <label class="form-label fw-bold text-muted">Login URL:</label>
+                                                    <label class="form-label fw-bold text-muted">{% translate "Login URL:" %}</label>
                                                     <div class="input-group">
                                                         <input type="text" class="form-control" value="http://{{ request.get_host }}/accounts/login/" readonly>
                                                         <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('http://{{ request.get_host }}/accounts/login/', this)">
@@ -664,14 +665,14 @@
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div class="text-muted">
                                                 <i class="fas fa-info-circle"></i>
-                                                <strong>Important:</strong> Save these credentials securely. The password cannot be recovered.
+                                                <strong>{% translate "Important:" %}</strong> {% translate "Save these credentials securely. The password cannot be recovered." %}
                                             </div>
                                             <div>
                                                 <button type="button" class="btn btn-success me-2" onclick="printCredentials()">
-                                                    <i class="fas fa-print"></i> Print
+                                                    <i class="fas fa-print"></i> {% translate "Print" %}
                                                 </button>
                                                 <button type="button" class="btn btn-primary" onclick="copyAllCredentials()">
-                                                    <i class="fas fa-clipboard"></i> Copy All
+                                                    <i class="fas fa-clipboard"></i> {% translate "Copy All" %}
                                                 </button>
                                             </div>
                                         </div>
@@ -682,10 +683,10 @@
                         
                         <div class="mt-3">
                             <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-outline-primary">
-                                <i class="fas fa-list"></i> View All Branches
+                                <i class="fas fa-list"></i> {% translate "View All Branches" %}
                             </a>
                             <a href="{% url 'admin_panel:add_branch' %}" class="btn btn-outline-secondary ms-2">
-                                <i class="fas fa-plus"></i> Add Another Branch
+                                <i class="fas fa-plus"></i> {% translate "Add Another Branch" %}
                             </a>
                         </div>
                     </div>
@@ -699,7 +700,7 @@
                 <div class="col-12">
                     <div class="form-container">
                         <div class="form-header">
-                            <h3><i class="fas fa-code-branch me-2"></i>Branch Information</h3>
+                            <h3><i class="fas fa-code-branch me-2"></i>{% translate "Branch Information" %}</h3>
                         </div>
                         
                         <div class="form-body">
@@ -710,19 +711,19 @@
                                 <div class="form-section">
                                     <div class="section-title">
                                         <i class="fas fa-info-circle"></i>
-                                        Basic Information
+                                        {% translate "Basic Information" %}
                                     </div>
                                     
                                     <div class="row g-3 mb-3">
                                         <div class="col-lg-6">
                                             <div class="form-row">
                                                 <label for="name" class="form-label">
-                                                    <i class="fas fa-store-alt me-2 text-primary"></i>Branch Name <span class="required">*</span>
+                                                    <i class="fas fa-store-alt me-2 text-primary"></i>{% translate "Branch Name" %} <span class="required">*</span>
                                                 </label>
                                                 <input type="text" class="form-control" id="name" name="name" 
-                                                       placeholder="e.g., Downtown Branch, Mall Location" required>
+                                                       placeholder="{% translate 'e.g., Downtown Branch, Mall Location' %}" required>
                                                 <div class="help-text">
-                                                    <i class="fas fa-info-circle me-1"></i>Enter a descriptive name for this branch location
+                                                    <i class="fas fa-info-circle me-1"></i>{% translate "Enter a descriptive name for this branch location" %}
                                                 </div>
                                             </div>
                                         </div>
@@ -730,12 +731,12 @@
                                         <div class="col-lg-6">
                                             <div class="form-row">
                                                 <label for="address" class="form-label">
-                                                    <i class="fas fa-map-marker-alt me-2 text-primary"></i>Address <span class="required">*</span>
+                                                    <i class="fas fa-map-marker-alt me-2 text-primary"></i>{% translate "Address" %} <span class="required">*</span>
                                                 </label>
                                                 <textarea class="form-control" id="address" name="address" rows="3"
-                                                          placeholder="Full address of the branch location" required></textarea>
+                                                          placeholder="{% translate 'Full address of the branch location' %}" required></textarea>
                                                 <div class="help-text">
-                                                    <i class="fas fa-info-circle me-1"></i>Complete address including street, city, and postal code
+                                                    <i class="fas fa-info-circle me-1"></i>{% translate "Complete address including street, city, and postal code" %}
                                                 </div>
                                             </div>
                                         </div>
@@ -745,12 +746,12 @@
                                         <div class="col-lg-12">
                                             <div class="form-row">
                                                 <label for="description" class="form-label">
-                                                    <i class="fas fa-align-left me-2 text-primary"></i>Description
+                                                    <i class="fas fa-align-left me-2 text-primary"></i>{% translate "Description" %}
                                                 </label>
                                                 <textarea class="form-control" id="description" name="description" rows="2"
-                                                          placeholder="Brief description of this branch location..."></textarea>
+                                                          placeholder="{% translate 'Brief description of this branch location...' %}"></textarea>
                                                 <div class="help-text">
-                                                    <i class="fas fa-info-circle me-1"></i>Optional description for this branch
+                                                    <i class="fas fa-info-circle me-1"></i>{% translate "Optional description for this branch" %}
                                                 </div>
                                             </div>
                                         </div>
@@ -761,13 +762,13 @@
                         <div class="form-section">
                             <div class="section-title">
                                 <i class="fas fa-globe"></i>
-                                Remote Ordering
+                                {% translate "Remote Ordering" %}
                             </div>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="allow_remote_orders" name="allow_remote_orders">
                                 <label class="form-check-label" for="allow_remote_orders">
-                                    <strong>Allow Orders from Anywhere</strong>
-                                    <div class="help-text mt-1">Customers can see this branch in the mobile app and place delivery or pickup orders without scanning a QR code.</div>
+                                    <strong>{% translate "Allow Orders from Anywhere" %}</strong>
+                                    <div class="help-text mt-1">{% translate "Customers can see this branch in the mobile app and place delivery or pickup orders without scanning a QR code." %}</div>
                                 </label>
                             </div>
                         </div>
@@ -776,32 +777,32 @@
                         <div class="form-section">
                             <div class="section-title">
                                 <i class="fas fa-user-tie"></i>
-                                Branch Owner Management
+                                {% translate "Branch Owner Management" %}
                             </div>
                             
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="auto_create_credentials" name="auto_create_credentials">
                                 <label class="form-check-label" for="auto_create_credentials">
-                                    <strong style="color: #1976D2; font-size: 16px;">✓ Create new branch owner credentials (Username & Password)</strong>
-                                    <br><small class="text-muted">Check this to automatically create a new user account with username and password for the branch owner</small>
+                                    <strong style="color: #1976D2; font-size: 16px;">✓ {% translate "Create new branch owner credentials (Username & Password)" %}</strong>
+                                    <br><small class="text-muted">{% translate "Check this to automatically create a new user account with username and password for the branch owner" %}</small>
                                 </label>
                             </div>
                             
                             <div id="new_credentials_section" class="credentials-section" style="display: none;">
                                 <h6 class="section-subtitle">
-                                    <i class="fas fa-user-plus me-2"></i>New Branch Owner Details
+                                    <i class="fas fa-user-plus me-2"></i>{% translate "New Branch Owner Details" %}
                                 </h6>
                                 
                                 <div class="row g-3">
                                     <div class="col-lg-6">
                                         <div class="form-row">
                                             <label for="branch_owner_username" class="form-label">
-                                                <i class="fas fa-user me-2 text-primary"></i>Username <span class="required">*</span>
+                                                <i class="fas fa-user me-2 text-primary"></i>{% translate "Username" %} <span class="required">*</span>
                                             </label>
                                             <input type="text" class="form-control" id="branch_owner_username" name="branch_owner_username" 
-                                                   placeholder="e.g., downtown_manager">
+                                                   placeholder="{% translate 'e.g., downtown_manager' %}">
                                             <div class="help-text">
-                                                <i class="fas fa-info-circle me-1"></i>This will be their login username
+                                                <i class="fas fa-info-circle me-1"></i>{% translate "This will be their login username" %}
                                             </div>
                                         </div>
                                     </div>
@@ -809,12 +810,12 @@
                                     <div class="col-lg-6">
                                         <div class="form-row">
                                             <label for="branch_owner_email" class="form-label">
-                                                <i class="fas fa-envelope me-2 text-primary"></i>Email <span class="required">*</span>
+                                                <i class="fas fa-envelope me-2 text-primary"></i>{% translate "Email" %} <span class="required">*</span>
                                             </label>
                                             <input type="email" class="form-control" id="branch_owner_email" name="branch_owner_email" 
                                                    placeholder="manager@example.com">
                                             <div class="help-text">
-                                                <i class="fas fa-info-circle me-1"></i>Email address for the branch owner
+                                                <i class="fas fa-info-circle me-1"></i>{% translate "Email address for the branch owner" %}
                                             </div>
                                         </div>
                                     </div>
@@ -822,11 +823,11 @@
                                     <div class="col-lg-6">
                                         <div class="form-row">
                                             <label for="branch_owner_password" class="form-label">
-                                                <i class="fas fa-lock me-2 text-primary"></i>Password <span class="required">*</span>
+                                                <i class="fas fa-lock me-2 text-primary"></i>{% translate "Password" %} <span class="required">*</span>
                                             </label>
                                             <div class="input-group">
                                                 <input type="password" class="form-control" id="branch_owner_password" name="branch_owner_password" 
-                                                       placeholder="Enter secure password" minlength="8">
+                                                       placeholder="{% translate 'Enter secure password' %}" minlength="8">
                                                 <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
@@ -835,7 +836,7 @@
                                                 </button>
                                             </div>
                                             <div class="help-text">
-                                                <i class="fas fa-shield-alt me-1"></i>Minimum 8 characters. Use the eye icon to show/hide or dice icon to generate
+                                                <i class="fas fa-shield-alt me-1"></i>{% translate "Minimum 8 characters. Use the eye icon to show/hide or dice icon to generate" %}
                                             </div>
                                         </div>
                                     </div>
@@ -843,12 +844,12 @@
                                     <div class="col-lg-6">
                                         <div class="form-row">
                                             <label for="branch_owner_name" class="form-label">
-                                                <i class="fas fa-id-card me-2 text-primary"></i>Full Name
+                                                <i class="fas fa-id-card me-2 text-primary"></i>{% translate "Full Name" %}
                                             </label>
                                             <input type="text" class="form-control" id="branch_owner_name" name="branch_owner_name" 
                                                    placeholder="John Doe">
                                             <div class="help-text">
-                                                <i class="fas fa-info-circle me-1"></i>Full name of the branch owner
+                                                <i class="fas fa-info-circle me-1"></i>{% translate "Full name of the branch owner" %}
                                             </div>
                                         </div>
                                     </div>
@@ -858,33 +859,33 @@
                                     <div class="d-flex align-items-start">
                                         <i class="fas fa-info-circle text-info me-3 mt-1"></i>
                                         <div>
-                                            <strong>Custom Password:</strong> You can set your own secure password for the branch owner or use the generate button for a random secure password.
+                                            <strong>{% translate "Custom Password:" %}</strong> {% translate "You can set your own secure password for the branch owner or use the generate button for a random secure password." %}
                                         </div>
                                     </div>
-                                    The branch owner will have full control over their branch location.
+                                    {% translate "The branch owner will have full control over their branch location." %}
                             </div>
                             
                             <div id="existing_user_section" class="mt-3">
                                 <div class="divider-section">
                                     <div class="divider-line"></div>
-                                    <span class="divider-text">OR</span>
+                                    <span class="divider-text">{% translate "OR" %}</span>
                                     <div class="divider-line"></div>
                                 </div>
                                 
                                 <h6 class="section-subtitle">
-                                    <i class="fas fa-user-check me-2"></i>Use Existing User (Optional)
+                                    <i class="fas fa-user-check me-2"></i>{% translate "Use Existing User (Optional)" %}
                                 </h6>
                                 
                                 <div class="row g-3">
                                     <div class="col-lg-8">
                                         <div class="form-row">
                                             <label for="existing_branch_owner" class="form-label">
-                                                <i class="fas fa-search me-2 text-primary"></i>Existing Username
+                                                <i class="fas fa-search me-2 text-primary"></i>{% translate "Existing Username" %}
                                             </label>
                                             <input type="text" class="form-control" id="existing_branch_owner" name="branch_owner_username_existing" 
-                                                   placeholder="Enter existing username (optional)">
+                                                   placeholder="{% translate 'Enter existing username (optional)' %}">
                                             <div class="help-text">
-                                                <i class="fas fa-info-circle me-1"></i>Leave blank to manage this branch yourself, or enter username of existing user to assign as branch owner.
+                                                <i class="fas fa-info-circle me-1"></i>{% translate "Leave blank to manage this branch yourself, or enter username of existing user to assign as branch owner." %}
                                             </div>
                                         </div>
                                     </div>
@@ -895,10 +896,10 @@
                         <!-- Default Settings Section -->
                         <div class="form-section">
                             <div class="section-title">
-                                <i class="fas fa-cog me-2"></i>Default Settings
+                                <i class="fas fa-cog me-2"></i>{% translate "Default Settings" %}
                             </div>
                             <p class="text-muted mb-3">
-                                <i class="fas fa-info-circle me-1"></i>These settings will be inherited from your main restaurant and can be changed later.
+                                <i class="fas fa-info-circle me-1"></i>{% translate "These settings will be inherited from your main restaurant and can be changed later." %}
                             </p>
                             
                             {% if main_restaurant %}
@@ -909,10 +910,10 @@
                                             <input class="form-check-input" type="checkbox" id="auto_print_kot" 
                                                    {% if main_restaurant.auto_print_kot %}checked{% endif %} disabled>
                                             <label class="form-check-label fw-semibold" for="auto_print_kot">
-                                                <i class="fas fa-utensils me-2 text-primary"></i>Auto Print KOT
+                                                <i class="fas fa-utensils me-2 text-primary"></i>{% translate "Auto Print KOT" %}
                                             </label>
                                         </div>
-                                        <small class="text-muted">Kitchen Order Tickets print automatically</small>
+                                        <small class="text-muted">{% translate "Kitchen Order Tickets print automatically" %}</small>
                                     </div>
                                 </div>
                                 
@@ -922,10 +923,10 @@
                                             <input class="form-check-input" type="checkbox" id="auto_print_bot" 
                                                    {% if main_restaurant.auto_print_bot %}checked{% endif %} disabled>
                                             <label class="form-check-label fw-semibold" for="auto_print_bot">
-                                                <i class="fas fa-cocktail me-2 text-primary"></i>Auto Print BOT
+                                                <i class="fas fa-cocktail me-2 text-primary"></i>{% translate "Auto Print BOT" %}
                                             </label>
                                         </div>
-                                        <small class="text-muted">Bar Order Tickets print automatically</small>
+                                        <small class="text-muted">{% translate "Bar Order Tickets print automatically" %}</small>
                                     </div>
                                 </div>
                                 
@@ -935,10 +936,10 @@
                                             <input class="form-check-input" type="checkbox" id="auto_print_receipt" 
                                                    {% if main_restaurant.auto_print_receipt %}checked{% endif %} disabled>
                                             <label class="form-check-label fw-semibold" for="auto_print_receipt">
-                                                <i class="fas fa-receipt me-2 text-primary"></i>Auto Print Receipt
+                                                <i class="fas fa-receipt me-2 text-primary"></i>{% translate "Auto Print Receipt" %}
                                             </label>
                                         </div>
-                                        <small class="text-muted">Payment receipts print automatically</small>
+                                        <small class="text-muted">{% translate "Payment receipts print automatically" %}</small>
                                     </div>
                                 </div>
                                 
@@ -946,11 +947,11 @@
                                     <div class="settings-card">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <label class="form-label fw-semibold mb-0">
-                                                <i class="fas fa-percentage me-2 text-primary"></i>Tax Rate
+                                                <i class="fas fa-percentage me-2 text-primary"></i>{% translate "Tax Rate" %}
                                             </label>
                                             <span class="badge bg-info">{{ main_restaurant.tax_rate|default:"0" }}%</span>
                                         </div>
-                                        <small class="text-muted">Default tax rate for orders</small>
+                                        <small class="text-muted">{% translate "Default tax rate for orders" %}</small>
                                     </div>
                                 </div>
                             </div>
@@ -962,12 +963,12 @@
                             <div class="row g-3">
                                 <div class="col-lg-6">
                                     <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-outline-secondary w-100">
-                                        <i class="fas fa-times me-1"></i>Cancel
+                                        <i class="fas fa-times me-1"></i>{% translate "Cancel" %}
                                     </a>
                                 </div>
                                 <div class="col-lg-6">
                                     <button type="submit" class="btn btn-primary w-100" id="submitBtn" form="addBranchForm">
-                                        <i class="fas fa-save me-1"></i>Create Branch
+                                        <i class="fas fa-save me-1"></i>{% translate "Create Branch" %}
                                     </button>
                                 </div>
                             </div>
@@ -983,6 +984,24 @@
 {% endblock content %}
 
 {% block extra_js %}
+{% translate "Branch name is required." as t_v_name %}
+{% translate "Address is required." as t_v_address %}
+{% translate "Username is required when creating new credentials." as t_v_username %}
+{% translate "Email is required when creating new credentials." as t_v_email %}
+{% translate "Password is required when creating new credentials." as t_v_password %}
+{% translate "Password must be at least 8 characters long." as t_v_pw_len %}
+{% translate "Branch Owner Login Credentials:" as t_creds_heading %}
+{% translate "Login URL:" as t_login_url %}
+{% translate "Copied!" as t_copied %}
+{% translate "Branch Owner Credentials" as t_p_title %}
+{% translate "Branch Owner Login Credentials" as t_p_heading %}
+{% translate "Restaurant Management System" as t_p_system %}
+{% translate "Full Name:" as t_p_fullname %}
+{% translate "Username:" as t_p_username %}
+{% translate "Email:" as t_p_email %}
+{% translate "Password:" as t_p_password %}
+{% translate "Role:" as t_p_role %}
+{% translate "IMPORTANT: Save these credentials securely. The password cannot be recovered." as t_p_important %}
 <script>
 $(document).ready(function() {
     // Form validation
@@ -993,33 +1012,33 @@ $(document).ready(function() {
         // Validate branch name
         if ($('#name').val().trim() === '') {
             isValid = false;
-            errorMessage += 'Branch name is required.\n';
+            errorMessage += "{{ t_v_name|escapejs }}" + '\n';
         }
         
         // Validate address
         if ($('#address').val().trim() === '') {
             isValid = false;
-            errorMessage += 'Address is required.\n';
+            errorMessage += "{{ t_v_address|escapejs }}" + '\n';
         }
         
         // Validate credentials if auto create is checked
         if ($('#auto_create_credentials').is(':checked')) {
             if ($('#branch_owner_username').val().trim() === '') {
                 isValid = false;
-                errorMessage += 'Username is required when creating new credentials.\n';
+                errorMessage += "{{ t_v_username|escapejs }}" + '\n';
             }
             
             if ($('#branch_owner_email').val().trim() === '') {
                 isValid = false;
-                errorMessage += 'Email is required when creating new credentials.\n';
+                errorMessage += "{{ t_v_email|escapejs }}" + '\n';
             }
             
             if ($('#branch_owner_password').val().trim() === '') {
                 isValid = false;
-                errorMessage += 'Password is required when creating new credentials.\n';
+                errorMessage += "{{ t_v_password|escapejs }}" + '\n';
             } else if ($('#branch_owner_password').val().length < 8) {
                 isValid = false;
-                errorMessage += 'Password must be at least 8 characters long.\n';
+                errorMessage += "{{ t_v_pw_len|escapejs }}" + '\n';
             }
         }
         
@@ -1096,20 +1115,20 @@ $(document).ready(function() {
     // Copy all credentials
     window.copyAllCredentials = function() {
         const credentials = document.querySelectorAll('.credentials-display .h6');
-        let text = 'Branch Owner Login Credentials:\n\n';
+        let text = "{{ t_creds_heading|escapejs }}" + '\n\n';
         
         credentials.forEach(cred => {
             const label = cred.previousElementSibling.textContent;
             text += label + ' ' + cred.textContent + '\n';
         });
         
-        text += '\nLogin URL: ' + window.location.origin + '/accounts/login/';
+        text += '\n' + "{{ t_login_url|escapejs }}" + ' ' + window.location.origin + '/accounts/login/';
         
         navigator.clipboard.writeText(text).then(() => {
             // Show success message
             const btn = event.target.closest('button');
             const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check text-success me-1"></i>Copied!';
+            btn.innerHTML = '<i class="fas fa-check text-success me-1"></i>' + "{{ t_copied|escapejs }}";
             setTimeout(() => {
                 btn.innerHTML = originalHTML;
             }, 2000);
@@ -1128,7 +1147,7 @@ function printCredentials() {
 
     const printWindow = window.open('', '_blank');
     printWindow.document.write(
-    '<!DOCTYPE html><html><head><title>Branch Owner Credentials</title>' +
+    '<!DOCTYPE html><html><head><title>' + "{{ t_p_title|escapejs }}" + '</title>' +
     '<style>body{font-family:Arial,sans-serif;padding:20px;}' +
     '.header{text-align:center;margin-bottom:30px;}' +
     '.credentials{background:#f8f9fa;padding:20px;border:1px solid #dee2e6;}' +
@@ -1136,16 +1155,16 @@ function printCredentials() {
     '.label{font-weight:bold;display:inline-block;width:120px;}' +
     '.important{color:#dc3545;font-weight:bold;margin-top:20px;}' +
     '</style></head><body>' +
-    '<div class="header"><h2>Branch Owner Login Credentials</h2><p>Restaurant Management System</p></div>' +
+    '<div class="header"><h2>' + "{{ t_p_heading|escapejs }}" + '</h2><p>' + "{{ t_p_system|escapejs }}" + '</p></div>' +
     '<div class="credentials">' +
-    '<div class="credential-row"><span class="label">Full Name:</span>' + credFullName + '</div>' +
-    '<div class="credential-row"><span class="label">Username:</span>' + credUsername + '</div>' +
-    '<div class="credential-row"><span class="label">Email:</span>' + credEmail + '</div>' +
-    '<div class="credential-row"><span class="label">Password:</span>' + credPassword + '</div>' +
-    '<div class="credential-row"><span class="label">Role:</span>' + credRole + '</div>' +
-    '<div class="credential-row"><span class="label">Login URL:</span>' + window.location.origin + '/accounts/login/</div>' +
+    '<div class="credential-row"><span class="label">' + "{{ t_p_fullname|escapejs }}" + '</span>' + credFullName + '</div>' +
+    '<div class="credential-row"><span class="label">' + "{{ t_p_username|escapejs }}" + '</span>' + credUsername + '</div>' +
+    '<div class="credential-row"><span class="label">' + "{{ t_p_email|escapejs }}" + '</span>' + credEmail + '</div>' +
+    '<div class="credential-row"><span class="label">' + "{{ t_p_password|escapejs }}" + '</span>' + credPassword + '</div>' +
+    '<div class="credential-row"><span class="label">' + "{{ t_p_role|escapejs }}" + '</span>' + credRole + '</div>' +
+    '<div class="credential-row"><span class="label">' + "{{ t_login_url|escapejs }}" + '</span>' + window.location.origin + '/accounts/login/</div>' +
     '</div>' +
-    '<p class="important">IMPORTANT: Save these credentials securely. The password cannot be recovered.</p>' +
+    '<p class="important">' + "{{ t_p_important|escapejs }}" + '</p>' +
     '</body></html>'
     );
     printWindow.document.close();

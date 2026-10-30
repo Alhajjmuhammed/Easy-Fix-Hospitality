@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Delivery Details - {{ restaurant.name }}{% endblock %}
+{% block title %}{% translate "Delivery Details" %} - {{ restaurant.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -20,21 +21,21 @@
     <div style="font-size:2.2rem; color:#e65100; margin-bottom:0.5rem">
         <i class="bi bi-bicycle"></i>
     </div>
-    <h1>Delivery Details</h1>
-    <p>Ordering from <strong>{{ restaurant.name }}</strong></p>
+    <h1>{% translate "Delivery Details" %}</h1>
+    <p>{% blocktranslate with name=restaurant.name %}Ordering from <strong>{{ name }}</strong>{% endblocktranslate %}</p>
 </div>
 
 <div class="container" style="max-width:520px; padding: 2.5rem 1rem;">
-    <p class="text-muted mb-2">Our delivery rider will use these details to find you.</p>
+    <p class="text-muted mb-2">{% translate "Our delivery rider will use these details to find you." %}</p>
     <div class="alert alert-light border mb-4 py-2">
         <i class="bi bi-truck me-1"></i>
         {% if restaurant.delivery_fee > 0 %}
-            Delivery fee: <strong>{{ restaurant.get_currency_symbol }}{{ restaurant.delivery_fee|floatformat:2 }}</strong>
+            {% translate "Delivery fee:" %} <strong>{{ restaurant.get_currency_symbol }}{{ restaurant.delivery_fee|floatformat:2 }}</strong>
             {% if restaurant.free_delivery_minimum is not None %}
-                — free for orders from {{ restaurant.get_currency_symbol }}{{ restaurant.free_delivery_minimum|floatformat:2 }}
+                {% blocktranslate with sym=restaurant.get_currency_symbol amount=restaurant.free_delivery_minimum|floatformat:2 %}— free for orders from {{ sym }}{{ amount }}{% endblocktranslate %}
             {% endif %}
         {% else %}
-            <strong>Free delivery</strong>
+            <strong>{% translate "Free delivery" %}</strong>
         {% endif %}
     </div>
 
@@ -52,16 +53,16 @@
 
         <div class="mb-3">
             <label for="delivery_address" class="form-label fw-semibold">
-                <i class="bi bi-geo-alt text-danger me-1"></i>Delivery Address *
+                <i class="bi bi-geo-alt text-danger me-1"></i>{% translate "Delivery Address" %} *
             </label>
             <textarea class="form-control" id="delivery_address" name="delivery_address"
-                      rows="3" placeholder="Street, building, floor, landmark…"
+                      rows="3" placeholder="{% translate 'Street, building, floor, landmark…' %}"
                       required>{{ delivery_address }}</textarea>
         </div>
 
         <div class="mb-4">
             <label for="delivery_phone" class="form-label fw-semibold">
-                <i class="bi bi-telephone text-success me-1"></i>Phone Number *
+                <i class="bi bi-telephone text-success me-1"></i>{% translate "Phone Number" %} *
             </label>
             <input type="tel" class="form-control" id="delivery_phone" name="delivery_phone"
                    placeholder="+1 555 000 0000" value="{{ delivery_phone }}" required>
@@ -71,20 +72,20 @@
             <input type="hidden" id="delivery_lat" name="delivery_lat" value="{{ delivery_lat|default_if_none:'' }}">
             <input type="hidden" id="delivery_lng" name="delivery_lng" value="{{ delivery_lng|default_if_none:'' }}">
             <button type="button" id="use-location" class="btn btn-outline-primary w-100">
-                <i class="bi bi-crosshair me-1"></i>Use my current location (optional)
+                <i class="bi bi-crosshair me-1"></i>{% translate "Use my current location (optional)" %}
             </button>
             <div id="location-status" class="form-text mt-1">
-                {% if delivery_lat %}<i class="bi bi-check-circle text-success"></i> Location pin saved for the rider.{% else %}Helps the rider find you exactly.{% endif %}
+                {% if delivery_lat %}<i class="bi bi-check-circle text-success"></i> {% translate "Location pin saved for the rider." %}{% else %}{% translate "Helps the rider find you exactly." %}{% endif %}
             </div>
         </div>
 
         <div class="d-grid gap-2">
             <button type="submit" class="btn btn-lg text-white fw-bold"
                     style="background: linear-gradient(135deg,#e65100,#bf360c); border:none; border-radius:10px;">
-                <i class="bi bi-bag-check me-2"></i>Browse Menu
+                <i class="bi bi-bag-check me-2"></i>{% translate "Browse Menu" %}
             </button>
             <a href="{% url 'restaurant:select_order_type' restaurant.id %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i> Back
+                <i class="bi bi-arrow-left me-1"></i> {% translate "Back" %}
             </a>
         </div>
     </form>
@@ -92,22 +93,26 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Location is not available on this device." as t_loc_na %}
+{% translate "Getting your location…" as t_loc_getting %}
+{% translate "✓ Location pin added for the rider." as t_loc_added %}
+{% translate "Could not get your location. You can still continue with the address." as t_loc_fail %}
 <script>
 (function () {
     var btn = document.getElementById('use-location');
     var status = document.getElementById('location-status');
     if (!btn) return;
-    if (!navigator.geolocation) { btn.disabled = true; status.textContent = 'Location is not available on this device.'; return; }
+    if (!navigator.geolocation) { btn.disabled = true; status.textContent = '{{ t_loc_na|escapejs }}'; return; }
     btn.addEventListener('click', function () {
         btn.disabled = true;
-        status.textContent = 'Getting your location…';
+        status.textContent = '{{ t_loc_getting|escapejs }}';
         navigator.geolocation.getCurrentPosition(function (pos) {
             document.getElementById('delivery_lat').value = pos.coords.latitude.toFixed(7);
             document.getElementById('delivery_lng').value = pos.coords.longitude.toFixed(7);
-            status.textContent = '✓ Location pin added for the rider.';
+            status.textContent = '{{ t_loc_added|escapejs }}';
             btn.disabled = false;
         }, function () {
-            status.textContent = 'Could not get your location. You can still continue with the address.';
+            status.textContent = '{{ t_loc_fail|escapejs }}';
             btn.disabled = false;
         }, { enableHighAccuracy: true, timeout: 15000 });
     });

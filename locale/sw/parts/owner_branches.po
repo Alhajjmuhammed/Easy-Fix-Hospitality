@@ -1,0 +1,1054 @@
+msgid "Staff Management"
+msgstr "Usimamizi wa Wafanyakazi"
+
+msgid "Users & Roles"
+msgstr "Watumiaji na Majukumu"
+
+msgid "Manage all restaurant staff and users"
+msgstr "Simamia wafanyakazi wote na watumiaji wa mgahawa"
+
+msgid "Manage system users and role permissions"
+msgstr "Simamia watumiaji wa mfumo na ruhusa za majukumu"
+
+msgid "Users"
+msgstr "Watumiaji"
+
+msgid "Roles & Permissions"
+msgstr "Majukumu na Ruhusa"
+
+msgid "Search Users"
+msgstr "Tafuta Watumiaji"
+
+msgid "Search by username, name, email..."
+msgstr "Tafuta kwa jina la mtumiaji, jina, barua pepe..."
+
+msgid "Role"
+msgstr "Jukumu"
+
+msgid "All Roles"
+msgstr "Majukumu Yote"
+
+msgid "Add User"
+msgstr "Ongeza Mtumiaji"
+
+msgid "User"
+msgstr "Mtumiaji"
+
+msgid "Email"
+msgstr "Barua pepe"
+
+msgid "Last Login"
+msgstr "Aliingia Mwisho"
+
+msgid "Super Admin"
+msgstr "Msimamizi Mkuu"
+
+msgid "Edit User"
+msgstr "Hariri Mtumiaji"
+
+msgid "Delete User"
+msgstr "Futa Mtumiaji"
+
+msgid "No users found"
+msgstr "Hakuna watumiaji waliopatikana"
+
+msgid "Users pagination"
+msgstr "Kurasa za watumiaji"
+
+msgid "Add Role"
+msgstr "Ongeza Jukumu"
+
+msgid "Search roles..."
+msgstr "Tafuta majukumu..."
+
+msgid "Permissions"
+msgstr "Ruhusa"
+
+msgid "All Permissions"
+msgstr "Ruhusa Zote"
+
+msgid "System Admin"
+msgstr "Msimamizi wa Mfumo"
+
+msgid "Menu Mgmt"
+msgstr "Usimamizi wa Menyu"
+
+msgid "Staff Mgmt"
+msgstr "Usimamizi wa Wafanyakazi"
+
+msgid "Orders"
+msgstr "Oda"
+
+msgid "No Admin"
+msgstr "Si Msimamizi"
+
+msgid "Support"
+msgstr "Msaada"
+
+msgid "Communication"
+msgstr "Mawasiliano"
+
+msgid "Payment Processing"
+msgstr "Kupokea Malipo"
+
+msgid "Bill Management"
+msgstr "Usimamizi wa Bili"
+
+msgid "Void Transactions"
+msgstr "Kubatilisha Miamala"
+
+msgid "Order"
+msgstr "Oda"
+
+msgid "Edit Role"
+msgstr "Hariri Jukumu"
+
+msgid "Delete Role"
+msgstr "Futa Jukumu"
+
+msgid "System Role - Cannot Delete"
+msgstr "Jukumu la Mfumo - Haliwezi Kufutwa"
+
+msgid "No roles found"
+msgstr "Hakuna majukumu yaliyopatikana"
+
+msgid "Add New User"
+msgstr "Ongeza Mtumiaji Mpya"
+
+msgid "Select Role"
+msgstr "Chagua Jukumu"
+
+msgid "Active User"
+msgstr "Mtumiaji Hai"
+
+msgid "New Password (optional)"
+msgstr "Nenosiri Jipya (si lazima)"
+
+msgid "Leave blank to keep current password"
+msgstr "Acha wazi ili kubaki na nenosiri la sasa"
+
+msgid "Update User"
+msgstr "Sasisha Mtumiaji"
+
+msgid "Add New Role"
+msgstr "Ongeza Jukumu Jipya"
+
+msgid "Role Name"
+msgstr "Jina la Jukumu"
+
+msgid "Select Role Type"
+msgstr "Chagua Aina ya Jukumu"
+
+msgid "Restaurant Owner"
+msgstr "Mmiliki wa Mgahawa"
+
+msgid "Describe the role's responsibilities and permissions"
+msgstr "Eleza majukumu na ruhusa za jukumu hili"
+
+msgid "Role name cannot be changed for system roles"
+msgstr "Jina la jukumu haliwezi kubadilishwa kwa majukumu ya mfumo"
+
+msgid "Role Statistics"
+msgstr "Takwimu za Jukumu"
+
+msgid "Users with this role:"
+msgstr "Watumiaji wenye jukumu hili:"
+
+msgid "Update Role"
+msgstr "Sasisha Jukumu"
+
+msgid "Failed to fetch user data"
+msgstr "Imeshindikana kupata taarifa za mtumiaji"
+
+msgid "Are you sure you want to activate this user?"
+msgstr "Una uhakika unataka kumwasha mtumiaji huyu?"
+
+msgid "Are you sure you want to deactivate this user?"
+msgstr "Una uhakika unataka kumzima mtumiaji huyu?"
+
+msgid "Failed to update user status"
+msgstr "Imeshindikana kubadilisha hali ya mtumiaji"
+
+msgid "Are you sure you want to delete this user? This action cannot be undone."
+msgstr "Una uhakika unataka kumfuta mtumiaji huyu? Hatua hii haiwezi kurudishwa nyuma."
+
+msgid "Failed to delete user"
+msgstr "Imeshindikana kumfuta mtumiaji"
+
+msgid "Role configuration for {role} will be implemented in the next update"
+msgstr "Mipangilio ya jukumu {role} itaongezwa katika toleo lijalo"
+
+msgid "Failed to fetch role data"
+msgstr "Imeshindikana kupata taarifa za jukumu"
+
+msgid "Are you sure you want to delete this role? This action cannot be undone."
+msgstr "Una uhakika unataka kufuta jukumu hili? Hatua hii haiwezi kurudishwa nyuma."
+
+msgid "Failed to delete role"
+msgstr "Imeshindikana kufuta jukumu"
+
+msgid "Failed to add user"
+msgstr "Imeshindikana kuongeza mtumiaji"
+
+msgid "Failed to update user"
+msgstr "Imeshindikana kusasisha mtumiaji"
+
+msgid "Failed to add role"
+msgstr "Imeshindikana kuongeza jukumu"
+
+msgid "Failed to update role"
+msgstr "Imeshindikana kusasisha jukumu"
+
+msgid "Showing <strong>%(total)s</strong> user total"
+msgid_plural "Showing <strong>%(total)s</strong> users total"
+msgstr[0] "Inaonyesha mtumiaji <strong>%(total)s</strong> kwa jumla"
+msgstr[1] "Inaonyesha watumiaji <strong>%(total)s</strong> kwa jumla"
+
+msgid "Showing %(start)s to %(end)s of %(total)s users"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya watumiaji %(total)s"
+
+msgid "User will be assigned to: %(name)s"
+msgstr "Mtumiaji atapangiwa: %(name)s"
+
+msgid "Update user account information"
+msgstr "Sasisha taarifa za akaunti ya mtumiaji"
+
+msgid "Back to Users"
+msgstr "Rudi kwa Watumiaji"
+
+msgid "New Password"
+msgstr "Nenosiri Jipya"
+
+msgid "Only fill this if you want to change the password."
+msgstr "Jaza hapa tu kama unataka kubadilisha nenosiri."
+
+msgid "Account Active"
+msgstr "Akaunti Iko Hai"
+
+msgid "Save Changes"
+msgstr "Hifadhi Mabadiliko"
+
+msgid "An unexpected error occurred. Please try again."
+msgstr "Hitilafu isiyotarajiwa imetokea. Tafadhali jaribu tena."
+
+msgid "Edit User: %(username)s"
+msgstr "Hariri Mtumiaji: %(username)s"
+
+msgid "Control what each staff role can access in your restaurant"
+msgstr "Dhibiti kile ambacho kila jukumu la wafanyakazi linaweza kufikia katika mgahawa wako"
+
+msgid "Built-in Roles"
+msgstr "Majukumu ya Mfumo"
+
+msgid "Custom Roles"
+msgstr "Majukumu Maalum"
+
+msgid "Select a role to edit"
+msgstr "Chagua jukumu la kuhariri"
+
+msgid "Loading…"
+msgstr "Inapakia…"
+
+msgid "Select a role"
+msgstr "Chagua jukumu"
+
+msgid "Unsaved changes"
+msgstr "Mabadiliko hayajahifadhiwa"
+
+msgid "Select a role from the left to<br>view and edit its permissions."
+msgstr "Chagua jukumu upande wa kushoto ili<br>kuona na kuhariri ruhusa zake."
+
+msgid "Create Custom Role"
+msgstr "Unda Jukumu Maalum"
+
+msgid "Edit"
+msgstr "Hariri"
+
+msgid "Delete"
+msgstr "Futa"
+
+msgid "No features"
+msgstr "Hakuna ruhusa"
+
+msgid "No custom roles yet"
+msgstr "Bado hakuna majukumu maalum"
+
+msgid "Create a custom role to give specific staff a unique set of permissions."
+msgstr "Unda jukumu maalum ili kuwapa wafanyakazi fulani ruhusa za kipekee."
+
+msgid "Assign Custom Roles to Staff"
+msgstr "Wapangie Wafanyakazi Majukumu Maalum"
+
+msgid "Staff Member"
+msgstr "Mfanyakazi"
+
+msgid "Built-in Role"
+msgstr "Jukumu la Mfumo"
+
+msgid "Active Custom Role"
+msgstr "Jukumu Maalum Linalotumika"
+
+msgid "Assign"
+msgstr "Panga"
+
+msgid "No role"
+msgstr "Hana jukumu"
+
+msgid "Using built-in"
+msgstr "Anatumia la mfumo"
+
+msgid "Built-in"
+msgstr "La mfumo"
+
+msgid "e.g. Senior Cashier"
+msgstr "mfano: Keshia Mkuu"
+
+msgid "optional"
+msgstr "si lazima"
+
+msgid "Brief description"
+msgstr "Maelezo mafupi"
+
+msgid "Select Permissions"
+msgstr "Chagua Ruhusa"
+
+msgid "Save Role"
+msgstr "Hifadhi Jukumu"
+
+msgid "{n} feature enabled"
+msgstr "Ruhusa {n} imewashwa"
+
+msgid "{n} features enabled"
+msgstr "Ruhusa {n} zimewashwa"
+
+msgid "Saving…"
+msgstr "Inahifadhi…"
+
+msgid "Permissions saved."
+msgstr "Ruhusa zimehifadhiwa."
+
+msgid "Error saving."
+msgstr "Imeshindikana kuhifadhi."
+
+msgid "Network error."
+msgstr "Hitilafu ya mtandao."
+
+msgid "Edit Custom Role"
+msgstr "Hariri Jukumu Maalum"
+
+msgid "Role name is required."
+msgstr "Jina la jukumu linahitajika."
+
+msgid "Custom role saved."
+msgstr "Jukumu maalum limehifadhiwa."
+
+msgid "Error."
+msgstr "Hitilafu."
+
+msgid "Delete custom role \"{name}\"? Staff assigned to it will revert to built-in role defaults."
+msgstr "Futa jukumu maalum \"{name}\"? Wafanyakazi waliopangiwa watarudi kwenye ruhusa za kawaida za jukumu la mfumo."
+
+msgid "Role deleted."
+msgstr "Jukumu limefutwa."
+
+msgid "Custom Role"
+msgstr "Jukumu Maalum"
+
+msgid "Assignment updated."
+msgstr "Upangaji umesasishwa."
+
+msgid "+%(count)s more"
+msgstr "+%(count)s zaidi"
+
+msgid "%(staff_count)s staff &bull; %(feature_count)s features"
+msgstr "Wafanyakazi %(staff_count)s &bull; ruhusa %(feature_count)s"
+
+msgid "Update role description"
+msgstr "Sasisha maelezo ya jukumu"
+
+msgid "Role names are system-defined and cannot be changed."
+msgstr "Majina ya majukumu yamewekwa na mfumo na hayawezi kubadilishwa."
+
+msgid "Brief description of this role's responsibilities."
+msgstr "Maelezo mafupi ya kazi za jukumu hili."
+
+msgid "Edit Role: %(role)s"
+msgstr "Hariri Jukumu: %(role)s"
+
+msgid "Manage Branches"
+msgstr "Simamia Matawi"
+
+msgid "Branch Management"
+msgstr "Usimamizi wa Matawi"
+
+msgid "Manage all restaurant locations and branches"
+msgstr "Simamia maeneo yote ya mgahawa na matawi"
+
+msgid "Total Restaurants"
+msgstr "Jumla ya Migahawa"
+
+msgid "Main Restaurant"
+msgstr "Mgahawa Mkuu"
+
+msgid "Branches"
+msgstr "Matawi"
+
+msgid "Single Restaurant"
+msgstr "Mgahawa Mmoja"
+
+msgid "Basic plan - No branches allowed"
+msgstr "Mpango wa msingi - Matawi hayaruhusiwi"
+
+msgid "Pro Plan"
+msgstr "Mpango wa Pro"
+
+msgid "Upgrade to Pro Plan"
+msgstr "Pandisha hadi Mpango wa Pro"
+
+msgid "Delete all branches first"
+msgstr "Futa matawi yote kwanza"
+
+msgid "Downgrade to Single"
+msgstr "Shusha hadi Mgahawa Mmoja"
+
+msgid "Want to expand?"
+msgstr "Unataka kupanua?"
+
+msgid "Upgrade to Pro Plan to create unlimited branches and manage multiple locations from one dashboard."
+msgstr "Pandisha hadi Mpango wa Pro ili kuunda matawi bila kikomo na kusimamia maeneo mengi kutoka dashibodi moja."
+
+msgid "Restaurant Locations"
+msgstr "Maeneo ya Mgahawa"
+
+msgid "Add New Branch"
+msgstr "Ongeza Tawi Jipya"
+
+msgid "Upgrade to Pro Plan to add branches"
+msgstr "Pandisha hadi Mpango wa Pro ili kuongeza matawi"
+
+msgid "Add Branch (Pro Only)"
+msgstr "Ongeza Tawi (Pro Pekee)"
+
+msgid "Not generated"
+msgstr "Haijatengenezwa"
+
+msgid "Branch Owner:"
+msgstr "Mmiliki wa Tawi:"
+
+msgid "Tax Rate:"
+msgstr "Kiwango cha Kodi:"
+
+msgid "Switch To"
+msgstr "Hamia"
+
+msgid "Settings"
+msgstr "Mipangilio"
+
+msgid "View QR"
+msgstr "Angalia QR"
+
+msgid "Restaurant pagination"
+msgstr "Kurasa za migahawa"
+
+msgid "First"
+msgstr "Ya kwanza"
+
+msgid "Previous"
+msgstr "Iliyotangulia"
+
+msgid "Last"
+msgstr "Ya mwisho"
+
+msgid "No Restaurants Found"
+msgstr "Hakuna Migahawa Iliyopatikana"
+
+msgid "You haven't created any restaurants yet. Start by adding your main restaurant and then create branches."
+msgstr "Bado hujaunda mgahawa wowote. Anza kwa kuongeza mgahawa wako mkuu kisha uunde matawi."
+
+msgid "Add Your First Restaurant"
+msgstr "Ongeza Mgahawa Wako wa Kwanza"
+
+msgid "Delete Branch"
+msgstr "Futa Tawi"
+
+msgid "Are you sure you want to delete the branch"
+msgstr "Una uhakika unataka kufuta tawi"
+
+msgid "This action cannot be undone. All data associated with this branch will be permanently deleted."
+msgstr "Hatua hii haiwezi kurudishwa nyuma. Taarifa zote za tawi hili zitafutwa kabisa."
+
+msgid "Error:"
+msgstr "Hitilafu:"
+
+msgid "An error occurred while deleting the branch."
+msgstr "Hitilafu imetokea wakati wa kufuta tawi."
+
+msgid "Switched to {name}. Opening QR management..."
+msgstr "Umehamia {name}. Inafungua usimamizi wa QR..."
+
+msgid "Error switching restaurant:"
+msgstr "Hitilafu wakati wa kubadilisha mgahawa:"
+
+msgid "An error occurred while switching restaurant."
+msgstr "Hitilafu imetokea wakati wa kubadilisha mgahawa."
+
+msgid "Upgrade to Pro Plan? This will allow you to create unlimited branches."
+msgstr "Pandisha hadi Mpango wa Pro? Hii itakuwezesha kuunda matawi bila kikomo."
+
+msgid "An error occurred while upgrading subscription."
+msgstr "Hitilafu imetokea wakati wa kupandisha usajili."
+
+msgid "Downgrade to Single Plan? You will no longer be able to create branches."
+msgstr "Shusha hadi Mpango wa Mgahawa Mmoja? Hutaweza tena kuunda matawi."
+
+msgid "An error occurred while downgrading subscription."
+msgstr "Hitilafu imetokea wakati wa kushusha usajili."
+
+msgid "Current Plan: %(plan)s"
+msgstr "Mpango wa Sasa: %(plan)s"
+
+msgid "Premium plan - %(allowed)s branches allowed"
+msgstr "Mpango wa juu - matawi %(allowed)s yanaruhusiwa"
+
+msgid "Created %(date)s"
+msgstr "Iliundwa %(date)s"
+
+msgid "Create a new branch location for your restaurant network"
+msgstr "Unda tawi jipya kwa mtandao wa migahawa yako"
+
+msgid "Main Restaurant Details"
+msgstr "Taarifa za Mgahawa Mkuu"
+
+msgid "Restaurant Name:"
+msgstr "Jina la Mgahawa:"
+
+msgid "Owner:"
+msgstr "Mmiliki:"
+
+msgid "Address:"
+msgstr "Anwani:"
+
+msgid "Branch Owner Login Credentials"
+msgstr "Taarifa za Kuingia za Mmiliki wa Tawi"
+
+msgid "Full Name:"
+msgstr "Jina Kamili:"
+
+msgid "Login URL:"
+msgstr "Kiungo cha Kuingia:"
+
+msgid "Important:"
+msgstr "Muhimu:"
+
+msgid "Save these credentials securely. The password cannot be recovered."
+msgstr "Hifadhi taarifa hizi mahali salama. Nenosiri haliwezi kurejeshwa."
+
+msgid "Print"
+msgstr "Chapisha"
+
+msgid "Copy All"
+msgstr "Nakili Zote"
+
+msgid "View All Branches"
+msgstr "Angalia Matawi Yote"
+
+msgid "Add Another Branch"
+msgstr "Ongeza Tawi Lingine"
+
+msgid "Branch Information"
+msgstr "Taarifa za Tawi"
+
+msgid "Basic Information"
+msgstr "Taarifa za Msingi"
+
+msgid "Branch Name"
+msgstr "Jina la Tawi"
+
+msgid "e.g., Downtown Branch, Mall Location"
+msgstr "mfano: Tawi la Mjini, Tawi la Mall"
+
+msgid "Enter a descriptive name for this branch location"
+msgstr "Weka jina linaloeleza tawi hili"
+
+msgid "Full address of the branch location"
+msgstr "Anwani kamili ya tawi"
+
+msgid "Complete address including street, city, and postal code"
+msgstr "Anwani kamili ikiwemo mtaa, mji na sanduku la posta"
+
+msgid "Brief description of this branch location..."
+msgstr "Maelezo mafupi ya tawi hili..."
+
+msgid "Optional description for this branch"
+msgstr "Maelezo ya tawi hili (si lazima)"
+
+msgid "Remote Ordering"
+msgstr "Kuagiza kwa Mbali"
+
+msgid "Allow Orders from Anywhere"
+msgstr "Ruhusu Oda Kutoka Popote"
+
+msgid "Customers can see this branch in the mobile app and place delivery or pickup orders without scanning a QR code."
+msgstr "Wateja wanaweza kuona tawi hili kwenye programu ya simu na kuweka oda za kuletewa au kuchukua mwenyewe bila kuskani QR."
+
+msgid "Branch Owner Management"
+msgstr "Usimamizi wa Mmiliki wa Tawi"
+
+msgid "Create new branch owner credentials (Username & Password)"
+msgstr "Unda taarifa mpya za kuingia za mmiliki wa tawi (Jina la mtumiaji na Nenosiri)"
+
+msgid "Check this to automatically create a new user account with username and password for the branch owner"
+msgstr "Weka alama hapa ili kuunda akaunti mpya ya mtumiaji yenye jina la mtumiaji na nenosiri kwa mmiliki wa tawi"
+
+msgid "New Branch Owner Details"
+msgstr "Taarifa za Mmiliki Mpya wa Tawi"
+
+msgid "e.g., downtown_manager"
+msgstr "mfano: meneja_mjini"
+
+msgid "This will be their login username"
+msgstr "Hili litakuwa jina lake la mtumiaji la kuingia"
+
+msgid "Email address for the branch owner"
+msgstr "Barua pepe ya mmiliki wa tawi"
+
+msgid "Enter secure password"
+msgstr "Weka nenosiri salama"
+
+msgid "Minimum 8 characters. Use the eye icon to show/hide or dice icon to generate"
+msgstr "Angalau herufi 8. Tumia alama ya jicho kuonyesha/kuficha au alama ya kete kutengeneza"
+
+msgid "Full Name"
+msgstr "Jina Kamili"
+
+msgid "Full name of the branch owner"
+msgstr "Jina kamili la mmiliki wa tawi"
+
+msgid "Custom Password:"
+msgstr "Nenosiri Lako:"
+
+msgid "You can set your own secure password for the branch owner or use the generate button for a random secure password."
+msgstr "Unaweza kuweka nenosiri lako salama kwa mmiliki wa tawi au kutumia kitufe cha kutengeneza ili kupata nenosiri salama la nasibu."
+
+msgid "The branch owner will have full control over their branch location."
+msgstr "Mmiliki wa tawi atakuwa na udhibiti kamili wa tawi lake."
+
+msgid "OR"
+msgstr "AU"
+
+msgid "Use Existing User (Optional)"
+msgstr "Tumia Mtumiaji Aliyepo (Si lazima)"
+
+msgid "Existing Username"
+msgstr "Jina la Mtumiaji Aliyepo"
+
+msgid "Enter existing username (optional)"
+msgstr "Weka jina la mtumiaji aliyepo (si lazima)"
+
+msgid "Leave blank to manage this branch yourself, or enter username of existing user to assign as branch owner."
+msgstr "Acha wazi ili usimamie tawi hili mwenyewe, au weka jina la mtumiaji aliyepo ili awe mmiliki wa tawi."
+
+msgid "Default Settings"
+msgstr "Mipangilio ya Awali"
+
+msgid "These settings will be inherited from your main restaurant and can be changed later."
+msgstr "Mipangilio hii itachukuliwa kutoka mgahawa wako mkuu na inaweza kubadilishwa baadaye."
+
+msgid "Auto Print KOT"
+msgstr "Chapisha KOT Yenyewe"
+
+msgid "Kitchen Order Tickets print automatically"
+msgstr "Tiketi za Oda za Jikoni zinachapishwa zenyewe"
+
+msgid "Auto Print BOT"
+msgstr "Chapisha BOT Yenyewe"
+
+msgid "Bar Order Tickets print automatically"
+msgstr "Tiketi za Oda za Baa zinachapishwa zenyewe"
+
+msgid "Auto Print Receipt"
+msgstr "Chapisha Risiti Yenyewe"
+
+msgid "Payment receipts print automatically"
+msgstr "Risiti za malipo zinachapishwa zenyewe"
+
+msgid "Tax Rate"
+msgstr "Kiwango cha Kodi"
+
+msgid "Default tax rate for orders"
+msgstr "Kiwango cha kodi cha kawaida kwa oda"
+
+msgid "Create Branch"
+msgstr "Unda Tawi"
+
+msgid "Branch name is required."
+msgstr "Jina la tawi linahitajika."
+
+msgid "Address is required."
+msgstr "Anwani inahitajika."
+
+msgid "Username is required when creating new credentials."
+msgstr "Jina la mtumiaji linahitajika unapounda taarifa mpya za kuingia."
+
+msgid "Email is required when creating new credentials."
+msgstr "Barua pepe inahitajika unapounda taarifa mpya za kuingia."
+
+msgid "Password is required when creating new credentials."
+msgstr "Nenosiri linahitajika unapounda taarifa mpya za kuingia."
+
+msgid "Password must be at least 8 characters long."
+msgstr "Nenosiri liwe na angalau herufi 8."
+
+msgid "Branch Owner Login Credentials:"
+msgstr "Taarifa za Kuingia za Mmiliki wa Tawi:"
+
+msgid "Branch Owner Credentials"
+msgstr "Taarifa za Mmiliki wa Tawi"
+
+msgid "Restaurant Management System"
+msgstr "Mfumo wa Usimamizi wa Mgahawa"
+
+msgid "IMPORTANT: Save these credentials securely. The password cannot be recovered."
+msgstr "MUHIMU: Hifadhi taarifa hizi mahali salama. Nenosiri haliwezi kurejeshwa."
+
+msgid "Branch \"%(name)s\" Created Successfully!"
+msgstr "Tawi \"%(name)s\" Limeundwa Kikamilifu!"
+
+msgid "Edit Branch"
+msgstr "Hariri Tawi"
+
+msgid "Created:"
+msgstr "Iliundwa:"
+
+msgid "Last Updated:"
+msgstr "Ilisasishwa Mwisho:"
+
+msgid "Restaurant Details"
+msgstr "Taarifa za Mgahawa"
+
+msgid "Update information and settings for this location"
+msgstr "Sasisha taarifa na mipangilio ya eneo hili"
+
+msgid "Restaurant Name"
+msgstr "Jina la Mgahawa"
+
+msgid "The display name for this restaurant location"
+msgstr "Jina litakaloonyeshwa kwa eneo hili la mgahawa"
+
+msgid "Brief description of this location..."
+msgstr "Maelezo mafupi ya eneo hili..."
+
+msgid "Optional description for this location"
+msgstr "Maelezo ya eneo hili (si lazima)"
+
+msgid "Branch Owner Information"
+msgstr "Taarifa za Mmiliki wa Tawi"
+
+msgid "Enter username"
+msgstr "Weka jina la mtumiaji"
+
+msgid "Username for login access"
+msgstr "Jina la mtumiaji la kuingia"
+
+msgid "Enter email"
+msgstr "Weka barua pepe"
+
+msgid "Email address for notifications"
+msgstr "Barua pepe ya kupokea taarifa"
+
+msgid "Enter first name"
+msgstr "Weka jina la kwanza"
+
+msgid "Enter last name"
+msgstr "Weka jina la mwisho"
+
+msgid "New Password (Optional)"
+msgstr "Nenosiri Jipya (Si lazima)"
+
+msgid "Enter new password (leave blank to keep current)"
+msgstr "Weka nenosiri jipya (acha wazi kubaki na la sasa)"
+
+msgid "Leave blank to keep current password, or enter new password to change it"
+msgstr "Acha wazi ili kubaki na nenosiri la sasa, au weka nenosiri jipya ili kulibadilisha"
+
+msgid "Current Owner:"
+msgstr "Mmiliki wa Sasa:"
+
+msgid "No email"
+msgstr "Hakuna barua pepe"
+
+msgid "Percentage rate for tax calculations"
+msgstr "Asilimia ya kukokotoa kodi"
+
+msgid "Print Settings"
+msgstr "Mipangilio ya Kuchapisha"
+
+msgid "Automatically print Kitchen Order Tickets"
+msgstr "Chapisha Tiketi za Oda za Jikoni zenyewe"
+
+msgid "Automatically print Bar Order Tickets"
+msgstr "Chapisha Tiketi za Oda za Baa zenyewe"
+
+msgid "Printer Configuration"
+msgstr "Mipangilio ya Printa"
+
+msgid "Kitchen Printer"
+msgstr "Printa ya Jikoni"
+
+msgid "Kitchen printer name"
+msgstr "Jina la printa ya jikoni"
+
+msgid "Bar Printer"
+msgstr "Printa ya Baa"
+
+msgid "Bar printer name"
+msgstr "Jina la printa ya baa"
+
+msgid "Receipt Printer"
+msgstr "Printa ya Risiti"
+
+msgid "Receipt printer name"
+msgstr "Jina la printa ya risiti"
+
+msgid "Added to every delivery order from this branch. Use 0 for no fee."
+msgstr "Inaongezwa kwenye kila oda ya kuletewa kutoka tawi hili. Weka 0 kama hakuna ada."
+
+msgid "Free delivery from (optional)"
+msgstr "Kuletewa bure kuanzia (si lazima)"
+
+msgid "Leave empty to always charge"
+msgstr "Acha wazi ili kutoza kila mara"
+
+msgid "Charge tax on the delivery fee"
+msgstr "Toza kodi kwenye ada ya kufikisha"
+
+msgid "Accept table reservations"
+msgstr "Pokea uhifadhi wa meza"
+
+msgid "Confirm bookings automatically"
+msgstr "Thibitisha uhifadhi wenyewe"
+
+msgid "Booking length (minutes)"
+msgstr "Muda wa uhifadhi (dakika)"
+
+msgid "Danger Zone"
+msgstr "Eneo la Hatari"
+
+msgid "Once you delete this branch, there is no going back. Please be certain. All data associated with this branch will be permanently deleted."
+msgstr "Ukishafuta tawi hili, hakuna kurudi nyuma. Tafadhali hakikisha. Taarifa zote za tawi hili zitafutwa kabisa."
+
+msgid "Delete This Branch"
+msgstr "Futa Tawi Hili"
+
+msgid "This action cannot be undone. All data associated with this branch including:"
+msgstr "Hatua hii haiwezi kurudishwa nyuma. Taarifa zote za tawi hili, ikiwemo:"
+
+msgid "Orders and order history"
+msgstr "Oda na historia ya oda"
+
+msgid "Tables and categories"
+msgstr "Meza na makundi"
+
+msgid "Products and pricing"
+msgstr "Bidhaa na bei"
+
+msgid "Reports and analytics"
+msgstr "Ripoti na uchambuzi"
+
+msgid "will be permanently deleted."
+msgstr "zitafutwa kabisa."
+
+msgid "Type <strong>DELETE</strong> to confirm:"
+msgstr "Andika <strong>DELETE</strong> kuthibitisha:"
+
+msgid "Type DELETE to confirm"
+msgstr "Andika DELETE kuthibitisha"
+
+msgid "Delete Branch Forever"
+msgstr "Futa Tawi Kabisa"
+
+msgid "This field is required."
+msgstr "Sehemu hii inahitajika."
+
+msgid "Please enter a valid tax rate between 0 and 100."
+msgstr "Tafadhali weka kiwango sahihi cha kodi kati ya 0 na 100."
+
+msgid "Saving Changes..."
+msgstr "Inahifadhi Mabadiliko..."
+
+msgid "Redirecting..."
+msgstr "Inakupeleka..."
+
+msgid "Modify settings for \"%(name)s\""
+msgstr "Badilisha mipangilio ya \"%(name)s\""
+
+msgid "Branch Details"
+msgstr "Taarifa za Tawi"
+
+msgid "Active Branch"
+msgstr "Tawi Linalofanya Kazi"
+
+msgid "Inactive Branch"
+msgstr "Tawi Lisilofanya Kazi"
+
+msgid "Excellent Performance"
+msgstr "Utendaji Bora Sana"
+
+msgid "Good Performance"
+msgstr "Utendaji Mzuri"
+
+msgid "Average Performance"
+msgstr "Utendaji wa Wastani"
+
+msgid "Needs Attention"
+msgstr "Linahitaji Uangalizi"
+
+msgid "Location & Contact"
+msgstr "Mahali na Mawasiliano"
+
+msgid "No address specified"
+msgstr "Hakuna anwani iliyowekwa"
+
+msgid "Opened:"
+msgstr "Lilifunguliwa:"
+
+msgid "Management"
+msgstr "Uongozi"
+
+msgid "Main Owner:"
+msgstr "Mmiliki Mkuu:"
+
+msgid "Branch Manager:"
+msgstr "Meneja wa Tawi:"
+
+msgid "No assigned branch manager"
+msgstr "Hakuna meneja wa tawi aliyepangwa"
+
+msgid "Financial Settings"
+msgstr "Mipangilio ya Fedha"
+
+msgid "Currency:"
+msgstr "Sarafu:"
+
+msgid "Parent Restaurant:"
+msgstr "Mgahawa Mkuu:"
+
+msgid "Total Orders"
+msgstr "Jumla ya Oda"
+
+msgid "Total Revenue"
+msgstr "Jumla ya Mapato"
+
+msgid "Avg Order Value"
+msgstr "Wastani wa Thamani ya Oda"
+
+msgid "Menu Items"
+msgstr "Bidhaa za Menyu"
+
+msgid "Total Tables"
+msgstr "Jumla ya Meza"
+
+msgid "Revenue Performance (Last 30 Days)"
+msgstr "Mwenendo wa Mapato (Siku 30 Zilizopita)"
+
+msgid "Recent Orders"
+msgstr "Oda za Karibuni"
+
+msgid "View All Orders"
+msgstr "Angalia Oda Zote"
+
+msgid "Order #"
+msgstr "Oda #"
+
+msgid "Walk-in Customer"
+msgstr "Mteja wa Papo Hapo"
+
+msgid "No recent orders for this branch"
+msgstr "Hakuna oda za karibuni kwa tawi hili"
+
+msgid "Daily Revenue"
+msgstr "Mapato ya Kila Siku"
+
+msgid "Error loading order details"
+msgstr "Imeshindikana kupakia maelezo ya oda"
+
+msgid "+%(count)s more..."
+msgstr "+%(count)s zaidi..."
+
+msgid "Branch Reports"
+msgstr "Ripoti za Matawi"
+
+msgid "Comprehensive performance analysis across all branch locations"
+msgstr "Uchambuzi kamili wa utendaji wa matawi yote"
+
+msgid "Export Excel"
+msgstr "Pakua Excel"
+
+msgid "Export PDF"
+msgstr "Pakua PDF"
+
+msgid "From Date"
+msgstr "Kuanzia Tarehe"
+
+msgid "To Date"
+msgstr "Hadi Tarehe"
+
+msgid "Report Type"
+msgstr "Aina ya Ripoti"
+
+msgid "Daily"
+msgstr "Kila Siku"
+
+msgid "Weekly"
+msgstr "Kila Wiki"
+
+msgid "Monthly"
+msgstr "Kila Mwezi"
+
+msgid "Custom Range"
+msgstr "Kipindi Maalum"
+
+msgid "Apply Filters"
+msgstr "Tumia Vichujio"
+
+msgid "Active Branches"
+msgstr "Matawi Yanayofanya Kazi"
+
+msgid "Revenue Trends"
+msgstr "Mwenendo wa Mapato"
+
+msgid "Branch Performance Analysis"
+msgstr "Uchambuzi wa Utendaji wa Matawi"
+
+msgid "Period:"
+msgstr "Kipindi:"
+
+msgid "Revenue"
+msgstr "Mapato"
+
+msgid "Performance"
+msgstr "Utendaji"
+
+msgid "No assigned manager"
+msgstr "Hakuna meneja aliyepangwa"
+
+msgid "Excellent"
+msgstr "Bora Sana"
+
+msgid "Good"
+msgstr "Mzuri"
+
+msgid "Average"
+msgstr "Wastani"
+
+msgid "View Chart"
+msgstr "Angalia Chati"
+
+msgid "No Branch Data Available"
+msgstr "Hakuna Taarifa za Matawi"
+
+msgid "No branches found for the selected period."
+msgstr "Hakuna matawi yaliyopatikana kwa kipindi kilichochaguliwa."
+
+msgid "Branch chart feature coming soon for branch ID:"
+msgstr "Chati ya tawi itapatikana hivi karibuni kwa tawi lenye namba:"

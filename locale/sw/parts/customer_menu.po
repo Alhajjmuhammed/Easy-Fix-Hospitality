@@ -1,0 +1,252 @@
+# Customer menu, cart, place order, order confirmation (templates/restaurant/menu.html, templates/orders/view_cart.html,
+# place_order.html, order_confirmation.html). Words follow the mobile app (mobile_app/src/i18n/sw/customer_ordering.js).
+
+msgid "Cart"
+msgstr "Kikapu"
+
+msgid "Your Cart"
+msgstr "Kikapu Chako"
+
+msgid "Delivery order"
+msgstr "Oda ya kuletewa"
+
+msgid "Pickup order"
+msgstr "Oda ya kuchukua mwenyewe"
+
+msgid "Table %(n)s"
+msgstr "Meza %(n)s"
+
+msgid "Continue Shopping"
+msgstr "Endelea Kuchagua"
+
+msgid "each"
+msgstr "kila moja"
+
+msgid "Happy Hour"
+msgstr "Saa ya Punguzo"
+
+msgid "Remove"
+msgstr "Ondoa"
+
+msgid "Order Summary"
+msgstr "Muhtasari wa Oda"
+
+msgid "Subtotal"
+msgstr "Jumla ndogo"
+
+msgid "Tax (%(rate)s%%)"
+msgstr "Kodi (%(rate)s%%)"
+
+msgid "Delivery fee"
+msgstr "Ada ya kufikisha"
+
+msgid "Free"
+msgstr "Bure"
+
+msgid "Free delivery for orders from"
+msgstr "Kuletewa bure kwa oda za kuanzia"
+
+msgid "Total"
+msgstr "Jumla"
+
+msgid "Place Order"
+msgstr "Weka Oda"
+
+msgid "Login to Order"
+msgstr "Ingia ili Uagize"
+
+msgid "An error occurred. Please try again."
+msgstr "Kuna tatizo. Tafadhali jaribu tena."
+
+msgid "Are you sure you want to remove this item from your cart?"
+msgstr "Una uhakika unataka kuondoa bidhaa hii kwenye kikapu?"
+
+msgid "Confirm Your Order"
+msgstr "Thibitisha Oda Yako"
+
+msgid "Delivery"
+msgstr "Kuletewa"
+
+msgid "to %(address)s"
+msgstr "hadi %(address)s"
+
+msgid "Please review your order before confirming."
+msgstr "Tafadhali kagua oda yako kabla ya kuthibitisha."
+
+msgid "Ordering on behalf of (optional)"
+msgstr "Kuagiza kwa niaba ya (si lazima)"
+
+msgid "My own order"
+msgstr "Oda yangu mwenyewe"
+
+msgid "If selected, the order will be attributed to that staff member. You (cashier) will be recorded as the one who entered it."
+msgstr "Ukichagua, oda itahesabiwa kwa mfanyakazi huyo. Wewe (keshia) utarekodiwa kama aliyeiingiza."
+
+msgid "Back to Cart"
+msgstr "Rudi Kikapuni"
+
+msgid "Confirm Order"
+msgstr "Thibitisha Oda"
+
+msgid "Order Confirmed"
+msgstr "Oda Imethibitishwa"
+
+msgid "Order Confirmed!"
+msgstr "Oda Imethibitishwa!"
+
+msgid "Thank you for your order. We're preparing it now."
+msgstr "Asante kwa oda yako. Tunaiandaa sasa."
+
+msgid "Order Details"
+msgstr "Maelezo ya Oda"
+
+msgid "Order Number"
+msgstr "Namba ya oda"
+
+msgid "Type"
+msgstr "Aina"
+
+msgid "Pickup"
+msgstr "Kuchukua mwenyewe"
+
+msgid "Table"
+msgstr "Meza"
+
+msgid "Status"
+msgstr "Hali"
+
+msgid "Back to Home"
+msgstr "Rudi Mwanzo"
+
+msgid "Back to Tables"
+msgstr "Rudi kwenye Meza"
+
+msgid "View My Orders"
+msgstr "Angalia Oda Zangu"
+
+msgid "Print Kitchen Order Ticket (KOT)"
+msgstr "Chapisha Tiketi ya Oda ya Jikoni (KOT)"
+
+msgid "Print Bar Order Ticket (BOT)"
+msgstr "Chapisha Tiketi ya Oda ya Baa (BOT)"
+
+msgid "Estimated preparation time: 15-30 minutes"
+msgstr "Muda wa kuandaa unakadiriwa: dakika 15-30"
+
+msgid "Please allow pop-ups to automatically print Kitchen Order Ticket (KOT)"
+msgstr "Tafadhali ruhusu madirisha ibukizi (pop-ups) ili Tiketi ya Oda ya Jikoni (KOT) ichapishwe yenyewe"
+
+msgid "Please allow pop-ups to automatically print Bar Order Ticket (BOT)"
+msgstr "Tafadhali ruhusu madirisha ibukizi (pop-ups) ili Tiketi ya Oda ya Baa (BOT) ichapishwe yenyewe"
+
+msgid "Menu"
+msgstr "Menyu"
+
+msgid "%(name)s Menu"
+msgstr "Menyu ya %(name)s"
+
+msgid "Collect at the restaurant"
+msgstr "Chukua mgahawani"
+
+msgid "Discover our amazing culinary creations"
+msgstr "Gundua vyakula vyetu vitamu"
+
+msgid "Search for categories or products..."
+msgstr "Tafuta makundi au bidhaa..."
+
+msgid "View Cart"
+msgstr "Angalia Kikapu"
+
+msgid "Change Restaurant"
+msgstr "Badilisha Mgahawa"
+
+msgid "Change Table"
+msgstr "Badilisha Meza"
+
+msgid "%(counter)s subcategory"
+msgid_plural "%(counter)s subcategories"
+msgstr[0] "Kikundi kidogo %(counter)s"
+msgstr[1] "Vikundi vidogo %(counter)s"
+
+msgid "View Menu"
+msgstr "Tazama Menyu"
+
+msgid "Click to explore"
+msgstr "Bofya kuangalia"
+
+msgid "Category Menu"
+msgstr "Menyu ya Kundi"
+
+msgid "Close"
+msgstr "Funga"
+
+msgid "%(counter)s item available"
+msgid_plural "%(counter)s items available"
+msgstr[0] "Bidhaa %(counter)s inapatikana"
+msgstr[1] "Bidhaa %(counter)s zinapatikana"
+
+msgid "%(pct)s%% OFF"
+msgstr "Punguzo %(pct)s%%"
+
+msgid "%(n)s min"
+msgstr "Dak %(n)s"
+
+msgid "%(n)s in stock"
+msgstr "%(n)s zipo"
+
+msgid "Add to Cart"
+msgstr "Ongeza kwenye Kikapu"
+
+msgid "Out of Stock"
+msgstr "Imeisha"
+
+msgid "No items available in this category"
+msgstr "Hakuna bidhaa katika kundi hili"
+
+msgid "Please check other categories or contact our staff."
+msgstr "Tafadhali angalia makundi mengine au wasiliana na wahudumu wetu."
+
+msgid "No Menu Categories Available"
+msgstr "Hakuna Makundi ya Menyu kwa Sasa"
+
+msgid "Please check back later or contact our staff."
+msgstr "Tafadhali rudi baadaye au wasiliana na wahudumu wetu."
+
+msgid "Stock: %(n)s"
+msgstr "Zilizopo: %(n)s"
+
+msgid "No products available in this subcategory."
+msgstr "Hakuna bidhaa katika kikundi hiki."
+
+msgid "%(name)s added to cart! (Demo mode)"
+msgstr "%(name)s kimeongezwa kwenye kikapu! (Majaribio)"
+
+msgid "Error adding item to cart"
+msgstr "Imeshindikana kuongeza bidhaa kwenye kikapu"
+
+msgid "Available"
+msgstr "Inapatikana"
+
+msgid "%(name)s Items"
+msgstr "Bidhaa za %(name)s"
+
+msgid "No items available in this category at the moment."
+msgstr "Hakuna bidhaa katika kundi hili kwa sasa."
+
+msgid "Category"
+msgstr "Kundi"
+
+msgid "in %(name)s"
+msgstr "katika %(name)s"
+
+msgid "In stock"
+msgstr "Zipo"
+
+msgid "Showing first 10 of %(n)s results"
+msgstr "Inaonyesha 10 za kwanza kati ya matokeo %(n)s"
+
+msgid "No results found for \"%(query)s\""
+msgstr "Hakuna matokeo ya \"%(query)s\""
+
+msgid "Try searching for different items"
+msgstr "Jaribu kutafuta bidhaa nyingine"

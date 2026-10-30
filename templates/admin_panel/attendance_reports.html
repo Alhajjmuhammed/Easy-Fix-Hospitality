@@ -1,6 +1,7 @@
 {% extends "admin_panel/base.html" %}
+{% load i18n %}
 
-{% block title %}Attendance Reports{% endblock %}
+{% block title %}{% translate "Attendance Reports" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -92,15 +93,15 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <a href="{% url 'attendance:dashboard' %}" class="text-decoration-none text-muted small me-2">
-                <i class="bi bi-arrow-left me-1"></i>Attendance
+                <i class="bi bi-arrow-left me-1"></i>{% translate "Attendance" %}
             </a>
             <h4 class="mb-0 fw-bold d-inline-block" style="color:var(--primary-color);">
-                <i class="bi bi-bar-chart-line me-2" style="color:var(--accent-color);"></i>Attendance Reports
+                <i class="bi bi-bar-chart-line me-2" style="color:var(--accent-color);"></i>{% translate "Attendance Reports" %}
             </h4>
         </div>
         <div class="d-flex gap-2">
             <a href="{% url 'attendance:calendar' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-calendar3 me-1"></i>Calendar
+                <i class="bi bi-calendar3 me-1"></i>{% translate "Calendar" %}
             </a>
         </div>
     </div>
@@ -113,26 +114,26 @@
         <div class="card-body py-3 px-4">
             <form method="get" class="d-flex align-items-end gap-3 flex-wrap">
                 <div>
-                    <label class="form-label small fw-semibold mb-1" style="color:var(--primary-color);">From</label>
+                    <label class="form-label small fw-semibold mb-1" style="color:var(--primary-color);">{% translate "From" %}</label>
                     <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" style="min-width:140px;">
                 </div>
                 <div>
-                    <label class="form-label small fw-semibold mb-1" style="color:var(--primary-color);">To</label>
+                    <label class="form-label small fw-semibold mb-1" style="color:var(--primary-color);">{% translate "To" %}</label>
                     <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" style="min-width:140px;">
                 </div>
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-sm" style="background:var(--accent-color);color:#fff;min-width:80px;">
-                        <i class="bi bi-funnel me-1"></i>Filter
+                        <i class="bi bi-funnel me-1"></i>{% translate "Filter" %}
                     </button>
-                    <a href="{% url 'attendance:reports' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+                    <a href="{% url 'attendance:reports' %}" class="btn btn-sm btn-outline-secondary">{% translate "Reset" %}</a>
                     <a href="#" class="btn btn-sm btn-outline-success" onclick="exportAttendanceCsv(event)">
-                        <i class="bi bi-download me-1"></i>Export CSV
+                        <i class="bi bi-download me-1"></i>{% translate "Export CSV" %}
                     </a>
                 </div>
                 <div class="ms-auto d-flex gap-2 flex-wrap">
-                    <button type="button" onclick="setThisMonth()" class="btn btn-sm btn-outline-secondary">This Month</button>
-                    <button type="button" onclick="setLastNDays(7)" class="btn btn-sm btn-outline-secondary">Last 7 days</button>
-                    <button type="button" onclick="setLastNDays(30)" class="btn btn-sm btn-outline-secondary">Last 30 days</button>
+                    <button type="button" onclick="setThisMonth()" class="btn btn-sm btn-outline-secondary">{% translate "This Month" %}</button>
+                    <button type="button" onclick="setLastNDays(7)" class="btn btn-sm btn-outline-secondary">{% translate "Last 7 days" %}</button>
+                    <button type="button" onclick="setLastNDays(30)" class="btn btn-sm btn-outline-secondary">{% translate "Last 30 days" %}</button>
                 </div>
             </form>
         </div>
@@ -148,7 +149,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color:var(--accent-color);">{{ total_records }}</div>
-                        <div class="stat-label">Total Check-Ins</div>
+                        <div class="stat-label">{% translate "Total Check-Ins" %}</div>
                     </div>
                 </div>
             </div>
@@ -161,7 +162,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color:var(--success-color);">{{ total_staff }}</div>
-                        <div class="stat-label">Active Staff</div>
+                        <div class="stat-label">{% translate "Active Staff" %}</div>
                     </div>
                 </div>
             </div>
@@ -174,7 +175,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color:var(--warning-color);">{{ total_late }}</div>
-                        <div class="stat-label">Late Arrivals</div>
+                        <div class="stat-label">{% translate "Late Arrivals" %}</div>
                     </div>
                 </div>
             </div>
@@ -187,7 +188,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color:#9b59b6;font-size:1.3rem;">{{ total_work_display }}</div>
-                        <div class="stat-label">Total Hours</div>
+                        <div class="stat-label">{% translate "Total Hours" %}</div>
                     </div>
                 </div>
             </div>
@@ -200,7 +201,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color:var(--accent-color);">{{ attendance_rate }}%</div>
-                        <div class="stat-label">Attendance Rate</div>
+                        <div class="stat-label">{% translate "Attendance Rate" %}</div>
                     </div>
                 </div>
             </div>
@@ -211,12 +212,12 @@
     <ul class="nav tab-pills mb-3" id="rptTabs">
         <li class="nav-item">
             <button class="nav-link active" data-tab="staff">
-                <i class="bi bi-person-lines-fill me-1"></i>By Staff
+                <i class="bi bi-person-lines-fill me-1"></i>{% translate "By Staff" %}
             </button>
         </li>
         <li class="nav-item">
             <button class="nav-link" data-tab="daily">
-                <i class="bi bi-calendar-week me-1"></i>By Day
+                <i class="bi bi-calendar-week me-1"></i>{% translate "By Day" %}
             </button>
         </li>
     </ul>
@@ -227,7 +228,7 @@
             <div class="card-header bg-white border-bottom py-3">
                 <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
                     <i class="bi bi-person-lines-fill me-2" style="color:var(--accent-color);"></i>
-                    Staff Attendance Summary
+                    {% translate "Staff Attendance Summary" %}
                 </h6>
             </div>
             <div class="card-body p-0">
@@ -236,15 +237,15 @@
                     <table class="table table-hover rpt-table mb-0">
                         <thead>
                             <tr>
-                                <th class="ps-4">Staff Name</th>
-                                <th>Role</th>
-                                <th>Days Present</th>
-                                <th>On Time</th>
-                                <th>Late</th>
-                                <th>Overtime Days</th>
-                                <th>Total Hours</th>
-                                <th>Avg / Day</th>
-                                <th>Punctuality</th>
+                                <th class="ps-4">{% translate "Staff Name" %}</th>
+                                <th>{% translate "Role" %}</th>
+                                <th>{% translate "Days Present" %}</th>
+                                <th>{% translate "On Time" %}</th>
+                                <th>{% translate "Late" %}</th>
+                                <th>{% translate "Overtime Days" %}</th>
+                                <th>{% translate "Total Hours" %}</th>
+                                <th>{% translate "Avg / Day" %}</th>
+                                <th>{% translate "Punctuality" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -291,7 +292,7 @@
                 {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="bi bi-inbox display-5 mb-2 d-block" style="opacity:0.3;"></i>
-                    <p class="mb-0">No attendance records found for this period.</p>
+                    <p class="mb-0">{% translate "No attendance records found for this period." %}</p>
                 </div>
                 {% endif %}
             </div>
@@ -304,7 +305,7 @@
             <div class="card-header bg-white border-bottom py-3">
                 <h6 class="mb-0 fw-bold" style="color:var(--primary-color);font-size:1rem;">
                     <i class="bi bi-calendar-week me-2" style="color:var(--accent-color);"></i>
-                    Daily Attendance Summary
+                    {% translate "Daily Attendance Summary" %}
                 </h6>
             </div>
             <div class="card-body p-0">
@@ -313,12 +314,12 @@
                     <table class="table table-hover rpt-table mb-0">
                         <thead>
                             <tr>
-                                <th class="ps-4">Date</th>
-                                <th>Day</th>
-                                <th>Present</th>
-                                <th>Late</th>
-                                <th>Total Hours</th>
-                                <th>Details</th>
+                                <th class="ps-4">{% translate "Date" %}</th>
+                                <th>{% translate "Day" %}</th>
+                                <th>{% translate "Present" %}</th>
+                                <th>{% translate "Late" %}</th>
+                                <th>{% translate "Total Hours" %}</th>
+                                <th>{% translate "Details" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -344,7 +345,7 @@
                                 <td>
                                     {% if d.present %}
                                     <a href="{% url 'attendance:day_detail' %}?date={{ d.date_str }}" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.78rem;">
-                                        <i class="bi bi-eye me-1"></i>View
+                                        <i class="bi bi-eye me-1"></i>{% translate "View" %}
                                     </a>
                                     {% endif %}
                                 </td>
@@ -356,7 +357,7 @@
                 {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="bi bi-inbox display-5 mb-2 d-block" style="opacity:0.3;"></i>
-                    <p class="mb-0">No attendance records found for this period.</p>
+                    <p class="mb-0">{% translate "No attendance records found for this period." %}</p>
                 </div>
                 {% endif %}
             </div>

@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Bar Dashboard - {{ user.restaurant_name|default:"Restaurant System" }}{% endblock %}
+{% block title %}{% translate "Bar Dashboard" %} - {{ user.restaurant_name|default:_("Restaurant System") }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -292,20 +293,20 @@
 <div class="container-fluid" data-restaurant-view="true" data-owner-id="{{ request.user.owner.id|default:'default' }}">
     <!-- Live Indicator -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h3 mb-0">Bar Dashboard</h1>
+        <h1 class="h3 mb-0">{% translate "Bar Dashboard" %}</h1>
         <div>
             <a href="{% url 'orders:bar_reports' %}" class="btn btn-info me-2">
-                <i class="bi bi-bar-chart-fill"></i> View Reports
+                <i class="bi bi-bar-chart-fill"></i> {% translate "View Reports" %}
             </a>
             <span class="badge bg-success fs-6 px-3 py-2" style="animation: pulse 2s infinite;">
-                <i class="fas fa-circle text-success me-1" style="font-size: 0.6rem;"></i>LIVE
+                <i class="fas fa-circle text-success me-1" style="font-size: 0.6rem;"></i>{% translate "LIVE" %}
             </span>
         </div>
     </div>
 
     <!-- Auto-refresh timer display -->
     <div class="refresh-timer" id="refreshTimer">
-        Auto-refresh in: <span id="countdown">30</span>s
+        {% translate "Auto-refresh in:" %} <span id="countdown">30</span>{% translate "s" context "seconds" %}
     </div>
 
     <!-- Header Section -->
@@ -313,9 +314,9 @@
         <div class="container">
             <h1 class="display-4 mb-3">
                 <i class="fas fa-cocktail me-3"></i>
-                Bar Dashboard
+                {% translate "Bar Dashboard" %}
             </h1>
-            <p class="lead mb-4">{% get_restaurant_name %} | Bar Staff: {{ user.get_full_name }}</p>
+            <p class="lead mb-4">{% get_restaurant_name %} | {% blocktranslate with name=user.get_full_name %}Bar Staff: {{ name }}{% endblocktranslate %}</p>
             
             <!-- Statistics Row -->
             <div class="row">
@@ -324,7 +325,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <div class="stat-number text-primary">{{ pending_count }}</div>
-                                <div class="stat-label text-muted">Pending</div>
+                                <div class="stat-label text-muted">{% translate "Pending" %}</div>
                             </div>
                             <div class="stat-icon text-primary">
                                 <i class="fas fa-clock"></i>
@@ -337,7 +338,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <div class="stat-number text-warning">{{ confirmed_count }}</div>
-                                <div class="stat-label text-muted">Confirmed</div>
+                                <div class="stat-label text-muted">{% translate "Confirmed" %}</div>
                             </div>
                             <div class="stat-icon text-warning">
                                 <i class="fas fa-check-circle"></i>
@@ -350,7 +351,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <div class="stat-number text-info">{{ preparing_count }}</div>
-                                <div class="stat-label text-muted">Preparing</div>
+                                <div class="stat-label text-muted">{% translate "Preparing" %}</div>
                             </div>
                             <div class="stat-icon text-info">
                                 <i class="fas fa-utensils"></i>
@@ -363,7 +364,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <div class="stat-number text-success">{{ ready_count }}</div>
-                                <div class="stat-label text-muted">Ready</div>
+                                <div class="stat-label text-muted">{% translate "Ready" %}</div>
                             </div>
                             <div class="stat-icon text-success">
                                 <i class="fas fa-bell"></i>
@@ -376,7 +377,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <div class="stat-number text-purple">{{ served_count }}</div>
-                                <div class="stat-label text-muted">Served</div>
+                                <div class="stat-label text-muted">{% translate "Served" %}</div>
                             </div>
                             <div class="stat-icon text-purple">
                                 <i class="fas fa-check-double"></i>
@@ -394,27 +395,27 @@
     <ul class="nav nav-tabs" id="orderTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
-                <i class="fas fa-clock"></i> Pending ({{ pending_count }})
+                <i class="fas fa-clock"></i> {% translate "Pending" %} ({{ pending_count }})
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="confirmed-tab" data-bs-toggle="tab" data-bs-target="#confirmed" type="button" role="tab">
-                <i class="fas fa-check-circle"></i> Confirmed ({{ confirmed_count }})
+                <i class="fas fa-check-circle"></i> {% translate "Confirmed" %} ({{ confirmed_count }})
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="preparing-tab" data-bs-toggle="tab" data-bs-target="#preparing" type="button" role="tab">
-                <i class="fas fa-utensils"></i> Preparing ({{ preparing_count }})
+                <i class="fas fa-utensils"></i> {% translate "Preparing" %} ({{ preparing_count }})
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="ready-tab" data-bs-toggle="tab" data-bs-target="#ready" type="button" role="tab">
-                <i class="fas fa-bell"></i> Ready ({{ ready_count }})
+                <i class="fas fa-bell"></i> {% translate "Ready" %} ({{ ready_count }})
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="served-tab" data-bs-toggle="tab" data-bs-target="#served" type="button" role="tab">
-                <i class="fas fa-check-double"></i> Served ({{ served_count }})
+                <i class="fas fa-check-double"></i> {% translate "Served" %} ({{ served_count }})
             </button>
         </li>
     </ul>
@@ -428,12 +429,12 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Order #</th>
-                                <th>Table</th>
-                                <th>Customer</th>
-                                <th>Time</th>
-                                <th>Bar Items</th>
-                                <th>Actions</th>
+                                <th>{% translate "Order #" %}</th>
+                                <th>{% translate "Table" %}</th>
+                                <th>{% translate "Customer" %}</th>
+                                <th>{% translate "Time" %}</th>
+                                <th>{% translate "Bar Items" %}</th>
+                                <th>{% translate "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -454,13 +455,13 @@
                                         <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
                                             <!-- BOT Print Button -->
                                             <a href="{% url 'orders:print_bot' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
-                                                <i class="fas fa-print"></i> Print BOT
+                                                <i class="fas fa-print"></i> {% translate "Print" %} BOT
                                             </a>
                                             <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="status" value="confirmed">
                                                 <button type="submit" class="btn btn-success btn-sm">
-                                                    <i class="fas fa-check"></i> Confirm
+                                                    <i class="fas fa-check"></i> {% translate "Confirm" %}
                                                 </button>
                                             </form>
                                         </div>
@@ -473,7 +474,7 @@
             {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="fas fa-clock fa-3x mb-3"></i>
-                    <p>No pending orders</p>
+                    <p>{% translate "No pending orders" %}</p>
                 </div>
             {% endif %}
         </div>
@@ -485,13 +486,13 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Order #</th>
-                                <th>Table</th>
-                                <th>Customer</th>
-                                <th>Time</th>
-                                <th>Duration</th>
-                                <th>Bar Items</th>
-                                <th>Actions</th>
+                                <th>{% translate "Order #" %}</th>
+                                <th>{% translate "Table" %}</th>
+                                <th>{% translate "Customer" %}</th>
+                                <th>{% translate "Time" %}</th>
+                                <th>{% translate "Duration" %}</th>
+                                <th>{% translate "Bar Items" %}</th>
+                                <th>{% translate "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -504,7 +505,7 @@
                                     <td>
                                         <span class="badge bg-info" id="timer-{{ order.id }}" 
                                               data-start-time="{{ order.confirmed_at|date:'c' }}">
-                                            Calculating...
+                                            {% translate "Calculating..." %}
                                         </span>
                                     </td>
                                     <td>
@@ -518,13 +519,13 @@
                                         <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
                                             <!-- BOT Print Button -->
                                             <a href="{% url 'orders:print_bot' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
-                                                <i class="fas fa-print"></i> Print BOT
+                                                <i class="fas fa-print"></i> {% translate "Print" %} BOT
                                             </a>
                                             <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="status" value="preparing">
                                                 <button type="submit" class="btn btn-primary btn-sm">
-                                                    <i class="fas fa-play"></i> Start Preparing
+                                                    <i class="fas fa-play"></i> {% translate "Start Preparing" %}
                                                 </button>
                                             </form>
                                         </div>
@@ -537,7 +538,7 @@
             {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="fas fa-check-circle fa-3x mb-3"></i>
-                    <p>No confirmed orders</p>
+                    <p>{% translate "No confirmed orders" %}</p>
                 </div>
             {% endif %}
         </div>
@@ -549,13 +550,13 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Order #</th>
-                                <th>Table</th>
-                                <th>Customer</th>
-                                <th>Time</th>
-                                <th>Duration</th>
-                                <th>Bar Items</th>
-                                <th>Actions</th>
+                                <th>{% translate "Order #" %}</th>
+                                <th>{% translate "Table" %}</th>
+                                <th>{% translate "Customer" %}</th>
+                                <th>{% translate "Time" %}</th>
+                                <th>{% translate "Duration" %}</th>
+                                <th>{% translate "Bar Items" %}</th>
+                                <th>{% translate "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -568,7 +569,7 @@
                                     <td>
                                         <span class="badge bg-warning" id="timer-{{ order.id }}" 
                                               data-start-time="{{ order.preparing_at|date:'c' }}">
-                                            Calculating...
+                                            {% translate "Calculating..." %}
                                         </span>
                                     </td>
                                     <td>
@@ -582,13 +583,13 @@
                                         <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
                                             <!-- BOT Reprint Button -->
                                             <a href="{% url 'orders:reprint_bot' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
-                                                <i class="fas fa-print"></i> Reprint BOT
+                                                <i class="fas fa-print"></i> {% translate "Reprint" %} BOT
                                             </a>
                                             <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="status" value="ready">
                                                 <button type="submit" class="btn btn-success btn-sm">
-                                                    <i class="fas fa-flag-checkered"></i> Mark Ready
+                                                    <i class="fas fa-flag-checkered"></i> {% translate "Mark Ready" %}
                                                 </button>
                                             </form>
                                         </div>
@@ -601,7 +602,7 @@
             {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="fas fa-utensils fa-3x mb-3"></i>
-                    <p>No orders being prepared</p>
+                    <p>{% translate "No orders being prepared" %}</p>
                 </div>
             {% endif %}
         </div>
@@ -613,13 +614,13 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Order #</th>
-                                <th>Table</th>
-                                <th>Customer</th>
-                                <th>Time</th>
-                                <th>Duration</th>
-                                <th>Bar Items</th>
-                                <th>Actions</th>
+                                <th>{% translate "Order #" %}</th>
+                                <th>{% translate "Table" %}</th>
+                                <th>{% translate "Customer" %}</th>
+                                <th>{% translate "Time" %}</th>
+                                <th>{% translate "Duration" %}</th>
+                                <th>{% translate "Bar Items" %}</th>
+                                <th>{% translate "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -632,7 +633,7 @@
                                     <td>
                                         <span class="badge bg-danger" id="timer-{{ order.id }}" 
                                               data-start-time="{{ order.ready_at|date:'c' }}">
-                                            Calculating...
+                                            {% translate "Calculating..." %}
                                         </span>
                                     </td>
                                     <td>
@@ -646,13 +647,13 @@
                                         <div class="btn-group btn-group-sm d-flex flex-wrap" role="group">
                                             <!-- BOT Reprint Button -->
                                             <a href="{% url 'orders:reprint_bot' order.id %}" target="_blank" class="btn btn-info btn-sm me-1">
-                                                <i class="fas fa-print"></i> Reprint BOT
+                                                <i class="fas fa-print"></i> {% translate "Reprint" %} BOT
                                             </a>
                                             <form method="post" action="{% url 'orders:update_order_status' order.id %}" class="d-inline">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="status" value="served">
                                                 <button type="submit" class="btn btn-purple btn-sm">
-                                                    <i class="fas fa-check-double"></i> Mark Served
+                                                    <i class="fas fa-check-double"></i> {% translate "Mark Served" %}
                                                 </button>
                                             </form>
                                         </div>
@@ -665,7 +666,7 @@
             {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="fas fa-bell fa-3x mb-3"></i>
-                    <p>No orders ready for service</p>
+                    <p>{% translate "No orders ready for service" %}</p>
                 </div>
             {% endif %}
         </div>
@@ -677,12 +678,12 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Order #</th>
-                                <th>Table</th>
-                                <th>Customer</th>
-                                <th>Ordered</th>
-                                <th>Served</th>
-                                <th>Bar Items</th>
+                                <th>{% translate "Order #" %}</th>
+                                <th>{% translate "Table" %}</th>
+                                <th>{% translate "Customer" %}</th>
+                                <th>{% translate "Ordered" %}</th>
+                                <th>{% translate "Served" %}</th>
+                                <th>{% translate "Bar Items" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -706,7 +707,7 @@
                     </table>
                 </div>
                 {% if served_orders.has_other_pages %}
-                <nav class="mt-3" aria-label="Served orders pagination">
+                <nav class="mt-3" aria-label="{% translate "Served orders pagination" %}">
                     <ul class="pagination justify-content-center">
                         {% if served_orders.has_previous %}
                             <li class="page-item">
@@ -735,7 +736,7 @@
             {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="fas fa-check-double fa-3x mb-3"></i>
-                    <p>No served orders yet today</p>
+                    <p>{% translate "No served orders yet today" %}</p>
                 </div>
             {% endif %}
         </div>

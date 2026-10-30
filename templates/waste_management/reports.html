@@ -1,17 +1,19 @@
 ﻿{% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}Waste Reports{% endblock %}
+{% block title %}{% translate "Waste Reports" %}{% endblock %}
 
 {% block content %}
+{% translate "units" as t_units %}
 <div class="page-header">
-    <h1>Food Waste Reports</h1>
+    <h1>{% translate "Food Waste Reports" %}</h1>
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h5>Filter Options</h5>
+        <h5>{% translate "Filter Options" %}</h5>
     </div>
     <div class="card-body">
         <form method="get" id="filter-form">
@@ -19,12 +21,12 @@
                 <!-- Restaurant Filter (for PRO/BRANCH users) -->
                 {% if accessible_restaurants|length > 1 %}
                 <div class="col-md-3">
-                    <label for="restaurant_filter">Restaurant:</label>
+                    <label for="restaurant_filter">{% translate "Restaurant:" %}</label>
                     <select class="form-control" id="restaurant_filter" name="restaurant_filter" onchange="this.form.submit()">
-                        <option value="view_all" {% if view_all %}selected{% endif %}>All Restaurants</option>
+                        <option value="view_all" {% if view_all %}selected{% endif %}>{% translate "All Restaurants" %}</option>
                         {% for restaurant in accessible_restaurants %}
                             <option value="{{ restaurant.id }}" {% if selected_restaurant.id == restaurant.id %}selected{% endif %}>
-                                {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                             </option>
                         {% endfor %}
                     </select>
@@ -32,17 +34,17 @@
                 {% endif %}
                 
                 <div class="col-md-3">
-                    <label for="start_date">Start Date:</label>
+                    <label for="start_date">{% translate "Start Date:" %}</label>
                     <input type="date" id="start_date" name="date_from" class="form-control" value="{{ start_date }}">
                 </div>
                 <div class="col-md-3">
-                    <label for="end_date">End Date:</label>
+                    <label for="end_date">{% translate "End Date:" %}</label>
                     <input type="date" id="end_date" name="date_to" class="form-control" value="{{ end_date }}">
                 </div>
                 <div class="col-md-3">
-                    <label for="product">Product:</label>
+                    <label for="product">{% translate "Product:" %}</label>
                     <select id="product" name="product" class="form-control">
-                        <option value="">All Products</option>
+                        <option value="">{% translate "All Products" %}</option>
                         {% for product in products %}
                             <option value="{{ product.id }}" {% if product.id|stringformat:"s" == product_filter %}selected{% endif %}>
                                 {{ product.name }}
@@ -51,23 +53,23 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label for="reason">Reason:</label>
+                    <label for="reason">{% translate "Reason:" %}</label>
                     <select id="reason" name="reason" class="form-control">
-                        <option value="">All Reasons</option>
-                        <option value="customer_refused" {% if reason_filter == 'customer_refused' %}selected{% endif %}>Customer Refused</option>
-                        <option value="customer_left" {% if reason_filter == 'customer_left' %}selected{% endif %}>Customer Left Before Pickup</option>
-                        <option value="wrong_order" {% if reason_filter == 'wrong_order' %}selected{% endif %}>Wrong Order Made</option>
-                        <option value="quality_issue" {% if reason_filter == 'quality_issue' %}selected{% endif %}>Quality Issue</option>
-                        <option value="kitchen_error" {% if reason_filter == 'kitchen_error' %}selected{% endif %}>Kitchen Error</option>
-                        <option value="other" {% if reason_filter == 'other' %}selected{% endif %}>Other</option>
+                        <option value="">{% translate "All Reasons" %}</option>
+                        <option value="customer_refused" {% if reason_filter == 'customer_refused' %}selected{% endif %}>{% translate "Customer Refused" %}</option>
+                        <option value="customer_left" {% if reason_filter == 'customer_left' %}selected{% endif %}>{% translate "Customer Left Before Pickup" %}</option>
+                        <option value="wrong_order" {% if reason_filter == 'wrong_order' %}selected{% endif %}>{% translate "Wrong Order Made" %}</option>
+                        <option value="quality_issue" {% if reason_filter == 'quality_issue' %}selected{% endif %}>{% translate "Quality Issue" %}</option>
+                        <option value="kitchen_error" {% if reason_filter == 'kitchen_error' %}selected{% endif %}>{% translate "Kitchen Error" %}</option>
+                        <option value="other" {% if reason_filter == 'other' %}selected{% endif %}>{% translate "Other" %}</option>
                     </select>
                 </div>
             </div>
             <div class="row mt-3">
                 <div class="col-md-12">
-                    <button type="submit" class="btn btn-primary">Apply Filters</button>
-                    <a href="{% url 'waste_management:reports' %}" class="btn btn-secondary">Clear Filters</a>
-                    <a href="{% url 'waste_management:export_report' %}?{{ request.GET.urlencode }}" class="btn btn-success">Export CSV</a>
+                    <button type="submit" class="btn btn-primary">{% translate "Apply Filters" %}</button>
+                    <a href="{% url 'waste_management:reports' %}" class="btn btn-secondary">{% translate "Clear Filters" %}</a>
+                    <a href="{% url 'waste_management:export_report' %}?{{ request.GET.urlencode }}" class="btn btn-success">{% translate "Export CSV" %}</a>
                 </div>
             </div>
         </form>
@@ -78,19 +80,19 @@
 {% if branch_performance %}
 <div class="card mt-4">
     <div class="card-header" style="background: linear-gradient(120deg, #1e3c72 0%, #2a5298 100%); color: white;">
-        <h5 class="mb-0"><i class="fas fa-chart-bar mr-2"></i>Waste Performance by Location</h5>
+        <h5 class="mb-0"><i class="fas fa-chart-bar mr-2"></i>{% translate "Waste Performance by Location" %}</h5>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead style="background-color: #f8f9fc;">
                     <tr>
-                        <th>Restaurant/Branch</th>
-                        <th>Total Items Wasted</th>
-                        <th>% of Total Items</th>
-                        <th>Total Cost</th>
-                        <th>% of Total Cost</th>
-                        <th>Avg Cost per Item</th>
+                        <th>{% translate "Restaurant/Branch" %}</th>
+                        <th>{% translate "Total Items Wasted" %}</th>
+                        <th>{% translate "% of Total Items" %}</th>
+                        <th>{% translate "Total Cost" %}</th>
+                        <th>{% translate "% of Total Cost" %}</th>
+                        <th>{% translate "Avg Cost per Item" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -99,9 +101,9 @@
                         <td>
                             <strong>{{ perf.restaurant.name }}</strong>
                             {% if perf.restaurant.is_main_restaurant %}
-                                <span class="badge badge-primary ml-2">Main</span>
+                                <span class="badge badge-primary ml-2">{% translate "Main" %}</span>
                             {% else %}
-                                <span class="badge badge-info ml-2">Branch</span>
+                                <span class="badge badge-info ml-2">{% translate "Branch" %}</span>
                             {% endif %}
                         </td>
                         <td>{{ perf.total_items }}</td>
@@ -142,7 +144,7 @@
 
 <div class="card mt-4">
     <div class="card-header">
-        <h5>Waste Records</h5>
+        <h5>{% translate "Waste Records" %}</h5>
     </div>
     <div class="card-body">
         {% if waste_records %}
@@ -150,13 +152,13 @@
                 <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Product</th>
-                            <th>Quantity</th>
-                            <th>Unit</th>
-                            <th>Reason</th>
-                            <th>Disposal Method</th>
-                            <th>Recorded By</th>
+                            <th>{% translate "Date" %}</th>
+                            <th>{% translate "Product" %}</th>
+                            <th>{% translate "Quantity" %}</th>
+                            <th>{% translate "Unit" %}</th>
+                            <th>{% translate "Reason" %}</th>
+                            <th>{% translate "Disposal Method" %}</th>
+                            <th>{% translate "Recorded By" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -165,7 +167,7 @@
                             <td>{{ record.created_at|date:"M d, Y H:i" }}</td>
                             <td>{{ record.product.name }}</td>
                             <td>{{ record.quantity_wasted }}</td>
-                            <td>{{ record.product.unit|default:"units" }}</td>
+                            <td>{{ record.product.unit|default:t_units }}</td>
                             <td>{{ record.get_waste_reason_display }}</td>
                             <td>{{ record.get_disposal_method_display }}</td>
                             <td>{{ record.recorded_by.get_full_name|default:record.recorded_by.username }}</td>
@@ -175,7 +177,7 @@
                 </table>
             </div>
         {% else %}
-            <p class="text-muted">No waste records found for the selected criteria.</p>
+            <p class="text-muted">{% translate "No waste records found for the selected criteria." %}</p>
         {% endif %}
     </div>
 </div>

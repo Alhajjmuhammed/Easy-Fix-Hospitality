@@ -1,8 +1,9 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}Waste Recording - Cashier{% endblock %}
+{% block title %}{% translate "Waste Recording - Cashier" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -218,10 +219,10 @@
             <div class="cashier-waste-container">
                 <h1 class="mb-3">
                     <i class="fas fa-trash-alt me-3"></i>
-                    Food Waste Recording
+                    {% translate "Food Waste Recording" %}
                 </h1>
                 <p class="mb-0 opacity-75 lead">
-                    Quick and accurate waste incident reporting
+                    {% translate "Quick and accurate waste incident reporting" %}
                 </p>
                 <div class="mt-3">
                     <small class="opacity-75">
@@ -244,7 +245,7 @@
             <div class="quick-form-header">
                 <h5>
                     <i class="fas fa-plus-circle me-2"></i>
-                    Record New Waste Incident
+                    {% translate "Record New Waste Incident" %}
                 </h5>
             </div>
             
@@ -256,10 +257,10 @@
                     <div class="row form-row">
                         <div class="col-md-8">
                             <label for="productSelect" class="form-label">
-                                <i class="fas fa-utensils me-2"></i>Product <span class="required-asterisk">*</span>
+                                <i class="fas fa-utensils me-2"></i>{% translate "Product" %} <span class="required-asterisk">*</span>
                             </label>
                             <select class="form-select" id="productSelect" name="product" required>
-                                <option value="">🔍 Select a product...</option>
+                                <option value="">🔍 {% translate "Select a product..." %}</option>
                                 {% for product in products %}
                                     <option value="{{ product.id }}" data-price="{{ product.price }}">
                                         {{ product.name }} - {% currency_symbol %}{{ product.price }}
@@ -269,7 +270,7 @@
                         </div>
                         <div class="col-md-4">
                             <label for="quantityInput" class="form-label">
-                                <i class="fas fa-sort-numeric-up me-2"></i>Quantity <span class="required-asterisk">*</span>
+                                <i class="fas fa-sort-numeric-up me-2"></i>{% translate "Quantity" %} <span class="required-asterisk">*</span>
                             </label>
                             <input type="number" class="form-control quantity-input" id="quantityInput" 
                                    name="quantity" min="1" max="99" placeholder="1" required>
@@ -280,30 +281,30 @@
                     <div class="row form-row">
                         <div class="col-md-6">
                             <label for="wasteReason" class="form-label">
-                                <i class="fas fa-question-circle me-2"></i>Waste Reason <span class="required-asterisk">*</span>
+                                <i class="fas fa-question-circle me-2"></i>{% translate "Waste Reason" %} <span class="required-asterisk">*</span>
                             </label>
                             <select class="form-select" id="wasteReason" name="waste_reason" required>
-                                <option value="">📋 Select reason...</option>
-                                <option value="customer_refused">😞 Customer Refused</option>
-                                <option value="customer_left">🚶 Customer Left Before Pickup</option>
-                                <option value="wrong_order">❌ Wrong Order Made</option>
-                                <option value="quality_issue">⚠️ Quality Issue</option>
-                                <option value="kitchen_error">👨‍🍳 Kitchen Error</option>
-                                <option value="overcooking">🔥 Overcooking</option>
-                                <option value="undercooking">❄️ Undercooking</option>
-                                <option value="contamination">🦠 Food Contamination</option>
-                                <option value="other">❓ Other Reason</option>
+                                <option value="">📋 {% translate "Select reason..." %}</option>
+                                <option value="customer_refused">😞 {% translate "Customer Refused" %}</option>
+                                <option value="customer_left">🚶 {% translate "Customer Left Before Pickup" %}</option>
+                                <option value="wrong_order">❌ {% translate "Wrong Order Made" %}</option>
+                                <option value="quality_issue">⚠️ {% translate "Quality Issue" %}</option>
+                                <option value="kitchen_error">👨‍🍳 {% translate "Kitchen Error" %}</option>
+                                <option value="overcooking">🔥 {% translate "Overcooking" %}</option>
+                                <option value="undercooking">❄️ {% translate "Undercooking" %}</option>
+                                <option value="contamination">🦠 {% translate "Food Contamination" %}</option>
+                                <option value="other">❓ {% translate "Other Reason" %}</option>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label for="disposalMethod" class="form-label">
-                                <i class="fas fa-recycle me-2"></i>Disposal Method
+                                <i class="fas fa-recycle me-2"></i>{% translate "Disposal Method" %}
                             </label>
                             <select class="form-select" id="disposalMethod" name="disposal_method">
-                                <option value="waste_bin">🗑️ Waste Bin</option>
-                                <option value="staff_meal">🍽️ Staff Meal</option>
-                                <option value="compost">🌱 Compost</option>
-                                <option value="donated">❤️ Donated</option>
+                                <option value="waste_bin">🗑️ {% translate "Waste Bin" %}</option>
+                                <option value="staff_meal">🍽️ {% translate "Staff Meal" %}</option>
+                                <option value="compost">🌱 {% translate "Compost" %}</option>
+                                <option value="donated">❤️ {% translate "Donated" %}</option>
                             </select>
                         </div>
                     </div>
@@ -311,25 +312,25 @@
                     <!-- Notes Section -->
                     <div class="form-row">
                         <label for="wasteNotes" class="form-label">
-                            <i class="fas fa-sticky-note me-2"></i>Additional Notes (Optional)
+                            <i class="fas fa-sticky-note me-2"></i>{% translate "Additional Notes (Optional)" %}
                         </label>
                         <textarea class="form-control" id="wasteNotes" name="notes" rows="3" 
-                                  placeholder="Any additional details about this waste incident..."></textarea>
+                                  placeholder="{% translate "Any additional details about this waste incident..." %}"></textarea>
                     </div>
                     
                     <!-- Cost Preview -->
                     <div id="costPreview" class="cost-preview" style="display: none;">
                         <i class="fas fa-dollar-sign me-2"></i>
-                        Estimated Cost Impact: <span id="estimatedCost">{% currency_symbol %}0.00</span>
+                        {% translate "Estimated Cost Impact:" %} <span id="estimatedCost">{% currency_symbol %}0.00</span>
                     </div>
                     
                     <!-- Action Buttons -->
                     <div class="d-flex justify-content-between align-items-center mt-4">
                         <a href="{% url 'cashier:dashboard' %}" class="btn btn-back">
-                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            <i class="fas fa-arrow-left me-2"></i>{% translate "Back to Dashboard" %}
                         </a>
                         <button type="submit" class="btn btn-record-waste" id="submitBtn">
-                            <i class="fas fa-save me-2"></i>Record Waste Incident
+                            <i class="fas fa-save me-2"></i>{% translate "Record Waste Incident" %}
                         </button>
                     </div>
                 </form>
@@ -340,8 +341,8 @@
         <div class="recent-waste-card">
             <div id="recentRecords">
                 <i class="fas fa-history icon-xl d-block"></i>
-                <h5 class="mb-2">Your Recent Waste Records</h5>
-                <p class="mb-0">Recent waste incidents you've recorded will appear here after submission.</p>
+                <h5 class="mb-2">{% translate "Your Recent Waste Records" %}</h5>
+                <p class="mb-0">{% translate "Recent waste incidents you've recorded will appear here after submission." %}</p>
             </div>
         </div>
     </div>
@@ -351,7 +352,7 @@
 <div class="loading-overlay" id="loadingOverlay">
     <div class="text-center text-white">
         <div class="loading-spinner mb-3"></div>
-        <p>Recording waste incident...</p>
+        <p>{% translate "Recording waste incident..." %}</p>
     </div>
 </div>
 
@@ -361,19 +362,19 @@
         <div class="modal-content border-0" style="border-radius: 20px;">
             <div class="modal-header bg-success text-white border-0" style="border-radius: 20px 20px 0 0;">
                 <h5 class="modal-title">
-                    <i class="fas fa-check-circle me-2"></i>Waste Recorded Successfully
+                    <i class="fas fa-check-circle me-2"></i>{% translate "Waste Recorded Successfully" %}
                 </h5>
             </div>
             <div class="modal-body p-4">
                 <div class="text-center mb-3">
                     <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
                 </div>
-                <h6 class="text-center mb-3">Incident Recorded Successfully!</h6>
+                <h6 class="text-center mb-3">{% translate "Incident Recorded Successfully!" %}</h6>
                 <div id="wasteDetails" class="bg-light p-3 rounded"></div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-success" data-bs-dismiss="modal" style="border-radius: 12px;">
-                    <i class="fas fa-check me-2"></i>Continue
+                    <i class="fas fa-check me-2"></i>{% translate "Continue" %}
                 </button>
             </div>
         </div>
@@ -382,6 +383,15 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Product:" as t_product %}
+{% translate "Quantity:" as t_quantity %}
+{% translate "Reason:" as t_reason %}
+{% translate "Cost Impact:" as t_cost_impact %}
+{% translate "Error:" as t_error %}
+{% translate "Failed to record waste" as t_fail_record %}
+{% translate "An error occurred while recording waste. Please try again." as t_err_record_retry %}
+{% translate "Latest Incident Recorded!" as t_latest %}
+{% translate "Waste incident has been successfully logged. You can record another incident above." as t_logged %}
 <script>
 // Currency symbol for JavaScript
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
@@ -448,13 +458,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success modal with details
                 document.getElementById('wasteDetails').innerHTML = `
                     <div class="row">
-                        <div class="col-6"><strong>Product:</strong></div>
+                        <div class="col-6"><strong>{{ t_product|escapejs }}</strong></div>
                         <div class="col-6">${data.waste_log.product_name}</div>
-                        <div class="col-6"><strong>Quantity:</strong></div>
+                        <div class="col-6"><strong>{{ t_quantity|escapejs }}</strong></div>
                         <div class="col-6">${data.waste_log.quantity_wasted}</div>
-                        <div class="col-6"><strong>Reason:</strong></div>
+                        <div class="col-6"><strong>{{ t_reason|escapejs }}</strong></div>
                         <div class="col-6">${data.waste_log.waste_reason}</div>
-                        <div class="col-6"><strong>Cost Impact:</strong></div>
+                        <div class="col-6"><strong>{{ t_cost_impact|escapejs }}</strong></div>
                         <div class="col-6 text-danger"><strong>${CURRENCY_SYMBOL}${data.waste_log.total_cost}</strong></div>
                     </div>
                 `;
@@ -470,22 +480,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateRecentRecords();
                 
             } else {
-                alert('Error: ' + (data.error || 'Failed to record waste'));
+                alert("{{ t_error|escapejs }} " + (data.error || "{{ t_fail_record|escapejs }}"));
             }
         })
         .catch(error => {
             loadingOverlay.style.display = 'none';
             submitBtn.disabled = false;
             console.error('Error:', error);
-            alert('An error occurred while recording waste. Please try again.');
+            alert("{{ t_err_record_retry|escapejs }}");
         });
     });
     
     function updateRecentRecords() {
         document.getElementById('recentRecords').innerHTML = `
             <i class="fas fa-check-circle icon-xl d-block text-success"></i>
-            <h5 class="mb-2 text-success">Latest Incident Recorded!</h5>
-            <p class="mb-0">Waste incident has been successfully logged. You can record another incident above.</p>
+            <h5 class="mb-2 text-success">{{ t_latest|escapejs }}</h5>
+            <p class="mb-0">{{ t_logged|escapejs }}</p>
         `;
     }
 });

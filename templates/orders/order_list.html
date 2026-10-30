@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Order List - Restaurant System{% endblock %}
+{% block title %}{% translate "Order List" %} - {% translate "Restaurant System" %}{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -9,14 +10,14 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="mb-0">
                 <i class="bi bi-list-check text-primary"></i> 
-                {% if is_customer_care %}My Orders{% else %}All Orders{% endif %}
+                {% if is_customer_care %}{% translate "My Orders" %}{% else %}{% translate "All Orders" %}{% endif %}
             </h2>
             <div>
                 <a href="{% url 'orders:select_table' %}" class="btn btn-primary me-2">
-                    <i class="bi bi-plus-circle"></i> New Order
+                    <i class="bi bi-plus-circle"></i> {% translate "New Order" %}
                 </a>
                 <a href="{% url 'restaurant:menu' %}" class="btn btn-outline-secondary">
-                    <i class="bi bi-menu-button-wide"></i> Browse Menu
+                    <i class="bi bi-menu-button-wide"></i> {% translate "Browse Menu" %}
                 </a>
             </div>
         </div>
@@ -26,7 +27,7 @@
 <div class="card shadow-sm">
     <div class="card-header">
         <h5 class="mb-0">
-            {% if is_customer_care %}My Recent Orders{% else %}Recent Orders{% endif %}
+            {% if is_customer_care %}{% translate "My Recent Orders" %}{% else %}{% translate "Recent Orders" %}{% endif %}
         </h5>
     </div>
     <div class="card-body">
@@ -34,14 +35,14 @@
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
-                        <th>Order #</th>
-                        <th>Table</th>
-                        {% if not is_customer_care %}<th>Ordered By</th>{% endif %}
-                        <th>Status</th>
-                        <th>Items</th>
-                        <th>Total</th>
-                        <th>Order Time</th>
-                        <th>Actions</th>
+                        <th>{% translate "Order #" %}</th>
+                        <th>{% translate "Table" %}</th>
+                        {% if not is_customer_care %}<th>{% translate "Ordered By" %}</th>{% endif %}
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Items" %}</th>
+                        <th>{% translate "Total" %}</th>
+                        <th>{% translate "Order Time" %}</th>
+                        <th>{% translate "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -60,21 +61,21 @@
                                     {{ order.get_status_display }}
                                 </span>
                             </td>
-                            <td>{{ order.get_total_products }} items</td>
+                            <td>{% blocktranslate count n=order.get_total_products %}{{ n }} item{% plural %}{{ n }} items{% endblocktranslate %}</td>
                             <td><strong>{% currency_symbol %}{{ order.total_amount }}</strong></td>
                             <td>
                                 <small>{{ order.created_at|date:"M d, Y H:i" }}</small>
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="#" class="btn btn-outline-primary" title="View Details">
+                                    <a href="#" class="btn btn-outline-primary" title="{% translate "View Details" %}">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     {% if order.status == 'pending' or order.status == 'confirmed' %}
-                                    <a href="#" class="btn btn-outline-warning" title="Edit Order">
+                                    <a href="#" class="btn btn-outline-warning" title="{% translate "Edit Order" %}">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <a href="#" class="btn btn-outline-danger" title="Cancel Order">
+                                    <a href="#" class="btn btn-outline-danger" title="{% translate "Cancel Order" %}">
                                         <i class="bi bi-x-circle"></i>
                                     </a>
                                     {% endif %}
@@ -86,8 +87,8 @@
                         <tr>
                             <td colspan="{% if is_customer_care %}7{% else %}8{% endif %}" class="text-center text-muted py-4">
                                 <i class="bi bi-info-circle display-4 mb-3"></i>
-                                <h5>No Orders Found</h5>
-                                <p>{% if is_customer_care %}You haven't created any orders yet.{% else %}Orders will appear here once customers start placing them.{% endif %}</p>
+                                <h5>{% translate "No Orders Found" %}</h5>
+                                <p>{% if is_customer_care %}{% translate "You haven't created any orders yet." %}{% else %}{% translate "Orders will appear here once customers start placing them." %}{% endif %}</p>
                             </td>
                         </tr>
                     {% endif %}
@@ -101,10 +102,10 @@
     <div class="col-12">
         <div class="card bg-light">
             <div class="card-body text-center">
-                <h5>Ready to Place an Order?</h5>
-                <p class="mb-3">Browse our menu and start your ordering experience.</p>
+                <h5>{% translate "Ready to Place an Order?" %}</h5>
+                <p class="mb-3">{% translate "Browse our menu and start your ordering experience." %}</p>
                 <a href="{% url 'orders:select_table' %}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-arrow-right-circle"></i> Start Ordering
+                    <i class="bi bi-arrow-right-circle"></i> {% translate "Start Ordering" %}
                 </a>
             </div>
         </div>

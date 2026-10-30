@@ -1,0 +1,2592 @@
+msgid "Based on your last %(counter)s day of orders (up to 8 weeks). Recent weeks count more."
+msgid_plural "Based on your last %(counter)s days of orders (up to 8 weeks). Recent weeks count more."
+msgstr[0] "Kulingana na oda za siku %(counter)s iliyopita (hadi wiki 8). Wiki za karibuni zina uzito zaidi."
+msgstr[1] "Kulingana na oda za siku %(counter)s zilizopita (hadi wiki 8). Wiki za karibuni zina uzito zaidi."
+
+msgid "Sales reports"
+msgstr "Ripoti za mauzo"
+
+msgid "The forecast gets reliable after about 2 weeks of orders. Numbers below are a first guess."
+msgstr "Utabiri unaaminika zaidi baada ya takriban wiki 2 za oda. Namba zilizo hapa chini ni makadirio ya awali."
+
+msgid "Expected sales — next 7 days"
+msgstr "Mauzo yanayotarajiwa — siku 7 zijazo"
+
+msgid "trend"
+msgstr "mwelekeo"
+
+msgid "usually %(low)s–%(high)s"
+msgstr "kwa kawaida %(low)s–%(high)s"
+
+msgid "Dishes on the move"
+msgstr "Vyakula vinavyobadilika"
+
+msgid "(last 14 days vs the 14 before)"
+msgstr "(siku 14 zilizopita dhidi ya 14 za kabla yake)"
+
+msgid "Rising"
+msgstr "Vinapanda"
+
+msgid "new"
+msgstr "kipya"
+
+msgid "Falling"
+msgstr "Vinashuka"
+
+msgid "Busy hours"
+msgstr "Saa za shughuli nyingi"
+
+msgid "(average orders per hour)"
+msgstr "(wastani wa oda kwa saa)"
+
+msgid "Busiest:"
+msgstr "Zenye shughuli zaidi:"
+
+msgid "plan the roster around these."
+msgstr "panga ratiba ya zamu kulingana na saa hizi."
+
+msgid "%(day)s %(hour)s:00 — about %(avg)s orders"
+msgstr "%(day)s %(hour)s:00 — takriban oda %(avg)s"
+
+msgid "No orders yet."
+msgstr "Bado hakuna oda."
+
+msgid "Ingredients to buy for the next 7 days"
+msgstr "Viungo vya kununua kwa siku 7 zijazo"
+
+msgid "Make a purchase order"
+msgstr "Tengeneza oda ya ununuzi"
+
+msgid "From your recipes and the expected dish sales above, compared with what is in stock (keeping each item's low-stock level)."
+msgstr "Kutokana na mapishi yako na mauzo ya vyakula yanayotarajiwa hapo juu, ukilinganisha na kilichopo stoo (ukizingatia kiwango cha chini cha kila bidhaa)."
+
+msgid "Ingredient"
+msgstr "Kiungo"
+
+msgid "Expected use"
+msgstr "Matumizi yanayotarajiwa"
+
+msgid "Buy"
+msgstr "Nunua"
+
+msgid "Est. cost"
+msgstr "Gharama (makadirio)"
+
+msgid "Nothing to buy — or no recipes yet. Add recipes under Inventory → Recipes to get a shopping list."
+msgstr "Hakuna cha kununua — au bado hakuna mapishi. Ongeza mapishi kwenye Stoo → Mapishi upate orodha ya manunuzi."
+
+msgid "Loyalty points are shared by all branches and set by the main restaurant owner."
+msgstr "Pointi za uaminifu zinatumika na matawi yote na zinawekwa na mmiliki wa mgahawa mkuu."
+
+msgid "Give customers loyalty points"
+msgstr "Wape wateja pointi za uaminifu"
+
+msgid "Customers earn 1 point for every"
+msgstr "Wateja wanapata pointi 1 kwa kila"
+
+msgid "spent on a fully paid order (money paid with points earns nothing)."
+msgstr "kinachotumika kwenye oda iliyolipwa yote (pesa iliyolipwa kwa pointi haipati pointi)."
+
+msgid "1 point is worth"
+msgstr "Pointi 1 ina thamani ya"
+
+msgid "when the customer pays with points at the cashier."
+msgstr "mteja anapolipa kwa pointi kwa keshia."
+
+msgid "Smallest number of points used at once"
+msgstr "Idadi ndogo kabisa ya pointi zinazotumika kwa mara moja"
+
+msgid "Save settings"
+msgstr "Hifadhi mipangilio"
+
+msgid "Points customers hold"
+msgstr "Pointi walizonazo wateja"
+
+msgid "worth %(worth)s"
+msgstr "thamani %(worth)s"
+
+msgid "Points used to pay"
+msgstr "Pointi zilizotumika kulipa"
+
+msgid "Points"
+msgstr "Pointi"
+
+msgid "Adjust"
+msgstr "Rekebisha"
+
+msgid "Points to add or remove"
+msgstr "Pointi za kuongeza au kupunguza"
+
+msgid "Save"
+msgstr "Hifadhi"
+
+msgid "No customer has points yet."
+msgstr "Bado hakuna mteja mwenye pointi."
+
+msgid "Example: a customer who spends {spend} earns 100 points, worth {back} ({pct}%% back). They can use them from {min} points."
+msgstr "Mfano: mteja anayetumia {spend} anapata pointi 100, zenye thamani ya {back} (anarudishiwa {pct}%%). Anaweza kuzitumia kuanzia pointi {min}."
+
+msgid "Customers pay from their phone (PIN prompt). The money goes straight to your own account with the provider. Your restaurant currency: <strong>%(currency)s</strong>."
+msgstr "Wateja wanalipa kutoka kwenye simu zao (wanaombwa PIN). Pesa inaingia moja kwa moja kwenye akaunti yako kwa mtoa huduma. Sarafu ya mgahawa wako: <strong>%(currency)s</strong>."
+
+msgid "This branch currently uses the main restaurant's mobile money account (%(provider)s). Save your own account below if this branch should be paid into a different one."
+msgstr "Tawi hili kwa sasa linatumia akaunti ya pesa kwa simu ya mgahawa mkuu (%(provider)s). Hifadhi akaunti yako hapa chini ikiwa tawi hili linapaswa kulipwa kwenye akaunti nyingine."
+
+msgid "Provider"
+msgstr "Mtoa huduma"
+
+msgid "Choose…"
+msgstr "Chagua…"
+
+msgid "Kenya (KES): M-Pesa Daraja. Tanzania, Uganda, Rwanda, Ghana: Flutterwave."
+msgstr "Kenya (KES): M-Pesa Daraja. Tanzania, Uganda, Rwanda, Ghana: Flutterwave."
+
+msgid "Saved — leave empty to keep"
+msgstr "Imehifadhiwa — acha wazi ili kuibakiza"
+
+msgid "Mode"
+msgstr "Hali ya kazi"
+
+msgid "Test (sandbox)"
+msgstr "Majaribio (sandbox)"
+
+msgid "Live (real money)"
+msgstr "Halisi (pesa halisi)"
+
+msgid "Flutterwave: test or live is decided by which secret key you paste."
+msgstr "Flutterwave: majaribio au halisi huamuliwa na ufunguo wa siri (secret key) unaoubandika."
+
+msgid "Take mobile money payments"
+msgstr "Pokea malipo ya pesa kwa simu"
+
+msgid "Customers can also pay their own orders in the app / website"
+msgstr "Wateja wanaweza pia kulipia oda zao wenyewe kwenye programu / tovuti"
+
+msgid "Save &amp; test connection"
+msgstr "Hifadhi na jaribu muunganisho"
+
+msgid "Callback address"
+msgstr "Anwani ya callback"
+
+msgid "In your Flutterwave dashboard → Settings → Webhooks, paste this URL and the same Secret Hash you entered here."
+msgstr "Kwenye dashibodi yako ya Flutterwave → Settings → Webhooks, bandika URL hii pamoja na Secret Hash ileile uliyoweka hapa."
+
+msgid "Used automatically for every M-Pesa request — nothing to set in Daraja."
+msgstr "Inatumika yenyewe kwa kila ombi la M-Pesa — hakuna cha kuweka kwenye Daraja."
+
+msgid "Recent requests"
+msgstr "Maombi ya karibuni"
+
+msgid "When"
+msgstr "Lini"
+
+msgid "No requests yet."
+msgstr "Bado hakuna maombi."
+
+msgid "Manage Staff"
+msgstr "Simamia Wafanyakazi"
+
+msgid "Name"
+msgstr "Jina"
+
+msgid "No staff members found."
+msgstr "Hakuna wafanyakazi waliopatikana."
+
+msgid "Add booking"
+msgstr "Ongeza uhifadhi"
+
+msgid "Name *"
+msgstr "Jina *"
+
+msgid "Phone *"
+msgstr "Simu *"
+
+msgid "People *"
+msgstr "Watu *"
+
+msgid "Date *"
+msgstr "Tarehe *"
+
+msgid "Time *"
+msgstr "Saa *"
+
+msgid "Table (optional)"
+msgstr "Meza (si lazima)"
+
+msgid "Birthday, window seat…"
+msgstr "Siku ya kuzaliwa, kiti cha dirishani…"
+
+msgid "%(counter)s booking waiting for confirmation:"
+msgid_plural "%(counter)s bookings waiting for confirmation:"
+msgstr[0] "Uhifadhi %(counter)s unasubiri kuthibitishwa:"
+msgstr[1] "Uhifadhi %(counter)s unasubiri kuthibitishwa:"
+
+msgctxt "reservations"
+msgid "Active"
+msgstr "Zinazoendelea"
+
+msgid "%(counter)s booking"
+msgid_plural "%(counter)s bookings"
+msgstr[0] "uhifadhi %(counter)s"
+msgstr[1] "uhifadhi %(counter)s"
+
+msgid "%(counter)s person"
+msgid_plural "%(counter)s people"
+msgstr[0] "mtu %(counter)s"
+msgstr[1] "watu %(counter)s"
+
+msgid "not assigned"
+msgstr "haijapangwa"
+
+msgid "No table"
+msgstr "Hakuna meza"
+
+msgid "Set table"
+msgstr "Weka meza"
+
+msgid "Staff notes"
+msgstr "Maelezo ya wafanyakazi"
+
+msgid "No bookings for this day."
+msgstr "Hakuna uhifadhi siku hii."
+
+msgid "Custom"
+msgstr "Chagua tarehe"
+
+msgid "to"
+msgstr "hadi"
+
+msgid "Apply"
+msgstr "Tumia"
+
+msgid "MONEY IN"
+msgstr "PESA INAYOINGIA"
+
+msgid "Sales + Events collected"
+msgstr "Mauzo + Matukio yaliyokusanywa"
+
+msgid "MONEY OUT"
+msgstr "PESA INAYOTOKA"
+
+msgid "Net inventory spend"
+msgstr "Matumizi halisi ya stoo"
+
+msgid "OUTSTANDING"
+msgstr "INAYODAIWA"
+
+msgid "Unpaid orders + event balances"
+msgstr "Oda ambazo hazijalipwa + salio za matukio"
+
+msgid "NET POSITION"
+msgstr "HALI HALISI"
+
+msgid "Money In &minus; Money Out"
+msgstr "Pesa Inayoingia &minus; Pesa Inayotoka"
+
+msgid "Daily Money Flow"
+msgstr "Mzunguko wa Pesa kwa Siku"
+
+msgid "Green = Money In"
+msgstr "Kijani = Pesa Inayoingia"
+
+msgid "Red = Money Out"
+msgstr "Nyekundu = Pesa Inayotoka"
+
+msgid "Sales Orders"
+msgstr "Oda za Mauzo"
+
+msgid "Collected"
+msgstr "Iliyokusanywa"
+
+msgid "View Sales Report"
+msgstr "Angalia Ripoti ya Mauzo"
+
+msgid "Total Events"
+msgstr "Jumla ya Matukio"
+
+msgid "Outstanding"
+msgstr "Inayodaiwa"
+
+msgid "View Events"
+msgstr "Angalia Matukio"
+
+msgid "Inventory Costs"
+msgstr "Gharama za Stoo"
+
+msgid "Transactions"
+msgstr "Miamala"
+
+msgid "Purchases"
+msgstr "Manunuzi"
+
+msgid "Refunds"
+msgstr "Marejesho"
+
+msgid "Net Cost"
+msgstr "Gharama Halisi"
+
+msgid "View Inventory"
+msgstr "Angalia Stoo"
+
+msgid "Money In"
+msgstr "Pesa Inayoingia"
+
+msgid "Money Out"
+msgstr "Pesa Inayotoka"
+
+msgid "TOTAL REVENUE"
+msgstr "JUMLA YA MAPATO"
+
+msgid "TOTAL ORDERS"
+msgstr "JUMLA YA ODA"
+
+msgid "ITEMS SOLD"
+msgstr "BIDHAA ZILIZOUZWA"
+
+msgid "AVG ORDER VALUE"
+msgstr "WASTANI WA THAMANI YA ODA"
+
+msgid "PAID ORDERS"
+msgstr "ODA ZILIZOLIPWA"
+
+msgid "UNPAID ORDERS"
+msgstr "ODA AMBAZO HAZIJALIPWA"
+
+msgid "PARTIAL PAYMENTS"
+msgstr "MALIPO YA KIASI"
+
+msgid "KITCHEN ORDERS"
+msgstr "ODA ZA JIKONI"
+
+msgid "BAR ORDERS"
+msgstr "ODA ZA BAA"
+
+msgid "MIXED ORDERS"
+msgstr "ODA MCHANGANYIKO"
+
+msgid "With Tax:"
+msgstr "Pamoja na kodi:"
+
+msgid "Top Selling Products"
+msgstr "Bidhaa Zinazouzwa Zaidi"
+
+msgid "%(n)s sold"
+msgstr "%(n)s zimeuzwa"
+
+msgid "Revenue:"
+msgstr "Mapato:"
+
+msgid "Yearly"
+msgstr "Kila mwaka"
+
+msgid "All Products"
+msgstr "Bidhaa Zote"
+
+msgid "No products available"
+msgstr "Hakuna bidhaa"
+
+msgid "Payment Type"
+msgstr "Aina ya Malipo"
+
+msgid "All Types"
+msgstr "Aina Zote"
+
+msgid "Digital"
+msgstr "Kidijitali"
+
+msgid "Detailed Sales Data"
+msgstr "Takwimu za Mauzo kwa Kina"
+
+msgid "%(counter)s Order"
+msgid_plural "%(counter)s Orders"
+msgstr[0] "Oda %(counter)s"
+msgstr[1] "Oda %(counter)s"
+
+msgid "Order By"
+msgstr "Imeagizwa na"
+
+msgid "Unknown"
+msgstr "Haijulikani"
+
+msgid "PAID"
+msgstr "IMELIPWA"
+
+msgid "UNPAID"
+msgstr "HAIJALIPWA"
+
+msgid "PARTIAL"
+msgstr "KIASI"
+
+msgid "No orders found for the selected filters"
+msgstr "Hakuna oda zilizopatikana kwa vichujio ulivyochagua"
+
+msgid "Orders pagination"
+msgstr "Kurasa za oda"
+
+msgid "Complete restaurant management and control center"
+msgstr "Kituo kamili cha kusimamia na kudhibiti mgahawa"
+
+msgid "Manage Tables"
+msgstr "Simamia Meza"
+
+msgid "View Orders"
+msgstr "Angalia Oda"
+
+msgid "Waste Dashboard"
+msgstr "Dashibodi ya Upotevu"
+
+msgid "Waste Reports"
+msgstr "Ripoti za Upotevu"
+
+msgid "Waste Cost Settings"
+msgstr "Mipangilio ya Gharama za Upotevu"
+
+msgid "Quick Management"
+msgstr "Usimamizi wa Haraka"
+
+msgid "Manage Categories"
+msgstr "Simamia Makundi"
+
+msgid "Add Kitchen/Care Staff"
+msgstr "Ongeza Mfanyakazi wa Jikoni/Huduma"
+
+msgid "No recent orders found"
+msgstr "Hakuna oda za karibuni"
+
+msgid "Popular Products"
+msgstr "Bidhaa Maarufu"
+
+msgid "No order data available yet"
+msgstr "Bado hakuna taarifa za oda"
+
+msgid "Your Permissions"
+msgstr "Ruhusa Zako"
+
+msgid "Add Kitchen Staff"
+msgstr "Ongeza Wafanyakazi wa Jikoni"
+
+msgid "Add Customer Care"
+msgstr "Ongeza Huduma kwa Wateja"
+
+msgid "Manage Roles"
+msgstr "Simamia Nyadhifa"
+
+msgid "Manage Admins"
+msgstr "Simamia Wasimamizi"
+
+msgid "You have full management access except for role/admin management which is restricted to administrators."
+msgstr "Una ruhusa kamili ya usimamizi isipokuwa usimamizi wa nyadhifa/wasimamizi ambao ni wa wasimamizi wa mfumo pekee."
+
+msgid "Food Waste Management"
+msgstr "Usimamizi wa Upotevu wa Chakula"
+
+msgid "Track, analyze, and reduce food waste in your restaurant"
+msgstr "Fuatilia, chambua na punguza upotevu wa chakula katika mgahawa wako"
+
+msgid "View waste overview and record new incidents"
+msgstr "Angalia muhtasari wa upotevu na rekodi matukio mapya"
+
+msgid "Generate detailed reports and analytics"
+msgstr "Tengeneza ripoti na uchambuzi wa kina"
+
+msgid "Configure waste cost calculations"
+msgstr "Weka jinsi gharama za upotevu zinavyokokotolewa"
+
+msgid "New Feature:"
+msgstr "Huduma Mpya:"
+
+msgid "Track food waste incidents, calculate cost impact, and export detailed reports in PDF, CSV, or Excel formats."
+msgstr "Fuatilia matukio ya upotevu wa chakula, kokotoa athari ya gharama, na pakua ripoti za kina kwa PDF, CSV au Excel."
+
+msgid "Password will be set to this value. User can change it later."
+msgstr "Nenosiri litawekwa kuwa hili. Mtumiaji anaweza kulibadilisha baadaye."
+
+msgid "Staff member added successfully!"
+msgstr "Mfanyakazi ameongezwa!"
+
+msgid "Error adding staff member"
+msgstr "Imeshindikana kuongeza mfanyakazi"
+
+msgid "Inventory Dashboard"
+msgstr "Dashibodi ya Stoo"
+
+msgid "Add Record"
+msgstr "Ongeza Rekodi"
+
+msgid "Manage Items"
+msgstr "Simamia Bidhaa"
+
+msgid "Full History"
+msgstr "Historia Kamili"
+
+msgid "Total Items"
+msgstr "Jumla ya Bidhaa"
+
+msgid "Low Stock Items"
+msgstr "Bidhaa Zinazokaribia Kuisha"
+
+msgid "Current Stock Levels"
+msgstr "Viwango vya Stoo kwa Sasa"
+
+msgid "Current Stock"
+msgstr "Stoo ya Sasa"
+
+msgid "Unit"
+msgstr "Kipimo"
+
+msgid "Low Stock"
+msgstr "Inakaribia Kuisha"
+
+msgid "Showing %(start)s–%(end)s of %(total)s items"
+msgstr "Inaonyesha %(start)s–%(end)s kati ya bidhaa %(total)s"
+
+msgid "Stock levels pagination"
+msgstr "Kurasa za viwango vya stoo"
+
+msgid "No inventory items yet."
+msgstr "Bado hakuna bidhaa za stoo."
+
+msgid "Add Your First Item"
+msgstr "Ongeza Bidhaa Yako ya Kwanza"
+
+msgid "Recent Activity"
+msgstr "Shughuli za Karibuni"
+
+msgid "No records yet."
+msgstr "Bado hakuna rekodi."
+
+msgid "Inventory History"
+msgstr "Historia ya Stoo"
+
+msgid "TOTAL SPENT"
+msgstr "JUMLA ILIYOTUMIKA"
+
+msgid "Money paid to suppliers"
+msgstr "Pesa zilizolipwa kwa wasambazaji"
+
+msgid "TOTAL REFUNDS"
+msgstr "JUMLA YA MAREJESHO"
+
+msgid "Money returned by suppliers"
+msgstr "Pesa zilizorudishwa na wasambazaji"
+
+msgid "NET COST"
+msgstr "GHARAMA HALISI"
+
+msgid "Spent minus refunds"
+msgstr "Matumizi ukiondoa marejesho"
+
+msgid "Filters"
+msgstr "Vichujio"
+
+msgid "All Items"
+msgstr "Bidhaa Zote"
+
+msgid "Record Type"
+msgstr "Aina ya Rekodi"
+
+msgid "Quick Range"
+msgstr "Kipindi cha Haraka"
+
+msgid "Records"
+msgstr "Rekodi"
+
+msgid "%(n)s Records"
+msgstr "Rekodi %(n)s"
+
+msgid "Qty Change"
+msgstr "Mabadiliko ya Idadi"
+
+msgid "Cost"
+msgstr "Gharama"
+
+msgid "Recorded By"
+msgstr "Imerekodiwa na"
+
+msgid "Refund"
+msgstr "Marejesho"
+
+msgid "Showing %(start)s to %(end)s of %(total)s records"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya rekodi %(total)s"
+
+msgid "Spent:"
+msgstr "Imetumika:"
+
+msgid "Refunds:"
+msgstr "Marejesho:"
+
+msgid "Net:"
+msgstr "Halisi:"
+
+msgid "History pagination"
+msgstr "Kurasa za historia"
+
+msgid "No records found matching your filters."
+msgstr "Hakuna rekodi zinazolingana na vichujio vyako."
+
+msgid "Add First Record"
+msgstr "Ongeza Rekodi ya Kwanza"
+
+msgid "Manage Inventory Items"
+msgstr "Simamia Bidhaa za Stoo"
+
+msgid "Add Item"
+msgstr "Ongeza Bidhaa"
+
+msgid "Manage categories & units"
+msgstr "Simamia makundi na vipimo"
+
+msgid "Hide Inactive"
+msgstr "Ficha Zilizosimamishwa"
+
+msgid "Show Inactive"
+msgstr "Onyesha Zilizosimamishwa"
+
+msgid "Search by Name"
+msgstr "Tafuta kwa Jina"
+
+msgid "e.g. Tomatoes..."
+msgstr "mf. Nyanya..."
+
+msgid "All Items (including inactive)"
+msgstr "Bidhaa Zote (pamoja na zilizosimamishwa)"
+
+msgid "Active Items"
+msgstr "Bidhaa Zinazotumika"
+
+msgid "Low Stock Alert"
+msgstr "Tahadhari ya Stoo Ndogo"
+
+msgid "Add Stock Record"
+msgstr "Ongeza Rekodi ya Stoo"
+
+msgid "Reactivate"
+msgstr "Rudisha Kutumika"
+
+msgid "Delete permanently"
+msgstr "Futa kabisa"
+
+msgid "Items pagination"
+msgstr "Kurasa za bidhaa"
+
+msgid "No inventory items found. Add your first item to get started."
+msgstr "Hakuna bidhaa za stoo. Ongeza bidhaa yako ya kwanza ili uanze."
+
+msgid "Add Inventory Item"
+msgstr "Ongeza Bidhaa ya Stoo"
+
+msgid "Item Name"
+msgstr "Jina la Bidhaa"
+
+msgid "e.g. Tomatoes"
+msgstr "mf. Nyanya"
+
+msgid "-- No category --"
+msgstr "-- Hakuna kundi --"
+
+msgid "No categories yet"
+msgstr "Bado hakuna makundi"
+
+msgid "Add in Settings"
+msgstr "Ongeza kwenye Mipangilio"
+
+msgid "-- Select unit --"
+msgstr "-- Chagua kipimo --"
+
+msgid "No units yet"
+msgstr "Bado hakuna vipimo"
+
+msgid "Opening stock quantity."
+msgstr "Idadi ya stoo ya kuanzia."
+
+msgid "Alert below this value."
+msgstr "Tahadhari ikishuka chini ya kiasi hiki."
+
+msgid "Supplier, storage location, etc."
+msgstr "Msambazaji, mahali pa kuhifadhi, n.k."
+
+msgid "Save Item"
+msgstr "Hifadhi Bidhaa"
+
+msgid "Edit Inventory Item"
+msgstr "Hariri Bidhaa ya Stoo"
+
+msgid "No categories — add in Settings"
+msgstr "Hakuna makundi — ongeza kwenye Mipangilio"
+
+msgid "No units — add in Settings"
+msgstr "Hakuna vipimo — ongeza kwenye Mipangilio"
+
+msgid "Low Stock Alert Threshold"
+msgstr "Kiwango cha Tahadhari ya Stoo Ndogo"
+
+msgid "Permanently delete \"{name}\"? This cannot be undone."
+msgstr "Futa \"{name}\" kabisa? Hili haliwezi kurudishwa."
+
+msgid "Deactivate \"{name}\"? It will be hidden from records."
+msgstr "Simamisha \"{name}\"? Itafichwa kwenye rekodi."
+
+msgid "Re-activate \"{name}\"?"
+msgstr "Rudisha \"{name}\" kutumika?"
+
+msgid "Request failed."
+msgstr "Ombi limeshindikana."
+
+msgid "Error saving item."
+msgstr "Imeshindikana kuhifadhi bidhaa."
+
+msgid "Close this order? Nothing more will be expected from the supplier."
+msgstr "Funga oda hii? Hakuna kitakachotarajiwa tena kutoka kwa msambazaji."
+
+msgid "Cancel this order?"
+msgstr "Ghairi oda hii?"
+
+msgid "Remove this payment?"
+msgstr "Ondoa malipo haya?"
+
+msgid "ordered %(date)s"
+msgstr "imeagizwa %(date)s"
+
+msgid "deliver by %(date)s"
+msgstr "ifikishwe kabla ya %(date)s"
+
+msgid "Print / PDF"
+msgstr "Chapisha / PDF"
+
+msgid "Share text"
+msgstr "Shiriki maandishi"
+
+msgid "Add the supplier's email on the Suppliers page"
+msgstr "Weka barua pepe ya msambazaji kwenye ukurasa wa Wasambazaji"
+
+msgid "Email is not set up on this system yet"
+msgstr "Barua pepe bado haijawekwa kwenye mfumo huu"
+
+msgid "Mark as sent"
+msgstr "Weka kuwa imetumwa"
+
+msgid "Received"
+msgstr "Iliyopokelewa"
+
+msgid "Unit price"
+msgstr "Bei ya kipimo kimoja"
+
+msgid "Arrived now"
+msgstr "Imefika sasa"
+
+msgid "Done"
+msgstr "Imekamilika"
+
+msgid "Order total"
+msgstr "Jumla ya oda"
+
+msgid "Value received so far"
+msgstr "Thamani iliyopokelewa hadi sasa"
+
+msgid "Receive a delivery"
+msgstr "Pokea mzigo"
+
+msgid "Enter what actually arrived (it can be less than ordered). It is added to your stock straight away at the order price."
+msgstr "Weka kilichofika kweli (kinaweza kuwa pungufu ya kilichoagizwa). Kinaongezwa kwenye stoo yako mara moja kwa bei ya oda."
+
+msgid "Delivery note / invoice number (optional)"
+msgstr "Hati ya mzigo / namba ya ankara (si lazima)"
+
+msgid "Everything arrived"
+msgstr "Vyote vimefika"
+
+msgid "Receive into stock"
+msgstr "Pokea kwenye stoo"
+
+msgid "Close order (rest not coming)"
+msgstr "Funga oda (vilivyobaki havitakuja)"
+
+msgid "Cancel order"
+msgstr "Ghairi oda"
+
+msgid "Received value"
+msgstr "Thamani iliyopokelewa"
+
+msgid "We owe"
+msgstr "Tunadaiwa"
+
+msgid "Supplier owes us back"
+msgstr "Msambazaji anatudai kurudisha"
+
+msgid "Paid on"
+msgstr "Tarehe ya kulipa"
+
+msgid "Reference"
+msgstr "Kumbukumbu"
+
+msgid "Record payment"
+msgstr "Rekodi malipo"
+
+msgid "Share %(code)s"
+msgstr "Shiriki %(code)s"
+
+msgid "Open WhatsApp"
+msgstr "Fungua WhatsApp"
+
+msgid "Copied"
+msgstr "Imenakiliwa"
+
+msgid "Edit %(code)s"
+msgstr "Hariri %(code)s"
+
+msgid "New Purchase Order"
+msgstr "Oda Mpya ya Ununuzi"
+
+msgid "Add a supplier first."
+msgstr "Ongeza msambazaji kwanza."
+
+msgid "Go to Suppliers"
+msgstr "Nenda kwa Wasambazaji"
+
+msgid "Add inventory items first."
+msgstr "Ongeza bidhaa za stoo kwanza."
+
+msgid "Manage items"
+msgstr "Simamia bidhaa"
+
+msgid "Supplier *"
+msgstr "Msambazaji *"
+
+msgid "Order date"
+msgstr "Tarehe ya oda"
+
+msgid "Deliver by"
+msgstr "Ifikishwe kabla ya"
+
+msgid "Notes for the supplier"
+msgstr "Maelezo kwa msambazaji"
+
+msgid "Unit price (%(currency)s)"
+msgstr "Bei ya kipimo kimoja (%(currency)s)"
+
+msgid "Choose item…"
+msgstr "Chagua bidhaa…"
+
+msgid "Add item"
+msgstr "Ongeza bidhaa"
+
+msgid "Save order"
+msgstr "Hifadhi oda"
+
+msgid "We owe suppliers"
+msgstr "Tunadaiwa na wasambazaji"
+
+msgid "For goods already delivered, minus payments"
+msgstr "Kwa bidhaa zilizokwisha fika, ukiondoa malipo"
+
+msgid "All statuses"
+msgstr "Hali zote"
+
+msgid "Open (not finished)"
+msgstr "Wazi (haijakamilika)"
+
+msgid "Supplier"
+msgstr "Msambazaji"
+
+msgid "All suppliers"
+msgstr "Wasambazaji wote"
+
+msgid "Any payment"
+msgstr "Malipo yoyote"
+
+msgid "Partly paid"
+msgstr "Imelipwa kiasi"
+
+msgid "Owed"
+msgstr "Deni"
+
+msgid "due %(date)s"
+msgstr "mwisho %(date)s"
+
+msgid "No purchase orders match these filters."
+msgstr "Hakuna oda za ununuzi zinazolingana na vichujio hivi."
+
+msgid "No purchase orders."
+msgstr "Hakuna oda za ununuzi."
+
+msgid "Recipe – %(name)s"
+msgstr "Mapishi – %(name)s"
+
+msgid "Ingredients for <strong>one serving</strong>, in each item's own unit. Price %(currency)s%(price)s."
+msgstr "Viungo vya <strong>sahani moja</strong>, kwa kipimo cha kila bidhaa. Bei %(currency)s%(price)s."
+
+msgid "Food cost (saved recipe)"
+msgstr "Gharama ya chakula (mapishi yaliyohifadhiwa)"
+
+msgid "%(margin)s%% margin"
+msgstr "faida %(margin)s%%"
+
+msgid "Some ingredients have no cost price in inventory"
+msgstr "Baadhi ya viungo havina bei ya gharama kwenye stoo"
+
+msgid "Add your ingredients as inventory items first."
+msgstr "Ongeza viungo vyako kama bidhaa za stoo kwanza."
+
+msgid "Quantity per serving"
+msgstr "Idadi kwa sahani moja"
+
+msgid "Choose ingredient…"
+msgstr "Chagua kiungo…"
+
+msgid "Add ingredient"
+msgstr "Ongeza kiungo"
+
+msgid "Cost per serving"
+msgstr "Gharama kwa sahani moja"
+
+msgid "Tip: for small amounts use a small unit for the item (for example grams instead of kg), so stock stays accurate."
+msgstr "Dokezo: kwa kiasi kidogo tumia kipimo kidogo kwa bidhaa (kwa mfano gramu badala ya kilo), ili stoo ibaki sahihi."
+
+msgid "Save recipe"
+msgstr "Hifadhi mapishi"
+
+msgid "no price"
+msgstr "hakuna bei"
+
+msgid "Recipes & Food Cost"
+msgstr "Mapishi na Gharama ya Chakula"
+
+msgid "%(with_recipe)s of %(total)s dishes have a recipe. Ingredients are taken from stock when the kitchen starts preparing an order."
+msgstr "Vyakula %(with_recipe)s kati ya %(total)s vina mapishi. Viungo hutolewa kwenye stoo jikoni linapoanza kuandaa oda."
+
+msgid "With recipe"
+msgstr "Vyenye mapishi"
+
+msgid "No recipe yet"
+msgstr "Bado havina mapishi"
+
+msgid "Dish"
+msgstr "Chakula"
+
+msgid "Ingredients"
+msgstr "Viungo"
+
+msgid "Food cost"
+msgstr "Gharama ya chakula"
+
+msgid "Margin"
+msgstr "Faida"
+
+msgid "Out of stock: %(items)s"
+msgstr "Vimeisha: %(items)s"
+
+msgid "prices missing"
+msgstr "bei hazipo"
+
+msgid "Add recipe"
+msgstr "Ongeza mapishi"
+
+msgid "No dishes match this filter."
+msgstr "Hakuna chakula kinacholingana na kichujio hiki."
+
+msgid "No menu dishes yet."
+msgstr "Bado hakuna vyakula kwenye menyu."
+
+msgid "Add Inventory Record"
+msgstr "Ongeza Rekodi ya Stoo"
+
+msgid "Record a Stock Movement"
+msgstr "Rekodi Mabadiliko ya Stoo"
+
+msgid "Inventory Item"
+msgstr "Bidhaa ya Stoo"
+
+msgid "-- Select an item --"
+msgstr "-- Chagua bidhaa --"
+
+msgid "Current stock:"
+msgstr "Stoo ya sasa:"
+
+msgid "-- Select type --"
+msgstr "-- Chagua aina --"
+
+msgid "Enter quantity (always positive)"
+msgstr "Weka idadi (namba chanya kila mara)"
+
+msgid "units"
+msgstr "vipimo"
+
+msgid "Always enter a positive number. Stock-out types (Used, Waste, Returned) will automatically be recorded as negative."
+msgstr "Weka namba chanya kila mara. Aina zinazopunguza stoo (Imetumika, Upotevu, Imerudishwa) zitarekodiwa kama hasi zenyewe."
+
+msgid "e.g. 50.00"
+msgstr "mf. 50.00"
+
+msgid "Total cost paid for this transaction. Leave empty if not tracking cost."
+msgstr "Jumla ya gharama iliyolipwa kwa muamala huu. Acha wazi kama hufuatilii gharama."
+
+msgid "Supplier name, batch number, reason for adjustment…"
+msgstr "Jina la msambazaji, namba ya mzigo, sababu ya marekebisho…"
+
+msgid "Save Record"
+msgstr "Hifadhi Rekodi"
+
+msgid "Record Types Guide"
+msgstr "Mwongozo wa Aina za Rekodi"
+
+msgid "Opening Stock"
+msgstr "Stoo ya Kuanzia"
+
+msgid "Initial stock entry"
+msgstr "Ingizo la kwanza la stoo"
+
+msgid "Stock Received"
+msgstr "Stoo Iliyopokelewa"
+
+msgid "Delivery from supplier"
+msgstr "Mzigo kutoka kwa msambazaji"
+
+msgid "Closing Count"
+msgstr "Hesabu ya Kufunga"
+
+msgid "End-of-day counted quantity (sets absolute level via adjustment)"
+msgstr "Idadi iliyohesabiwa mwisho wa siku (huweka kiwango kamili kwa marekebisho)"
+
+msgid "Manual Adjustment"
+msgstr "Marekebisho ya Mkono"
+
+msgid "Corrections, audits"
+msgstr "Masahihisho, ukaguzi"
+
+msgid "Used / Consumed"
+msgstr "Imetumika"
+
+msgid "Removed for service"
+msgstr "Imetolewa kwa ajili ya huduma"
+
+msgid "Waste / Spoilage"
+msgstr "Upotevu / Kuharibika"
+
+msgid "Thrown away"
+msgstr "Imetupwa"
+
+msgid "Sent back"
+msgstr "Imerudishwa"
+
+msgid "This type removes stock (will be recorded as negative automatically)."
+msgstr "Aina hii inapunguza stoo (itarekodiwa kama hasi yenyewe)."
+
+msgid "This type adds stock."
+msgstr "Aina hii inaongeza stoo."
+
+msgid "Refund Received"
+msgstr "Marejesho Yaliyopokelewa"
+
+msgid "e.g. 30.00 — amount the supplier refunded you"
+msgstr "mf. 30.00 — kiasi msambazaji alichokurudishia"
+
+msgid "Money coming back to you."
+msgstr "Pesa zinazokurudia."
+
+msgid "Enter the refund amount if the supplier paid you back."
+msgstr "Weka kiasi cha marejesho kama msambazaji alikurudishia pesa."
+
+msgid "(not usually applicable)"
+msgstr "(kwa kawaida haihusiki)"
+
+msgid "Usually leave empty — no cash transaction"
+msgstr "Kwa kawaida acha wazi — hakuna muamala wa pesa"
+
+msgid "Used/Waste records are internal movements — no new cash is paid. Leave empty."
+msgstr "Rekodi za Imetumika/Upotevu ni mabadiliko ya ndani — hakuna pesa mpya inayolipwa. Acha wazi."
+
+msgid "Amount Paid"
+msgstr "Kiasi Kilicholipwa"
+
+msgid "e.g. 50.00 — total you paid for this delivery"
+msgstr "mf. 50.00 — jumla uliyolipa kwa mzigo huu"
+
+msgid "Money going out."
+msgstr "Pesa zinazotoka."
+
+msgid "Enter what you paid the supplier."
+msgstr "Weka ulichomlipa msambazaji."
+
+msgid "Total cost for this transaction. Leave empty if not tracking cost."
+msgstr "Jumla ya gharama ya muamala huu. Acha wazi kama hufuatilii gharama."
+
+msgid "Inventory Settings"
+msgstr "Mipangilio ya Stoo"
+
+msgid "Units of Measure"
+msgstr "Vipimo"
+
+msgid "Manage the categories used to organise your inventory items."
+msgstr "Simamia makundi yanayotumika kupanga bidhaa zako za stoo."
+
+msgid "Items Using"
+msgstr "Bidhaa Zinazotumia"
+
+msgid "No categories yet."
+msgstr "Bado hakuna makundi."
+
+msgid "Add First Category"
+msgstr "Ongeza Kundi la Kwanza"
+
+msgid "Manage the units of measure used when tracking stock quantities."
+msgstr "Simamia vipimo vinavyotumika kufuatilia idadi za stoo."
+
+msgid "Add Unit"
+msgstr "Ongeza Kipimo"
+
+msgid "No units yet."
+msgstr "Bado hakuna vipimo."
+
+msgid "Add First Unit"
+msgstr "Ongeza Kipimo cha Kwanza"
+
+msgid "Enter name"
+msgstr "Weka jina"
+
+msgid "Edit Unit"
+msgstr "Hariri Kipimo"
+
+msgid "Unit Name"
+msgstr "Jina la Kipimo"
+
+msgid "e.g. Fresh Produce, Japanese Spirits"
+msgstr "mf. Mazao Mabichi, Vinywaji Vikali"
+
+msgid "e.g. kg, bottles (720ml), trays"
+msgstr "mf. kg, chupa (720ml), trei"
+
+msgid "Name is required."
+msgstr "Jina linahitajika."
+
+msgid "Delete \"{name}\"?"
+msgstr "Futa \"{name}\"?"
+
+msgid "{n} item(s) are currently using this category. They will keep their existing value but it won't appear in the dropdown list anymore."
+msgstr "Bidhaa {n} zinatumia kundi hili kwa sasa. Zitabaki na thamani yake lakini halitaonekana tena kwenye orodha ya kuchagua."
+
+msgid "{n} item(s) are currently using this unit. They will keep their existing value but it won't appear in the dropdown list anymore."
+msgstr "Bidhaa {n} zinatumia kipimo hiki kwa sasa. Zitabaki na thamani yake lakini hakitaonekana tena kwenye orodha ya kuchagua."
+
+msgid "Add Supplier"
+msgstr "Ongeza Msambazaji"
+
+msgid "Contact"
+msgstr "Mawasiliano"
+
+msgid "Archived"
+msgstr "Imehifadhiwa kando"
+
+msgid "New order"
+msgstr "Oda mpya"
+
+msgid "Archive"
+msgstr "Weka kando"
+
+msgid "No suppliers yet."
+msgstr "Bado hakuna wasambazaji."
+
+msgid "Contact person"
+msgstr "Mtu wa kuwasiliana"
+
+msgid "Phone / WhatsApp"
+msgstr "Simu / WhatsApp"
+
+msgid "Edit Supplier"
+msgstr "Hariri Msambazaji"
+
+msgid "%% of Total Cost"
+msgstr "%% ya Gharama Yote"
+
+msgid "%% of Total Items"
+msgstr "%% ya Bidhaa Zote"
+
+msgid "%(n)s Items"
+msgstr "Bidhaa %(n)s"
+
+msgid "Additional Notes (Optional)"
+msgstr "Maelezo ya Ziada (si lazima)"
+
+msgid "Additional details about this waste incident..."
+msgstr "Maelezo zaidi kuhusu tukio hili la upotevu..."
+
+msgid "All Reasons"
+msgstr "Sababu Zote"
+
+msgid "An error occurred during auto-detection"
+msgstr "Kuna tatizo wakati wa utambuzi wa kiotomatiki"
+
+msgid "An error occurred while recording waste"
+msgstr "Kuna tatizo wakati wa kurekodi upotevu"
+
+msgid "An error occurred while recording waste. Please try again."
+msgstr "Kuna tatizo wakati wa kurekodi upotevu. Tafadhali jaribu tena."
+
+msgid "Any additional details about this waste incident..."
+msgstr "Maelezo yoyote ya ziada kuhusu tukio hili la upotevu..."
+
+msgid "Are you sure you want to delete this waste record?"
+msgstr "Una uhakika unataka kufuta rekodi hii ya upotevu?"
+
+msgid "Automatically detected {n} waste incidents!"
+msgstr "Matukio {n} ya upotevu yametambuliwa kiotomatiki!"
+
+msgid "Avg Cost Per Item"
+msgstr "Wastani wa Gharama kwa Bidhaa"
+
+msgid "Avg Cost per Item"
+msgstr "Wastani wa Gharama kwa Bidhaa"
+
+msgid "Benefits and taxes"
+msgstr "Marupurupu na kodi"
+
+msgid "Beverages and condiments"
+msgstr "Vinywaji na viungo vya kuongeza ladha"
+
+msgid "Breakdown"
+msgstr "Mchanganuo"
+
+msgid "Configure cost percentages for accurate waste cost calculations. These settings help track the true cost impact of food waste."
+msgstr "Weka asilimia za gharama ili kukokotoa gharama za upotevu kwa usahihi. Mipangilio hii husaidia kufuatilia gharama halisi ya upotevu wa chakula."
+
+msgid "Contamination"
+msgstr "Uchafuzi"
+
+msgid "Cost Calculation Example"
+msgstr "Mfano wa Kukokotoa Gharama"
+
+msgid "Cost Impact:"
+msgstr "Athari ya Gharama:"
+
+msgid "Cost:"
+msgstr "Gharama:"
+
+msgid "Customer Left"
+msgstr "Mteja ameondoka"
+
+msgid "Detailed Waste Data"
+msgstr "Taarifa Kamili za Upotevu"
+
+msgid "Detecting..."
+msgstr "Inatambua..."
+
+msgid "End Date:"
+msgstr "Tarehe ya mwisho:"
+
+msgid "Equipment depreciation"
+msgstr "Uchakavu wa vifaa"
+
+msgid "Estimated Cost Impact:"
+msgstr "Makadirio ya Gharama:"
+
+msgid "Estimated Cost:"
+msgstr "Gharama Inayokadiriwa:"
+
+msgid "Failed to record waste"
+msgstr "Imeshindikana kurekodi upotevu"
+
+msgid "Failed to run auto-detection"
+msgstr "Imeshindikana kufanya utambuzi wa kiotomatiki"
+
+msgid "Filter Options"
+msgstr "Machaguo ya Kuchuja"
+
+msgid "Food Waste Cost Settings"
+msgstr "Mipangilio ya Gharama za Upotevu wa Chakula"
+
+msgid "Food Waste Recording"
+msgstr "Kurekodi Upotevu wa Chakula"
+
+msgid "Food Waste Reports"
+msgstr "Ripoti za Upotevu wa Chakula"
+
+msgid "Guidelines for Setting Cost Percentages"
+msgstr "Mwongozo wa Kuweka Asilimia za Gharama"
+
+msgid "Incident Recorded Successfully!"
+msgstr "Tukio Limerekodiwa!"
+
+msgid "Ingredient Cost"
+msgstr "Gharama ya Viungo"
+
+msgid "Ingredient Cost Percentage"
+msgstr "Asilimia ya Gharama ya Viungo"
+
+msgid "Ingredient Cost:"
+msgstr "Gharama ya Viungo:"
+
+msgid "Ingredient Costs"
+msgstr "Gharama za Viungo"
+
+msgid "Kitchen staff wages"
+msgstr "Mishahara ya wafanyakazi wa jikoni"
+
+msgid "Labor Cost"
+msgstr "Gharama ya Nguvu Kazi"
+
+msgid "Labor Cost Percentage"
+msgstr "Asilimia ya Gharama ya Nguvu Kazi"
+
+msgid "Labor Cost:"
+msgstr "Gharama ya Nguvu Kazi:"
+
+msgid "Labor Costs"
+msgstr "Gharama za Nguvu Kazi"
+
+msgid "Latest Incident Recorded!"
+msgstr "Tukio la Karibuni Limerekodiwa!"
+
+msgid "Log waste incidents quickly and accurately"
+msgstr "Rekodi matukio ya upotevu haraka na kwa usahihi"
+
+msgid "Most Common Reason"
+msgstr "Sababu ya Mara Nyingi Zaidi"
+
+msgid "No automatic waste detected. Great job!"
+msgstr "Hakuna upotevu uliotambuliwa kiotomatiki. Kazi nzuri!"
+
+msgid "No recent changes"
+msgstr "Hakuna mabadiliko ya karibuni"
+
+msgid "No waste records found for the selected criteria."
+msgstr "Hakuna rekodi za upotevu kwa vigezo ulivyochagua."
+
+msgid "No waste records found for the selected filters"
+msgstr "Hakuna rekodi za upotevu kwa vichujio ulivyochagua"
+
+msgid "None"
+msgstr "Hakuna"
+
+msgid "Other"
+msgstr "Nyingine"
+
+msgid "Overhead Cost"
+msgstr "Gharama za Uendeshaji"
+
+msgid "Overhead Cost Percentage"
+msgstr "Asilimia ya Gharama za Uendeshaji"
+
+msgid "Overhead Cost:"
+msgstr "Gharama za Uendeshaji:"
+
+msgid "Overhead Costs"
+msgstr "Gharama za Uendeshaji"
+
+msgid "Packaging materials"
+msgstr "Vifaa vya kufungashia"
+
+msgid "Percentage of menu price representing ingredient costs"
+msgstr "Asilimia ya bei ya menyu inayowakilisha gharama za viungo"
+
+msgid "Percentage of menu price representing labor costs for preparation"
+msgstr "Asilimia ya bei ya menyu inayowakilisha gharama za nguvu kazi ya maandalizi"
+
+msgid "Percentage of menu price representing overhead costs (utilities, rent, etc.)"
+msgstr "Asilimia ya bei ya menyu inayowakilisha gharama za uendeshaji (umeme, maji, kodi ya pango, n.k.)"
+
+msgid "Preparation time"
+msgstr "Muda wa maandalizi"
+
+msgid "Product:"
+msgstr "Bidhaa:"
+
+msgid "Quick and accurate waste incident reporting"
+msgstr "Kuripoti matukio ya upotevu haraka na kwa usahihi"
+
+msgid "Raw food ingredients"
+msgstr "Viungo ghafi vya chakula"
+
+msgid "Recent Changes"
+msgstr "Mabadiliko ya Karibuni"
+
+msgid "Recent waste incidents you've recorded will appear here after submission."
+msgstr "Matukio ya upotevu uliyorekodi hivi karibuni yataonekana hapa baada ya kutuma."
+
+msgid "Record Another"
+msgstr "Rekodi Jingine"
+
+msgid "Record Food Waste - Cashier"
+msgstr "Rekodi Upotevu wa Chakula - Keshia"
+
+msgid "Record New Waste Incident"
+msgstr "Rekodi Tukio Jipya la Upotevu"
+
+msgid "Record Waste - Cashier"
+msgstr "Rekodi Upotevu - Keshia"
+
+msgid "Record Waste Incident"
+msgstr "Rekodi Tukio la Upotevu"
+
+msgid "Record waste incidents quickly and accurately"
+msgstr "Rekodi matukio ya upotevu haraka na kwa usahihi"
+
+msgid "Recording waste incident..."
+msgstr "Inarekodi tukio la upotevu..."
+
+msgid "Rent allocation"
+msgstr "Mgao wa kodi ya pango"
+
+msgid "Review and update these percentages quarterly to ensure accurate waste cost tracking. Consider seasonal variations in ingredient costs and operational efficiency improvements."
+msgstr "Kagua na usasishe asilimia hizi kila robo mwaka ili ufuatiliaji wa gharama za upotevu uwe sahihi. Zingatia mabadiliko ya msimu katika gharama za viungo na maboresho ya ufanisi wa uendeshaji."
+
+msgid "Sample Menu Item Price"
+msgstr "Bei ya Mfano ya Bidhaa ya Menyu"
+
+msgid "Search product, notes, or recorded by..."
+msgstr "Tafuta bidhaa, maelezo, au aliyerekodi..."
+
+msgid "Should typically be 55-85%% of menu price"
+msgstr "Kwa kawaida inapaswa kuwa 55-85%% ya bei ya menyu"
+
+msgid "Show:"
+msgstr "Onyesha:"
+
+msgid "Showing %(start)s to %(end)s of %(total)s waste records"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya rekodi %(total)s za upotevu"
+
+msgid "Start Date:"
+msgstr "Tarehe ya kuanza:"
+
+msgid "The waste incident has been recorded successfully."
+msgstr "Tukio la upotevu limerekodiwa."
+
+msgid "This shows how much each wasted item of this price would cost your business."
+msgstr "Hii inaonyesha kiasi ambacho kila bidhaa ya bei hii ikipotea ingegharimu biashara yako."
+
+msgid "Total Cost"
+msgstr "Jumla ya Gharama"
+
+msgid "Total Cost Percentage"
+msgstr "Jumla ya Asilimia ya Gharama"
+
+msgid "Total Items Wasted"
+msgstr "Jumla ya Bidhaa Zilizopotea"
+
+msgid "Total Waste Cost"
+msgstr "Jumla ya Gharama ya Upotevu"
+
+msgid "Total Waste Cost:"
+msgstr "Jumla ya Gharama ya Upotevu:"
+
+msgid "Typical range: 10-20%%"
+msgstr "Kiwango cha kawaida: 10-20%%"
+
+msgid "Typical range: 10-20%% for restaurants"
+msgstr "Kiwango cha kawaida: 10-20%% kwa migahawa"
+
+msgid "Typical range: 20-30%%"
+msgstr "Kiwango cha kawaida: 20-30%%"
+
+msgid "Typical range: 20-30%% for restaurants"
+msgstr "Kiwango cha kawaida: 20-30%% kwa migahawa"
+
+msgid "Typical range: 25-35%%"
+msgstr "Kiwango cha kawaida: 25-35%%"
+
+msgid "Typical range: 25-35%% for restaurants"
+msgstr "Kiwango cha kawaida: 25-35%% kwa migahawa"
+
+msgid "Update Cost Settings"
+msgstr "Badilisha Mipangilio ya Gharama"
+
+msgid "Update Settings"
+msgstr "Hifadhi Mipangilio"
+
+msgid "Updated by %(name)s"
+msgstr "Imebadilishwa na %(name)s"
+
+msgid "Utilities (gas, electricity)"
+msgstr "Huduma (gesi, umeme)"
+
+msgid "Waste Cost Breakdown:"
+msgstr "Mchanganuo wa Gharama ya Upotevu:"
+
+msgid "Waste Filters"
+msgstr "Vichujio vya Upotevu"
+
+msgid "Waste Performance by Location"
+msgstr "Upotevu kwa Kila Tawi"
+
+msgid "Waste Recorded Successfully"
+msgstr "Upotevu Umerekodiwa"
+
+msgid "Waste Recorded Successfully!"
+msgstr "Upotevu Umerekodiwa!"
+
+msgid "Waste Recording - Cashier"
+msgstr "Kurekodi Upotevu - Keshia"
+
+msgid "Waste Records"
+msgstr "Rekodi za Upotevu"
+
+msgid "Waste incident has been successfully logged. You can record another incident above."
+msgstr "Tukio la upotevu limerekodiwa. Unaweza kurekodi tukio jingine hapo juu."
+
+msgid "Waste logs pagination"
+msgstr "Kurasa za rekodi za upotevu"
+
+msgid "Waste recorded successfully! Record another incident above."
+msgstr "Upotevu umerekodiwa! Rekodi tukio jingine hapo juu."
+
+msgid "Wrong Order"
+msgstr "Oda isiyo sahihi"
+
+msgid "Your Recent Records"
+msgstr "Rekodi Zako za Karibuni"
+
+msgid "Your Recent Waste Records"
+msgstr "Rekodi Zako za Upotevu za Karibuni"
+
+msgid "Your recent waste records will appear here after recording..."
+msgstr "Rekodi zako za upotevu za karibuni zitaonekana hapa baada ya kurekodi..."
+
+msgid "entries per page"
+msgstr "kwa kila ukurasa"
+
+msgid "of menu price"
+msgstr "ya bei ya menyu"
+
+msgid "Attendance Calendar"
+msgstr "Kalenda ya Mahudhurio"
+
+msgid "Previous month"
+msgstr "Mwezi uliopita"
+
+msgid "Next month"
+msgstr "Mwezi ujao"
+
+msgid "Mon"
+msgstr "Jtt"
+
+msgid "Tue"
+msgstr "Jnn"
+
+msgid "Wed"
+msgstr "Jtn"
+
+msgid "Thu"
+msgstr "Alh"
+
+msgid "Fri"
+msgstr "Ijm"
+
+msgid "Sat"
+msgstr "Jms"
+
+msgid "Sun"
+msgstr "Jpl"
+
+msgid "View records for %(date)s"
+msgstr "Angalia rekodi za %(date)s"
+
+msgid "%(n)s late"
+msgstr "%(n)s wamechelewa"
+
+msgctxt "late count, short"
+msgid "%(n)sL"
+msgstr "%(n)sCh"
+
+msgid "Present count"
+msgstr "Idadi waliohudhuria"
+
+msgid "Late arrivals"
+msgstr "Waliochelewa kufika"
+
+msgid "Click a day with records to view details"
+msgstr "Bofya siku yenye rekodi kuona maelezo"
+
+msgid "Web Check-In / Check-Out"
+msgstr "Kuingia / Kutoka Kazini kwa Wavuti"
+
+msgid "My History"
+msgstr "Historia Yangu"
+
+msgid "Not Checked In"
+msgstr "Hujaingia Kazini"
+
+msgid "You have not checked in today."
+msgstr "Bado hujaingia kazini leo."
+
+msgid "Check In Now"
+msgstr "Ingia Kazini Sasa"
+
+msgid "Point your camera at the restaurant QR code"
+msgstr "Elekeza kamera kwenye QR ya mgahawa"
+
+msgid "Camera not available."
+msgstr "Kamera haipatikani."
+
+msgid "Try Camera Again"
+msgstr "Jaribu Kamera Tena"
+
+msgid "Checked In at %(time)s"
+msgstr "Umeingia kazini saa %(time)s"
+
+msgid "Late Arrival"
+msgstr "Amechelewa Kufika"
+
+msgid "You are currently on the clock. Scan the QR code to check out."
+msgstr "Uko kazini sasa. Skani QR ili kutoka kazini."
+
+msgid "Check Out Now"
+msgstr "Toka Kazini Sasa"
+
+msgid "Point your camera at the restaurant QR code to check out"
+msgstr "Elekeza kamera kwenye QR ya mgahawa ili kutoka kazini"
+
+msgid "Shift Complete"
+msgstr "Zamu Imekamilika"
+
+msgid "Check In"
+msgstr "Kuingia kazini"
+
+msgid "Check Out"
+msgstr "Kutoka kazini"
+
+msgid "Total Hours"
+msgstr "Jumla ya Saa"
+
+msgid "Late"
+msgstr "Kuchelewa"
+
+msgid "On Time"
+msgstr "Kwa Wakati"
+
+msgid "Overtime"
+msgstr "Muda wa ziada"
+
+msgid "Current Shift"
+msgstr "Zamu ya Sasa"
+
+msgctxt "shift start time"
+msgid "Start"
+msgstr "Mwanzo"
+
+msgid "End"
+msgstr "Mwisho"
+
+msgid "Grace"
+msgstr "Muda wa ziada wa kuchelewa"
+
+msgid "View My Attendance History"
+msgstr "Angalia Historia ya Mahudhurio Yangu"
+
+msgid "QR detected — recording..."
+msgstr "QR imetambuliwa — inarekodi..."
+
+msgid "Could not record attendance."
+msgstr "Imeshindikana kurekodi mahudhurio."
+
+msgid "Camera requires HTTPS. Open <strong>https://hospitality.easyfixsoft.com</strong> — not http://."
+msgstr "Kamera inahitaji HTTPS. Fungua <strong>https://hospitality.easyfixsoft.com</strong> — si http://."
+
+msgid "Camera access blocked. Tap the <strong>camera icon</strong> in your browser address bar, set it to <strong>Allow</strong>, then tap <em>Try Camera Again</em> below."
+msgstr "Ruhusa ya kamera imezuiwa. Gusa <strong>alama ya kamera</strong> kwenye sehemu ya anwani ya kivinjari, weka <strong>Ruhusu (Allow)</strong>, kisha gusa <em>Jaribu Kamera Tena</em> hapa chini."
+
+msgid "Could not load QR scanner. Please check your internet connection and tap Try Camera Again."
+msgstr "Imeshindikana kupakia kisoma QR. Tafadhali angalia mtandao wako kisha gusa Jaribu Kamera Tena."
+
+msgid "Camera not available. Tap Try Camera Again, or check that no other app is using your camera."
+msgstr "Kamera haipatikani. Gusa Jaribu Kamera Tena, au hakikisha hakuna programu nyingine inayotumia kamera yako."
+
+msgid "Today's Attendance"
+msgstr "Mahudhurio ya Leo"
+
+msgid "Shifts"
+msgstr "Zamu"
+
+msgid "Roster"
+msgstr "Ratiba ya zamu"
+
+msgid "Calendar"
+msgstr "Kalenda"
+
+msgid "Web Check-In"
+msgstr "Kuingia Kazini kwa Wavuti"
+
+msgid "Require Check-In Before Work"
+msgstr "Lazimisha Kuingia Kazini Kabla ya Kazi"
+
+msgid "When <strong>ON</strong>, staff cannot access their work panels until they scan the attendance QR code today."
+msgstr "Ikiwa <strong>IMEWASHWA</strong>, wafanyakazi hawawezi kufungua paneli zao za kazi hadi waskani QR ya mahudhurio leo."
+
+msgid "Default: OFF"
+msgstr "Chaguo-msingi: IMEZIMWA"
+
+msgid "Checked In"
+msgstr "Wameingia"
+
+msgid "Checked Out"
+msgstr "Wametoka"
+
+msgid "Late Arrivals"
+msgstr "Waliochelewa Kufika"
+
+msgid "Today's Records"
+msgstr "Rekodi za Leo"
+
+msgid "Staff Name"
+msgstr "Jina la Mfanyakazi"
+
+msgid "Shift"
+msgstr "Zamu"
+
+msgid "Hours"
+msgstr "Saa"
+
+msgid "Via"
+msgstr "Kupitia"
+
+msgid "Still in"
+msgstr "Bado yupo"
+
+msgid "OT"
+msgstr "Ziada"
+
+msgid "Mobile"
+msgstr "Simu"
+
+msgid "Web"
+msgstr "Wavuti"
+
+msgid "No check-ins recorded today."
+msgstr "Hakuna aliyeingia kazini leo."
+
+msgid "Not Yet Checked In"
+msgstr "Bado Hawajaingia"
+
+msgid "Hours Worked"
+msgstr "Saa za Kazi"
+
+msgid "Attendance Records"
+msgstr "Rekodi za Mahudhurio"
+
+msgid "+%(n)sm"
+msgstr "+dk %(n)s"
+
+msgid "No attendance records for this day."
+msgstr "Hakuna rekodi za mahudhurio siku hii."
+
+msgid "Not Yet In"
+msgstr "Bado Hawajaingia"
+
+msgid "Did Not Attend"
+msgstr "Hawakuhudhuria"
+
+msgid "All staff attended"
+msgstr "Wafanyakazi wote walihudhuria"
+
+msgid "This day hasn't happened yet."
+msgstr "Siku hii bado haijafika."
+
+msgid "My Attendance History"
+msgstr "Historia ya Mahudhurio Yangu"
+
+msgid "Check In / Out"
+msgstr "Ingia / Toka Kazini"
+
+msgid "My Upcoming Shifts"
+msgstr "Zamu Zangu Zijazo"
+
+msgid "Shift to be confirmed"
+msgstr "Zamu itathibitishwa"
+
+msgid "Total Days"
+msgstr "Jumla ya Siku"
+
+msgid "Days Present"
+msgstr "Siku Alizohudhuria"
+
+msgid "Late Days"
+msgstr "Siku za Kuchelewa"
+
+msgid "Overtime Days"
+msgstr "Siku za Muda wa Ziada"
+
+msgid "Day"
+msgstr "Siku"
+
+msgid "Flags"
+msgstr "Alama"
+
+msgid "In progress"
+msgstr "Bado yupo kazini"
+
+msgid "Late by %(n)s min"
+msgstr "Amechelewa dakika %(n)s"
+
+msgid "Overtime %(n)s min"
+msgstr "Muda wa ziada dakika %(n)s"
+
+msgid "No attendance records for %(month_name)s."
+msgstr "Hakuna rekodi za mahudhurio za %(month_name)s."
+
+msgid "Records will appear here once you check in."
+msgstr "Rekodi zitaonekana hapa ukishaingia kazini."
+
+msgid "Attendance QR Code"
+msgstr "QR ya Mahudhurio"
+
+msgid "Staff scan this QR code with their mobile app to check in/out"
+msgstr "Wafanyakazi huskani QR hii kwa programu ya simu ili kuingia/kutoka kazini"
+
+msgid "Scan to check in / check out"
+msgstr "Skani ili kuingia / kutoka kazini"
+
+msgid "QR Token"
+msgstr "Tokeni ya QR"
+
+msgid "Last regenerated:"
+msgstr "Ilitengenezwa upya mara ya mwisho:"
+
+msgid "Print QR Code"
+msgstr "Chapisha QR"
+
+msgid "This will invalidate the current QR code. Staff will need to scan the new one. Continue?"
+msgstr "Hii itabatilisha QR ya sasa. Wafanyakazi watahitaji kuskani mpya. Uendelee?"
+
+msgid "Regenerate QR"
+msgstr "Tengeneza QR Mpya"
+
+msgid "How to Use"
+msgstr "Jinsi ya Kutumia"
+
+msgid "Open the mobile app"
+msgstr "Fungua programu ya simu"
+
+msgid "Make sure you are logged in to the restaurant app."
+msgstr "Hakikisha umeingia kwenye programu ya mgahawa."
+
+msgid "Go to the Attendance tab"
+msgstr "Nenda kwenye kichupo cha Mahudhurio"
+
+msgid "Tap the Attendance icon in the bottom navigation."
+msgstr "Gusa alama ya Mahudhurio kwenye menyu ya chini."
+
+msgid "Scan this QR code"
+msgstr "Skani QR hii"
+
+msgid "Point the camera at the QR code displayed here."
+msgstr "Elekeza kamera kwenye QR inayoonyeshwa hapa."
+
+msgid "Confirm check-in or check-out"
+msgstr "Thibitisha kuingia au kutoka kazini"
+
+msgid "The app will detect whether you are checking in or out and confirm the action."
+msgstr "Programu itatambua kama unaingia au unatoka kazini na kuthibitisha kitendo hicho."
+
+msgid "Regenerating the QR code will immediately invalidate the old one. All staff must scan the new code for their next attendance action."
+msgstr "Kutengeneza QR mpya kutabatilisha ya zamani mara moja. Wafanyakazi wote lazima waskani QR mpya wanapoingia au kutoka kazini tena."
+
+msgid "Attendance Reports"
+msgstr "Ripoti za Mahudhurio"
+
+msgid "From"
+msgstr "Kuanzia"
+
+msgid "To"
+msgstr "Hadi"
+
+msgid "Last 7 days"
+msgstr "Siku 7 zilizopita"
+
+msgid "Last 30 days"
+msgstr "Siku 30 zilizopita"
+
+msgid "Total Check-Ins"
+msgstr "Jumla ya Kuingia Kazini"
+
+msgid "Active Staff"
+msgstr "Wafanyakazi Hai"
+
+msgid "Attendance Rate"
+msgstr "Kiwango cha Mahudhurio"
+
+msgid "By Staff"
+msgstr "Kwa Mfanyakazi"
+
+msgid "By Day"
+msgstr "Kwa Siku"
+
+msgid "Staff Attendance Summary"
+msgstr "Muhtasari wa Mahudhurio ya Wafanyakazi"
+
+msgid "Avg / Day"
+msgstr "Wastani / Siku"
+
+msgid "Punctuality"
+msgstr "Kufika kwa Wakati"
+
+msgid "No attendance records found for this period."
+msgstr "Hakuna rekodi za mahudhurio kwa kipindi hiki."
+
+msgid "Daily Attendance Summary"
+msgstr "Muhtasari wa Mahudhurio kwa Siku"
+
+msgid "Present"
+msgstr "Waliohudhuria"
+
+msgid "Details"
+msgstr "Maelezo"
+
+msgid "Week of %(start)s"
+msgstr "Wiki ya %(start)s"
+
+msgid "Published"
+msgstr "Imechapishwa"
+
+msgid "Draft – staff can't see it yet"
+msgstr "Rasimu – wafanyakazi bado hawaioni"
+
+msgid "Previous week"
+msgstr "Wiki iliyopita"
+
+msgid "This week"
+msgstr "Wiki hii"
+
+msgid "Next week"
+msgstr "Wiki ijayo"
+
+msgid "Create your shifts first (for example Morning 08:00–16:00), then put staff on them here."
+msgstr "Tengeneza zamu zako kwanza (kwa mfano Asubuhi 08:00–16:00), kisha wapange wafanyakazi hapa."
+
+msgid "Manage shifts"
+msgstr "Simamia zamu"
+
+msgid "inactive"
+msgstr "amesimamishwa"
+
+msgid "This day is planned on another restaurant's roster"
+msgstr "Siku hii imepangwa kwenye ratiba ya mgahawa mwingine"
+
+msgid "Other restaurant"
+msgstr "Mgahawa mwingine"
+
+msgid "Shift removed"
+msgstr "Zamu imeondolewa"
+
+msgid "Day off"
+msgstr "Siku ya mapumziko"
+
+msgid "On leave"
+msgstr "Likizoni"
+
+msgid "Staff on shift"
+msgstr "Wafanyakazi zamuni"
+
+msgid "Save roster"
+msgstr "Hifadhi ratiba"
+
+msgid "Fill the empty days of this week from last week? Days you already filled are kept."
+msgstr "Jaza siku tupu za wiki hii kutoka wiki iliyopita? Siku ulizokwisha jaza zitabaki kama zilivyo."
+
+msgid "Copy last week"
+msgstr "Nakili wiki iliyopita"
+
+msgid "Move this week back to draft? Staff will no longer see it until you publish again."
+msgstr "Rudisha wiki hii kuwa rasimu? Wafanyakazi hawataiona hadi uichapishe tena."
+
+msgid "Back to draft"
+msgstr "Rudisha kuwa rasimu"
+
+msgid "Publish this week? Every rostered staff member will be notified."
+msgstr "Chapisha wiki hii? Kila mfanyakazi aliyepangwa atajulishwa."
+
+msgid "Publish to staff"
+msgstr "Chapisha kwa wafanyakazi"
+
+msgid "This week is published: saved changes are shown to staff straight away and the affected staff are notified."
+msgstr "Wiki hii imechapishwa: mabadiliko yanayohifadhiwa yanaonekana kwa wafanyakazi papo hapo na wanaohusika wanajulishwa."
+
+msgid "Save as often as you like. Staff see the week and are notified only when you publish it."
+msgstr "Hifadhi mara nyingi upendavyo. Wafanyakazi wataiona wiki na kujulishwa pale tu utakapoichapisha."
+
+msgid "Attendance uses the published roster to decide if someone is late."
+msgstr "Mahudhurio hutumia ratiba iliyochapishwa kuamua kama mtu amechelewa."
+
+msgid "No active staff to put on the roster yet."
+msgstr "Bado hakuna wafanyakazi hai wa kupangwa kwenye ratiba."
+
+msgid "Please save your changes first."
+msgstr "Tafadhali hifadhi mabadiliko yako kwanza."
+
+msgid "Shift Management"
+msgstr "Usimamizi wa Zamu"
+
+msgid "Add Shift"
+msgstr "Ongeza Zamu"
+
+msgid "Shift Name"
+msgstr "Jina la Zamu"
+
+msgid "Start Time"
+msgstr "Saa ya Kuanza"
+
+msgid "End Time"
+msgstr "Saa ya Kumaliza"
+
+msgid "Grace Period"
+msgstr "Muda wa Ziada wa Kuchelewa"
+
+msgctxt "shift type"
+msgid "Day"
+msgstr "Mchana"
+
+msgctxt "shift type"
+msgid "Night"
+msgstr "Usiku"
+
+msgctxt "shift type"
+msgid "Custom"
+msgstr "Maalum"
+
+msgid "Delete shift"
+msgstr "Futa zamu"
+
+msgid "This cannot be undone."
+msgstr "Hili haliwezi kutenduliwa."
+
+msgid "No shifts defined yet."
+msgstr "Bado hakuna zamu zilizowekwa."
+
+msgid "Add First Shift"
+msgstr "Ongeza Zamu ya Kwanza"
+
+msgid "Add New Shift"
+msgstr "Ongeza Zamu Mpya"
+
+msgid "e.g. Morning Shift"
+msgstr "mf. Zamu ya Asubuhi"
+
+msgid "Grace Period (minutes)"
+msgstr "Muda wa Ziada wa Kuchelewa (dakika)"
+
+msgid "Minutes allowed after shift start before marking late."
+msgstr "Dakika zinazoruhusiwa baada ya zamu kuanza kabla ya kuhesabiwa amechelewa."
+
+msgid "Edit Shift"
+msgstr "Hariri Zamu"
+
+msgid "Event Menu - Manage Events"
+msgstr "Menyu ya Matukio - Simamia Matukio"
+
+msgid "TOTAL EVENTS"
+msgstr "JUMLA YA MATUKIO"
+
+msgid "UPCOMING EVENTS"
+msgstr "MATUKIO YAJAYO"
+
+msgid "TODAY'S EVENTS"
+msgstr "MATUKIO YA LEO"
+
+msgid "Event Filters"
+msgstr "Vichujio vya Matukio"
+
+msgid "Event title, contact..."
+msgstr "Jina la tukio, mawasiliano..."
+
+msgid "Event Type"
+msgstr "Aina ya Tukio"
+
+msgid "Upcoming"
+msgstr "Yajayo"
+
+msgid "Events List"
+msgstr "Orodha ya Matukio"
+
+msgid "New Event"
+msgstr "Tukio Jipya"
+
+msgid "Event"
+msgstr "Tukio"
+
+msgid "PAX"
+msgstr "Wageni"
+
+msgid "TODAY"
+msgstr "LEO"
+
+msgid "pax"
+msgstr "mgeni"
+
+msgid "Deposit"
+msgstr "Amana"
+
+msgid "Refunded"
+msgstr "Imerudishwa"
+
+msgid "Due:"
+msgstr "Inadaiwa:"
+
+msgid "Approve Payment"
+msgstr "Idhinisha Malipo"
+
+msgid "Record Payment"
+msgstr "Rekodi Malipo"
+
+msgid "No Events Found"
+msgstr "Hakuna Matukio Yaliyopatikana"
+
+msgid "No events match your current filters. Try adjusting your search criteria."
+msgstr "Hakuna matukio yanayolingana na vichujio ulivyochagua. Jaribu kubadilisha vigezo vya utafutaji."
+
+msgid "Start managing your banquets, parties, and special events."
+msgstr "Anza kusimamia karamu, sherehe na matukio yako maalum."
+
+msgid "Create Your First Event"
+msgstr "Unda Tukio Lako la Kwanza"
+
+msgid "Delete Event"
+msgstr "Futa Tukio"
+
+msgid "Already Paid"
+msgstr "Kilicholipwa Tayari"
+
+msgid "Amount is pre-filled with full balance. Change it for partial payment."
+msgstr "Kiasi kimejazwa salio lote. Kibadilishe kwa malipo ya sehemu."
+
+msgid "This is a deposit payment"
+msgstr "Haya ni malipo ya amana"
+
+msgid "Payment method, reference number, etc."
+msgstr "Njia ya malipo, namba ya kumbukumbu, n.k."
+
+msgid "Processing..."
+msgstr "Inashughulikiwa..."
+
+msgid "Approve"
+msgstr "Idhinisha"
+
+msgid "Approve payment for \"{title}\"?"
+msgstr "Idhinisha malipo ya \"{title}\"?"
+
+msgid "Session expired. Please refresh the page and try again."
+msgstr "Muda wa kipindi umekwisha. Tafadhali onyesha ukurasa upya kisha ujaribu tena."
+
+msgid "Error approving payment"
+msgstr "Imeshindikana kuidhinisha malipo"
+
+msgid "Error deleting event"
+msgstr "Imeshindikana kufuta tukio"
+
+msgid "Please enter a valid payment amount"
+msgstr "Tafadhali weka kiasi sahihi cha malipo"
+
+msgid "Error: No event selected"
+msgstr "Hitilafu: Hakuna tukio lililochaguliwa"
+
+msgid "Error recording payment"
+msgstr "Imeshindikana kurekodi malipo"
+
+msgid "Error recording payment. Please try again."
+msgstr "Imeshindikana kurekodi malipo. Tafadhali jaribu tena."
+
+msgid "PAID (%(n)s)"
+msgstr "YALIYOLIPWA (%(n)s)"
+
+msgid "UNPAID (%(n)s)"
+msgstr "HAYAJALIPWA (%(n)s)"
+
+msgid "%(counter)s event"
+msgid_plural "%(counter)s events"
+msgstr[0] "Tukio %(counter)s"
+msgstr[1] "Matukio %(counter)s"
+
+msgid "Page %(page)s of %(pages)s"
+msgstr "Ukurasa %(page)s kati ya %(pages)s"
+
+msgid "Are you sure you want to delete <strong id=\"deleteEventName\"></strong>?"
+msgstr "Una uhakika unataka kufuta <strong id=\"deleteEventName\"></strong>?"
+
+msgid "Event Details"
+msgstr "Maelezo ya Tukio"
+
+msgid "Event Information"
+msgstr "Taarifa za Tukio"
+
+msgid "Contact Name"
+msgstr "Jina la Mhusika"
+
+msgid "Special Requirements"
+msgstr "Mahitaji Maalum"
+
+msgid "Change Status"
+msgstr "Badilisha Hali"
+
+msgid "Total Value"
+msgstr "Thamani Yote"
+
+msgid "Payment Details"
+msgstr "Maelezo ya Malipo"
+
+msgid "Edit Event"
+msgstr "Hariri Tukio"
+
+msgid "Balance due:"
+msgstr "Salio linalodaiwa:"
+
+msgid "Error updating status"
+msgstr "Imeshindikana kubadilisha hali"
+
+msgid "%(pct)s%% Paid"
+msgstr "%(pct)s%% Imelipwa"
+
+msgid "Are you sure you want to delete <strong>%(title)s</strong>?"
+msgstr "Una uhakika unataka kufuta <strong>%(title)s</strong>?"
+
+msgid "Add Event"
+msgstr "Ongeza Tukio"
+
+msgid "Back to Events"
+msgstr "Rudi kwenye Matukio"
+
+msgid "Event Title"
+msgstr "Jina la Tukio"
+
+msgid "Event Date"
+msgstr "Tarehe ya Tukio"
+
+msgid "Guests & Pricing"
+msgstr "Wageni na Bei"
+
+msgid "Total PAX (Number of Guests)"
+msgstr "Jumla ya Wageni (Idadi ya Wageni)"
+
+msgid "Price per PAX"
+msgstr "Bei kwa Mgeni"
+
+msgid "Contact Phone"
+msgstr "Simu ya Mhusika"
+
+msgid "Estimated Total"
+msgstr "Jumla Inayokadiriwa"
+
+msgid "guests"
+msgstr "wageni"
+
+msgid "Payment Summary"
+msgstr "Muhtasari wa Malipo"
+
+msgid "Amount Paid:"
+msgstr "Kiasi Kilicholipwa:"
+
+msgid "Create Event"
+msgstr "Unda Tukio"
+
+msgid "Event Reports - Analytics"
+msgstr "Ripoti za Matukio - Takwimu"
+
+msgid "Event Reports"
+msgstr "Ripoti za Matukio"
+
+msgid "Week"
+msgstr "Wiki"
+
+msgid "Month"
+msgstr "Mwezi"
+
+msgid "Quarter"
+msgstr "Robo Mwaka"
+
+msgid "Year"
+msgstr "Mwaka"
+
+msgid "Total Guests"
+msgstr "Jumla ya Wageni"
+
+msgid "Avg PAX/Event"
+msgstr "Wastani wa Wageni/Tukio"
+
+msgid "Revenue Collected"
+msgstr "Mapato Yaliyokusanywa"
+
+msgid "Events by Type"
+msgstr "Matukio kwa Aina"
+
+msgid "No data available"
+msgstr "Hakuna taarifa"
+
+msgid "Events by Status"
+msgstr "Matukio kwa Hali"
+
+msgid "Upcoming Events"
+msgstr "Matukio Yajayo"
+
+msgid "No upcoming events"
+msgstr "Hakuna matukio yajayo"
+
+msgid "View All Upcoming Events"
+msgstr "Angalia Matukio Yote Yajayo"
+
+msgid "Recently Completed"
+msgstr "Yaliyokamilika Karibuni"
+
+msgid "No completed events"
+msgstr "Hakuna matukio yaliyokamilika"
+
+msgid "Analytics for %(start)s - %(end)s"
+msgstr "Takwimu za %(start)s - %(end)s"
+
+msgid "Fully Paid (%(n)s)"
+msgstr "Yamelipwa Yote (%(n)s)"
+
+msgid "Unpaid Due (%(n)s)"
+msgstr "Madeni Yasiyolipwa (%(n)s)"
+
+msgid "Event Analytics"
+msgstr "Takwimu za Matukio"
+
+msgid "Manage Happy Hour Promotions"
+msgstr "Simamia Ofa za Saa ya Punguzo"
+
+msgid "Happy Hour Promotions"
+msgstr "Ofa za Saa ya Punguzo"
+
+msgid "Manage time-based promotional pricing for your restaurant"
+msgstr "Simamia bei za ofa kulingana na muda kwa mgahawa wako"
+
+msgid "Create New Promotion"
+msgstr "Unda Ofa Mpya"
+
+msgid "Search Promotions"
+msgstr "Tafuta Ofa"
+
+msgid "Search by name, description..."
+msgstr "Tafuta kwa jina, maelezo..."
+
+msgid "Showing %(counter)s promotion total"
+msgid_plural "Showing %(counter)s promotions total"
+msgstr[0] "Inaonyesha ofa %(counter)s kwa jumla"
+msgstr[1] "Inaonyesha ofa %(counter)s kwa jumla"
+
+msgid "Total Promotions"
+msgstr "Jumla ya Ofa"
+
+msgid "Active Promotions"
+msgstr "Ofa Zinazotumika"
+
+msgid "Currently Running LIVE"
+msgstr "Zinazoendelea SASA"
+
+msgid "Products Affected"
+msgstr "Bidhaa Zinazohusika"
+
+msgid "LIVE NOW"
+msgstr "INAENDELEA SASA"
+
+msgid "Preview"
+msgstr "Hakiki"
+
+msgid "Days:"
+msgstr "Siku:"
+
+msgid "%(counter)s product affected"
+msgid_plural "%(counter)s products affected"
+msgstr[0] "Bidhaa %(counter)s inahusika"
+msgstr[1] "Bidhaa %(counter)s zinahusika"
+
+msgid "Promotions pagination"
+msgstr "Kurasa za ofa"
+
+msgid "Showing %(start)s to %(end)s of %(total)s promotions"
+msgstr "Inaonyesha %(start)s hadi %(end)s kati ya ofa %(total)s"
+
+msgid "No Happy Hour Promotions Yet"
+msgstr "Bado Hakuna Ofa za Saa ya Punguzo"
+
+msgid "Create your first time-based promotion to attract customers during specific hours!"
+msgstr "Unda ofa yako ya kwanza ya muda maalum ili kuvutia wateja katika saa fulani!"
+
+msgid "Create First Promotion"
+msgstr "Unda Ofa ya Kwanza"
+
+msgid "An error occurred while updating the promotion."
+msgstr "Kuna tatizo wakati wa kubadilisha ofa."
+
+msgid "Create Happy Hour Promotion"
+msgstr "Unda Ofa ya Saa ya Punguzo"
+
+msgid "Set up time-based promotional pricing for your products"
+msgstr "Weka bei za ofa kulingana na muda kwa bidhaa zako"
+
+msgid "Back to Promotions"
+msgstr "Rudi kwenye Ofa"
+
+msgid "Choose a descriptive name for your promotion"
+msgstr "Chagua jina linaloeleza ofa yako"
+
+msgid "Enter discount from 1%% to 99%%"
+msgstr "Weka punguzo kuanzia 1%% hadi 99%%"
+
+msgid "(Main)"
+msgstr "(Mkuu)"
+
+msgid "(Branch)"
+msgstr "(Tawi)"
+
+msgid "Promotion will be assigned to: %(name)s"
+msgstr "Ofa itawekwa kwa: %(name)s"
+
+msgid "Optional description visible to customers"
+msgstr "Maelezo ya hiari yatakayoonekana kwa wateja"
+
+msgid "Timing & Schedule"
+msgstr "Muda na Ratiba"
+
+msgid "Days of Week"
+msgstr "Siku za Wiki"
+
+msgid "Select the days when this promotion should be active"
+msgstr "Chagua siku ambazo ofa hii itatumika"
+
+msgid "Target Products"
+msgstr "Bidhaa Lengwa"
+
+msgid "Select which products, categories, or subcategories this promotion applies to. You can mix and match different levels."
+msgstr "Chagua bidhaa, makundi au vikundi vidogo ambavyo ofa hii inahusu. Unaweza kuchanganya ngazi tofauti."
+
+msgid "Specific Products"
+msgstr "Bidhaa Maalum"
+
+msgid "Individual products to include"
+msgstr "Bidhaa moja moja za kujumuisha"
+
+msgid "No categories available"
+msgstr "Hakuna makundi yanayopatikana"
+
+msgid "All products in these categories"
+msgstr "Bidhaa zote katika makundi haya"
+
+msgid "Sub Categories"
+msgstr "Vikundi Vidogo"
+
+msgid "No subcategories available"
+msgstr "Hakuna vikundi vidogo vinavyopatikana"
+
+msgid "All products in these subcategories"
+msgstr "Bidhaa zote katika vikundi vidogo hivi"
+
+msgid "Enable this promotion immediately after creation"
+msgstr "Washa ofa hii mara baada ya kuiunda"
+
+msgid "Create Promotion"
+msgstr "Unda Ofa"
+
+msgid "Promotion Name"
+msgstr "Jina la Ofa"
+
+msgid "None selected"
+msgstr "Hakuna iliyochaguliwa"
+
+msgid "Tips"
+msgstr "Vidokezo"
+
+msgid "Higher discounts attract more customers but reduce profit margins"
+msgstr "Punguzo kubwa huvutia wateja wengi lakini hupunguza faida"
+
+msgid "Target slow periods to maximize restaurant utilization"
+msgstr "Lenga nyakati zenye wateja wachache ili mgahawa utumike zaidi"
+
+msgid "Categories apply to all current and future products in that category"
+msgstr "Makundi yanahusu bidhaa zote za sasa na zijazo katika kundi hilo"
+
+msgid "You can combine products, categories, and subcategories in one promotion"
+msgstr "Unaweza kuchanganya bidhaa, makundi na vikundi vidogo katika ofa moja"
+
+msgid "Promotions can span midnight (e.g., 22:00 to 02:00)"
+msgstr "Ofa zinaweza kuvuka saa sita usiku (mf. 22:00 hadi 02:00)"
+
+msgid "Error loading products:"
+msgstr "Hitilafu katika kupakia bidhaa:"
+
+msgid "Failed to load products. Please try again."
+msgstr "Imeshindikana kupakia bidhaa. Tafadhali jaribu tena."
+
+msgid "Edit Promotion"
+msgstr "Hariri Ofa"
+
+msgid "Edit Promotion: %(name)s"
+msgstr "Hariri Ofa: %(name)s"
+
+msgid "Modify your Happy Hour promotion settings"
+msgstr "Badilisha mipangilio ya ofa yako ya Saa ya Punguzo"
+
+msgid "Currently Active!"
+msgstr "Inaendelea Sasa!"
+
+msgid "This promotion is currently running. Changes will take effect immediately."
+msgstr "Ofa hii inaendelea sasa. Mabadiliko yataanza kutumika mara moja."
+
+msgid "Select Restaurant..."
+msgstr "Chagua Mgahawa..."
+
+msgid "Select which restaurant this promotion belongs to"
+msgstr "Chagua mgahawa ambao ofa hii ni yake"
+
+msgid "Delete Promotion"
+msgstr "Futa Ofa"
+
+msgid "Promotion Info"
+msgstr "Taarifa za Ofa"
+
+msgid "Products Affected:"
+msgstr "Bidhaa Zinazohusika:"
+
+msgid "Currently running!"
+msgstr "Inaendelea sasa!"
+
+msgid "Permanently remove this Happy Hour promotion"
+msgstr "Ondoa kabisa ofa hii ya Saa ya Punguzo"
+
+msgid "Warning!"
+msgstr "Tahadhari!"
+
+msgid "You are about to permanently delete the following Happy Hour promotion. This action cannot be undone."
+msgstr "Unakaribia kufuta kabisa ofa ifuatayo ya Saa ya Punguzo. Kitendo hiki hakiwezi kutenduliwa."
+
+msgid "Currently Running"
+msgstr "Inaendelea Sasa"
+
+msgid "Impact:"
+msgstr "Athari:"
+
+msgid "After deletion, products affected by this promotion will revert to their regular prices immediately. Any customers currently viewing the menu will see the updated prices."
+msgstr "Baada ya kufuta, bidhaa zinazohusika na ofa hii zitarudi kwenye bei zao za kawaida mara moja. Wateja wanaoangalia menyu sasa wataona bei mpya."
+
+msgid "Yes, Delete Promotion"
+msgstr "Ndiyo, Futa Ofa"
+
+msgid "Promotion Preview"
+msgstr "Hakiki ya Ofa"
+
+msgid "Preview promotion details and affected products"
+msgstr "Hakiki maelezo ya ofa na bidhaa zinazohusika"
+
+msgid "Promotion Details"
+msgstr "Maelezo ya Ofa"
+
+msgid "Products:"
+msgstr "Bidhaa:"
+
+msgid "%(n)s affected"
+msgstr "%(n)s zinahusika"
+
+msgid "Affected Products (%(n)s)"
+msgstr "Bidhaa Zinazohusika (%(n)s)"
+
+msgid "Original Price"
+msgstr "Bei ya Awali"
+
+msgid "Promotional Price"
+msgstr "Bei ya Ofa"
+
+msgid "Savings"
+msgstr "Akiba"
+
+msgid "ON SALE"
+msgstr "KWA OFA"
+
+msgid "No Products Found"
+msgstr "Hakuna Bidhaa Zilizopatikana"
+
+msgid "This promotion doesn't currently affect any products."
+msgstr "Ofa hii kwa sasa haihusu bidhaa yoyote."

@@ -1,7 +1,7 @@
 {% extends 'cashier_base.html' %}
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 
-{% block title %}Cashier Profile - {{ user.get_restaurant_name }}{% endblock %}
+{% block title %}{% translate "Cashier Profile" %} - {{ user.get_restaurant_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -17,12 +17,12 @@
     <div class="profile-avatar">{% if user.first_name %}{{ user.first_name|first|upper }}{% if user.last_name %}{{ user.last_name|first|upper }}{% endif %}{% else %}{{ user.username|first|upper }}{% endif %}</div>
     <div class="profile-hero-info">
       <h3>{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</h3>
-      <div class="profile-role-badge"><i class="fas fa-cash-register me-1"></i>{{ user.role.get_name_display|default:"Cashier" }}</div>
+      <div class="profile-role-badge"><i class="fas fa-cash-register me-1"></i>{% translate "Cashier" as t_def %}{{ user.role.get_name_display|default:t_def }}</div>
       <div class="profile-restaurant"><i class="fas fa-store me-1"></i>{{ user.get_restaurant_name }}</div>
       <div class="profile-meta">
-        <span><i class="fas fa-calendar-alt me-1"></i>Joined {{ user.date_joined|date:"M Y" }}</span>
-        <span><i class="fas fa-clock me-1"></i>{{ user.last_login|date:"M d, Y H:i"|default:"Never logged in" }}</span>
-        {% if user.is_active %}<span class="profile-status">● Active</span>{% else %}<span class="profile-status">● Inactive</span>{% endif %}
+        <span><i class="fas fa-calendar-alt me-1"></i>{% blocktranslate with date=user.date_joined|date:"M Y" %}Joined {{ date }}{% endblocktranslate %}</span>
+        <span><i class="fas fa-clock me-1"></i>{% translate "Never logged in" as t_def %}{{ user.last_login|date:"M d, Y H:i"|default:t_def }}</span>
+        {% if user.is_active %}<span class="profile-status">● {% translate "Active" %}</span>{% else %}<span class="profile-status">● {% translate "Inactive" %}</span>{% endif %}
       </div>
     </div>
   </div>
@@ -30,67 +30,67 @@
   <div class="row g-3 mb-3">
     <div class="col-12 col-lg-6">
       <div class="profile-card">
-        <div class="profile-card-title"><i class="fas fa-user"></i> Personal Information</div>
-        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
-        <div class="info-row"><span class="info-label">Username</span><span class="info-value">{{ user.username }}</span></div>
-        <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ user.email|default:"Not provided" }}</span></div>
-        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{ user.phone_number|default:"Not provided" }}</span></div>
-        {% if user.address %}<div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
+        <div class="profile-card-title"><i class="fas fa-user"></i> {% translate "Personal Information" %}</div>
+        <div class="info-row"><span class="info-label">{% translate "Full Name" %}</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Username" %}</span><span class="info-value">{{ user.username }}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Email" %}</span><span class="info-value">{% translate "Not provided" as t_def %}{{ user.email|default:t_def }}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Phone" %}</span><span class="info-value">{% translate "Not provided" as t_def %}{{ user.phone_number|default:t_def }}</span></div>
+        {% if user.address %}<div class="info-row"><span class="info-label">{% translate "Address" %}</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
       </div>
     </div>
     <div class="col-12 col-lg-6">
       <div class="profile-card">
-        <div class="profile-card-title"><i class="fas fa-shield-alt"></i> Account Details</div>
-        <div class="info-row"><span class="info-label">Role</span><span class="info-value"><span class="role-chip">{{ user.role.get_name_display|default:"Cashier" }}</span></span></div>
-        <div class="info-row"><span class="info-label">Restaurant</span><span class="info-value">{{ user.get_restaurant_name }}</span></div>
-        {% if user.owner %}<div class="info-row"><span class="info-label">Manager / Owner</span><span class="info-value">{{ user.owner.get_full_name|default:user.owner.username }}</span></div>{% endif %}
-        <div class="info-row"><span class="info-label">Member Since</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
-        <div class="info-row"><span class="info-label">Status</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-danger">Inactive</span>{% endif %}</span></div>
+        <div class="profile-card-title"><i class="fas fa-shield-alt"></i> {% translate "Account Details" %}</div>
+        <div class="info-row"><span class="info-label">{% translate "Role" %}</span><span class="info-value"><span class="role-chip">{% translate "Cashier" as t_def %}{{ user.role.get_name_display|default:t_def }}</span></span></div>
+        <div class="info-row"><span class="info-label">{% translate "Restaurant" %}</span><span class="info-value">{{ user.get_restaurant_name }}</span></div>
+        {% if user.owner %}<div class="info-row"><span class="info-label">{% translate "Manager / Owner" %}</span><span class="info-value">{{ user.owner.get_full_name|default:user.owner.username }}</span></div>{% endif %}
+        <div class="info-row"><span class="info-label">{% translate "Member Since" %}</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Status" %}</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">{% translate "Active" %}</span>{% else %}<span class="badge bg-danger">{% translate "Inactive" %}</span>{% endif %}</span></div>
       </div>
     </div>
   </div>
 
   <div class="profile-card mb-3">
-    <div class="profile-card-title"><i class="fas fa-tools"></i> Cashier Tools</div>
+    <div class="profile-card-title"><i class="fas fa-tools"></i> {% translate "Cashier Tools" %}</div>
     <div class="row g-2">
-      <div class="col-6 col-md-3"><a href="{% url 'cashier:dashboard' %}" class="action-btn action-btn-primary w-100"><i class="fas fa-tachometer-alt"></i> Dashboard</a></div>
-      <div class="col-6 col-md-3"><a href="{% url 'cashier:receipt_management' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-receipt"></i> Receipts</a></div>
-      <div class="col-6 col-md-3"><a href="{% url 'restaurant:menu' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-utensils"></i> Menu</a></div>
-      <div class="col-6 col-md-3"><a href="{% url 'orders:my_orders' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-list-alt"></i> My Orders</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'cashier:dashboard' %}" class="action-btn action-btn-primary w-100"><i class="fas fa-tachometer-alt"></i> {% translate "Dashboard" %}</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'cashier:receipt_management' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-receipt"></i> {% translate "Receipts" %}</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'restaurant:menu' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-utensils"></i> {% translate "Menu" %}</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'orders:my_orders' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-list-alt"></i> {% translate "My Orders" %}</a></div>
     </div>
   </div>
 
   <div class="profile-card mb-3">
-    <div class="profile-card-title"><i class="fas fa-check-circle"></i> Cashier Capabilities</div>
+    <div class="profile-card-title"><i class="fas fa-check-circle"></i> {% translate "Cashier Capabilities" %}</div>
     <div class="row">
       <div class="col-12 col-md-6">
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Process payments (Cash, Card, Digital)</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Track orders by table number</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Handle split bills</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Select individual items for payment</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Process payments (Cash, Card, Digital)" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Track orders by table number" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Handle split bills" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Select individual items for payment" %}</div>
       </div>
       <div class="col-12 col-md-6">
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Void transactions and refunds</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Cancel unpaid orders</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>View payment history</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Generate receipts and reports</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Void transactions and refunds" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Cancel unpaid orders" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "View payment history" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Generate receipts and reports" %}</div>
       </div>
     </div>
   </div>
 
   <div class="profile-card mb-3">
-    <div class="profile-card-title"><i class="fas fa-chart-bar"></i> Quick Stats</div>
+    <div class="profile-card-title"><i class="fas fa-chart-bar"></i> {% translate "Quick Stats" %}</div>
     <div class="row g-3">
-      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value">0</div><div class="stat-label">Today's Orders</div></div></div>
-      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value">{% currency_symbol %}0.00</div><div class="stat-label">Today's Revenue</div></div></div>
-      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value" style="color:#f39c12">0</div><div class="stat-label">Pending Payments</div></div></div>
-      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value" style="color:#27ae60">0</div><div class="stat-label">Completed Today</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value">0</div><div class="stat-label">{% translate "Today's Orders" %}</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value">{% currency_symbol %}0.00</div><div class="stat-label">{% translate "Today's Revenue" %}</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value" style="color:#f39c12">0</div><div class="stat-label">{% translate "Pending Payments" %}</div></div></div>
+      <div class="col-6 col-lg-3"><div class="stat-tile"><div class="stat-value" style="color:#27ae60">0</div><div class="stat-label">{% translate "Completed Today" %}</div></div></div>
     </div>
   </div>
 
   <div class="profile-footer">
-    <span>Account created: {{ user.date_joined|date:"F d, Y" }}</span>
-    <span>Profile updated: {% now "F d, Y H:i" %}</span>
+    <span>{% blocktranslate with date=user.date_joined|date:"F d, Y" %}Account created: {{ date }}{% endblocktranslate %}</span>
+    <span>{% translate "Profile updated:" %} {% now "F d, Y H:i" %}</span>
   </div>
 
 </div>

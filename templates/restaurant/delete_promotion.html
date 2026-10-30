@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Delete Promotion - Restaurant System{% endblock %}
+{% block title %}{% translate "Delete Promotion" %} - {% translate "Restaurant System" %}{% endblock %}
 
-{% block page_title %}Delete Promotion{% endblock %}
-{% block page_description %}Permanently remove this Happy Hour promotion{% endblock %}
+{% block page_title %}{% translate "Delete Promotion" %}{% endblock %}
+{% block page_description %}{% translate "Permanently remove this Happy Hour promotion" %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -11,13 +12,13 @@
         <div class="card border-danger">
             <div class="card-header bg-danger text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-exclamation-triangle"></i> Delete Promotion
+                    <i class="fas fa-exclamation-triangle"></i> {% translate "Delete Promotion" %}
                 </h5>
             </div>
             <div class="card-body">
                 <div class="alert alert-warning">
-                    <h6><i class="fas fa-warning"></i> Warning!</h6>
-                    You are about to permanently delete the following Happy Hour promotion. This action cannot be undone.
+                    <h6><i class="fas fa-warning"></i> {% translate "Warning!" %}</h6>
+                    {% translate "You are about to permanently delete the following Happy Hour promotion. This action cannot be undone." %}
                 </div>
                 
                 <div class="promotion-preview p-3 border rounded mb-4">
@@ -28,35 +29,34 @@
                     
                     <div class="row">
                         <div class="col-md-6">
-                            <strong>Discount:</strong> {{ promotion.discount_percentage }}% OFF<br>
-                            <strong>Time:</strong> {{ promotion.start_time|time:"H:i" }} - {{ promotion.end_time|time:"H:i" }}<br>
-                            <strong>Days:</strong> {{ promotion.get_days_display }}
+                            <strong>{% translate "Discount:" %}</strong> {% blocktranslate with pct=promotion.discount_percentage %}{{ pct }}% OFF{% endblocktranslate %}<br>
+                            <strong>{% translate "Time:" %}</strong> {{ promotion.start_time|time:"H:i" }} - {{ promotion.end_time|time:"H:i" }}<br>
+                            <strong>{% translate "Days:" %}</strong> {{ promotion.get_days_display }}
                         </div>
                         <div class="col-md-6">
-                            <strong>Status:</strong> 
+                            <strong>{% translate "Status:" %}</strong> 
                             <span class="badge {% if promotion.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                {% if promotion.is_active %}Active{% else %}Inactive{% endif %}
+                                {% if promotion.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %}
                             </span><br>
-                            <strong>Products Affected:</strong> {{ promotion.get_affected_products_count }}<br>
+                            <strong>{% translate "Products Affected:" %}</strong> {{ promotion.get_affected_products_count }}<br>
                             {% if promotion.is_currently_active %}
-                                <span class="badge bg-warning">Currently Running</span>
+                                <span class="badge bg-warning">{% translate "Currently Running" %}</span>
                             {% endif %}
                         </div>
                     </div>
                 </div>
                 
                 <p class="text-muted">
-                    <strong>Impact:</strong> After deletion, products affected by this promotion will revert to their regular prices immediately. 
-                    Any customers currently viewing the menu will see the updated prices.
+                    <strong>{% translate "Impact:" %}</strong> {% translate "After deletion, products affected by this promotion will revert to their regular prices immediately. Any customers currently viewing the menu will see the updated prices." %}
                 </p>
                 
                 <form method="post" class="d-flex justify-content-between">
                     {% csrf_token %}
                     <a href="{% url 'restaurant:manage_promotions' %}" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Cancel
+                        <i class="fas fa-times"></i> {% translate "Cancel" %}
                     </a>
                     <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash"></i> Yes, Delete Promotion
+                        <i class="fas fa-trash"></i> {% translate "Yes, Delete Promotion" %}
                     </button>
                 </form>
             </div>

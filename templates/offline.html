@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Offline - Restaurant Ordering System{% endblock %}
+{% block title %}{% translate "Offline" %} - {% translate "Restaurant Ordering System" %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -11,46 +12,45 @@
                     <i class="fas fa-wifi-slash text-muted" style="font-size: 4rem;"></i>
                 </div>
                 
-                <h3 class="mb-3">You're Offline</h3>
+                <h3 class="mb-3">{% translate "You're Offline" %}</h3>
                 <p class="text-muted mb-4">
-                    It looks like you're not connected to the internet. 
-                    You can still browse previously loaded content while offline.
+                    {% translate "It looks like you're not connected to the internet. You can still browse previously loaded content while offline." %}
                 </p>
                 
                 <div class="mb-4">
-                    <h5>What you can do offline:</h5>
+                    <h5>{% translate "What you can do offline:" %}</h5>
                     <ul class="list-unstyled text-start">
                         <li class="mb-2">
                             <i class="fas fa-check text-success me-2"></i>
-                            View previously loaded menu items
+                            {% translate "View previously loaded menu items" %}
                         </li>
                         <li class="mb-2">
                             <i class="fas fa-check text-success me-2"></i>
-                            Browse your order history
+                            {% translate "Browse your order history" %}
                         </li>
                         <li class="mb-2">
                             <i class="fas fa-check text-success me-2"></i>
-                            Prepare orders (they'll sync when online)
+                            {% translate "Prepare orders (they'll sync when online)" %}
                         </li>
                         <li class="mb-2">
                             <i class="fas fa-times text-danger me-2"></i>
-                            Place new orders
+                            {% translate "Place new orders" %}
                         </li>
                         <li class="mb-2">
                             <i class="fas fa-times text-danger me-2"></i>
-                            Receive real-time updates
+                            {% translate "Receive real-time updates" %}
                         </li>
                     </ul>
                 </div>
                 
                 <button class="btn btn-primary" onclick="window.location.reload()">
                     <i class="fas fa-sync-alt me-2"></i>
-                    Try Again
+                    {% translate "Try Again" %}
                 </button>
                 
                 <div class="mt-4">
                     <small class="text-muted">
-                        Your data will automatically sync when you're back online.
+                        {% translate "Your data will automatically sync when you're back online." %}
                     </small>
                 </div>
             </div>
@@ -58,6 +58,7 @@
     </div>
 </div>
 
+{% translate "Connection restored! Refreshing..." as t_restored %}
 <script>
 // Auto-retry when connection is restored
 window.addEventListener('online', function() {
@@ -69,7 +70,7 @@ window.addEventListener('online', function() {
         <div class="d-flex">
             <div class="toast-body">
                 <i class="fas fa-wifi me-2"></i>
-                Connection restored! Refreshing...
+                ${"{{ t_restored|escapejs }}"}
             </div>
         </div>
     `;

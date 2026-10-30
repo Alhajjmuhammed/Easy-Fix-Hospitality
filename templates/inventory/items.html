@@ -1,6 +1,7 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Manage Inventory Items{% endblock %}
+{% block title %}{% translate "Manage Inventory Items" %}{% endblock %}
 
 {% block content %}
 <style>
@@ -9,21 +10,21 @@
 <div class="container-fluid">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-cog mr-2"></i>Manage Inventory Items</h1>
+        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-cog mr-2"></i>{% translate "Manage Inventory Items" %}</h1>
         <div>
             <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary btn-sm mr-2">
-                <i class="fas fa-arrow-left mr-1"></i> Dashboard
+                <i class="fas fa-arrow-left mr-1"></i> {% translate "Dashboard" %}
             </a>
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">
-                <i class="fas fa-plus mr-1"></i> Add Item
+                <i class="fas fa-plus mr-1"></i> {% translate "Add Item" %}
             </button>
-            <a href="{% url 'inventory:settings' %}" class="btn btn-outline-secondary btn-sm ml-2" title="Manage categories & units">
-                <i class="fas fa-sliders-h mr-1"></i> Settings
+            <a href="{% url 'inventory:settings' %}" class="btn btn-outline-secondary btn-sm ml-2" title="{% translate "Manage categories & units" %}">
+                <i class="fas fa-sliders-h mr-1"></i> {% translate "Settings" %}
             </a>
             {% if show_inactive %}
-            <a href="{% url 'inventory:items' %}" class="btn btn-outline-warning btn-sm ml-2">Hide Inactive</a>
+            <a href="{% url 'inventory:items' %}" class="btn btn-outline-warning btn-sm ml-2">{% translate "Hide Inactive" %}</a>
             {% else %}
-            <a href="{% url 'inventory:items' %}?show_inactive=1" class="btn btn-outline-secondary btn-sm ml-2">Show Inactive</a>
+            <a href="{% url 'inventory:items' %}?show_inactive=1" class="btn btn-outline-secondary btn-sm ml-2">{% translate "Show Inactive" %}</a>
             {% endif %}
         </div>
     </div>
@@ -31,28 +32,28 @@
     <!-- Filters -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-filter mr-2"></i>Filters</h6>
+            <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-filter mr-2"></i>{% translate "Filters" %}</h6>
         </div>
         <div class="card-body">
             <form method="get" class="d-flex flex-wrap gap-2 align-items-end" id="itemsFilterForm">
                 {% if show_inactive %}<input type="hidden" name="show_inactive" value="1">{% endif %}
                 <input type="hidden" name="per_page" value="{{ per_page }}">
                 <div style="flex:1;min-width:150px;max-width:280px;">
-                    <label class="form-label font-weight-bold">Search by Name</label>
-                    <input type="text" name="search" class="form-control" placeholder="e.g. Tomatoes..." value="{{ search }}">
+                    <label class="form-label font-weight-bold">{% translate "Search by Name" %}</label>
+                    <input type="text" name="search" class="form-control" placeholder="{% translate "e.g. Tomatoes..." %}" value="{{ search }}">
                 </div>
                 <div style="flex:1;min-width:130px;max-width:220px;">
-                    <label class="form-label font-weight-bold">Category</label>
+                    <label class="form-label font-weight-bold">{% translate "Category" %}</label>
                     <select name="category_filter" class="form-control" id="itemsCategoryFilter">
-                        <option value="">All Categories</option>
+                        <option value="">{% translate "All Categories" %}</option>
                         {% for cat in categories %}
                         <option value="{{ cat.name }}" {% if category_filter == cat.name %}selected{% endif %}>{{ cat.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="d-flex gap-2 align-items-end">
-                    <button type="submit" class="btn btn-primary">Apply</button>
-                    <a href="{% url 'inventory:items' %}{% if show_inactive %}?show_inactive=1{% endif %}" class="btn btn-outline-secondary">Clear</a>
+                    <button type="submit" class="btn btn-primary">{% translate "Apply" %}</button>
+                    <a href="{% url 'inventory:items' %}{% if show_inactive %}?show_inactive=1{% endif %}" class="btn btn-outline-secondary">{% translate "Clear" %}</a>
                 </div>
             </form>
         </div>
@@ -61,12 +62,12 @@
     <div class="card shadow" style="border-radius:8px;border:none;">
         <div class="card-header py-3 d-flex justify-content-between align-items-center" style="background:#fff;border-bottom:2px solid #f0f0f0;">
             <h6 class="m-0 font-weight-bold text-primary">
-                {% if show_inactive %}All Items (including inactive){% else %}Active Items{% endif %}
+                {% if show_inactive %}{% translate "All Items (including inactive)" %}{% else %}{% translate "Active Items" %}{% endif %}
                 <span class="badge bg-secondary ms-2">{{ total_items }}</span>
             </h6>
             <form method="get" id="itemsPerPageForm" class="d-flex align-items-center gap-2">
                 {% if show_inactive %}<input type="hidden" name="show_inactive" value="1">{% endif %}
-                <label class="mb-0 text-muted small"><i class="fas fa-list"></i> Per Page</label>
+                <label class="mb-0 text-muted small"><i class="fas fa-list"></i> {% translate "Per Page" %}</label>
                 <select name="per_page" class="form-select form-select-sm" style="width:auto;" id="itemsPerPageSelect">
                     <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                     <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
@@ -82,14 +83,14 @@
                     <thead class="thead-light">
                         <tr>
                             <th>#</th>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Unit</th>
-                            <th>Current Stock</th>
-                            <th>Low Stock Alert</th>
-                            <th>Notes</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>{% translate "Name" %}</th>
+                            <th>{% translate "Category" %}</th>
+                            <th>{% translate "Unit" %}</th>
+                            <th>{% translate "Current Stock" %}</th>
+                            <th>{% translate "Low Stock Alert" %}</th>
+                            <th>{% translate "Notes" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th>{% translate "Actions" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -106,29 +107,29 @@
                             <td class="text-muted small">{{ row.item.notes|truncatechars:40 }}</td>
                             <td>
                                 {% if row.item.is_active %}
-                                <span class="badge bg-success">Active</span>
+                                <span class="badge bg-success">{% translate "Active" %}</span>
                                 {% else %}
-                                <span class="badge bg-secondary">Inactive</span>
+                                <span class="badge bg-secondary">{% translate "Inactive" %}</span>
                                 {% endif %}
                             </td>
                             <td style="white-space:nowrap;">
-                                <a href="{% url 'inventory:add_record' %}?item={{ row.item.id }}" class="btn btn-xs btn-outline-primary btn-action" title="Add Stock Record">
+                                <a href="{% url 'inventory:add_record' %}?item={{ row.item.id }}" class="btn btn-xs btn-outline-primary btn-action" title="{% translate "Add Stock Record" %}">
                                     <i class="fas fa-plus"></i>
                                 </a>
-                                <button class="btn btn-xs btn-outline-secondary btn-action" title="Edit"
+                                <button class="btn btn-xs btn-outline-secondary btn-action" title="{% translate "Edit" %}"
                                     onclick="openEditModal({{ row.item.id }}, '{{ row.item.name|escapejs }}', '{{ row.item.category }}', '{{ row.item.unit }}', '{{ row.item.low_stock_threshold }}', '{{ row.item.notes|escapejs }}')">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 {% if row.item.is_active %}
-                                <button class="btn btn-xs btn-outline-warning btn-action" title="Deactivate" onclick="deactivateItem({{ row.item.id }}, '{{ row.item.name|escapejs }}')">
+                                <button class="btn btn-xs btn-outline-warning btn-action" title="{% translate "Deactivate" %}" onclick="deactivateItem({{ row.item.id }}, '{{ row.item.name|escapejs }}')">
                                     <i class="fas fa-ban"></i>
                                 </button>
                                 {% else %}
-                                <button class="btn btn-xs btn-outline-success btn-action" title="Reactivate" onclick="reactivateItem({{ row.item.id }}, '{{ row.item.name|escapejs }}')">
+                                <button class="btn btn-xs btn-outline-success btn-action" title="{% translate "Reactivate" %}" onclick="reactivateItem({{ row.item.id }}, '{{ row.item.name|escapejs }}')">
                                     <i class="fas fa-check"></i>
                                 </button>
                                 {% endif %}
-                                <button class="btn btn-xs btn-outline-danger btn-action" title="Delete permanently" onclick="deleteItem({{ row.item.id }}, '{{ row.item.name|escapejs }}')">
+                                <button class="btn btn-xs btn-outline-danger btn-action" title="{% translate "Delete permanently" %}" onclick="deleteItem({{ row.item.id }}, '{{ row.item.name|escapejs }}')">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </td>
@@ -140,9 +141,9 @@
             {% if page_obj.has_other_pages %}
             <div class="card-footer bg-white border-top-0 d-flex justify-content-between align-items-center py-3">
                 <div class="text-muted small">
-                    Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} items
+                    {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}–{{ end }} of {{ total }} items{% endblocktranslate %}
                 </div>
-                <nav aria-label="Items pagination">
+                <nav aria-label="{% translate "Items pagination" %}">
                     <ul class="pagination pagination-sm mb-0">
                         {% if page_obj.has_previous %}
                         <li class="page-item">
@@ -174,9 +175,9 @@
             {% else %}
             <div class="text-center py-5 text-muted">
                 <i class="fas fa-box-open fa-3x mb-3" style="opacity:.3;"></i>
-                <p>No inventory items found. Add your first item to get started.</p>
+                <p>{% translate "No inventory items found. Add your first item to get started." %}</p>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
-                    <i class="fas fa-plus mr-1"></i> Add Item
+                    <i class="fas fa-plus mr-1"></i> {% translate "Add Item" %}
                 </button>
             </div>
             {% endif %}
@@ -189,8 +190,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-plus mr-2"></i>Add Inventory Item</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title"><i class="fas fa-plus mr-2"></i>{% translate "Add Inventory Item" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="addItemForm">
                 {% csrf_token %}
@@ -199,62 +200,62 @@
                     <div id="addItemError" style="display:none;padding:8px 12px;margin-bottom:12px;border-radius:4px;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;font-size:.9em;"></div>
 
                     <div class="form-group mb-3">
-                        <label class="font-weight-bold">Item Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" placeholder="e.g. Tomatoes" required>
+                        <label class="font-weight-bold">{% translate "Item Name" %} <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control" placeholder="{% translate "e.g. Tomatoes" %}" required>
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="font-weight-bold">Category</label>
+                            <label class="font-weight-bold">{% translate "Category" %}</label>
                             {% if categories %}
                             <select name="category" class="form-control">
-                                <option value="">-- No category --</option>
+                                <option value="">{% translate "-- No category --" %}</option>
                                 {% for cat in categories %}
                                 <option value="{{ cat.name }}">{{ cat.name }}</option>
                                 {% endfor %}
                             </select>
                             {% else %}
-                            <input type="text" name="category" class="form-control" placeholder="No categories yet">
-                            <small class="text-warning"><a href="{% url 'inventory:settings' %}">Add in Settings</a></small>
+                            <input type="text" name="category" class="form-control" placeholder="{% translate "No categories yet" %}">
+                            <small class="text-warning"><a href="{% url 'inventory:settings' %}">{% translate "Add in Settings" %}</a></small>
                             {% endif %}
                         </div>
                         <div class="col-6">
-                            <label class="font-weight-bold">Unit <span class="text-danger">*</span></label>
+                            <label class="font-weight-bold">{% translate "Unit" %} <span class="text-danger">*</span></label>
                             {% if units %}
                             <select name="unit" class="form-control" required>
-                                <option value="">-- Select unit --</option>
+                                <option value="">{% translate "-- Select unit --" %}</option>
                                 {% for u in units %}
                                 <option value="{{ u.name }}">{{ u.name }}</option>
                                 {% endfor %}
                             </select>
                             {% else %}
-                            <input type="text" name="unit" class="form-control" placeholder="No units yet" required>
-                            <small class="text-warning"><a href="{% url 'inventory:settings' %}">Add in Settings</a></small>
+                            <input type="text" name="unit" class="form-control" placeholder="{% translate "No units yet" %}" required>
+                            <small class="text-warning"><a href="{% url 'inventory:settings' %}">{% translate "Add in Settings" %}</a></small>
                             {% endif %}
                         </div>
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="font-weight-bold">Current Stock</label>
+                            <label class="font-weight-bold">{% translate "Current Stock" %}</label>
                             <input type="number" name="initial_stock" class="form-control" value="0" min="0" step="0.01" placeholder="0">
-                            <small class="text-muted">Opening stock quantity.</small>
+                            <small class="text-muted">{% translate "Opening stock quantity." %}</small>
                         </div>
                         <div class="col-6">
-                            <label class="font-weight-bold">Low Stock Alert</label>
+                            <label class="font-weight-bold">{% translate "Low Stock Alert" %}</label>
                             <input type="number" name="low_stock_threshold" class="form-control" value="5" min="0" step="0.01">
-                            <small class="text-muted">Alert below this value.</small>
+                            <small class="text-muted">{% translate "Alert below this value." %}</small>
                         </div>
                     </div>
 
                     <div class="form-group mb-2">
-                        <label class="font-weight-bold">Notes <span class="text-muted fw-normal">(optional)</span></label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="Supplier, storage location, etc."></textarea>
+                        <label class="font-weight-bold">{% translate "Notes" %} <span class="text-muted fw-normal">{% translate "(optional)" %}</span></label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="{% translate "Supplier, storage location, etc." %}"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Save Item</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>{% translate "Save Item" %}</button>
                 </div>
             </form>
         </div>
@@ -266,8 +267,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-edit mr-2"></i>Edit Inventory Item</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title"><i class="fas fa-edit mr-2"></i>{% translate "Edit Inventory Item" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="editItemForm">
                 {% csrf_token %}
@@ -276,55 +277,61 @@
                 <div class="modal-body">
                     <div id="editItemError" style="display:none;padding:8px 12px;margin-bottom:8px;border-radius:4px;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;font-size:.9em;"></div>
                     <div class="form-group">
-                        <label class="font-weight-bold">Item Name <span class="text-danger">*</span></label>
+                        <label class="font-weight-bold">{% translate "Item Name" %} <span class="text-danger">*</span></label>
                         <input type="text" name="name" id="editItemName" class="form-control" required>
                     </div>
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label class="font-weight-bold">Category</label>
+                            <label class="font-weight-bold">{% translate "Category" %}</label>
                             {% if categories %}
                             <select name="category" id="editItemCategory" class="form-control">
-                                <option value="">-- No category --</option>
+                                <option value="">{% translate "-- No category --" %}</option>
                                 {% for cat in categories %}
                                 <option value="{{ cat.name }}">{{ cat.name }}</option>
                                 {% endfor %}
                             </select>
                             {% else %}
-                            <input type="text" name="category" id="editItemCategory" class="form-control" placeholder="No categories — add in Settings">
+                            <input type="text" name="category" id="editItemCategory" class="form-control" placeholder="{% translate "No categories — add in Settings" %}">
                             {% endif %}
                         </div>
                         <div class="form-group col-md-6">
-                            <label class="font-weight-bold">Unit <span class="text-danger">*</span></label>
+                            <label class="font-weight-bold">{% translate "Unit" %} <span class="text-danger">*</span></label>
                             {% if units %}
                             <select name="unit" id="editItemUnit" class="form-control" required>
-                                <option value="">-- Select unit --</option>
+                                <option value="">{% translate "-- Select unit --" %}</option>
                                 {% for u in units %}
                                 <option value="{{ u.name }}">{{ u.name }}</option>
                                 {% endfor %}
                             </select>
                             {% else %}
-                            <input type="text" name="unit" id="editItemUnit" class="form-control" placeholder="No units — add in Settings" required>
+                            <input type="text" name="unit" id="editItemUnit" class="form-control" placeholder="{% translate "No units — add in Settings" %}" required>
                             {% endif %}
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="font-weight-bold">Low Stock Alert Threshold</label>
+                        <label class="font-weight-bold">{% translate "Low Stock Alert Threshold" %}</label>
                         <input type="number" name="low_stock_threshold" id="editItemThreshold" class="form-control" min="0" step="0.01">
                     </div>
                     <div class="form-group">
-                        <label class="font-weight-bold">Notes</label>
+                        <label class="font-weight-bold">{% translate "Notes" %}</label>
                         <textarea name="notes" id="editItemNotes" class="form-control" rows="2"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Save Changes</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>{% translate "Save Changes" %}</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+{% translate 'Permanently delete "{name}"? This cannot be undone.' as t_del_q %}
+{% translate 'Deactivate "{name}"? It will be hidden from records.' as t_deact_q %}
+{% translate 'Re-activate "{name}"?' as t_react_q %}
+{% translate "Error" as t_error %}
+{% translate "Request failed." as t_req_failed %}
+{% translate "Error saving item." as t_err_saving %}
 <script>
 const ITEMS_URL = "{% url 'inventory:items' %}";
 
@@ -340,17 +347,17 @@ function openEditModal(id, name, category, unit, threshold, notes) {
 }
 
 function deleteItem(id, name) {
-    if (!confirm('Permanently delete "' + name + '"? This cannot be undone.')) return;
+    if (!confirm("{{ t_del_q|escapejs }}".replace('{name}', name))) return;
     postAction({ action: 'delete', item_id: id });
 }
 
 function deactivateItem(id, name) {
-    if (!confirm('Deactivate "' + name + '"? It will be hidden from records.')) return;
+    if (!confirm("{{ t_deact_q|escapejs }}".replace('{name}', name))) return;
     postAction({ action: 'deactivate', item_id: id });
 }
 
 function reactivateItem(id, name) {
-    if (!confirm('Re-activate "' + name + '"?')) return;
+    if (!confirm("{{ t_react_q|escapejs }}".replace('{name}', name))) return;
     postAction({ action: 'reactivate', item_id: id });
 }
 
@@ -360,8 +367,8 @@ function postAction(data) {
     Object.entries(data).forEach(([k, v]) => formData.append(k, v));
     fetch(ITEMS_URL, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData })
         .then(r => r.json())
-        .then(d => { if (d.success) location.reload(); else alert(d.error || 'Error'); })
-        .catch(() => alert('Request failed.'));
+        .then(d => { if (d.success) location.reload(); else alert(d.error || "{{ t_error|escapejs }}"); })
+        .catch(() => alert("{{ t_req_failed|escapejs }}"));
 }
 
 document.getElementById('addItemForm').addEventListener('submit', function(e) {
@@ -373,9 +380,9 @@ document.getElementById('addItemForm').addEventListener('submit', function(e) {
         .then(r => r.json())
         .then(d => {
             if (d.success) { location.reload(); }
-            else if (errEl) { errEl.textContent = d.error || 'Error saving item.'; errEl.style.display = 'block'; }
+            else if (errEl) { errEl.textContent = d.error || "{{ t_err_saving|escapejs }}"; errEl.style.display = 'block'; }
         })
-        .catch(() => { if (errEl) { errEl.textContent = 'Request failed.'; errEl.style.display = 'block'; } });
+        .catch(() => { if (errEl) { errEl.textContent = "{{ t_req_failed|escapejs }}"; errEl.style.display = 'block'; } });
 });
 
 document.getElementById('editItemForm').addEventListener('submit', function(e) {
@@ -387,7 +394,7 @@ document.getElementById('editItemForm').addEventListener('submit', function(e) {
         .then(r => r.json())
         .then(d => {
             if (d.success) { location.reload(); }
-            else if (errEl) { errEl.textContent = d.error || 'Error saving item.'; errEl.style.display = 'block'; }
+            else if (errEl) { errEl.textContent = d.error || "{{ t_err_saving|escapejs }}"; errEl.style.display = 'block'; }
         });
 });
 document.getElementById('itemsPerPageSelect').addEventListener('change', function() {

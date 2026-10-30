@@ -302,6 +302,15 @@ class CustomerFlowTests(TestCase):
             self.assertLess(self.client.get(u).status_code, 500, u)
 
     def test_smoke_all_pages(self):
+        self._smoke_all_pages()
+
+    def test_smoke_all_pages_swahili(self):
+        for user in (self.main, self.cashier, self.kitchen, self.cc, self.admin):
+            user.language = 'sw'
+            user.save(update_fields=['language'])
+        self._smoke_all_pages(check_text=True)
+
+    def _smoke_all_pages(self, check_text=False):
         def collect(resolver, prefix=''):
             out = []
             for p in resolver.url_patterns:
@@ -315,7 +324,7 @@ class CustomerFlowTests(TestCase):
         skip = ('logout', 'delete', 'export', 'pdf', 'csv', 'regenerate', 'print', 'download', 'debug', 'upload', 'secure-management-portal')
         urls = sorted(set(u for u in collect(get_resolver()) if not any(s in u for s in skip)))
         self._place({'order_type': 'delivery', 'delivery_phone': '0777', 'delivery_address': 'x', 'items': self._item()}, self.r_main.id)
-        errors = []
+        errors, sw_pages = [], 0
         for user in (self.main, self.cashier, self.kitchen, self.cc, self.admin):
             self.client.force_login(user)
             api = self._api(user)
@@ -324,9 +333,18 @@ class CustomerFlowTests(TestCase):
                     r = (api if u.startswith('/api/') else self.client).get(u)
                     if r.status_code >= 500:
                         errors.append(f'{user.username} {u} -> {r.status_code}')
+                    elif check_text and r.status_code == 200 and 'html' in r.get('Content-Type', ''):
+                        body = r.content.decode('utf-8', 'replace')
+                        sw_pages += 'lang="sw"' in body
+                        for leak in ('{% ', ' %}', '%(', ')s ', '&#x27;s', '&amp;#'):
+                            if leak in body:
+                                i = body.index(leak)
+                                errors.append(f'{user.username} {u} -> leaked {leak!r}: {body[max(0, i - 60):i + 40]!r}')
                 except Exception as e:
                     errors.append(f'{user.username} {u} -> {e.__class__.__name__}: {str(e)[:100]}')
-        print(f'\nSMOKE: {len(urls)} urls x 5 users, errors={len(errors)}')
+        print(f'\nSMOKE{" (sw)" if check_text else ""}: {len(urls)} urls x 5 users, errors={len(errors)}, sw pages={sw_pages}')
         for e in errors:
             print('SMOKEERR', e)
         self.assertEqual(errors, [])
+        if check_text:
+            self.assertGreater(sw_pages, 100)

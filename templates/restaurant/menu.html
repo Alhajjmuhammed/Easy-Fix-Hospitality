@@ -1,7 +1,8 @@
 ﻿{% extends base_template %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Menu - {{ restaurant_name|default:"Restaurant" }}{% endblock %}
+{% block title %}{% translate "Menu" %} - {{ restaurant_name|default:"Restaurant" }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -1047,14 +1048,14 @@
 <div class="menu-header p-3 text-center">
     <div class="menu-header-content">
         <h2 class="mb-2">
-            <i class="bi bi-menu-button-wide"></i> {{ restaurant_name|default:"Restaurant" }} Menu
+            <i class="bi bi-menu-button-wide"></i> {% blocktranslate with name=restaurant_name|default:"Restaurant" %}{{ name }} Menu{% endblocktranslate %}
         </h2>
         {% if order_type == 'delivery' %}
-        <p class="mb-3"><i class="bi bi-bicycle me-1"></i>Delivery{% if delivery_address %} &bull; {{ delivery_address|truncatechars:45 }}{% endif %}</p>
+        <p class="mb-3"><i class="bi bi-bicycle me-1"></i>{% translate "Delivery" %}{% if delivery_address %} &bull; {{ delivery_address|truncatechars:45 }}{% endif %}</p>
         {% elif order_type == 'pickup' %}
-        <p class="mb-3"><i class="bi bi-bag-check me-1"></i>Pickup order &bull; Collect at the restaurant</p>
+        <p class="mb-3"><i class="bi bi-bag-check me-1"></i>{% translate "Pickup order" %} &bull; {% translate "Collect at the restaurant" %}</p>
         {% else %}
-        <p class="mb-3">Table {{ table_number }} &bull; Discover our amazing culinary creations</p>
+        <p class="mb-3">{% blocktranslate with n=table_number %}Table {{ n }}{% endblocktranslate %} &bull; {% translate "Discover our amazing culinary creations" %}</p>
         {% endif %}
         
         <!-- Search Bar -->
@@ -1066,7 +1067,7 @@
                 <input type="text" 
                        class="form-control" 
                        id="menuSearch" 
-                       placeholder="Search for categories or products..."
+                       placeholder="{% translate 'Search for categories or products...' %}"
                        style="box-shadow: none; border-radius: 0 25px 25px 0; border-left: none;"
                        autocomplete="off">
                 <button class="btn btn-outline-secondary" type="button" id="clearSearch" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: transparent; z-index: 10;">
@@ -1080,15 +1081,15 @@
         
         <div class="d-flex gap-2 justify-content-center flex-wrap">
             <a href="{% url 'orders:view_cart' %}" class="btn btn-light rounded-pill px-3 py-2" id="viewCartBtn">
-                <i class="bi bi-cart3"></i> View Cart (<span id="cartCount">{{ cart_count|default:0 }}</span>)
+                <i class="bi bi-cart3"></i> {% translate "View Cart" %} (<span id="cartCount">{{ cart_count|default:0 }}</span>)
             </a>
             {% if is_remote_order %}
             <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-light rounded-pill px-3 py-2">
-                <i class="bi bi-arrow-left"></i> Change Restaurant
+                <i class="bi bi-arrow-left"></i> {% translate "Change Restaurant" %}
             </a>
             {% else %}
             <a href="{% url 'orders:select_table' %}" class="btn btn-outline-light rounded-pill px-3 py-2">
-                <i class="bi bi-arrow-left"></i> Change Table
+                <i class="bi bi-arrow-left"></i> {% translate "Change Table" %}
             </a>
             {% endif %}
         </div>
@@ -1131,11 +1132,11 @@
                                         <div class="stats-section">
                                             <div class="stat-item">
                                                 <i class="bi bi-folder-plus"></i>
-                                                {{ category.subcategories.all|length }} subcategories
+                                                {% blocktranslate count counter=category.subcategories.all|length %}{{ counter }} subcategory{% plural %}{{ counter }} subcategories{% endblocktranslate %}
                                             </div>
                                             <div class="stat-item">
                                                 <i class="bi bi-basket"></i>
-                                                View Menu
+                                                {% translate "View Menu" %}
                                             </div>
                                         </div>
                                     </div>
@@ -1143,7 +1144,7 @@
                                     <!-- Click indicator -->
                                     <div class="click-indicator">
                                         <i class="bi bi-arrow-right-circle"></i>
-                                        Click to explore
+                                        {% translate "Click to explore" %}
                                     </div>
                                 </div>
                             </div>
@@ -1159,8 +1160,8 @@
         <div class="modal-dialog modal-xl modal-fullscreen-md-down">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="categoryModalLabel">Category Menu</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="categoryModalLabel">{% translate "Category Menu" %}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
                 </div>
                 <div class="modal-body">
                     <!-- Subcategory Tabs -->
@@ -1206,7 +1207,7 @@
                                                     </div>
                                                 </div>
                                                 <div class="category-info-badge">
-                                                    <i class="bi bi-basket"></i> {{ subcategory.products.all|length }} items available
+                                                    <i class="bi bi-basket"></i> {% blocktranslate count counter=subcategory.products.all|length %}{{ counter }} item available{% plural %}{{ counter }} items available{% endblocktranslate %}
                                                 </div>
                                             </div>
                                         </div>
@@ -1245,7 +1246,7 @@
                                                                                 <div class="original-price text-decoration-line-through text-muted">{% currency_symbol %}{{ product.price }}</div>
                                                                                 <div class="price-badge promotional-price">{% currency_symbol %}{{ product.get_current_price }}</div>
                                                                                 <div class="happy-hour-badge">
-                                                                                    <i class="fas fa-fire"></i> {{ product.get_active_promotion.discount_percentage|floatformat:0 }}% OFF
+                                                                                    <i class="fas fa-fire"></i> {% blocktranslate with pct=product.get_active_promotion.discount_percentage|floatformat:0 %}{{ pct }}% OFF{% endblocktranslate %}
                                                                                 </div>
                                                                             {% else %}
                                                                                 <div class="price-badge">{% currency_symbol %}{{ product.price }}</div>
@@ -1254,11 +1255,11 @@
                                                                         <div class="product-details text-end">
                                                                             {% if product.preparation_time %}
                                                                                 <div class="prep-time">
-                                                                                    <i class="bi bi-clock"></i> {{ product.preparation_time }} min
+                                                                                    <i class="bi bi-clock"></i> {% blocktranslate with n=product.preparation_time %}{{ n }} min{% endblocktranslate %}
                                                                                 </div>
                                                                             {% endif %}
                                                                             <div class="stock-info">
-                                                                                <i class="bi bi-check-circle"></i> {{ product.available_in_stock }} in stock
+                                                                                <i class="bi bi-check-circle"></i> {% blocktranslate with n=product.available_in_stock %}{{ n }} in stock{% endblocktranslate %}
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1285,12 +1286,12 @@
 
                                                                             <!-- Add to Cart Button -->
                                                                             <button class="btn add-to-cart-btn w-100" data-product="{{ product.id }}">
-                                                                                <i class="bi bi-cart-plus me-1"></i> Add to Cart
+                                                                                <i class="bi bi-cart-plus me-1"></i> {% translate "Add to Cart" %}
                                                                             </button>
                                                                         </div>
                                                                     {% else %}
                                                                         <button class="btn btn-secondary w-100 rounded-pill" disabled>
-                                                                            <i class="bi bi-x-circle"></i> Out of Stock
+                                                                            <i class="bi bi-x-circle"></i> {% translate "Out of Stock" %}
                                                                         </button>
                                                                     {% endif %}
                                                                 </div>
@@ -1307,8 +1308,8 @@
                     {% else %}
                         <div class="text-center py-5">
                             <i class="bi bi-exclamation-triangle display-4 text-warning mb-3"></i>
-                            <h4>No items available in this category</h4>
-                            <p class="text-muted">Please check other categories or contact our staff.</p>
+                            <h4>{% translate "No items available in this category" %}</h4>
+                            <p class="text-muted">{% translate "Please check other categories or contact our staff." %}</p>
                         </div>
                     {% endif %}
                 </div>
@@ -1319,8 +1320,8 @@
     <div class="container">
         <div class="text-center py-5">
             <i class="bi bi-exclamation-triangle display-4 text-warning mb-3"></i>
-            <h4>No Menu Categories Available</h4>
-            <p class="text-muted">Please check back later or contact our staff.</p>
+            <h4>{% translate "No Menu Categories Available" %}</h4>
+            <p class="text-muted">{% translate "Please check back later or contact our staff." %}</p>
         </div>
     </div>
 {% endif %}
@@ -1328,7 +1329,31 @@
 {% endblock %}
 
 {% block extra_js %}
+{% blocktranslate with name="{name}" asvar t_menu_of %}{{ name }} Menu{% endblocktranslate %}{% blocktranslate with pct="{pct}" asvar t_off %}{{ pct }}% OFF{% endblocktranslate %}{% blocktranslate with n="{n}" asvar t_stock %}Stock: {{ n }}{% endblocktranslate %}{% translate "Add to Cart" as t_add_to_cart %}{% translate "No products available in this subcategory." as t_no_products %}{% blocktranslate with name="{name}" asvar t_demo_added %}{{ name }} added to cart! (Demo mode){% endblocktranslate %}{% translate "Error adding item to cart" as t_add_error %}{% translate "View Cart" as t_view_cart %}{% translate "Available" as t_available %}{% blocktranslate with name="{name}" asvar t_items_of %}{{ name }} Items{% endblocktranslate %}{% translate "No items available in this category at the moment." as t_no_items_now %}{% translate "Category" as t_category %}{% blocktranslate with name="{name}" asvar t_in_category %}in {{ name }}{% endblocktranslate %}{% translate "In stock" as t_in_stock %}{% blocktranslate with n="{n}" asvar t_showing_first %}Showing first 10 of {{ n }} results{% endblocktranslate %}{% blocktranslate with query="{query}" asvar t_no_results %}No results found for "{{ query }}"{% endblocktranslate %}{% translate "Try searching for different items" as t_try_other %}
 <script>
+// Translated text (Kiswahili or English, chosen by the server). {placeholders} are filled by fmt().
+const T = {
+    menuOf: "{{ t_menu_of|escapejs }}",
+    off: "{{ t_off|escapejs }}",
+    stock: "{{ t_stock|escapejs }}",
+    addToCart: "{{ t_add_to_cart|escapejs }}",
+    noProducts: "{{ t_no_products|escapejs }}",
+    demoAdded: "{{ t_demo_added|escapejs }}",
+    addError: "{{ t_add_error|escapejs }}",
+    viewCart: "{{ t_view_cart|escapejs }}",
+    available: "{{ t_available|escapejs }}",
+    itemsOf: "{{ t_items_of|escapejs }}",
+    noItemsNow: "{{ t_no_items_now|escapejs }}",
+    category: "{{ t_category|escapejs }}",
+    inCategory: "{{ t_in_category|escapejs }}",
+    inStock: "{{ t_in_stock|escapejs }}",
+    showingFirst: "{{ t_showing_first|escapejs }}",
+    noResults: "{{ t_no_results|escapejs }}",
+    tryOther: "{{ t_try_other|escapejs }}"
+};
+function fmt(text, values) {
+    return text.replace(/\{(\w+)\}/g, (match, key) => (key in values ? String(values[key]) : match));
+}
 // Currency symbol from server-side context
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
 
@@ -1340,7 +1365,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const categoryName = this.getAttribute('data-category-name');
             
             // Update modal title
-            document.getElementById('categoryModalLabel').textContent = categoryName + ' Menu';
+            document.getElementById('categoryModalLabel').textContent = fmt(T.menuOf, { name: categoryName });
 
             // Get containers
             const tabsContainer = document.getElementById('subcategoryTabs');
@@ -1428,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         `<span class="h6 mb-0">${CURRENCY_SYMBOL}${product.original_price}</span>`;
                                     
                                     const discountBadge = product.has_promotion ? 
-                                        `<div class="happy-hour-badge mt-1"><i class="fas fa-fire"></i> ${Math.round(product.discount_percentage)}% OFF</div>` : '';
+                                        `<div class="happy-hour-badge mt-1"><i class="fas fa-fire"></i> ${fmt(T.off, { pct: Math.round(product.discount_percentage) })}</div>` : '';
                                     
                                     productsHtml += `
                                         <div class="col-12 col-sm-6 mb-3">
@@ -1441,7 +1466,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             ${priceDisplay}
                                                             ${discountBadge}
                                                         </div>
-                                                        <small class="text-muted">Stock: ${product.stock}</small>
+                                                        <small class="text-muted">${fmt(T.stock, { n: product.stock })}</small>
                                                     </div>
                                                     <div class="d-flex flex-column gap-2">
                                                         <div class="d-flex align-items-center justify-content-center gap-1">
@@ -1455,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             </button>
                                                         </div>
                                                         <button class="btn btn-primary btn-sm w-100" style="white-space:nowrap;" onclick="addToCartDemo('${product.name}', ${product.id})">
-                                                            <i class="bi bi-cart-plus me-1"></i>Add to Cart
+                                                            <i class="bi bi-cart-plus me-1"></i>${T.addToCart}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1465,7 +1490,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 }
                             });
                         } else {
-                            productsHtml = '<div class="col-12"><p class="text-muted">No products available in this subcategory.</p></div>';
+                            productsHtml = `<div class="col-12"><p class="text-muted">${T.noProducts}</p></div>`;
                         }
                         
                         contentHtml += `
@@ -1520,7 +1545,7 @@ function changeQty(id, change) {
 function addToCartDemo(productName, productId = null) {
     // For demo products without real IDs, just show alert
     if (!productId) {
-        alert(productName + ' added to cart! (Demo mode)');
+        alert(fmt(T.demoAdded, { name: productName }));
         return;
     }
     
@@ -1550,7 +1575,7 @@ function addToCartDemo(productName, productId = null) {
         }
     })
     .catch(error => {
-        showAlert('Error adding item to cart', 'danger');
+        showAlert(T.addError, 'danger');
     });
 }
 
@@ -1582,14 +1607,14 @@ function updateCartCount(count) {
     // Method 2: Fallback - update the entire button if span not found
     const viewCartBtn = document.getElementById('viewCartBtn');
     if (viewCartBtn && !cartCountSpan) {
-        viewCartBtn.innerHTML = `<i class="bi bi-cart3"></i> View Cart (<span id="cartCount">${count}</span>)`;
+        viewCartBtn.innerHTML = `<i class="bi bi-cart3"></i> ${T.viewCart} (<span id="cartCount">${count}</span>)`;
     }
     
     // Method 3: Final fallback - search by href
     if (!cartCountSpan && !viewCartBtn) {
         const btnByHref = document.querySelector('a[href*="view_cart"]');
         if (btnByHref) {
-            btnByHref.innerHTML = `<i class="bi bi-cart3"></i> View Cart (${count})`;
+            btnByHref.innerHTML = `<i class="bi bi-cart3"></i> ${T.viewCart} (${count})`;
         }
     }
 }
@@ -1618,7 +1643,7 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
                                     <p class="card-text">Fresh brewed coffee</p>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="h6 mb-0">${CURRENCY_SYMBOL}3.99</span>
-                                        <small class="text-muted">Available</small>
+                                        <small class="text-muted">${T.available}</small>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div class="quantity-controls d-flex align-items-center">
@@ -1632,7 +1657,7 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
                                             </button>
                                         </div>
                                         <button class="btn btn-primary btn-sm" onclick="addToCartDemo('Coffee', 10)">
-                                            <i class="bi bi-cart-plus me-1"></i>Add to Cart
+                                            <i class="bi bi-cart-plus me-1"></i>${T.addToCart}
                                         </button>
                                     </div>
                                 </div>
@@ -1645,7 +1670,7 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
                                     <p class="card-text">Rich hot chocolate</p>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="h6 mb-0">${CURRENCY_SYMBOL}4.99</span>
-                                        <small class="text-muted">Available</small>
+                                        <small class="text-muted">${T.available}</small>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div class="quantity-controls d-flex align-items-center">
@@ -1659,7 +1684,7 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
                                             </button>
                                         </div>
                                         <button class="btn btn-primary btn-sm" onclick="addToCartDemo('Hot Chocolate', 12)">
-                                            <i class="bi bi-cart-plus me-1"></i>Add to Cart
+                                            <i class="bi bi-cart-plus me-1"></i>${T.addToCart}
                                         </button>
                                     </div>
                                 </div>
@@ -1673,8 +1698,8 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
         // Simple fallback for other categories
         contentContainer.innerHTML = `
             <div class="p-4">
-                <h5>${categoryName} Items</h5>
-                <p class="text-muted">No items available in this category at the moment.</p>
+                <h5>${fmt(T.itemsOf, { name: categoryName })}</h5>
+                <p class="text-muted">${T.noItemsNow}</p>
             </div>
         `;
     }
@@ -1821,7 +1846,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <div>
                                 <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${escapeHtml(item.name)}</div>
-                                <small style="color: #6c757d; font-size: 0.8rem;">Category</small>
+                                <small style="color: #6c757d; font-size: 0.8rem;">${T.category}</small>
                             </div>
                         </div>
                     </div>
@@ -1836,12 +1861,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                                 <div>
                                     <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">${escapeHtml(item.name)}</div>
-                                    <small style="color: #6c757d; font-size: 0.8rem;">in ${escapeHtml(item.categoryName)}</small>
+                                    <small style="color: #6c757d; font-size: 0.8rem;">${fmt(T.inCategory, { name: escapeHtml(item.categoryName) })}</small>
                                 </div>
                             </div>
                             <div style="text-align: right; min-width: 70px;">
-                                <div style="font-weight: 700; color: #1976d2; font-size: 1rem;">£${item.price}</div>
-                                <small style="color: #2e7d32; font-size: 0.75rem; font-weight: 500;">✓ In stock</small>
+                                <div style="font-weight: 700; color: #1976d2; font-size: 1rem;">${CURRENCY_SYMBOL}${item.price}</div>
+                                <small style="color: #2e7d32; font-size: 0.75rem; font-weight: 500;">✓ ${T.inStock}</small>
                             </div>
                         </div>
                     </div>
@@ -1850,7 +1875,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         if (results.length > 10) {
-            html += `<div style="padding: 12px 16px; text-align: center; color: #6c757d; font-size: 0.85rem; background: #f8f9fa; border-top: 1px solid #eee;">Showing first 10 of ${results.length} results</div>`;
+            html += `<div style="padding: 12px 16px; text-align: center; color: #6c757d; font-size: 0.85rem; background: #f8f9fa; border-top: 1px solid #eee;">${fmt(T.showingFirst, { n: results.length })}</div>`;
         }
         
         html += '</div>';
@@ -1862,8 +1887,8 @@ document.addEventListener('DOMContentLoaded', function() {
         searchDropdown.innerHTML = `
             <div style="padding: 30px; text-align: center; color: #6c757d; background: white;">
                 <i class="bi bi-search" style="font-size: 2rem; opacity: 0.5;"></i>
-                <p class="mt-2 mb-0">No results found for "${query}"</p>
-                <small>Try searching for different items</small>
+                <p class="mt-2 mb-0">${fmt(T.noResults, { query: escapeHtml(query) })}</p>
+                <small>${T.tryOther}</small>
             </div>
         `;
         searchDropdown.style.display = 'block';

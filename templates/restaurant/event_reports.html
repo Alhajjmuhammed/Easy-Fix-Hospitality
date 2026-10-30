@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load i18n %}
 
-{% block title %}Event Reports - Analytics{% endblock %}
+{% block title %}{% translate "Event Reports - Analytics" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -158,16 +159,16 @@
     <div class="report-header">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div>
-                <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i>Event Reports</h2>
+                <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i>{% translate "Event Reports" %}</h2>
                 <p class="mb-0 opacity-75">
-                    Analytics for {{ start_date|date:"M d, Y" }} - {{ end_date|date:"M d, Y" }}
+                    {% blocktranslate with start=start_date|date:"M d, Y" end=end_date|date:"M d, Y" %}Analytics for {{ start }} - {{ end }}{% endblocktranslate %}
                 </p>
             </div>
             <div class="period-selector btn-group">
-                <a href="?period=week" class="btn btn-outline-light {% if period == 'week' %}active{% endif %}">Week</a>
-                <a href="?period=month" class="btn btn-outline-light {% if period == 'month' %}active{% endif %}">Month</a>
-                <a href="?period=quarter" class="btn btn-outline-light {% if period == 'quarter' %}active{% endif %}">Quarter</a>
-                <a href="?period=year" class="btn btn-outline-light {% if period == 'year' %}active{% endif %}">Year</a>
+                <a href="?period=week" class="btn btn-outline-light {% if period == 'week' %}active{% endif %}">{% translate "Week" %}</a>
+                <a href="?period=month" class="btn btn-outline-light {% if period == 'month' %}active{% endif %}">{% translate "Month" %}</a>
+                <a href="?period=quarter" class="btn btn-outline-light {% if period == 'quarter' %}active{% endif %}">{% translate "Quarter" %}</a>
+                <a href="?period=year" class="btn btn-outline-light {% if period == 'year' %}active{% endif %}">{% translate "Year" %}</a>
             </div>
         </div>
     </div>
@@ -180,7 +181,7 @@
                     <i class="fas fa-calendar-check"></i>
                 </div>
                 <div class="stat-value text-primary">{{ stats.total_events }}</div>
-                <div class="stat-label">Total Events</div>
+                <div class="stat-label">{% translate "Total Events" %}</div>
             </div>
         </div>
         <div class="col-md-3 col-6">
@@ -189,7 +190,7 @@
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div class="stat-value text-success">{{ stats.completed_events }}</div>
-                <div class="stat-label">Completed</div>
+                <div class="stat-label">{% translate "Completed" %}</div>
             </div>
         </div>
         <div class="col-md-3 col-6">
@@ -198,7 +199,7 @@
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-value text-info">{{ stats.total_pax|floatformat:0 }}</div>
-                <div class="stat-label">Total Guests</div>
+                <div class="stat-label">{% translate "Total Guests" %}</div>
             </div>
         </div>
         <div class="col-md-3 col-6">
@@ -207,7 +208,7 @@
                     <i class="fas fa-user-friends"></i>
                 </div>
                 <div class="stat-value text-warning">{{ stats.average_pax|floatformat:0 }}</div>
-                <div class="stat-label">Avg PAX/Event</div>
+                <div class="stat-label">{% translate "Avg PAX/Event" %}</div>
             </div>
         </div>
     </div>
@@ -220,7 +221,7 @@
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div class="stat-value">{{ currency_symbol }}{{ stats.paid_amount|floatformat:0 }}</div>
-                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Fully Paid ({{ stats.paid_events_count }})</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">{% blocktranslate with n=stats.paid_events_count %}Fully Paid ({{ n }}){% endblocktranslate %}</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -229,7 +230,7 @@
                     <i class="fas fa-exclamation-circle"></i>
                 </div>
                 <div class="stat-value">{{ currency_symbol }}{{ stats.unpaid_amount|floatformat:0 }}</div>
-                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Unpaid Due ({{ stats.unpaid_events_count }})</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">{% blocktranslate with n=stats.unpaid_events_count %}Unpaid Due ({{ n }}){% endblocktranslate %}</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -238,7 +239,7 @@
                     <i class="fas fa-dollar-sign"></i>
                 </div>
                 <div class="stat-value">{{ currency_symbol }}{{ stats.total_revenue|floatformat:0 }}</div>
-                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Revenue Collected</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">{% translate "Revenue Collected" %}</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -247,7 +248,7 @@
                     <i class="fas fa-exclamation-circle"></i>
                 </div>
                 <div class="stat-value">{{ stats.pending_payments }}</div>
-                <div class="stat-label" style="color: rgba(255,255,255,0.8);">Pending Payments</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.8);">{% translate "Pending Payments" %}</div>
             </div>
         </div>
     </div>
@@ -258,7 +259,7 @@
             <div class="report-card">
                 <div class="report-card-title">
                     <i class="fas fa-tags"></i>
-                    Events by Type
+                    {% translate "Events by Type" %}
                 </div>
                 {% if events_by_type %}
                 {% for item in events_by_type %}
@@ -267,21 +268,21 @@
                     <div class="type-stats">
                         <div class="type-stat">
                             <div class="type-stat-value">{{ item.count }}</div>
-                            <div class="type-stat-label">Events</div>
+                            <div class="type-stat-label">{% translate "Events" %}</div>
                         </div>
                         <div class="type-stat">
                             <div class="type-stat-value">{{ item.total_pax|default:0 }}</div>
-                            <div class="type-stat-label">PAX</div>
+                            <div class="type-stat-label">{% translate "PAX" %}</div>
                         </div>
                         <div class="type-stat">
                             <div class="type-stat-value text-success">{{ currency_symbol }}{{ item.revenue|default:0|floatformat:0 }}</div>
-                            <div class="type-stat-label">Revenue</div>
+                            <div class="type-stat-label">{% translate "Revenue" %}</div>
                         </div>
                     </div>
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-muted text-center py-3">No data available</p>
+                <p class="text-muted text-center py-3">{% translate "No data available" %}</p>
                 {% endif %}
             </div>
 
@@ -289,7 +290,7 @@
             <div class="report-card">
                 <div class="report-card-title">
                     <i class="fas fa-chart-pie"></i>
-                    Events by Status
+                    {% translate "Events by Status" %}
                 </div>
                 {% if events_by_status %}
                 {% for item in events_by_status %}
@@ -301,7 +302,7 @@
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-muted text-center py-3">No data available</p>
+                <p class="text-muted text-center py-3">{% translate "No data available" %}</p>
                 {% endif %}
             </div>
         </div>
@@ -311,7 +312,7 @@
             <div class="report-card">
                 <div class="report-card-title">
                     <i class="fas fa-calendar-alt"></i>
-                    Upcoming Events
+                    {% translate "Upcoming Events" %}
                 </div>
                 {% if upcoming_events %}
                 {% for event in upcoming_events %}
@@ -323,7 +324,7 @@
                     <div class="event-mini-info">
                         <div class="event-mini-title">{{ event.title }}</div>
                         <div class="event-mini-meta">
-                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX
+                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} {% translate "PAX" %}
                             <span class="ms-2 badge bg-{{ event.get_status_color }} badge-sm">{{ event.get_status_display }}</span>
                         </div>
                     </div>
@@ -331,10 +332,10 @@
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-muted text-center py-3">No upcoming events</p>
+                <p class="text-muted text-center py-3">{% translate "No upcoming events" %}</p>
                 {% endif %}
                 <a href="{% url 'restaurant:manage_events' %}?date_filter=upcoming" class="btn btn-outline-primary btn-sm w-100 mt-3">
-                    View All Upcoming Events
+                    {% translate "View All Upcoming Events" %}
                 </a>
             </div>
 
@@ -342,7 +343,7 @@
             <div class="report-card">
                 <div class="report-card-title">
                     <i class="fas fa-check-circle text-success"></i>
-                    Recently Completed
+                    {% translate "Recently Completed" %}
                 </div>
                 {% if recent_completed %}
                 {% for event in recent_completed %}
@@ -354,7 +355,7 @@
                     <div class="event-mini-info">
                         <div class="event-mini-title">{{ event.title }}</div>
                         <div class="event-mini-meta">
-                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} PAX
+                            <i class="fas fa-users me-1"></i>{{ event.total_pax }} {% translate "PAX" %}
                             <span class="ms-2">{{ event.get_event_type_display }}</span>
                         </div>
                     </div>
@@ -362,7 +363,7 @@
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="text-muted text-center py-3">No completed events</p>
+                <p class="text-muted text-center py-3">{% translate "No completed events" %}</p>
                 {% endif %}
             </div>
         </div>
@@ -371,7 +372,7 @@
     <!-- Back Button -->
     <div class="text-center mt-4">
         <a href="{% url 'restaurant:manage_events' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Back to Events
+            <i class="fas fa-arrow-left me-2"></i>{% translate "Back to Events" %}
         </a>
     </div>
 </div>

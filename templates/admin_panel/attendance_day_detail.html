@@ -1,6 +1,7 @@
 {% extends "admin_panel/base.html" %}
+{% load i18n %}
 
-{% block title %}Attendance — {{ day_label }}{% endblock %}
+{% block title %}{% translate "Attendance" %} — {{ day_label }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap">
@@ -422,23 +423,23 @@
     <div class="dd-header">
         <div>
             <a href="{% url 'attendance:calendar' %}" class="dd-back">
-                <i class="bi bi-arrow-left"></i> Calendar
+                <i class="bi bi-arrow-left"></i> {% translate "Calendar" %}
             </a>
             <div class="dd-date-label">
                 {{ day_label }}
-                {% if is_today %}<span class="dd-today-badge">Today</span>{% endif %}
+                {% if is_today %}<span class="dd-today-badge">{% translate "Today" %}</span>{% endif %}
             </div>
         </div>
         <div class="dd-nav">
             <a href="{% url 'attendance:day_detail' %}?date={{ prev_day }}" class="dd-nav-btn">
-                <i class="bi bi-chevron-left"></i> Prev
+                <i class="bi bi-chevron-left"></i> {% translate "Prev" %}
             </a>
             {% if not is_today and not is_future %}
                 <a href="{% url 'attendance:day_detail' %}?date={{ next_day }}" class="dd-nav-btn">
-                    Next <i class="bi bi-chevron-right"></i>
+                    {% translate "Next" %} <i class="bi bi-chevron-right"></i>
                 </a>
             {% elif not is_future %}
-                <span class="dd-nav-btn disabled">Next <i class="bi bi-chevron-right"></i></span>
+                <span class="dd-nav-btn disabled">{% translate "Next" %} <i class="bi bi-chevron-right"></i></span>
             {% endif %}
         </div>
     </div>
@@ -448,27 +449,27 @@
         <div class="dd-stat dd-stat--blue">
             <div class="dd-stat-icon"><i class="bi bi-box-arrow-in-right"></i></div>
             <div class="dd-stat-val">{{ checked_in_count }}</div>
-            <div class="dd-stat-lbl">Checked In</div>
+            <div class="dd-stat-lbl">{% translate "Checked In" %}</div>
         </div>
         <div class="dd-stat dd-stat--green">
             <div class="dd-stat-icon"><i class="bi bi-box-arrow-right"></i></div>
             <div class="dd-stat-val">{{ checked_out_count }}</div>
-            <div class="dd-stat-lbl">Checked Out</div>
+            <div class="dd-stat-lbl">{% translate "Checked Out" %}</div>
         </div>
         <div class="dd-stat dd-stat--amber">
             <div class="dd-stat-icon"><i class="bi bi-alarm"></i></div>
             <div class="dd-stat-val">{{ late_count }}</div>
-            <div class="dd-stat-lbl">Late</div>
+            <div class="dd-stat-lbl">{% translate "Late" %}</div>
         </div>
         <div class="dd-stat dd-stat--red">
             <div class="dd-stat-icon"><i class="bi bi-lightning-charge"></i></div>
             <div class="dd-stat-val">{{ overtime_count }}</div>
-            <div class="dd-stat-lbl">Overtime</div>
+            <div class="dd-stat-lbl">{% translate "Overtime" %}</div>
         </div>
         <div class="dd-stat dd-stat--purple">
             <div class="dd-stat-icon"><i class="bi bi-clock-history"></i></div>
             <div class="dd-stat-val">{{ total_work_display }}</div>
-            <div class="dd-stat-lbl">Hours Worked</div>
+            <div class="dd-stat-lbl">{% translate "Hours Worked" %}</div>
         </div>
     </div>
 
@@ -480,7 +481,7 @@
             <div class="dd-panel-head">
                 <div class="dd-panel-title">
                     <i class="bi bi-people" style="color:var(--dd-blue);"></i>
-                    Attendance Records
+                    {% translate "Attendance Records" %}
                     <span class="dd-count-badge">{{ records|length }}</span>
                 </div>
             </div>
@@ -489,13 +490,13 @@
                 <table class="dd-table">
                     <thead>
                         <tr>
-                            <th>Staff</th>
-                            <th>Shift</th>
-                            <th>Check In</th>
-                            <th>Check Out</th>
-                            <th>Hours</th>
-                            <th>Status</th>
-                            <th>Via</th>
+                            <th>{% translate "Staff" context "group" %}</th>
+                            <th>{% translate "Shift" %}</th>
+                            <th>{% translate "Check In" %}</th>
+                            <th>{% translate "Check Out" %}</th>
+                            <th>{% translate "Hours" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th>{% translate "Via" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -528,7 +529,7 @@
                                 {% if rec.check_out != '—' %}
                                     <span class="dd-time">{{ rec.check_out }}</span>
                                 {% else %}
-                                    <span class="dd-time--muted">Still in</span>
+                                    <span class="dd-time--muted">{% translate "Still in" %}</span>
                                 {% endif %}
                             </td>
                             <td class="dd-hours-cell">{{ rec.work_display }}</td>
@@ -537,25 +538,25 @@
                                     {% if rec.is_late %}
                                         <span class="dd-status-pill dd-pill-amber">
                                             <i class="bi bi-clock-history"></i>
-                                            Late{% if rec.late_minutes %} +{{ rec.late_minutes }}m{% endif %}
+                                            {% translate "Late" %}{% if rec.late_minutes %} {% blocktranslate with n=rec.late_minutes %}+{{ n }}m{% endblocktranslate %}{% endif %}
                                         </span>
                                     {% else %}
                                         <span class="dd-status-pill dd-pill-green">
-                                            <i class="bi bi-check-circle"></i> On Time
+                                            <i class="bi bi-check-circle"></i> {% translate "On Time" %}
                                         </span>
                                     {% endif %}
                                     {% if rec.is_overtime %}
                                         <span class="dd-status-pill dd-pill-purple">
-                                            <i class="bi bi-lightning-charge"></i> OT +{{ rec.overtime_minutes }}m
+                                            <i class="bi bi-lightning-charge"></i> {% translate "OT" %} {% blocktranslate with n=rec.overtime_minutes %}+{{ n }}m{% endblocktranslate %}
                                         </span>
                                     {% endif %}
                                 </div>
                             </td>
                             <td>
                                 {% if rec.check_in_via == 'mobile' %}
-                                    <span class="dd-via-badge dd-via-mobile"><i class="bi bi-phone me-1"></i>Mobile</span>
+                                    <span class="dd-via-badge dd-via-mobile"><i class="bi bi-phone me-1"></i>{% translate "Mobile" %}</span>
                                 {% else %}
-                                    <span class="dd-via-badge dd-via-web"><i class="bi bi-globe me-1"></i>Web</span>
+                                    <span class="dd-via-badge dd-via-web"><i class="bi bi-globe me-1"></i>{% translate "Web" %}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -566,7 +567,7 @@
             {% else %}
             <div class="dd-empty">
                 <i class="bi bi-calendar-x"></i>
-                <p>No attendance records for this day.</p>
+                <p>{% translate "No attendance records for this day." %}</p>
             </div>
             {% endif %}
         </div>
@@ -577,7 +578,7 @@
             <div class="dd-absent-head">
                 <div class="dd-absent-title">
                     <i class="bi bi-person-x"></i>
-                    {% if is_today %}Not Yet In{% else %}Did Not Attend{% endif %}
+                    {% if is_today %}{% translate "Not Yet In" %}{% else %}{% translate "Did Not Attend" %}{% endif %}
                 </div>
                 {% if absent_staff %}
                     <span class="dd-absent-badge">{{ absent_staff|length }}</span>
@@ -592,7 +593,7 @@
                     </div>
                     <div>
                         <div class="dd-absent-name">{{ staff.get_full_name|default:staff.username }}</div>
-                        <div class="dd-absent-role">{% if staff.role %}{{ staff.role.name }}{% else %}Staff{% endif %}</div>
+                        <div class="dd-absent-role">{% if staff.role %}{{ staff.role.name }}{% else %}{% translate "Staff" %}{% endif %}</div>
                     </div>
                 </div>
                 {% endfor %}
@@ -600,14 +601,14 @@
             {% else %}
             <div class="dd-all-present">
                 <i class="bi bi-patch-check-fill"></i>
-                <p>All staff attended</p>
+                <p>{% translate "All staff attended" %}</p>
             </div>
             {% endif %}
         </div>
         {% else %}
         <div class="dd-future-panel">
             <i class="bi bi-calendar-event"></i>
-            <p style="font-size:.88rem;margin:0;">This day hasn't happened yet.</p>
+            <p style="font-size:.88rem;margin:0;">{% translate "This day hasn't happened yet." %}</p>
         </div>
         {% endif %}
 

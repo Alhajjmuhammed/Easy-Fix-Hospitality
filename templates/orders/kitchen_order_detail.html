@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Order Details - Restaurant System{% endblock %}
+{% block title %}{% translate "Order Details" %} - {% translate "Restaurant System" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2>Order {{ order.order_number }}</h2>
-        <p class="text-muted mb-0">Table {{ order.table_info.tbl_no|default:order.get_order_type_display }} • {{ order.created_at|date:"M d, Y H:i" }}</p>
+        <h2>{% blocktranslate with n=order.order_number %}Order {{ n }}{% endblocktranslate %}</h2>
+        <p class="text-muted mb-0">{% blocktranslate with n=order.table_info.tbl_no|default:order.get_order_type_display %}Table {{ n }}{% endblocktranslate %} • {{ order.created_at|date:"M d, Y H:i" }}</p>
     </div>
     <a href="{% url 'orders:kitchen_dashboard' %}" class="btn btn-outline-primary">
-        <i class="bi bi-arrow-left"></i> Back to Kitchen
+        <i class="bi bi-arrow-left"></i> {% translate "Back to Kitchen" %}
     </a>
 </div>
 
@@ -18,7 +19,7 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Order Items</h5>
+                <h5 class="mb-0">{% translate "Order Items" %}</h5>
             </div>
             <div class="card-body">
                 {% for item in order.order_items.all %}
@@ -43,14 +44,14 @@
                         
                         <div class="text-end">
                             <div class="badge bg-primary mb-1">{{ item.quantity }}x</div>
-                            <div class="text-muted">{% currency_symbol %}{{ item.unit_price|floatformat:2 }} each</div>
+                            <div class="text-muted">{% currency_symbol %}{{ item.unit_price|floatformat:2 }} {% translate "each" %}</div>
                             <div class="fw-bold">{% currency_symbol %}{{ item.get_subtotal|floatformat:2 }}</div>
                         </div>
                     </div>
                 {% endfor %}
                 
                 <div class="d-flex justify-content-between align-items-center pt-3">
-                    <strong>Total Amount:</strong>
+                    <strong>{% translate "Total Amount:" %}</strong>
                     <strong class="text-primary h5">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</strong>
                 </div>
             </div>
@@ -59,7 +60,7 @@
         {% if order.display_instructions %}
             <div class="card mt-3">
                 <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-chat-text"></i> Special Instructions</h6>
+                    <h6 class="mb-0"><i class="bi bi-chat-text"></i> {% translate "Special Instructions" %}</h6>
                 </div>
                 <div class="card-body">
                     <p class="mb-0">{{ order.display_instructions }}</p>
@@ -71,25 +72,25 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
-                <h6 class="mb-0">Order Information</h6>
+                <h6 class="mb-0">{% translate "Order Information" %}</h6>
             </div>
             <div class="card-body">
-                <p><strong>Status:</strong> 
+                <p><strong>{% translate "Status:" %}</strong> 
                     <span class="badge bg-{% if order.status == 'pending' %}warning{% elif order.status == 'confirmed' %}primary{% elif order.status == 'preparing' %}info{% elif order.status == 'ready' %}success{% elif order.status == 'served' %}secondary{% else %}danger{% endif %}">
                         {{ order.get_status_display }}
                     </span>
                 </p>
-                <p><strong>Customer:</strong> {{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</p>
-                <p><strong>Table:</strong> {{ order.table_info.tbl_no|default:order.get_order_type_display }}</p>
-                <p><strong>Order Time:</strong> {{ order.created_at|date:"M d, Y H:i" }}</p>
+                <p><strong>{% translate "Customer:" %}</strong> {{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</p>
+                <p><strong>{% translate "Table:" %}</strong> {{ order.table_info.tbl_no|default:order.get_order_type_display }}</p>
+                <p><strong>{% translate "Order Time:" %}</strong> {{ order.created_at|date:"M d, Y H:i" }}</p>
                 {% if order.confirmed_by %}
-                    <p><strong>Confirmed By:</strong> {{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</p>
+                    <p><strong>{% translate "Confirmed By:" %}</strong> {{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</p>
                 {% endif %}
-                <p><strong>Total Items:</strong> {{ order.get_total_products }}</p>
+                <p><strong>{% translate "Total Items:" %}</strong> {{ order.get_total_products }}</p>
                 
                 {% if order.reason_if_cancelled %}
                     <div class="alert alert-danger mt-3">
-                        <strong>Cancellation Reason:</strong><br>
+                        <strong>{% translate "Cancellation Reason:" %}</strong><br>
                         {{ order.reason_if_cancelled }}
                     </div>
                 {% endif %}
@@ -99,30 +100,30 @@
         {% if order.status not in "served,cancelled,delivered,out_for_delivery,customer_refused,kitchen_error,quality_issue,wasted" %}
             <div class="card mt-3">
                 <div class="card-header">
-                    <h6 class="mb-0">Quick Actions</h6>
+                    <h6 class="mb-0">{% translate "Quick Actions" %}</h6>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
                         {% if order.status == 'pending' %}
                             <button class="btn btn-success" onclick="confirmOrder({{ order.id }})">
-                                <i class="bi bi-check-circle"></i> Confirm Order
+                                <i class="bi bi-check-circle"></i> {% translate "Confirm Order" %}
                             </button>
                         {% elif order.status == 'confirmed' %}
                             <button class="btn btn-info" onclick="updateStatus({{ order.id }}, 'preparing')">
-                                <i class="bi bi-hourglass-split"></i> Start Preparing
+                                <i class="bi bi-hourglass-split"></i> {% translate "Start Preparing" %}
                             </button>
                         {% elif order.status == 'preparing' %}
                             <button class="btn btn-success" onclick="updateStatus({{ order.id }}, 'ready')">
-                                <i class="bi bi-check2-all"></i> Mark Ready
+                                <i class="bi bi-check2-all"></i> {% translate "Mark Ready" %}
                             </button>
                         {% elif order.status == 'ready' %}
                             <button class="btn btn-secondary" onclick="updateStatus({{ order.id }}, 'served')">
-                                <i class="bi bi-check-all"></i> Mark Served
+                                <i class="bi bi-check-all"></i> {% translate "Mark Served" %}
                             </button>
                         {% endif %}
                         
                         <a href="{% url 'orders:cancel_order' order.id %}" class="btn btn-outline-danger">
-                            <i class="bi bi-x-circle"></i> Cancel Order
+                            <i class="bi bi-x-circle"></i> {% translate "Cancel Order" %}
                         </a>
                     </div>
                 </div>
@@ -133,14 +134,32 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Confirm this order?" as t_confirm %}
+{% translate "Failed to confirm order." as t_confirm_fail %}
+{% translate "Network error. Please try again." as t_network %}
+{% translate "Start preparing this order?" as t_q_preparing %}
+{% translate "Mark this order as ready?" as t_q_ready %}
+{% translate "Mark this order as served?" as t_q_served %}
+{% translate "Update order status?" as t_q_update %}
+{% translate "Failed to update status." as t_update_fail %}
 <script>
+var KOD_T = {
+    confirm: "{{ t_confirm|escapejs }}",
+    confirmFail: "{{ t_confirm_fail|escapejs }}",
+    network: "{{ t_network|escapejs }}",
+    qPreparing: "{{ t_q_preparing|escapejs }}",
+    qReady: "{{ t_q_ready|escapejs }}",
+    qServed: "{{ t_q_served|escapejs }}",
+    qUpdate: "{{ t_q_update|escapejs }}",
+    updateFail: "{{ t_update_fail|escapejs }}"
+};
 function getCsrfToken() {
     var m = document.cookie.match(/csrftoken=([^;]+)/);
     return m ? m[1] : '';
 }
 
 function confirmOrder(orderId) {
-    if (!confirm('Confirm this order?')) return;
+    if (!confirm(KOD_T.confirm)) return;
 
     fetch(`/orders/confirm-order/${orderId}/`, {
         method: 'POST',
@@ -152,21 +171,21 @@ function confirmOrder(orderId) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.success) { location.reload(); }
-        else { alert(data.message || 'Failed to confirm order.'); }
+        else { alert(data.message || KOD_T.confirmFail); }
     })
     .catch(function(err) {
-        alert('Network error. Please try again.');
+        alert(KOD_T.network);
         console.error(err);
     });
 }
 
 function updateStatus(orderId, newStatus) {
     var messages = {
-        'preparing': 'Start preparing this order?',
-        'ready': 'Mark this order as ready?',
-        'served': 'Mark this order as served?'
+        'preparing': KOD_T.qPreparing,
+        'ready': KOD_T.qReady,
+        'served': KOD_T.qServed
     };
-    if (!confirm(messages[newStatus] || 'Update order status?')) return;
+    if (!confirm(messages[newStatus] || KOD_T.qUpdate)) return;
 
     fetch(`/orders/update-status/${orderId}/`, {
         method: 'POST',
@@ -179,10 +198,10 @@ function updateStatus(orderId, newStatus) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.success) { location.reload(); }
-        else { alert(data.message || 'Failed to update status.'); }
+        else { alert(data.message || KOD_T.updateFail); }
     })
     .catch(function(err) {
-        alert('Network error. Please try again.');
+        alert(KOD_T.network);
         console.error(err);
     });
 }

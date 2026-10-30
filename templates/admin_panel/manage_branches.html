@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Manage Branches{% endblock %}
+{% block title %}{% translate "Manage Branches" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -99,10 +100,10 @@
                             </div>
                             <div>
                                 <h4 class="text-white mb-2" style="font-weight: 700; font-size: 1.8rem; letter-spacing: -0.5px;">
-                                    Branch Management
+                                    {% translate "Branch Management" %}
                                 </h4>
                                 <p class="text-white mb-0" style="opacity: 0.95; font-size: 0.95rem;">
-                                    Manage all restaurant locations and branches
+                                    {% translate "Manage all restaurant locations and branches" %}
                                 </p>
                             </div>
                         </div>
@@ -119,7 +120,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
-                            <h5 class="card-title mb-1">Total Restaurants</h5>
+                            <h5 class="card-title mb-1">{% translate "Total Restaurants" %}</h5>
                             <h3 class="mb-0">{{ total_restaurants }}</h3>
                         </div>
                         <div class="ml-3">
@@ -134,7 +135,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
-                            <h5 class="card-title mb-1">Main Restaurant</h5>
+                            <h5 class="card-title mb-1">{% translate "Main Restaurant" %}</h5>
                             <h3 class="mb-0">1</h3>
                         </div>
                         <div class="ml-3">
@@ -149,7 +150,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
-                            <h5 class="card-title mb-1">Branches</h5>
+                            <h5 class="card-title mb-1">{% translate "Branches" %}</h5>
                             <h3 class="mb-0">{{ branches_count }}</h3>
                         </div>
                         <div class="ml-3">
@@ -171,27 +172,27 @@
                         <div class="col-md-6">
                             <h5 class="card-title mb-2">
                                 <i class="fas fa-crown me-2 text-warning"></i>
-                                Current Plan: {{ subscription_plan }}
+                                {% blocktranslate with plan=subscription_plan %}Current Plan: {{ plan }}{% endblocktranslate %}
                             </h5>
                             <div class="d-flex align-items-center">
                                 {% if subscription_plan_code == 'SINGLE' %}
-                                    <span class="badge bg-primary me-2">Single Restaurant</span>
-                                    <small class="text-muted">Basic plan - No branches allowed</small>
+                                    <span class="badge bg-primary me-2">{% translate "Single Restaurant" %}</span>
+                                    <small class="text-muted">{% translate "Basic plan - No branches allowed" %}</small>
                                 {% else %}
-                                    <span class="badge bg-success me-2">Pro Plan</span>
-                                    <small class="text-muted">Premium plan - {{ branches_allowed }} branches allowed</small>
+                                    <span class="badge bg-success me-2">{% translate "Pro Plan" %}</span>
+                                    <small class="text-muted">{% blocktranslate with allowed=branches_allowed %}Premium plan - {{ allowed }} branches allowed{% endblocktranslate %}</small>
                                 {% endif %}
                             </div>
                         </div>
                         <div class="col-md-6 text-md-end">
                             {% if subscription_plan_code == 'SINGLE' %}
                                 <button type="button" class="btn btn-success btn-sm" onclick="upgradeToPro()">
-                                    <i class="fas fa-arrow-up me-1"></i> Upgrade to Pro Plan
+                                    <i class="fas fa-arrow-up me-1"></i> {% translate "Upgrade to Pro Plan" %}
                                 </button>
                             {% else %}
                                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downgradeToSingle()" 
-                                        {% if branches_count > 0 %}disabled title="Delete all branches first"{% endif %}>
-                                    <i class="fas fa-arrow-down me-1"></i> Downgrade to Single
+                                        {% if branches_count > 0 %}disabled title="{% translate "Delete all branches first" %}"{% endif %}>
+                                    <i class="fas fa-arrow-down me-1"></i> {% translate "Downgrade to Single" %}
                                 </button>
                             {% endif %}
                         </div>
@@ -200,7 +201,7 @@
                     {% if subscription_plan_code == 'SINGLE' %}
                         <div class="alert alert-info mt-3 mb-0">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Want to expand?</strong> Upgrade to Pro Plan to create unlimited branches and manage multiple locations from one dashboard.
+                            <strong>{% translate "Want to expand?" %}</strong> {% translate "Upgrade to Pro Plan to create unlimited branches and manage multiple locations from one dashboard." %}
                         </div>
                     {% endif %}
                 </div>
@@ -214,15 +215,15 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h4 class="mb-0">
-                    <i class="fas fa-list me-2"></i>Restaurant Locations
+                    <i class="fas fa-list me-2"></i>{% translate "Restaurant Locations" %}
                 </h4>
                 {% if can_add_branch %}
                     <a href="{% url 'admin_panel:add_branch' %}" class="btn btn-success">
-                        <i class="fas fa-plus me-1"></i> Add New Branch
+                        <i class="fas fa-plus me-1"></i> {% translate "Add New Branch" %}
                     </a>
                 {% else %}
-                    <button class="btn btn-secondary" disabled title="Upgrade to Pro Plan to add branches">
-                        <i class="fas fa-lock me-1"></i> Add Branch (Pro Only)
+                    <button class="btn btn-secondary" disabled title="{% translate "Upgrade to Pro Plan to add branches" %}">
+                        <i class="fas fa-lock me-1"></i> {% translate "Add Branch (Pro Only)" %}
                     </button>
                 {% endif %}
             </div>
@@ -248,7 +249,7 @@
                                         {{ restaurant.name }}
                                     </h5>
                                     <span class="restaurant-status {% if restaurant.is_main_restaurant %}status-main{% else %}status-branch{% endif %}">
-                                        {% if restaurant.is_main_restaurant %}Main Restaurant{% else %}Branch{% endif %}
+                                        {% if restaurant.is_main_restaurant %}{% translate "Main Restaurant" %}{% else %}{% translate "Branch" %}{% endif %}
                                     </span>
                                 </div>
                                 <div class="dropdown">
@@ -258,12 +259,12 @@
                                     </button>
                                     <div class="dropdown-menu dropdown-menu-right">
                                         <a class="dropdown-item" href="{% url 'admin_panel:edit_branch' restaurant.id %}">
-                                            <i class="fas fa-edit"></i> Edit
+                                            <i class="fas fa-edit"></i> {% translate "Edit" %}
                                         </a>
                                         {% if not restaurant.is_main_restaurant %}
                                             <div class="dropdown-divider"></div>
                                             <button class="dropdown-item text-danger" onclick="deleteBranch({{ restaurant.id }}, '{{ restaurant.name|escapejs }}')">>
-                                                <i class="fas fa-trash"></i> Delete
+                                                <i class="fas fa-trash"></i> {% translate "Delete" %}
                                             </button>
                                         {% endif %}
                                     </div>
@@ -287,21 +288,21 @@
                                 <!-- QR Code Info -->
                                 <p class="mb-2">
                                     <i class="fas fa-qrcode"></i> 
-                                    <strong>QR Code:</strong> {{ restaurant.qr_code|default:"Not generated" }}
+                                    {% translate "Not generated" as t_not_generated %}<strong>{% translate "QR Code:" %}</strong> {{ restaurant.qr_code|default:t_not_generated }}
                                 </p>
                                 
                                 <div class="row">
                                     <div class="col-6">
                                         <small>
                                             <i class="fas fa-user"></i> 
-                                            <strong>Branch Owner:</strong><br>
+                                            <strong>{% translate "Branch Owner:" %}</strong><br>
                                             {{ restaurant.branch_owner.username }}
                                         </small>
                                     </div>
                                     <div class="col-6">
                                         <small>
                                             <i class="fas fa-percentage"></i> 
-                                            <strong>Tax Rate:</strong><br>
+                                            <strong>{% translate "Tax Rate:" %}</strong><br>
                                             {{ restaurant.tax_rate_percentage|floatformat:1 }}%
                                         </small>
                                     </div>
@@ -314,20 +315,20 @@
                                     <div>
                                         <button class="btn btn-sm btn-primary btn-action" 
                                                 onclick="switchRestaurant({{ restaurant.id }}, '{{ restaurant.name|escapejs }}')">
-                                            <i class="fas fa-exchange-alt"></i> Switch To
+                                            <i class="fas fa-exchange-alt"></i> {% translate "Switch To" %}
                                         </button>
                                         <a href="{% url 'admin_panel:edit_branch' restaurant.id %}" 
                                            class="btn btn-sm btn-outline-secondary btn-action">
-                                            <i class="fas fa-cog"></i> Settings
+                                            <i class="fas fa-cog"></i> {% translate "Settings" %}
                                         </a>
                                         <button class="btn btn-sm btn-info btn-action" 
                                                 onclick="switchAndViewQR({{ restaurant.id }}, '{{ restaurant.name|escapejs }}')">
-                                            <i class="fas fa-qrcode"></i> View QR
+                                            <i class="fas fa-qrcode"></i> {% translate "View QR" %}
                                         </button>
                                     </div>
                                     <small class="text-muted">
                                         <i class="fas fa-clock"></i> 
-                                        Created {{ restaurant.created_at|date:"M d, Y" }}
+                                        {% blocktranslate with date=restaurant.created_at|date:"M d, Y" %}Created {{ date }}{% endblocktranslate %}
                                     </small>
                                 </div>
                             </div>
@@ -341,16 +342,16 @@
         {% if restaurants.has_other_pages %}
             <div class="row">
                 <div class="col-12">
-                    <nav aria-label="Restaurant pagination">
+                    <nav aria-label="{% translate "Restaurant pagination" %}">
                         <ul class="pagination justify-content-center">
                             {% if restaurants.has_previous %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page=1" aria-label="First">
+                                    <a class="page-link" href="?page=1" aria-label="{% translate "First" %}">
                                         <span aria-hidden="true">&laquo;&laquo;</span>
                                     </a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ restaurants.previous_page_number }}" aria-label="Previous">
+                                    <a class="page-link" href="?page={{ restaurants.previous_page_number }}" aria-label="{% translate "Previous" %}">
                                         <span aria-hidden="true">&laquo;</span>
                                     </a>
                                 </li>
@@ -370,12 +371,12 @@
 
                             {% if restaurants.has_next %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ restaurants.next_page_number }}" aria-label="Next">
+                                    <a class="page-link" href="?page={{ restaurants.next_page_number }}" aria-label="{% translate "Next" %}">
                                         <span aria-hidden="true">&raquo;</span>
                                     </a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ restaurants.paginator.num_pages }}" aria-label="Last">
+                                    <a class="page-link" href="?page={{ restaurants.paginator.num_pages }}" aria-label="{% translate "Last" %}">
                                         <span aria-hidden="true">&raquo;&raquo;</span>
                                     </a>
                                 </li>
@@ -392,10 +393,10 @@
                 <div class="card">
                     <div class="card-body empty-state">
                         <i class="fas fa-store"></i>
-                        <h4>No Restaurants Found</h4>
-                        <p class="mb-4">You haven't created any restaurants yet. Start by adding your main restaurant and then create branches.</p>
+                        <h4>{% translate "No Restaurants Found" %}</h4>
+                        <p class="mb-4">{% translate "You haven't created any restaurants yet. Start by adding your main restaurant and then create branches." %}</p>
                         <a href="{% url 'admin_panel:add_branch' %}" class="btn btn-primary">
-                            <i class="fas fa-plus"></i> Add Your First Restaurant
+                            <i class="fas fa-plus"></i> {% translate "Add Your First Restaurant" %}
                         </a>
                     </div>
                 </div>
@@ -409,18 +410,18 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Delete Branch</h5>
+                <h5 class="modal-title">{% translate "Delete Branch" %}</h5>
                 <button type="button" class="close" data-dismiss="modal">
                     <span>&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete the branch "<span id="deleteBranchName"></span>"?</p>
-                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone. All data associated with this branch will be permanently deleted.</p>
+                <p>{% translate "Are you sure you want to delete the branch" %} "<span id="deleteBranchName"></span>"?</p>
+                <p class="text-danger"><strong>{% translate "Warning:" %}</strong> {% translate "This action cannot be undone. All data associated with this branch will be permanently deleted." %}</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Branch</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">{% translate "Cancel" %}</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">{% translate "Delete Branch" %}</button>
             </div>
         </div>
     </div>
@@ -428,6 +429,15 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Error:" as t_error_prefix %}
+{% translate "An error occurred while deleting the branch." as t_err_delete %}
+{% translate "Switched to {name}. Opening QR management..." as t_switched_qr %}
+{% translate "Error switching restaurant:" as t_err_switch_prefix %}
+{% translate "An error occurred while switching restaurant." as t_err_switch %}
+{% translate "Upgrade to Pro Plan? This will allow you to create unlimited branches." as t_confirm_upgrade %}
+{% translate "An error occurred while upgrading subscription." as t_err_upgrade %}
+{% translate "Downgrade to Single Plan? You will no longer be able to create branches." as t_confirm_downgrade %}
+{% translate "An error occurred while downgrading subscription." as t_err_downgrade %}
 <script>
 let branchToDelete = null;
 
@@ -461,11 +471,11 @@ $('#confirmDeleteBtn').click(function() {
                         window.location.reload();
                     }, 1500);
                 } else {
-                    alert('Error: ' + data.error);
+                    alert("{{ t_error_prefix|escapejs }}" + ' ' + data.error);
                 }
             },
             error: function() {
-                alert('An error occurred while deleting the branch.');
+                alert("{{ t_err_delete|escapejs }}");
             }
         });
     }
@@ -489,16 +499,16 @@ function switchAndViewQR(restaurantId, restaurantName) {
                 
                 // Show success message
                 $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-                    '<i class="fas fa-check-circle me-2"></i>Switched to ' + restaurantName + '. Opening QR management...' +
+                    '<i class="fas fa-check-circle me-2"></i>' + "{{ t_switched_qr|escapejs }}".replace('{name}', restaurantName) +
                     '<button type="button" class="close" data-dismiss="alert">' +
                     '<span>&times;</span></button></div>')
                     .prependTo('.container-fluid');
             } else {
-                alert('Error switching restaurant: ' + data.error);
+                alert("{{ t_err_switch_prefix|escapejs }}" + ' ' + data.error);
             }
         },
         error: function() {
-            alert('An error occurred while switching restaurant.');
+            alert("{{ t_err_switch|escapejs }}");
         }
     });
 }
@@ -525,17 +535,17 @@ function switchRestaurant(restaurantId, restaurantName) {
                     window.location.href = '{% url "admin_panel:admin_dashboard" %}?t=' + new Date().getTime();
                 }, 1500);
             } else {
-                alert('Error: ' + data.error);
+                alert("{{ t_error_prefix|escapejs }}" + ' ' + data.error);
             }
         },
         error: function() {
-            alert('An error occurred while switching restaurant.');
+            alert("{{ t_err_switch|escapejs }}");
         }
     });
 }
 
 function upgradeToPro() {
-    if (confirm('Upgrade to Pro Plan? This will allow you to create unlimited branches.')) {
+    if (confirm("{{ t_confirm_upgrade|escapejs }}")) {
         $.ajax({
             url: '{% url "admin_panel:upgrade_to_pro" %}',
             type: 'POST',
@@ -555,18 +565,18 @@ function upgradeToPro() {
                         window.location.reload();
                     }, 2000);
                 } else {
-                    alert('Error: ' + data.error);
+                    alert("{{ t_error_prefix|escapejs }}" + ' ' + data.error);
                 }
             },
             error: function() {
-                alert('An error occurred while upgrading subscription.');
+                alert("{{ t_err_upgrade|escapejs }}");
             }
         });
     }
 }
 
 function downgradeToSingle() {
-    if (confirm('Downgrade to Single Plan? You will no longer be able to create branches.')) {
+    if (confirm("{{ t_confirm_downgrade|escapejs }}")) {
         $.ajax({
             url: '{% url "admin_panel:downgrade_to_single" %}',
             type: 'POST',
@@ -586,11 +596,11 @@ function downgradeToSingle() {
                         window.location.reload();
                     }, 2000);
                 } else {
-                    alert('Error: ' + data.error);
+                    alert("{{ t_error_prefix|escapejs }}" + ' ' + data.error);
                 }
             },
             error: function() {
-                alert('An error occurred while downgrading subscription.');
+                alert("{{ t_err_downgrade|escapejs }}");
             }
         });
     }

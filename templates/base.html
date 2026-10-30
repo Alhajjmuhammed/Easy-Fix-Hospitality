@@ -1,17 +1,18 @@
 {% load static %}
 {% load restaurant_tags %}
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+{% get_current_language as CURRENT_LANG %}<html lang="{{ CURRENT_LANG }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>{% block title %}Restaurant Ordering System{% endblock %}</title>
+    <title>{% block title %}{% translate "Restaurant Ordering System" %}{% endblock %}</title>
     
     <!-- PWA Meta Tags -->
-    <meta name="description" content="Multi-tenant restaurant ordering system with real-time order tracking">
+    <meta name="description" content="{% translate 'Multi-tenant restaurant ordering system with real-time order tracking' %}">
     <meta name="theme-color" content="#d63384">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -206,13 +207,13 @@
                 {% if user.is_authenticated %}
                     {% get_restaurant_name %}
                 {% else %}
-                    Restaurant System
+                    {% translate "Restaurant System" %}
                 {% endif %}
             </span>
             
             <button class="navbar-toggler" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="{% translate 'Toggle navigation' %}">
                 <span class="navbar-toggler-icon"></span>
             </button>
             
@@ -220,47 +221,47 @@
                 <ul class="navbar-nav me-auto">
                     {% if not user.is_authenticated or user.is_owner or user.is_manager or user.is_administrator %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'restaurant:home' %}">Home</a>
+                        <a class="nav-link" href="{% url 'restaurant:home' %}">{% translate "Home" %}</a>
                     </li>
                     {% endif %}
                     {% if user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'restaurant:menu' %}">Menu</a>
+                            <a class="nav-link" href="{% url 'restaurant:menu' %}">{% translate "Menu" %}</a>
                         </li>
                         {% if user.is_owner or user.is_manager %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'admin_panel:admin_dashboard' %}">
-                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                    <i class="fas fa-tachometer-alt"></i> {% translate "Dashboard" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:customer_care_payments' %}">
-                                    <i class="fas fa-cash-register"></i> Payments
+                                    <i class="fas fa-cash-register"></i> {% translate "Payments" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:customer_care_receipt_management' %}">
-                                    <i class="bi bi-receipt"></i> Receipts
+                                    <i class="bi bi-receipt"></i> {% translate "Receipts" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'reports:dashboard' %}">
-                                    <i class="fas fa-chart-bar"></i> Sales Reports
+                                    <i class="fas fa-chart-bar"></i> {% translate "Sales Reports" %}
                                 </a>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="wasteDropdown" role="button" data-bs-toggle="dropdown">
-                                    <i class="fas fa-trash-alt"></i> Waste Management
+                                    <i class="fas fa-trash-alt"></i> {% translate "Waste Management" %}
                                 </a>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{% url 'waste_management:dashboard' %}">
-                                        <i class="fas fa-chart-pie"></i> Dashboard
+                                        <i class="fas fa-chart-pie"></i> {% translate "Dashboard" %}
                                     </a></li>
                                     <li><a class="dropdown-item" href="{% url 'waste_management:reports' %}">
-                                        <i class="fas fa-chart-bar"></i> Reports
+                                        <i class="fas fa-chart-bar"></i> {% translate "Reports" %}
                                     </a></li>
                                     <li><a class="dropdown-item" href="{% url 'waste_management:cost_settings' %}">
-                                        <i class="fas fa-cog"></i> Cost Settings
+                                        <i class="fas fa-cog"></i> {% translate "Cost Settings" %}
                                     </a></li>
                                 </ul>
                             </li>
@@ -292,90 +293,90 @@
                             </script>
                         {% elif user.is_admin %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'admin_panel:admin_dashboard' %}">Admin Panel</a>
+                                <a class="nav-link" href="{% url 'admin_panel:admin_dashboard' %}">{% translate "Admin Panel" %}</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'reports:dashboard' %}">
-                                    <i class="fas fa-chart-bar"></i> Sales Reports
+                                    <i class="fas fa-chart-bar"></i> {% translate "Sales Reports" %}
                                 </a>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="wasteDropdown" role="button" data-bs-toggle="dropdown">
-                                    <i class="fas fa-trash-alt"></i> System Waste Reports
+                                    <i class="fas fa-trash-alt"></i> {% translate "System Waste Reports" %}
                                 </a>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{% url 'waste_management:dashboard' %}">
-                                        <i class="fas fa-chart-pie"></i> All Restaurants Dashboard
+                                        <i class="fas fa-chart-pie"></i> {% translate "All Restaurants Dashboard" %}
                                     </a></li>
                                     <li><a class="dropdown-item" href="{% url 'waste_management:reports' %}">
-                                        <i class="fas fa-chart-bar"></i> System Wide Reports
+                                        <i class="fas fa-chart-bar"></i> {% translate "System Wide Reports" %}
                                     </a></li>
                                     <li><a class="dropdown-item" href="{% url 'waste_management:cost_settings' %}">
-                                        <i class="fas fa-cog"></i> Cost Settings
+                                        <i class="fas fa-cog"></i> {% translate "Cost Settings" %}
                                     </a></li>
                                 </ul>
                             </li>
                         {% elif user.is_kitchen_staff %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'orders:kitchen_dashboard' %}">Kitchen</a>
+                                <a class="nav-link" href="{% url 'orders:kitchen_dashboard' %}">{% translate "Kitchen" %}</a>
                             </li>
                         {% elif user.is_bar_staff %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'orders:bar_dashboard' %}">Bar</a>
+                                <a class="nav-link" href="{% url 'orders:bar_dashboard' %}">{% translate "Bar" %}</a>
                             </li>
                         {% elif user.is_buffet_staff %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'orders:buffet_dashboard' %}">Buffet</a>
+                                <a class="nav-link" href="{% url 'orders:buffet_dashboard' %}">{% translate "Buffet" %}</a>
                             </li>
                         {% elif user.is_service_staff %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'orders:service_dashboard' %}">Service</a>
+                                <a class="nav-link" href="{% url 'orders:service_dashboard' %}">{% translate "Service" %}</a>
                             </li>
                         {% elif user.is_customer %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:my_orders' %}">
-                                    <i class="bi bi-receipt"></i> My Orders
+                                    <i class="bi bi-receipt"></i> {% translate "My Orders" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'restaurant:my_reservations' %}">
-                                    <i class="bi bi-calendar-check"></i> My Reservations
+                                    <i class="bi bi-calendar-check"></i> {% translate "My Reservations" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:my_points' %}">
-                                    <i class="bi bi-gift"></i> My Points
+                                    <i class="bi bi-gift"></i> {% translate "My Points" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:view_cart' %}">
-                                    <i class="bi bi-cart"></i> Cart
+                                    <i class="bi bi-cart"></i> {% translate "Cart" %}
                                 </a>
                             </li>
                         {% elif user.is_customer_care %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:customer_care_dashboard' %}">
-                                    <i class="fas fa-headset"></i> Customer Care
+                                    <i class="fas fa-headset"></i> {% translate "Customer Care" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:customer_care_payments' %}">
-                                    <i class="bi bi-cash-coin"></i> Process Payments
+                                    <i class="bi bi-cash-coin"></i> {% translate "Process Payments" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:customer_care_receipt_management' %}">
-                                    <i class="bi bi-receipt"></i> Receipts
+                                    <i class="bi bi-receipt"></i> {% translate "Receipts" %}
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'orders:customer_care_reports' %}">
-                                    <i class="bi bi-graph-up"></i> Reports
+                                    <i class="bi bi-graph-up"></i> {% translate "Reports" %}
                                 </a>
                             </li>
                         {% elif user.is_cashier %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'cashier:dashboard' %}">💰 Cashier</a>
+                                <a class="nav-link" href="{% url 'cashier:dashboard' %}">💰 {% translate "Cashier" %}</a>
                             </li>
                         {% endif %}
                     {% endif %}
@@ -388,35 +389,35 @@
                                 <i class="bi bi-person-circle"></i> 
                                 <span class="fw-semibold">{{ user.get_full_name|default:user.username }}</span>
                                 {% if user.is_owner %}
-                                    <small class="text-muted">| Owner</small>
+                                    <small class="text-muted">| {% translate "Owner" %}</small>
                                 {% elif user.is_manager %}
-                                    <small class="text-muted">| Manager</small>
+                                    <small class="text-muted">| {% translate "Manager" %}</small>
                                 {% elif user.is_admin %}
-                                    <small class="text-muted">| Administrator</small>
+                                    <small class="text-muted">| {% translate "Administrator" %}</small>
                                 {% elif user.is_kitchen_staff %}
-                                    <small class="text-muted">| Kitchen Staff</small>
+                                    <small class="text-muted">| {% translate "Kitchen Staff" %}</small>
                                 {% elif user.is_bar_staff %}
-                                    <small class="text-muted">| Bar Staff</small>
+                                    <small class="text-muted">| {% translate "Bar Staff" %}</small>
                                 {% elif user.is_buffet_staff %}
-                                    <small class="text-muted">| Buffet Staff</small>
+                                    <small class="text-muted">| {% translate "Buffet Staff" %}</small>
                                 {% elif user.is_service_staff %}
-                                    <small class="text-muted">| Service Staff</small>
+                                    <small class="text-muted">| {% translate "Service Staff" %}</small>
                                 {% elif user.is_customer_care %}
-                                    <small class="text-muted">| Customer Care</small>
+                                    <small class="text-muted">| {% translate "Customer Care" %}</small>
                                 {% elif user.is_cashier %}
-                                    <small class="text-muted">| Cashier</small>
+                                    <small class="text-muted">| {% translate "Cashier" %}</small>
                                 {% elif user.is_staff %}
-                                    <small class="text-muted">| Staff</small>
+                                    <small class="text-muted">| {% translate "Staff" %}</small>
                                 {% endif %}
                             </a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">
-                                    <i class="bi bi-person"></i> Profile
+                                    <i class="bi bi-person"></i> {% translate "Profile" %}
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <a class="dropdown-item" href="#" onclick="document.getElementById('logoutFormNav').submit(); return false;" style="cursor:pointer;">
-                                        <i class="bi bi-box-arrow-right"></i> Logout
+                                        <i class="bi bi-box-arrow-right"></i> {% translate "Logout" %}
                                     </a>
                                     <form id="logoutFormNav" method="post" action="{% url 'accounts:logout' %}" style="display:none;">
                                         {% csrf_token %}
@@ -426,12 +427,15 @@
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:login' %}">Login</a>
+                            <a class="nav-link" href="{% url 'accounts:login' %}">{% translate "Login" %}</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:register' %}">Register</a>
+                            <a class="nav-link" href="{% url 'accounts:register' %}">{% translate "Register" %}</a>
                         </li>
                     {% endif %}
+                    <li class="nav-item d-flex align-items-center py-2 py-lg-0 ms-lg-2">
+                        {% include '_language_switch.html' with switch_id='Nav' %}
+                    </li>
                 </ul>
             </div>
         </div>
@@ -457,7 +461,7 @@
     <!-- Footer -->
     <footer class="footer py-3 mt-5">
         <div class="container text-center">
-            <span class="text-muted">&copy; 2024 Restaurant Ordering System. All rights reserved.</span>
+            <span class="text-muted">&copy; 2024 {% translate "Restaurant Ordering System. All rights reserved." %}</span>
         </div>
     </footer>
 
@@ -476,7 +480,7 @@
     <!-- <script src="{% static 'js/dev-cache-cleaner.js' %}?v={% now 'U' %}"></script> -->
     
     <!-- Connection Status Indicator -->
-    <div class="connection-status" id="connectionStatus" style="display: none;">Connecting...</div>
+    <div class="connection-status" id="connectionStatus" style="display: none;">{% translate "Connecting..." %}</div>
     
     <!-- Toast Container for Notifications -->
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>

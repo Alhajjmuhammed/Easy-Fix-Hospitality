@@ -1,10 +1,10 @@
 {% extends 'admin_panel/base.html' %}
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 
-{% block title %}Dashboard - Admin Panel{% endblock %}
+{% block title %}{% translate "Dashboard" %} - {% translate "Admin Panel" %}{% endblock %}
 
-{% block page_title %}Dashboard{% endblock %}
-{% block page_description %}Overview of your restaurant system{% endblock %}
+{% block page_title %}{% translate "Dashboard" %}{% endblock %}
+{% block page_description %}{% translate "Overview of your restaurant system" %}{% endblock %}
 
 {% block content %}
 <!-- Restaurant Context Header -->
@@ -60,7 +60,7 @@
                         <div class="d-flex align-items-start">
                             <div class="restaurant-icon-box me-3" style="width: 80px; height: 80px; flex-shrink: 0; overflow: hidden; border-radius: 12px;">
                                 {% if restaurant_logo %}
-                                    <img src="{{ restaurant_logo.url }}" alt="Restaurant Logo" 
+                                    <img src="{{ restaurant_logo.url }}" alt="{% translate 'Restaurant Logo' %}" 
                                          style="width: 100%; height: 100%; object-fit: cover; display: block;">
                                 {% elif current_restaurant and current_restaurant.is_main_restaurant %}
                                     <div class="d-flex align-items-center justify-content-center h-100" style="background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05)); backdrop-filter: blur(10px);">
@@ -80,9 +80,9 @@
                                     {% if current_restaurant %}
                                         <span class="restaurant-badge px-3 py-2 rounded-pill text-white fw-semibold" style="font-size: 0.85rem;">
                                             {% if current_restaurant.is_main_restaurant %}
-                                                <i class="fas fa-star text-warning me-1"></i> Main Restaurant
+                                                <i class="fas fa-star text-warning me-1"></i> {% translate "Main Restaurant" %}
                                             {% else %}
-                                                <i class="fas fa-code-branch me-1"></i> Branch Location
+                                                <i class="fas fa-code-branch me-1"></i> {% translate "Branch Location" %}
                                             {% endif %}
                                         </span>
                                         {% if current_restaurant.address %}
@@ -92,7 +92,7 @@
                                         {% endif %}
                                     {% elif view_all_restaurants %}
                                         <span class="restaurant-badge px-3 py-2 rounded-pill text-white fw-semibold">
-                                            <i class="fas fa-globe me-1"></i> All Locations
+                                            <i class="fas fa-globe me-1"></i> {% translate "All Locations" %}
                                         </span>
                                     {% endif %}
                                 </div>
@@ -103,10 +103,10 @@
                         <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
                             {% if can_manage_branches %}
                                 <a href="{% url 'admin_panel:manage_branches' %}" class="btn btn-glass px-4 py-2 rounded-pill">
-                                    <i class="fas fa-cog me-2"></i>Manage Branches
+                                    <i class="fas fa-cog me-2"></i>{% translate "Manage Branches" %}
                                 </a>
                                 <a href="{% url 'admin_panel:restaurant_selection' %}" class="btn btn-glass px-4 py-2 rounded-pill">
-                                    <i class="fas fa-exchange-alt me-2"></i>Switch Restaurant
+                                    <i class="fas fa-exchange-alt me-2"></i>{% translate "Switch Restaurant" %}
                                 </a>
                             {% endif %}
                         </div>
@@ -124,7 +124,7 @@
         <div class="card stats-card">
             <div class="card-body position-relative">
                 <div class="stats-number">{{ total_users }}</div>
-                <div class="stats-label">Total Users</div>
+                <div class="stats-label">{% translate "Total Users" %}</div>
                 <i class="fas fa-users stats-icon text-primary"></i>
             </div>
         </div>
@@ -134,7 +134,7 @@
         <div class="card stats-card">
             <div class="card-body position-relative">
                 <div class="stats-number">{{ total_orders }}</div>
-                <div class="stats-label">Total Orders</div>
+                <div class="stats-label">{% translate "Total Orders" %}</div>
                 <i class="fas fa-shopping-cart stats-icon text-success"></i>
             </div>
         </div>
@@ -144,7 +144,7 @@
         <div class="card stats-card">
             <div class="card-body position-relative">
                 <div class="stats-number">{{ total_products }}</div>
-                <div class="stats-label">Total Products</div>
+                <div class="stats-label">{% translate "Total Products" %}</div>
                 <i class="fas fa-utensils stats-icon text-info"></i>
             </div>
         </div>
@@ -154,7 +154,7 @@
         <div class="card stats-card">
             <div class="card-body position-relative">
                 <div class="stats-number">{{ total_tables }}</div>
-                <div class="stats-label">Total Tables</div>
+                <div class="stats-label">{% translate "Total Tables" %}</div>
                 <i class="fas fa-table stats-icon text-warning"></i>
             </div>
         </div>
@@ -168,7 +168,7 @@
             <div class="card-header bg-white border-0 py-3">
                 <h5 class="mb-0 fw-bold">
                     <i class="fas fa-chart-line me-2 text-primary"></i>
-                    Performance Overview
+                    {% translate "Performance Overview" %}
                 </h5>
             </div>
             <div class="card-body">
@@ -176,19 +176,19 @@
                     <div class="col-md-4 text-center">
                         <div class="bg-light rounded p-3">
                             <h3 class="text-primary mb-2">{{ recent_orders }}</h3>
-                            <p class="text-muted mb-0 small">Orders (Last 7 Days)</p>
+                            <p class="text-muted mb-0 small">{% translate "Orders (Last 7 Days)" %}</p>
                         </div>
                     </div>
                     <div class="col-md-4 text-center">
                         <div class="bg-light rounded p-3">
                             <h3 class="text-success mb-2">{% currency_symbol %}{{ today_revenue|floatformat:2 }}</h3>
-                            <p class="text-muted mb-0 small">Today's Revenue</p>
+                            <p class="text-muted mb-0 small">{% translate "Today's Revenue" %}</p>
                         </div>
                     </div>
                     <div class="col-md-4 text-center">
                         <div class="bg-light rounded p-3">
                             <h3 class="text-warning mb-2">{{ pending_orders }}</h3>
-                            <p class="text-muted mb-0 small">Pending Orders</p>
+                            <p class="text-muted mb-0 small">{% translate "Pending Orders" %}</p>
                         </div>
                     </div>
                 </div>
@@ -206,8 +206,8 @@
                 <div class="d-flex align-items-center">
                     <i class="bi bi-qr-code me-3 fs-4" style="color: green !important;"></i>
                     <div>
-                        <h5 class="card-title mb-1" style="color: black !important;">Restaurant QR Code</h5>
-                        <p class="card-text mb-0" style="color: black !important;">Share this QR code with customers for direct access to your restaurant</p>
+                        <h5 class="card-title mb-1" style="color: black !important;">{% translate "Restaurant QR Code" %}</h5>
+                        <p class="card-text mb-0" style="color: black !important;">{% translate "Share this QR code with customers for direct access to your restaurant" %}</p>
                     </div>
                 </div>
             </div>
@@ -215,29 +215,29 @@
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">QR Code URL{% if current_restaurant and not current_restaurant.is_main_restaurant %} <span class="badge bg-info">Branch</span>{% endif %}</label>
+                            <label class="form-label fw-semibold">{% translate "QR Code URL" %}{% if current_restaurant and not current_restaurant.is_main_restaurant %} <span class="badge bg-info">{% translate "Branch" %}</span>{% endif %}</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="qrUrl" value="{{ request.scheme }}://{{ request.get_host }}/r/{{ current_qr_code|default:user.restaurant_qr_code }}/" readonly>
                                 <button class="btn btn-outline-primary" type="button" onclick="copyQRUrl()">
-                                    <i class="bi bi-clipboard"></i> Copy
+                                    <i class="bi bi-clipboard"></i> {% translate "Copy" %}
                                 </button>
                             </div>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
                             <button type="button" class="btn btn-success" onclick="shareQRCode()">
-                                <i class="bi bi-share"></i> Share QR Code
+                                <i class="bi bi-share"></i> {% translate "Share QR Code" %}
                             </button>
                             <button type="button" class="btn btn-info" onclick="window.open('{% url 'admin_panel:manage_qr_code' %}', '_blank')">
-                                <i class="bi bi-eye"></i> View Full QR
+                                <i class="bi bi-eye"></i> {% translate "View Full QR" %}
                             </button>
                         </div>
                     </div>
                     <div class="col-md-4 text-center">
                         <div class="qr-preview-container p-3 bg-light rounded">
                             <div class="qr-code-display bg-white border rounded d-flex align-items-center justify-content-center" style="width: 150px; height: 150px; margin: 0 auto;">
-                                <img src="{% url 'admin_panel:generate_qr_image' %}?t={% now 'U' %}" alt="QR Code" class="img-fluid" style="max-width: 140px; max-height: 140px;">
+                                <img src="{% url 'admin_panel:generate_qr_image' %}?t={% now 'U' %}" alt="{% translate 'QR Code' %}" class="img-fluid" style="max-width: 140px; max-height: 140px;">
                             </div>
-                            <p class="small text-muted mt-2 mb-0">Scan this code to access your restaurant</p>
+                            <p class="small text-muted mt-2 mb-0">{% translate "Scan this code to access your restaurant" %}</p>
                         </div>
                     </div>
                 </div>
@@ -246,6 +246,7 @@
     </div>
 </div>
 
+{% translate "Copied!" as t_copied %}{% translate "Restaurant QR Code" as t_qr_title %}{% translate "Scan this QR code to access our restaurant menu and place orders!" as t_qr_share_text %}{% translate "QR URL copied to clipboard! Share it with your customers." as t_qr_copied %}
 <script>
 function copyQRUrl() {
     const urlInput = document.getElementById('qrUrl');
@@ -255,7 +256,7 @@ function copyQRUrl() {
         // Show success feedback
         const button = event.target.closest('button');
         const originalText = button.innerHTML;
-        button.innerHTML = '<i class="bi bi-check"></i> Copied!';
+        button.innerHTML = '<i class="bi bi-check"></i> ' + "{{ t_copied|escapejs }}";
         button.classList.remove('btn-outline-primary');
         button.classList.add('btn-success');
         setTimeout(() => {
@@ -270,13 +271,13 @@ function shareQRCode() {
     const qrUrl = document.getElementById('qrUrl').value;
     if (navigator.share) {
         navigator.share({
-            title: 'Restaurant QR Code',
-            text: 'Scan this QR code to access our restaurant menu and place orders!',
+            title: "{{ t_qr_title|escapejs }}",
+            text: "{{ t_qr_share_text|escapejs }}",
             url: qrUrl
         });
     } else {
         copyQRUrl();
-        alert('QR URL copied to clipboard! Share it with your customers.');
+        alert("{{ t_qr_copied|escapejs }}");
     }
 }
 

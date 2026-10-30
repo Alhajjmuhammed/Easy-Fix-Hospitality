@@ -1,5 +1,6 @@
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,9 +72,9 @@
         
         .BUFFET-header {
             text-align: center;
-            border-BUFFETtom: 2px dashed #1e90ff;
-            padding-BUFFETtom: 10px;
-            margin-BUFFETtom: 10px;
+            border-bottom: 2px dashed #1e90ff;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
         }
         
         .BUFFET-title {
@@ -127,17 +128,17 @@
         .BUFFET-item {
             margin: 8px 0;
             padding: 5px 0;
-            border-BUFFETtom: 1px dotted #ccc;
+            border-bottom: 1px dotted #ccc;
         }
         
         .BUFFET-item:last-child {
-            border-BUFFETtom: none;
+            border-bottom: none;
         }
         
         .item-qty-name {
             font-size: 16px;
             font-weight: bold;
-            margin-BUFFETtom: 3px;
+            margin-bottom: 3px;
         }
         
         .item-notes {
@@ -160,7 +161,7 @@
         .special-instructions-title {
             font-size: 16px;
             text-decoration: underline;
-            margin-BUFFETtom: 5px;
+            margin-bottom: 5px;
         }
         
         .BUFFET-footer {
@@ -222,46 +223,46 @@
 <body>
     <div class="print-buttons no-print">
         <button class="print-btn" onclick="window.print()">
-            🖨️ Print BUFFET
+            🖨️ {% translate "Print" %} BUFFET
         </button>
         <button class="print-btn back-btn" onclick="window.location.href='{% url 'orders:buffet_dashboard' %}'">
-            ← Back to Buffet Dashboard
+            ← {% translate "Back to Buffet Dashboard" %}
         </button>
     </div>
 
     <div class="BUFFET-container">
         <!-- Header -->
         <div class="BUFFET-header">
-            <div class="BUFFET-title">BUFFET ORDER TICKET</div>
+            <div class="BUFFET-title">{% translate "BUFFET ORDER TICKET" %}</div>
             <div class="restaurant-name">{{ restaurant_name|upper }}</div>
-            <span class="station-badge">BUFFET STATION</span>
+            <span class="station-badge">{% translate "BUFFET STATION" %}</span>
         </div>
 
         <!-- Order Information -->
         <div class="BUFFET-info">
             <div class="BUFFET-info-row">
-                <span class="BUFFET-info-label">Order #:</span>
+                <span class="BUFFET-info-label">{% translate "Order #:" %}</span>
                 <span>{{ order.order_number }}</span>
             </div>
             <div class="BUFFET-info-row">
-                <span class="BUFFET-info-label">Table:</span>
+                <span class="BUFFET-info-label">{% translate "Table:" %}</span>
                 <span>{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
             </div>
             <div class="BUFFET-info-row">
-                <span class="BUFFET-info-label">Customer:</span>
+                <span class="BUFFET-info-label">{% translate "Customer:" %}</span>
                 <span>{{ order.ordered_by.get_full_name|default:order.ordered_by.username }}</span>
             </div>
             <div class="BUFFET-info-row">
-                <span class="BUFFET-info-label">Status:</span>
+                <span class="BUFFET-info-label">{% translate "Status:" %}</span>
                 <span>{{ order.get_status_display|upper }}</span>
             </div>
             <div class="BUFFET-info-row">
-                <span class="BUFFET-info-label">Order Time:</span>
+                <span class="BUFFET-info-label">{% translate "Order Time:" %}</span>
                 <span>{{ order.created_at|date:"d/m/Y H:i" }}</span>
             </div>
             {% if order.confirmed_by %}
             <div class="BUFFET-info-row">
-                <span class="BUFFET-info-label">Confirmed By:</span>
+                <span class="BUFFET-info-label">{% translate "Confirmed By:" %}</span>
                 <span>{{ order.confirmed_by.get_full_name|default:order.confirmed_by.username }}</span>
             </div>
             {% endif %}
@@ -271,7 +272,7 @@
 
         <!-- Buffet Items -->
         <div class="BUFFET-items">
-            <div class="BUFFET-items-title">BUFFET ITEMS</div>
+            <div class="BUFFET-items-title">{% translate "BUFFET ITEMS" %}</div>
             {% for item in order.order_items.all %}
                 {% if item.product.station == 'buffet' %}
                     <div class="BUFFET-item">
@@ -291,7 +292,7 @@
         {% if order.display_instructions %}
         <div class="BUFFET-divider"></div>
         <div class="special-instructions">
-            <div class="special-instructions-title">⚠️ SPECIAL INSTRUCTIONS</div>
+            <div class="special-instructions-title">⚠️ {% translate "SPECIAL INSTRUCTIONS" %}</div>
             {{ order.display_instructions }}
         </div>
         {% endif %}
@@ -300,10 +301,10 @@
 
         <!-- Footer -->
         <div class="BUFFET-footer">
-            <div>BUFFET STATION - PRIORITY ORDER</div>
-            <div class="BUFFET-time">Printed: {{ now|date:"d/m/Y H:i:s" }}</div>
+            <div>{% translate "BUFFET STATION - PRIORITY ORDER" %}</div>
+            <div class="BUFFET-time">{% blocktranslate with time=now|date:"d/m/Y H:i:s" %}Printed: {{ time }}{% endblocktranslate %}</div>
             <div style="margin-top: 10px; font-size: 10px;">
-                Thank you for your service! 🍽️
+                {% translate "Thank you for your service!" %} 🍽️
             </div>
         </div>
     </div>

@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
-{% block title %}Roles & Permissions{% endblock %}
-{% block page_title %}Roles & Permissions{% endblock %}
-{% block page_description %}Control what each staff role can access in your restaurant{% endblock %}
+{% load i18n %}
+{% block title %}{% translate "Roles & Permissions" %}{% endblock %}
+{% block page_title %}{% translate "Roles & Permissions" %}{% endblock %}
+{% block page_description %}{% translate "Control what each staff role can access in your restaurant" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -201,10 +202,10 @@
 <!-- Tabs -->
 <div class="rp-tabs-bar">
     <button class="rp-tab-btn active" data-tab="rpBuiltin">
-        <i class="fas fa-users-cog"></i> Built-in Roles
+        <i class="fas fa-users-cog"></i> {% translate "Built-in Roles" %}
     </button>
     <button class="rp-tab-btn" data-tab="rpCustom">
-        <i class="fas fa-user-tag"></i> Custom Roles
+        <i class="fas fa-user-tag"></i> {% translate "Custom Roles" %}
         <span class="rp-tab-badge">{{ custom_roles|length }}</span>
     </button>
 </div>
@@ -215,7 +216,7 @@
 
         <!-- Sidebar -->
         <div class="rp-sidebar">
-            <div class="rp-sidebar-title">Select a role to edit</div>
+            <div class="rp-sidebar-title">{% translate "Select a role to edit" %}</div>
             {% for role_name, role_display in built_in_roles %}
             <button class="rp-role-btn" data-role="{{ role_name }}" onclick="rpSelectRole('{{ role_name }}','{{ role_display }}')">
                 <span class="rp-role-icon ri-{{ role_name }}">
@@ -231,7 +232,7 @@
                 </span>
                 <div style="flex:1;min-width:0;">
                     <div class="rp-role-name">{{ role_display }}</div>
-                    <div class="rp-role-count" id="rpcnt-{{ role_name }}">Loading…</div>
+                    <div class="rp-role-count" id="rpcnt-{{ role_name }}">{% translate "Loading…" %}</div>
                 </div>
                 <span class="rp-unsaved-dot" id="rpdot-{{ role_name }}"></span>
             </button>
@@ -244,21 +245,21 @@
                 <div class="rp-panel-title">
                     <i class="fas fa-shield-alt"></i>
                     <div>
-                        <span id="rpPanelTitle">Select a role</span>
+                        <span id="rpPanelTitle">{% translate "Select a role" %}</span>
                         <small id="rpPanelCount"></small>
                     </div>
                 </div>
                 <div class="rp-panel-actions">
-                    <span class="rp-unsaved-badge" id="rpUnsaved">Unsaved changes</span>
+                    <span class="rp-unsaved-badge" id="rpUnsaved">{% translate "Unsaved changes" %}</span>
                     <button class="rp-save-btn" id="rpSaveBtn" disabled>
-                        <i class="fas fa-save"></i> Save Changes
+                        <i class="fas fa-save"></i> {% translate "Save Changes" %}
                     </button>
                 </div>
             </div>
             <div class="rp-panel-body" id="rpPanelBody">
                 <div class="rp-empty">
                     <i class="fas fa-hand-pointer"></i>
-                    <p style="font-size:.87rem;">Select a role from the left to<br>view and edit its permissions.</p>
+                    <p style="font-size:.87rem;">{% translate "Select a role from the left to<br>view and edit its permissions." %}</p>
                 </div>
             </div>
 
@@ -316,9 +317,9 @@
 <!-- TAB 2: Custom Roles -->
 <div class="rp-tab-pane" id="rpCustom">
     <div class="cr-toolbar">
-        <h2><i class="fas fa-user-tag me-2" style="color:var(--rp-blue);"></i>Custom Roles</h2>
+        <h2><i class="fas fa-user-tag me-2" style="color:var(--rp-blue);"></i>{% translate "Custom Roles" %}</h2>
         <button class="rp-btn-primary" id="rpOpenCreate">
-            <i class="fas fa-plus"></i> Create Custom Role
+            <i class="fas fa-plus"></i> {% translate "Create Custom Role" %}
         </button>
     </div>
 
@@ -332,11 +333,11 @@
                     {% if cr.description %}<div class="cr-desc">{{ cr.description }}</div>{% endif %}
                 </div>
                 <div class="cr-actions">
-                    <button class="btn-icon edit edit-custom-role" title="Edit"
+                    <button class="btn-icon edit edit-custom-role" title="{% translate "Edit" %}"
                             data-id="{{ cr.pk }}" data-name="{{ cr.name }}" data-description="{{ cr.description|default:'' }}">
                         <i class="fas fa-pen"></i>
                     </button>
-                    <button class="btn-icon del delete-custom-role" title="Delete"
+                    <button class="btn-icon del delete-custom-role" title="{% translate "Delete" %}"
                             data-id="{{ cr.pk }}" data-name="{{ cr.name }}">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -347,23 +348,23 @@
                 <span class="cr-chip">{{ f.name }}</span>
                 {% endfor %}
                 {% if cr.features.count > 5 %}
-                <span class="cr-chip-more">+{{ cr.features.count|add:"-5" }} more</span>
+                <span class="cr-chip-more">{% blocktranslate with count=cr.features.count|add:"-5" %}+{{ count }} more{% endblocktranslate %}</span>
                 {% endif %}
                 {% if cr.features.count == 0 %}
-                <span class="cr-chip-more" style="font-style:italic;">No features</span>
+                <span class="cr-chip-more" style="font-style:italic;">{% translate "No features" %}</span>
                 {% endif %}
             </div>
             <div class="cr-footer">
                 <i class="fas fa-users" style="font-size:.73rem;"></i>
-                {{ cr.assigned_users.count }} staff &bull; {{ cr.features.count }} features
+                {% blocktranslate with staff_count=cr.assigned_users.count feature_count=cr.features.count %}{{ staff_count }} staff &bull; {{ feature_count }} features{% endblocktranslate %}
             </div>
         </div>
         {% endfor %}
         {% else %}
         <div class="cr-empty" id="noCRMsg">
             <i class="fas fa-user-tag"></i>
-            <div style="font-weight:600;margin-bottom:6px;">No custom roles yet</div>
-            <div style="font-size:.83rem;">Create a custom role to give specific staff a unique set of permissions.</div>
+            <div style="font-weight:600;margin-bottom:6px;">{% translate "No custom roles yet" %}</div>
+            <div style="font-size:.83rem;">{% translate "Create a custom role to give specific staff a unique set of permissions." %}</div>
         </div>
         {% endif %}
     </div>
@@ -372,16 +373,16 @@
     {% if staff %}
     <div class="assign-card">
         <div class="assign-card-head">
-            <h3><i class="fas fa-user-check me-2" style="color:var(--rp-blue);"></i>Assign Custom Roles to Staff</h3>
+            <h3><i class="fas fa-user-check me-2" style="color:var(--rp-blue);"></i>{% translate "Assign Custom Roles to Staff" %}</h3>
         </div>
         <div class="assign-card-body" style="padding:0;">
             <table class="assign-table">
                 <thead>
                     <tr>
-                        <th>Staff Member</th>
-                        <th>Built-in Role</th>
-                        <th>Active Custom Role</th>
-                        <th>Assign</th>
+                        <th>{% translate "Staff Member" %}</th>
+                        <th>{% translate "Built-in Role" %}</th>
+                        <th>{% translate "Active Custom Role" %}</th>
+                        <th>{% translate "Assign" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -391,17 +392,17 @@
                             <div class="staff-name">{{ s.get_full_name|default:s.username }}</div>
                             <div class="staff-uname">@{{ s.username }}</div>
                         </td>
-                        <td><span class="built-chip">{{ s.role.get_name_display|default:"No role" }}</span></td>
+                        <td>{% translate "No role" as t_no_role %}<span class="built-chip">{{ s.role.get_name_display|default:t_no_role }}</span></td>
                         <td id="asr-label-{{ s.pk }}">
                             {% if s.custom_role %}
                             <span class="custom-chip">{{ s.custom_role.name }}</span>
                             {% else %}
-                            <span style="color:var(--rp-muted);font-size:.81rem;">Using built-in</span>
+                            <span style="color:var(--rp-muted);font-size:.81rem;">{% translate "Using built-in" %}</span>
                             {% endif %}
                         </td>
                         <td>
                             <select class="assign-sel" onchange="rpAssign({{ s.pk }}, this.value, this)">
-                                <option value="">— Built-in —</option>
+                                <option value="">— {% translate "Built-in" %} —</option>
                                 {% for cr in custom_roles %}
                                 <option value="{{ cr.pk }}"{% if s.custom_role_id == cr.pk %} selected{% endif %}>{{ cr.name }}</option>
                                 {% endfor %}
@@ -420,22 +421,22 @@
 <div class="rp-modal-overlay" id="rpModalOverlay">
     <div class="rp-modal">
         <div class="rp-modal-head">
-            <div class="rp-modal-title" id="rpModalTitle"><i class="fas fa-user-tag me-2" style="color:var(--rp-blue);"></i>Create Custom Role</div>
+            <div class="rp-modal-title" id="rpModalTitle"><i class="fas fa-user-tag me-2" style="color:var(--rp-blue);"></i>{% translate "Create Custom Role" %}</div>
             <button class="btn-mclose" id="rpModalClose"><i class="fas fa-times"></i></button>
         </div>
         <div class="rp-modal-body">
             <input type="hidden" id="rpEditId">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:4px;">
                 <div>
-                    <label class="rp-form-label">Role Name <span style="color:var(--rp-danger);">*</span></label>
-                    <input type="text" class="rp-form-input" id="rpCrName" maxlength="100" placeholder="e.g. Senior Cashier">
+                    <label class="rp-form-label">{% translate "Role Name" %} <span style="color:var(--rp-danger);">*</span></label>
+                    <input type="text" class="rp-form-input" id="rpCrName" maxlength="100" placeholder="{% translate 'e.g. Senior Cashier' %}">
                 </div>
                 <div>
-                    <label class="rp-form-label">Description <span style="color:var(--rp-muted);font-weight:400;">(optional)</span></label>
-                    <input type="text" class="rp-form-input" id="rpCrDesc" maxlength="255" placeholder="Brief description">
+                    <label class="rp-form-label">{% translate "Description" %} <span style="color:var(--rp-muted);font-weight:400;">({% translate "optional" %})</span></label>
+                    <input type="text" class="rp-form-input" id="rpCrDesc" maxlength="255" placeholder="{% translate 'Brief description' %}">
                 </div>
             </div>
-            <div class="modal-sect">Select Permissions</div>
+            <div class="modal-sect">{% translate "Select Permissions" %}</div>
             {% for category_name, cat_features in features_by_category.items %}
             <div style="margin-bottom:16px;">
                 <div style="font-size:.71rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--rp-muted);margin-bottom:9px;display:flex;align-items:center;gap:5px;">
@@ -464,8 +465,8 @@
             <div class="rp-modal-error" id="rpCrError"></div>
         </div>
         <div class="rp-modal-foot">
-            <button class="btn-mcancel" id="rpModalCancel">Cancel</button>
-            <button class="btn-msave" id="rpSaveCr"><i class="fas fa-save"></i> Save Role</button>
+            <button class="btn-mcancel" id="rpModalCancel">{% translate "Cancel" %}</button>
+            <button class="btn-msave" id="rpSaveCr"><i class="fas fa-save"></i> {% translate "Save Role" %}</button>
         </div>
     </div>
 </div>
@@ -473,9 +474,28 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "{n} feature enabled" as t_feat_one %}
+{% translate "{n} features enabled" as t_feat_many %}
+{% translate "Saving…" as t_saving %}
+{% translate "Save Changes" as t_save_changes %}
+{% translate "Permissions saved." as t_perm_saved %}
+{% translate "Error saving." as t_err_saving %}
+{% translate "Network error." as t_network %}
+{% translate "Create Custom Role" as t_create_cr %}
+{% translate "Edit Custom Role" as t_edit_cr %}
+{% translate "Role name is required." as t_name_req %}
+{% translate "Save Role" as t_save_role %}
+{% translate "Custom role saved." as t_cr_saved %}
+{% translate "Error." as t_error %}
+{% translate 'Delete custom role "{name}"? Staff assigned to it will revert to built-in role defaults.' as t_del_confirm %}
+{% translate "Role deleted." as t_role_deleted %}
+{% translate "Custom Role" as t_custom_role %}
+{% translate "Using built-in" as t_using_builtin %}
+{% translate "Assignment updated." as t_assign_updated %}
 <script>
 (function(){
     const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+    function featCount(n){ return (n!==1 ? "{{ t_feat_many|escapejs }}" : "{{ t_feat_one|escapejs }}").replace('{n}', n); }
 
     function postJSON(url, data){
         return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},body:JSON.stringify(data)}).then(r=>r.json());
@@ -496,7 +516,7 @@
     // Init sidebar counts
     Object.keys(roleSets).forEach(function(role){
         var el=document.getElementById('rpcnt-'+role);
-        if(el){var n=(roleSets[role]||[]).length;el.textContent=n+' feature'+(n!==1?'s':'')+' enabled';}
+        if(el){var n=(roleSets[role]||[]).length;el.textContent=featCount(n);}
     });
 
     // Tab switching
@@ -542,9 +562,9 @@
 
     function updateCount(){
         var n=document.querySelectorAll('#rpPanelBody .feature-toggle:checked').length;
-        document.getElementById('rpPanelCount').textContent=n+' feature'+(n!==1?'s':'')+' enabled';
+        document.getElementById('rpPanelCount').textContent=featCount(n);
         var cnt=document.getElementById('rpcnt-'+currentRole);
-        if(cnt) cnt.textContent=n+' feature'+(n!==1?'s':'')+' enabled';
+        if(cnt) cnt.textContent=featCount(n);
     }
     function updateUnsaved(){
         var badge=document.getElementById('rpUnsaved');
@@ -555,17 +575,17 @@
         if(!currentRole) return;
         var btn=this;
         var slugs=Array.from(document.querySelectorAll('#rpPanelBody .feature-toggle:checked')).map(function(cb){return cb.dataset.slug;});
-        btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Saving…';
+        btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> '+"{{ t_saving|escapejs }}";
         postJSON('{% url "admin_panel:save_role_permissions" %}',{role_name:currentRole,feature_slugs:slugs})
             .then(function(res){
-                btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Save Changes';
+                btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> '+"{{ t_save_changes|escapejs }}";
                 if(res.success){
                     roleSets[currentRole]=slugs; delete localChanges[currentRole];
                     var dot=document.getElementById('rpdot-'+currentRole);
                     if(dot) dot.style.display='none';
-                    updateUnsaved(); toast('Permissions saved.','success');
-                } else { toast(res.error||'Error saving.','danger'); }
-            }).catch(function(){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Save Changes';toast('Network error.','danger');});
+                    updateUnsaved(); toast("{{ t_perm_saved|escapejs }}",'success');
+                } else { toast(res.error||"{{ t_err_saving|escapejs }}",'danger'); }
+            }).catch(function(){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> '+"{{ t_save_changes|escapejs }}";toast("{{ t_network|escapejs }}",'danger');});
     });
 
     // Auto-select first role
@@ -590,7 +610,7 @@
 
     document.getElementById('rpOpenCreate').addEventListener('click',function(){
         clearModal();
-        document.getElementById('rpModalTitle').innerHTML='<i class="fas fa-plus me-2" style="color:var(--rp-blue);"></i>Create Custom Role';
+        document.getElementById('rpModalTitle').innerHTML='<i class="fas fa-plus me-2" style="color:var(--rp-blue);"></i>'+"{{ t_create_cr|escapejs }}";
         openModal();
     });
 
@@ -601,7 +621,7 @@
             document.getElementById('rpEditId').value=id;
             document.getElementById('rpCrName').value=this.dataset.name||'';
             document.getElementById('rpCrDesc').value=this.dataset.description||'';
-            document.getElementById('rpModalTitle').innerHTML='<i class="fas fa-pen me-2" style="color:var(--rp-blue);"></i>Edit Custom Role';
+            document.getElementById('rpModalTitle').innerHTML='<i class="fas fa-pen me-2" style="color:var(--rp-blue);"></i>'+"{{ t_edit_cr|escapejs }}";
             var cr=customRolesMap[id];
             if(cr&&cr.feature_slugs) cr.feature_slugs.forEach(function(s){
                 var cb=document.querySelector('.cr-feat-cb[data-slug="'+s+'"]');
@@ -615,26 +635,26 @@
         var errEl=document.getElementById('rpCrError');
         errEl.style.display='none';
         var name=document.getElementById('rpCrName').value.trim();
-        if(!name){errEl.textContent='Role name is required.';errEl.style.display='block';return;}
+        if(!name){errEl.textContent="{{ t_name_req|escapejs }}";errEl.style.display='block';return;}
         var desc=document.getElementById('rpCrDesc').value.trim();
         var roleId=document.getElementById('rpEditId').value;
         var slugs=Array.from(document.querySelectorAll('.cr-feat-cb:checked')).map(function(cb){return cb.dataset.slug;});
-        var btn=this; btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Saving…';
+        var btn=this; btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> '+"{{ t_saving|escapejs }}";
         postJSON('{% url "admin_panel:create_custom_role" %}',{name:name,description:desc,feature_slugs:slugs,role_id:roleId?parseInt(roleId):null})
             .then(function(res){
-                btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Save Role';
-                if(res.success){closeModal();toast('Custom role saved.','success');setTimeout(function(){location.reload();},700);}
-                else{errEl.textContent=res.error||'Error.';errEl.style.display='block';}
-            }).catch(function(){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Save Role';toast('Network error.','danger');});
+                btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> '+"{{ t_save_role|escapejs }}";
+                if(res.success){closeModal();toast("{{ t_cr_saved|escapejs }}",'success');setTimeout(function(){location.reload();},700);}
+                else{errEl.textContent=res.error||"{{ t_error|escapejs }}";errEl.style.display='block';}
+            }).catch(function(){btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> '+"{{ t_save_role|escapejs }}";toast("{{ t_network|escapejs }}",'danger');});
     });
 
     document.querySelectorAll('.delete-custom-role').forEach(function(btn){
         btn.addEventListener('click',function(){
             var name=this.dataset.name, id=parseInt(this.dataset.id);
-            if(!confirm('Delete custom role "'+name+'"? Staff assigned to it will revert to built-in role defaults.')) return;
+            if(!confirm("{{ t_del_confirm|escapejs }}".replace('{name}', name))) return;
             postJSON('{% url "admin_panel:delete_custom_role" %}',{role_id:id}).then(function(res){
-                if(res.success){var el=document.getElementById('cr-row-'+id);if(el)el.remove();toast('Role deleted.','success');}
-                else toast(res.error||'Error.','danger');
+                if(res.success){var el=document.getElementById('cr-row-'+id);if(el)el.remove();toast("{{ t_role_deleted|escapejs }}",'success');}
+                else toast(res.error||"{{ t_error|escapejs }}",'danger');
             });
         });
     });
@@ -645,11 +665,11 @@
                 if(res.success){
                     var label=document.getElementById('asr-label-'+userId);
                     if(label){
-                        if(roleId){var cr=customRolesMap[parseInt(roleId)];label.innerHTML='<span class="custom-chip">'+(cr?cr.name:'Custom Role')+'</span>';}
-                        else label.innerHTML='<span style="color:var(--rp-muted);font-size:.81rem;">Using built-in</span>';
+                        if(roleId){var cr=customRolesMap[parseInt(roleId)];label.innerHTML='<span class="custom-chip">'+(cr?cr.name:"{{ t_custom_role|escapejs }}")+'</span>';}
+                        else label.innerHTML='<span style="color:var(--rp-muted);font-size:.81rem;">'+"{{ t_using_builtin|escapejs }}"+'</span>';
                     }
-                    toast('Assignment updated.','success');
-                } else toast(res.error||'Error.','danger');
+                    toast("{{ t_assign_updated|escapejs }}",'success');
+                } else toast(res.error||"{{ t_error|escapejs }}",'danger');
             });
     };
 })();

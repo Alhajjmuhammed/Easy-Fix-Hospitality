@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Kitchen Dashboard - {{ user.restaurant_name|default:"Restaurant System" }}{% endblock %}
+{% block title %}{% translate "Kitchen Dashboard" %} - {{ user.restaurant_name|default:_("Restaurant System") }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -489,7 +490,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                     {% csrf_token %}
                                     <input type="hidden" name="status" value="confirmed">
                                     <button type="submit" class="kds-btn kds-btn-confirm">
-                                        <i class="fas fa-check"></i> Confirm
+                                        <i class="fas fa-check"></i> {% translate "Confirm" %}
                                     </button>
                                 </form>
                             </div>
@@ -501,7 +502,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                 <div class="kds-grid">
                     <div class="kds-empty">
                         <div class="kds-empty-icon"><i class="fas fa-clock"></i></div>
-                        <p>No pending orders right now</p>
+                        <p>{% translate "No pending orders right now" %}</p>
                     </div>
                 </div>
                 {% endif %}
@@ -551,7 +552,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                     {% csrf_token %}
                                     <input type="hidden" name="status" value="preparing">
                                     <button type="submit" class="kds-btn kds-btn-start">
-                                        <i class="fas fa-play"></i> Start
+                                        <i class="fas fa-play"></i> {% translate "Start" %}
                                     </button>
                                 </form>
                             </div>
@@ -563,7 +564,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                 <div class="kds-grid">
                     <div class="kds-empty">
                         <div class="kds-empty-icon"><i class="fas fa-check-circle"></i></div>
-                        <p>No confirmed orders</p>
+                        <p>{% translate "No confirmed orders" %}</p>
                     </div>
                 </div>
                 {% endif %}
@@ -613,7 +614,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                     {% csrf_token %}
                                     <input type="hidden" name="status" value="ready">
                                     <button type="submit" class="kds-btn kds-btn-ready">
-                                        <i class="fas fa-flag-checkered"></i> Ready
+                                        <i class="fas fa-flag-checkered"></i> {% translate "Ready" %}
                                     </button>
                                 </form>
                             </div>
@@ -625,7 +626,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                 <div class="kds-grid">
                     <div class="kds-empty">
                         <div class="kds-empty-icon"><i class="fas fa-fire"></i></div>
-                        <p>No orders being prepared</p>
+                        <p>{% translate "No orders being prepared" %}</p>
                     </div>
                 </div>
                 {% endif %}
@@ -675,7 +676,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                     {% csrf_token %}
                                     <input type="hidden" name="status" value="served">
                                     <button type="submit" class="kds-btn kds-btn-serve">
-                                        <i class="fas fa-check-double"></i> Served
+                                        <i class="fas fa-check-double"></i> {% translate "Served" %}
                                     </button>
                                 </form>
                             </div>
@@ -687,7 +688,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                 <div class="kds-grid">
                     <div class="kds-empty">
                         <div class="kds-empty-icon"><i class="fas fa-bell"></i></div>
-                        <p>No orders ready for service</p>
+                        <p>{% translate "No orders ready for service" %}</p>
                     </div>
                 </div>
                 {% endif %}
@@ -701,12 +702,12 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                     <table class="kds-log">
                         <thead>
                             <tr>
-                                <th>Order</th>
-                                <th>Table</th>
-                                <th>Customer</th>
-                                <th>Ordered</th>
-                                <th>Served at</th>
-                                <th>Items</th>
+                                <th>{% translate "Order" context "order number column" %}</th>
+                                <th>{% translate "Table" %}</th>
+                                <th>{% translate "Customer" %}</th>
+                                <th>{% translate "Ordered" %}</th>
+                                <th>{% translate "Served at" %}</th>
+                                <th>{% translate "Items" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -755,7 +756,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                 <div class="kds-grid">
                     <div class="kds-empty">
                         <div class="kds-empty-icon"><i class="fas fa-check-double"></i></div>
-                        <p>No served orders yet today</p>
+                        <p>{% translate "No served orders yet today" %}</p>
                     </div>
                 </div>
                 {% endif %}
@@ -775,35 +776,35 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                         data-kds-target="#pending" type="button" role="tab" aria-selected="true">
                     <span class="kds-stage-icon"><i class="fas fa-clock"></i></span>
                     <span class="kds-stage-num">{{ pending_count }}</span>
-                    <span class="kds-stage-lbl">Pending</span>
+                    <span class="kds-stage-lbl">{% translate "Pending" %}</span>
                 </button>
 
                 <button class="kds-stage s-confirmed" id="confirmed-tab"
                         data-kds-target="#confirmed" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-check-circle"></i></span>
                     <span class="kds-stage-num">{{ confirmed_count }}</span>
-                    <span class="kds-stage-lbl">Confirmed</span>
+                    <span class="kds-stage-lbl">{% translate "Confirmed" %}</span>
                 </button>
 
                 <button class="kds-stage s-preparing" id="preparing-tab"
                         data-kds-target="#preparing" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-fire"></i></span>
                     <span class="kds-stage-num">{{ preparing_count }}</span>
-                    <span class="kds-stage-lbl">Preparing</span>
+                    <span class="kds-stage-lbl">{% translate "Preparing" %}</span>
                 </button>
 
                 <button class="kds-stage s-ready" id="ready-tab"
                         data-kds-target="#ready" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-bell"></i></span>
                     <span class="kds-stage-num">{{ ready_count }}</span>
-                    <span class="kds-stage-lbl">Ready</span>
+                    <span class="kds-stage-lbl">{% translate "Ready" %}</span>
                 </button>
 
                 <button class="kds-stage s-served" id="served-tab"
                         data-kds-target="#served" type="button" role="tab" aria-selected="false">
                     <span class="kds-stage-icon"><i class="fas fa-check-double"></i></span>
                     <span class="kds-stage-num">{{ served_count }}</span>
-                    <span class="kds-stage-lbl">Served</span>
+                    <span class="kds-stage-lbl">{% translate "Served" %}</span>
                 </button>
 
             </div>
@@ -815,17 +816,17 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                 <span class="kds-live-dot"></span>
                 <div>
                     <div class="kds-name"><i class="fas fa-utensils" style="color:var(--c-preparing);margin-right:.5rem;font-size:.9rem;"></i>{% get_restaurant_name %}</div>
-                    <div class="kds-sub">{{ user.get_full_name }} &nbsp;·&nbsp; Kitchen Station</div>
+                    <div class="kds-sub">{{ user.get_full_name }} &nbsp;·&nbsp; {% translate "Kitchen Station" %}</div>
                 </div>
-                <span class="kds-live-badge">Live</span>
+                <span class="kds-live-badge">{% translate "Live" %}</span>
             </div>
             <div class="kds-bar-right">
                 <div class="kds-refresh-pill" id="refreshTimer">
                     <i class="fas fa-sync-alt" id="refreshIcon"></i>
-                    Refresh in <span class="kds-refresh-num" id="countdown">15</span>s
+                    {% translate "Refresh in" %} <span class="kds-refresh-num" id="countdown">15</span>{% translate "s" context "seconds" %}
                 </div>
                 <a href="{% url 'orders:kitchen_reports' %}" class="kds-report-btn">
-                    <i class="fas fa-chart-bar"></i> Reports
+                    <i class="fas fa-chart-bar"></i> {% translate "Reports" %}
                 </a>
             </div>
         </div>

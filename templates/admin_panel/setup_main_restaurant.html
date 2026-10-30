@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Setup Main Restaurant{% endblock %}
+{% block title %}{% translate "Setup Main Restaurant" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -141,7 +141,7 @@
 {% block content %}
 <div class="container-fluid">
     <a href="{% url 'admin_panel:manage_branches' %}" class="back-link">
-        <i class="fas fa-arrow-left me-2"></i> Back to Branches
+        <i class="fas fa-arrow-left me-2"></i> {% translate "Back to Branches" %}
     </a>
     
     <div class="setup-container">
@@ -149,8 +149,8 @@
             <div class="setup-icon">
                 <i class="fas fa-store"></i>
             </div>
-            <h1>Setup Your Main Restaurant</h1>
-            <p class="text-muted">Complete your restaurant setup to start managing your business</p>
+            <h1>{% translate "Setup Your Main Restaurant" %}</h1>
+            <p class="text-muted">{% translate "Complete your restaurant setup to start managing your business" %}</p>
         </div>
         
         <form method="post">
@@ -158,36 +158,36 @@
             
             <!-- Restaurant Basic Information -->
             <div class="form-section">
-                <label for="name">Restaurant Name *</label>
+                <label for="name">{% translate "Restaurant Name" %} *</label>
                 <input type="text" 
                        class="form-control" 
                        id="name" 
                        name="name" 
-                       placeholder="e.g., Taste of Italy"
+                       placeholder="{% translate 'e.g., Taste of Italy' %}"
                        required>
             </div>
             
             <div class="form-section">
-                <label for="address">Restaurant Address *</label>
+                <label for="address">{% translate "Restaurant Address" %} *</label>
                 <textarea class="form-control" 
                           id="address" 
                           name="address" 
                           rows="3"
-                          placeholder="Full address of your restaurant"
+                          placeholder="{% translate 'Full address of your restaurant' %}"
                           required></textarea>
             </div>
             
             <div class="form-section">
-                <label for="description">Description</label>
+                <label for="description">{% translate "Description" %}</label>
                 <textarea class="form-control" 
                           id="description" 
                           name="description" 
                           rows="3"
-                          placeholder="Brief description of your restaurant (optional)"></textarea>
+                          placeholder="{% translate 'Brief description of your restaurant (optional)' %}"></textarea>
             </div>
             
             <div class="form-section">
-                <label for="tax_rate">Tax Rate (%)</label>
+                <label for="tax_rate">{% translate "Tax Rate (%)" %}</label>
                 <input type="number" 
                        class="form-control" 
                        id="tax_rate" 
@@ -200,21 +200,21 @@
             
             <!-- Subscription Plan Selection -->
             <div class="form-section">
-                <label>Choose Your Subscription Plan</label>
+                <label>{% translate "Choose Your Subscription Plan" %}</label>
                 <div class="plan-cards">
                     <label class="plan-card" for="single">
                         <input type="radio" id="single" name="subscription_plan" value="SINGLE" checked>
                         <div class="plan-content">
                             <div class="plan-name single-plan">
                                 <i class="fas fa-store me-2"></i>
-                                Single Restaurant
+                                {% translate "Single Restaurant" %}
                             </div>
                             <div class="plan-features">
-                                ✓ One restaurant location<br>
-                                ✓ All basic features<br>
-                                ✓ Staff management<br>
-                                ✓ Orders & inventory<br>
-                                <span class="text-success">✓ Free forever</span>
+                                ✓ {% translate "One restaurant location" %}<br>
+                                ✓ {% translate "All basic features" %}<br>
+                                ✓ {% translate "Staff management" %}<br>
+                                ✓ {% translate "Orders & inventory" %}<br>
+                                <span class="text-success">✓ {% translate "Free forever" %}</span>
                             </div>
                         </div>
                     </label>
@@ -222,29 +222,29 @@
                     <label class="plan-card" for="pro">
                         <input type="radio" id="pro" name="subscription_plan" value="PRO">
                         <div class="plan-content">
-                            <span class="plan-badge">RECOMMENDED</span>
+                            <span class="plan-badge">{% translate "RECOMMENDED" %}</span>
                             <div class="plan-name pro-plan">
                                 <i class="fas fa-building me-2"></i>
-                                Pro Plan
+                                {% translate "Pro Plan" %}
                             </div>
                             <div class="plan-features">
-                                ✓ Unlimited branches<br>
-                                ✓ Multi-location management<br>
-                                ✓ Advanced analytics<br>
-                                ✓ Consolidated reporting<br>
-                                <span class="text-success">✓ Scale your business</span>
+                                ✓ {% translate "Unlimited branches" %}<br>
+                                ✓ {% translate "Multi-location management" %}<br>
+                                ✓ {% translate "Advanced analytics" %}<br>
+                                ✓ {% translate "Consolidated reporting" %}<br>
+                                <span class="text-success">✓ {% translate "Scale your business" %}</span>
                             </div>
                         </div>
                     </label>
                 </div>
                 <small class="text-muted">
                     <i class="fas fa-info-circle me-1"></i>
-                    You can upgrade or downgrade your plan anytime from the branches management page.
+                    {% translate "You can upgrade or downgrade your plan anytime from the branches management page." %}
                 </small>
             </div>
             
             <button type="submit" class="btn btn-setup">
-                <i class="fas fa-rocket me-2"></i> Create Main Restaurant
+                <i class="fas fa-rocket me-2"></i> {% translate "Create Main Restaurant" %}
             </button>
         </form>
     </div>

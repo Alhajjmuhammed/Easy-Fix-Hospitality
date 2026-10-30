@@ -1,8 +1,9 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}Record Food Waste - Cashier{% endblock %}
+{% block title %}{% translate "Record Food Waste - Cashier" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -68,9 +69,9 @@
 <!-- Page Title -->
 <div class="page-title">
     <div class="container">
-        <h1 class="mb-2">🗑️ Food Waste Recording</h1>
+        <h1 class="mb-2">🗑️ {% translate "Food Waste Recording" %}</h1>
         <p class="mb-0 opacity-75">
-            Record waste incidents quickly and accurately
+            {% translate "Record waste incidents quickly and accurately" %}
         </p>
     </div>
 </div>
@@ -79,49 +80,49 @@
                     <form id="wasteForm" class="row g-3">
                         {% csrf_token %}
                         <div class="col-md-6">
-                            <label for="product" class="form-label">Product <span class="text-danger">*</span></label>
+                            <label for="product" class="form-label">{% translate "Product" %} <span class="text-danger">*</span></label>
                             <select class="form-select" id="product" name="product" required>
-                                <option value="">Select a product...</option>
+                                <option value="">{% translate "Select a product..." %}</option>
                                 {% for product in products %}
                                     <option value="{{ product.id }}">{{ product.name }} - {% currency_symbol %}{{ product.price }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="quantity" class="form-label">Quantity Wasted <span class="text-danger">*</span></label>
+                            <label for="quantity" class="form-label">{% translate "Quantity Wasted" %} <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="waste_reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                            <label for="waste_reason" class="form-label">{% translate "Reason" %} <span class="text-danger">*</span></label>
                             <select class="form-select" id="waste_reason" name="waste_reason" required>
-                                <option value="">Select reason...</option>
-                                <option value="customer_refused">Customer Refused</option>
-                                <option value="customer_left">Customer Left Before Pickup</option>
-                                <option value="wrong_order">Wrong Order Made</option>
-                                <option value="quality_issue">Quality Issue</option>
-                                <option value="kitchen_error">Kitchen Error</option>
-                                <option value="overcooking">Overcooking</option>
-                                <option value="undercooking">Undercooking</option>
-                                <option value="contamination">Food Contamination</option>
-                                <option value="other">Other Reason</option>
+                                <option value="">{% translate "Select reason..." %}</option>
+                                <option value="customer_refused">{% translate "Customer Refused" %}</option>
+                                <option value="customer_left">{% translate "Customer Left Before Pickup" %}</option>
+                                <option value="wrong_order">{% translate "Wrong Order Made" %}</option>
+                                <option value="quality_issue">{% translate "Quality Issue" %}</option>
+                                <option value="kitchen_error">{% translate "Kitchen Error" %}</option>
+                                <option value="overcooking">{% translate "Overcooking" %}</option>
+                                <option value="undercooking">{% translate "Undercooking" %}</option>
+                                <option value="contamination">{% translate "Food Contamination" %}</option>
+                                <option value="other">{% translate "Other Reason" %}</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="disposal_method" class="form-label">Disposal Method</label>
+                            <label for="disposal_method" class="form-label">{% translate "Disposal Method" %}</label>
                             <select class="form-select" id="disposal_method" name="disposal_method">
-                                <option value="waste_bin">Waste Bin</option>
-                                <option value="staff_meal">Staff Meal</option>
-                                <option value="compost">Compost</option>
-                                <option value="donated">Donated</option>
+                                <option value="waste_bin">{% translate "Waste Bin" %}</option>
+                                <option value="staff_meal">{% translate "Staff Meal" %}</option>
+                                <option value="compost">{% translate "Compost" %}</option>
+                                <option value="donated">{% translate "Donated" %}</option>
                             </select>
                         </div>
                         <div class="col-12">
-                            <label for="notes" class="form-label">Notes (Optional)</label>
-                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional details about the waste incident..."></textarea>
+                            <label for="notes" class="form-label">{% translate "Notes (Optional)" %}</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="{% translate "Additional details about the waste incident..." %}"></textarea>
                         </div>
                         <div class="col-12 d-flex justify-content-end">
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-2"></i>Record Waste
+                                <i class="fas fa-save me-2"></i>{% translate "Record Waste" %}
                             </button>
                         </div>
                     </form>
@@ -131,11 +132,11 @@
             <!-- Recent Records -->
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">📋 Your Recent Records</h5>
+                    <h5 class="mb-0">📋 {% translate "Your Recent Records" %}</h5>
                 </div>
                 <div class="card-body">
                     <div id="recentRecords">
-                        <p class="text-muted">Your recent waste records will appear here after recording...</p>
+                        <p class="text-muted">{% translate "Your recent waste records will appear here after recording..." %}</p>
                     </div>
                 </div>
             </div>
@@ -148,20 +149,26 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">✅ Waste Recorded Successfully</h5>
+                <h5 class="modal-title">✅ {% translate "Waste Recorded Successfully" %}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>The waste incident has been recorded successfully.</p>
+                <p>{% translate "The waste incident has been recorded successfully." %}</p>
                 <div id="wasteDetails"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-success" data-bs-dismiss="modal">Continue</button>
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal">{% translate "Continue" %}</button>
             </div>
         </div>
     </div>
 </div>
 
+{% translate "Product:" as t_product %}
+{% translate "Quantity:" as t_quantity %}
+{% translate "Estimated Cost:" as t_est_cost %}
+{% translate "Error:" as t_error %}
+{% translate "An error occurred while recording waste" as t_err_record %}
+{% translate "Waste recorded successfully! Record another incident above." as t_recorded_again %}
 <script>
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
 
@@ -190,9 +197,9 @@ document.getElementById('wasteForm').addEventListener('submit', function(e) {
         if (data.success) {
             // Show success modal
             document.getElementById('wasteDetails').innerHTML = `
-                <strong>Product:</strong> ${data.waste_log.product_name}<br>
-                <strong>Quantity:</strong> ${data.waste_log.quantity_wasted}<br>
-                <strong>Estimated Cost:</strong> ${CURRENCY_SYMBOL}${data.waste_log.total_cost}
+                <strong>{{ t_product|escapejs }}</strong> ${data.waste_log.product_name}<br>
+                <strong>{{ t_quantity|escapejs }}</strong> ${data.waste_log.quantity_wasted}<br>
+                <strong>{{ t_est_cost|escapejs }}</strong> ${CURRENCY_SYMBOL}${data.waste_log.total_cost}
             `;
             
             const modal = new bootstrap.Modal(document.getElementById('successModal'));
@@ -204,19 +211,19 @@ document.getElementById('wasteForm').addEventListener('submit', function(e) {
             // Refresh recent records
             loadRecentRecords();
         } else {
-            alert('Error: ' + data.error);
+            alert("{{ t_error|escapejs }} " + data.error);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while recording waste');
+        alert("{{ t_err_record|escapejs }}");
     });
 });
 
 function loadRecentRecords() {
     // This would load recent records, but for simplicity we'll skip this for now
     document.getElementById('recentRecords').innerHTML = 
-        '<p class="text-success">Waste recorded successfully! Record another incident above.</p>';
+        '<p class="text-success">' + "{{ t_recorded_again|escapejs }}" + '</p>';
 }
 </script>
 {% endblock %}

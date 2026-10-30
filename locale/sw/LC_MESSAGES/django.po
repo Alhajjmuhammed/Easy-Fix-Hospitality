@@ -1,0 +1,17 @@
+# Kiswahili for the website. English is the key (msgid); a missing msgstr shows English.
+# After editing run:  python scripts/compile_translations.py   (writes django.mo, commit both)
+# Please have a native speaker review.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: sw\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Language"
+msgstr "Lugha"
+
+msgid "English"
+msgstr "Kiingereza"
+
+msgid "Kiswahili"
+msgstr "Kiswahili"

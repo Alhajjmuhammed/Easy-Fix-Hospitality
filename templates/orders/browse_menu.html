@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Menu - {{ user.get_restaurant_name }}{% endblock %}
+{% block title %}{% translate "Menu" %} - {{ user.get_restaurant_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -103,7 +104,7 @@
 <!-- Floating Cart Badge (mobile: bottom-right; desktop: top-right) -->
 <div class="cart-badge">
     <a href="{% url 'orders:view_cart' %}" class="btn btn-primary shadow position-relative">
-        <i class="bi bi-cart3"></i> <span class="d-none d-sm-inline">Cart</span>
+        <i class="bi bi-cart3"></i> <span class="d-none d-sm-inline">{% translate "Cart" %}</span>
         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="cart-count">
             {{ cart_count }}
         </span>
@@ -113,11 +114,11 @@
 <!-- Header -->
 <div class="d-flex justify-content-between align-items-start align-items-sm-center mb-3 gap-2 flex-wrap">
     <div>
-        <h2 class="mb-1" style="font-size: clamp(1.25rem, 3vw, 1.75rem);"><i class="bi bi-menu-button-wide text-primary"></i> Menu</h2>
-        <p class="text-muted mb-0 small">Table <strong>{{ table_number }}</strong> &mdash; Select items to add to your cart</p>
+        <h2 class="mb-1" style="font-size: clamp(1.25rem, 3vw, 1.75rem);"><i class="bi bi-menu-button-wide text-primary"></i> {% translate "Menu" %}</h2>
+        <p class="text-muted mb-0 small">{% blocktranslate with no=table_number %}Table <strong>{{ no }}</strong>{% endblocktranslate %} &mdash; {% translate "Select items to add to your cart" %}</p>
     </div>
     <a href="{% url 'orders:select_table' %}" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left"></i> Change Table
+        <i class="bi bi-arrow-left"></i> {% translate "Change Table" %}
     </a>
 </div>
 
@@ -163,7 +164,7 @@
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <span class="fw-bold text-primary" style="font-size: 1.05rem;">{% currency_symbol %}{{ product.price }}</span>
                                             <small class="text-muted">
-                                                <i class="bi bi-clock"></i> {{ product.preparation_time }}m
+                                                <i class="bi bi-clock"></i> {% blocktranslate with t=product.preparation_time %}{{ t }}m{% endblocktranslate %}
                                             </small>
                                         </div>
                                         
@@ -174,7 +175,7 @@
                                                 <button class="btn btn-outline-secondary qty-increase" type="button" data-product-id="{{ product.id }}" data-max="100">+</button>
                                             </div>
                                             <button class="btn btn-primary btn-sm flex-grow-1 add-to-cart-btn" data-product-id="{{ product.id }}">
-                                                <i class="bi bi-cart-plus"></i> Add
+                                                <i class="bi bi-cart-plus"></i> {% translate "Add" %}
                                             </button>
                                         </div>
                                     </div>
@@ -189,8 +190,8 @@
 {% empty %}
     <div class="text-center py-5">
         <i class="bi bi-menu-button-wide display-1 text-muted"></i>
-        <h4 class="mt-3">No Menu Items Available</h4>
-        <p class="text-muted">Please check back later or contact our staff.</p>
+        <h4 class="mt-3">{% translate "No Menu Items Available" %}</h4>
+        <p class="text-muted">{% translate "Please check back later or contact our staff." %}</p>
     </div>
 {% endfor %}
 
@@ -200,11 +201,11 @@
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <span class="fw-bold fs-6">{{ cart_count }} item{{ cart_count|pluralize }}</span>
+                <span class="fw-bold fs-6">{% blocktranslate count n=cart_count %}{{ n }} item{% plural %}{{ n }} items{% endblocktranslate %}</span>
                 <span class="text-muted ms-2">&mdash; {% currency_symbol %}{{ cart_total|floatformat:2 }}</span>
             </div>
             <a href="{% url 'orders:view_cart' %}" class="btn btn-primary btn-sm px-3">
-                <i class="bi bi-cart-check"></i> View Cart
+                <i class="bi bi-cart-check"></i> {% translate "View Cart" %}
             </a>
         </div>
     </div>
@@ -214,6 +215,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "An error occurred. Please try again." as t_err %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Event delegation for quantity decrease
@@ -282,7 +284,7 @@ function addToCart(productId) {
         }
     })
     .catch(error => {
-        showToast('An error occurred. Please try again.', 'error');
+        showToast('{{ t_err|escapejs }}', 'error');
     });
 }
 

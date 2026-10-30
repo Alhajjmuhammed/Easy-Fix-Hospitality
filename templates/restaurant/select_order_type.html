@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}How would you like to order? - {{ restaurant.name }}{% endblock %}
+{% block title %}{% translate "How would you like to order?" %} - {{ restaurant.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -47,7 +48,7 @@
 </div>
 
 <div class="container" style="max-width:560px; padding: 2.5rem 1rem;">
-    <h5 class="fw-bold mb-4 text-center" style="color:#1a1a2e">{% if restaurant.allow_remote_orders %}How would you like to receive your order?{% else %}What would you like to do?{% endif %}</h5>
+    <h5 class="fw-bold mb-4 text-center" style="color:#1a1a2e">{% if restaurant.allow_remote_orders %}{% translate "How would you like to receive your order?" %}{% else %}{% translate "What would you like to do?" %}{% endif %}</h5>
 
     {% if restaurant.allow_remote_orders %}
     <form method="post">
@@ -61,8 +62,8 @@
                         <i class="bi bi-bicycle"></i>
                     </div>
                     <div>
-                        <div class="fw-bold fs-6" style="color:#e65100">Delivery</div>
-                        <div class="text-muted small">Order now and get it delivered to your door</div>
+                        <div class="fw-bold fs-6" style="color:#e65100">{% translate "Delivery" %}</div>
+                        <div class="text-muted small">{% translate "Order now and get it delivered to your door" %}</div>
                     </div>
                     <i class="bi bi-chevron-right ms-auto text-muted"></i>
                 </button>
@@ -76,8 +77,8 @@
                         <i class="bi bi-bag-check"></i>
                     </div>
                     <div>
-                        <div class="fw-bold fs-6" style="color:#1565c0">Pickup</div>
-                        <div class="text-muted small">Order ahead and collect at the restaurant</div>
+                        <div class="fw-bold fs-6" style="color:#1565c0">{% translate "Pickup" %}</div>
+                        <div class="text-muted small">{% translate "Order ahead and collect at the restaurant" %}</div>
                     </div>
                     <i class="bi bi-chevron-right ms-auto text-muted"></i>
                 </button>
@@ -95,8 +96,8 @@
                     <i class="bi bi-calendar-check"></i>
                 </div>
                 <div>
-                    <div class="fw-bold fs-6" style="color:#2e7d32">Book a table</div>
-                    <div class="text-muted small">Reserve a table for dining in</div>
+                    <div class="fw-bold fs-6" style="color:#2e7d32">{% translate "Book a table" %}</div>
+                    <div class="text-muted small">{% translate "Reserve a table for dining in" %}</div>
                 </div>
                 <i class="bi bi-chevron-right ms-auto text-muted"></i>
             </a>
@@ -106,7 +107,7 @@
 
     <div class="text-center">
         <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left me-1"></i> Back to Restaurants
+            <i class="bi bi-arrow-left me-1"></i> {% translate "Back to Restaurants" %}
         </a>
     </div>
 </div>

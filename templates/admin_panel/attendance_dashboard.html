@@ -1,6 +1,7 @@
 {% extends "admin_panel/base.html" %}
+{% load i18n %}
 
-{% block title %}Attendance - {{ today|date:"N j, Y" }}{% endblock %}
+{% block title %}{% translate "Attendance" %} - {{ today|date:"N j, Y" }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -91,29 +92,29 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <h4 class="mb-0 fw-bold" style="color: var(--primary-color);">
-                <i class="bi bi-calendar-check me-2" style="color: var(--accent-color);"></i>Today's Attendance
+                <i class="bi bi-calendar-check me-2" style="color: var(--accent-color);"></i>{% translate "Today's Attendance" %}
             </h4>
             <small class="text-muted">{{ today|date:"l, N j, Y" }}</small>
         </div>
         <div class="nav-action-bar">
             <a href="{% url 'attendance:shifts' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-clock me-1"></i>Shifts
+                <i class="bi bi-clock me-1"></i>{% translate "Shifts" %}
             </a>
             <a href="{% url 'attendance:roster' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-calendar-week me-1"></i>Roster
+                <i class="bi bi-calendar-week me-1"></i>{% translate "Roster" %}
             </a>
             <a href="{% url 'attendance:calendar' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-calendar3 me-1"></i>Calendar
+                <i class="bi bi-calendar3 me-1"></i>{% translate "Calendar" %}
             </a>
             <a href="{% url 'attendance:reports' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-bar-chart-line me-1"></i>Reports
+                <i class="bi bi-bar-chart-line me-1"></i>{% translate "Reports" %}
             </a>
             <a href="{% url 'attendance:qr' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-qr-code me-1"></i>QR Code
+                <i class="bi bi-qr-code me-1"></i>{% translate "QR Code" %}
             </a>
             {% if can_web_checkin %}
             <a href="{% url 'attendance:web_checkin' %}" class="btn btn-sm" style="background-color: var(--accent-color); color: #fff;">
-                <i class="bi bi-box-arrow-in-right me-1"></i>Web Check-In
+                <i class="bi bi-box-arrow-in-right me-1"></i>{% translate "Web Check-In" %}
             </a>
             {% endif %}
         </div>
@@ -126,11 +127,11 @@
         <div class="card-body py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
             <div>
                 <div class="fw-semibold" style="color:var(--primary-color);font-size:0.95rem;">
-                    <i class="bi bi-shield-lock me-2" style="color:var(--accent-color);"></i>Require Check-In Before Work
+                    <i class="bi bi-shield-lock me-2" style="color:var(--accent-color);"></i>{% translate "Require Check-In Before Work" %}
                 </div>
                 <div class="text-muted small mt-1">
-                    When <strong>ON</strong>, staff cannot access their work panels until they scan the attendance QR code today.
-                    <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">Default: OFF</span>
+                    {% translate "When <strong>ON</strong>, staff cannot access their work panels until they scan the attendance QR code today." %}
+                    <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">{% translate "Default: OFF" %}</span>
                 </div>
             </div>
             <div class="form-check form-switch mb-0" style="min-width:60px;">
@@ -179,7 +180,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color: var(--accent-color);">{{ checked_in_count }}</div>
-                        <div class="stat-label">Checked In</div>
+                        <div class="stat-label">{% translate "Checked In" %}</div>
                     </div>
                 </div>
             </div>
@@ -193,7 +194,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color: var(--success-color);">{{ checked_out_count }}</div>
-                        <div class="stat-label">Checked Out</div>
+                        <div class="stat-label">{% translate "Checked Out" %}</div>
                     </div>
                 </div>
             </div>
@@ -207,7 +208,7 @@
                     </div>
                     <div>
                         <div class="stat-number" style="color: var(--warning-color);">{{ late_count }}</div>
-                        <div class="stat-label">Late Arrivals</div>
+                        <div class="stat-label">{% translate "Late Arrivals" %}</div>
                     </div>
                 </div>
             </div>
@@ -219,7 +220,7 @@
         <div class="card-header bg-white border-bottom py-3">
             <h6 class="mb-0 section-title">
                 <i class="bi bi-people me-2" style="color: var(--accent-color);"></i>
-                Today's Records
+                {% translate "Today's Records" %}
                 <span class="badge bg-secondary ms-2" style="font-size: 0.75rem;">{{ records|length }}</span>
             </h6>
         </div>
@@ -229,14 +230,14 @@
                 <table class="table table-hover attendance-table mb-0">
                     <thead>
                         <tr>
-                            <th class="ps-4">Staff Name</th>
-                            <th>Role</th>
-                            <th>Shift</th>
-                            <th>Check In</th>
-                            <th>Check Out</th>
-                            <th>Hours</th>
-                            <th>Status</th>
-                            <th>Via</th>
+                            <th class="ps-4">{% translate "Staff Name" %}</th>
+                            <th>{% translate "Role" %}</th>
+                            <th>{% translate "Shift" %}</th>
+                            <th>{% translate "Check In" %}</th>
+                            <th>{% translate "Check Out" %}</th>
+                            <th>{% translate "Hours" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th>{% translate "Via" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -264,7 +265,7 @@
                                 {% if rec.check_out != '—' %}
                                     <span class="fw-semibold">{{ rec.check_out }}</span>
                                 {% else %}
-                                    <span class="text-muted small fst-italic">Still in</span>
+                                    <span class="text-muted small fst-italic">{% translate "Still in" %}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -277,27 +278,27 @@
                             <td>
                                 {% if rec.is_late %}
                                     <span class="badge bg-warning text-dark me-1">
-                                        <i class="bi bi-clock-history me-1"></i>Late
+                                        <i class="bi bi-clock-history me-1"></i>{% translate "Late" %}
                                     </span>
                                 {% else %}
                                     <span class="badge bg-success me-1">
-                                        <i class="bi bi-check-circle me-1"></i>On Time
+                                        <i class="bi bi-check-circle me-1"></i>{% translate "On Time" %}
                                     </span>
                                 {% endif %}
                                 {% if rec.is_overtime %}
                                     <span class="badge bg-danger">
-                                        <i class="bi bi-lightning me-1"></i>OT
+                                        <i class="bi bi-lightning me-1"></i>{% translate "OT" %}
                                     </span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if rec.check_in_via == 'mobile' %}
                                     <span class="badge bg-primary">
-                                        <i class="bi bi-phone me-1"></i>Mobile
+                                        <i class="bi bi-phone me-1"></i>{% translate "Mobile" %}
                                     </span>
                                 {% else %}
                                     <span class="badge bg-secondary">
-                                        <i class="bi bi-globe me-1"></i>Web
+                                        <i class="bi bi-globe me-1"></i>{% translate "Web" %}
                                     </span>
                                 {% endif %}
                             </td>
@@ -309,7 +310,7 @@
             {% else %}
             <div class="text-center py-5 text-muted">
                 <i class="bi bi-calendar-x display-5 mb-2 d-block" style="opacity: 0.3;"></i>
-                <p class="mb-0">No check-ins recorded today.</p>
+                <p class="mb-0">{% translate "No check-ins recorded today." %}</p>
             </div>
             {% endif %}
         </div>
@@ -321,7 +322,7 @@
         <div class="card-header bg-white border-bottom py-3">
             <h6 class="mb-0 section-title">
                 <i class="bi bi-person-x me-2" style="color: var(--danger-color);"></i>
-                Not Yet Checked In
+                {% translate "Not Yet Checked In" %}
                 <span class="badge ms-2" style="background-color: var(--danger-color); font-size: 0.75rem;">{{ absent_staff|length }}</span>
             </h6>
         </div>
@@ -338,7 +339,7 @@
                                 {{ staff.get_full_name|default:staff.username }}
                             </div>
                             <div class="text-muted" style="font-size: 0.78rem;">
-                                {% if staff.role %}{{ staff.role.name }}{% else %}Staff{% endif %}
+                                {% if staff.role %}{{ staff.role.name }}{% else %}{% translate "Staff" %}{% endif %}
                             </div>
                         </div>
                     </div>

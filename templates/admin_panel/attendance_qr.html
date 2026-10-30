@@ -1,6 +1,7 @@
 {% extends "admin_panel/base.html" %}
+{% load i18n %}
 
-{% block title %}Attendance QR Code{% endblock %}
+{% block title %}{% translate "Attendance QR Code" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -94,16 +95,17 @@
 {% endblock %}
 
 {% block content %}
+{% translate "This will invalidate the current QR code. Staff will need to scan the new one. Continue?" as t_regen_confirm %}
 <div class="content-header">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <a href="{% url 'attendance:dashboard' %}" class="text-decoration-none text-muted small me-2">
-                <i class="bi bi-arrow-left me-1"></i>Attendance
+                <i class="bi bi-arrow-left me-1"></i>{% translate "Attendance" %}
             </a>
             <h4 class="mb-0 fw-bold d-inline-block" style="color: var(--primary-color);">
-                <i class="bi bi-qr-code me-2" style="color: var(--accent-color);"></i>Attendance QR Code
+                <i class="bi bi-qr-code me-2" style="color: var(--accent-color);"></i>{% translate "Attendance QR Code" %}
             </h4>
-            <div class="text-muted small mt-1">Staff scan this QR code with their mobile app to check in/out</div>
+            <div class="text-muted small mt-1">{% translate "Staff scan this QR code with their mobile app to check in/out" %}</div>
         </div>
     </div>
 </div>
@@ -118,30 +120,30 @@
 
                     <div id="printArea">
                         <div class="qr-image-wrap mb-3">
-                            <img src="{{ qr_data_uri }}" alt="Attendance QR Code">
+                            <img src="{{ qr_data_uri }}" alt="{% translate "Attendance QR Code" %}">
                         </div>
                         <div class="restaurant-name-display mb-1">{{ restaurant_name }}</div>
-                        <div class="text-muted small mb-3">Scan to check in / check out</div>
+                        <div class="text-muted small mb-3">{% translate "Scan to check in / check out" %}</div>
                     </div>
 
-                    <div class="qr-token mb-3" title="QR Token">{{ qr_token }}</div>
+                    <div class="qr-token mb-3" title="{% translate "QR Token" %}">{{ qr_token }}</div>
 
                     <div class="text-muted" style="font-size: 0.78rem;">
                         <i class="bi bi-clock-history me-1"></i>
-                        Last regenerated: {{ regenerated_at|date:"N j, Y H:i" }}
+                        {% translate "Last regenerated:" %} {{ regenerated_at|date:"N j, Y H:i" }}
                     </div>
                 </div>
                 <div class="card-footer bg-white border-top pt-3 pb-3 d-flex flex-column gap-2">
                     <button class="btn w-100"
                             style="background-color: var(--accent-color); color: #fff;"
                             onclick="window.print()">
-                        <i class="bi bi-printer me-1"></i>Print QR Code
+                        <i class="bi bi-printer me-1"></i>{% translate "Print QR Code" %}
                     </button>
                     <form method="post" action="{% url 'attendance:qr_regenerate' %}"
-                          onsubmit="return confirm('This will invalidate the current QR code. Staff will need to scan the new one. Continue?');">
+                          onsubmit="return confirm('{{ t_regen_confirm|escapejs }}');">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-outline-danger w-100">
-                            <i class="bi bi-arrow-repeat me-1"></i>Regenerate QR
+                            <i class="bi bi-arrow-repeat me-1"></i>{% translate "Regenerate QR" %}
                         </button>
                     </form>
                 </div>
@@ -154,7 +156,7 @@
                 <div class="card-header bg-white border-bottom py-3">
                     <h6 class="mb-0 fw-bold" style="color: var(--primary-color);">
                         <i class="bi bi-info-circle me-2" style="color: var(--accent-color);"></i>
-                        How to Use
+                        {% translate "How to Use" %}
                     </h6>
                 </div>
                 <div class="card-body">
@@ -162,29 +164,29 @@
                         <li>
                             <div class="step-num">1</div>
                             <div>
-                                <div class="fw-semibold">Open the mobile app</div>
-                                <div class="text-muted small">Make sure you are logged in to the restaurant app.</div>
+                                <div class="fw-semibold">{% translate "Open the mobile app" %}</div>
+                                <div class="text-muted small">{% translate "Make sure you are logged in to the restaurant app." %}</div>
                             </div>
                         </li>
                         <li>
                             <div class="step-num">2</div>
                             <div>
-                                <div class="fw-semibold">Go to the Attendance tab</div>
-                                <div class="text-muted small">Tap the Attendance icon in the bottom navigation.</div>
+                                <div class="fw-semibold">{% translate "Go to the Attendance tab" %}</div>
+                                <div class="text-muted small">{% translate "Tap the Attendance icon in the bottom navigation." %}</div>
                             </div>
                         </li>
                         <li>
                             <div class="step-num">3</div>
                             <div>
-                                <div class="fw-semibold">Scan this QR code</div>
-                                <div class="text-muted small">Point the camera at the QR code displayed here.</div>
+                                <div class="fw-semibold">{% translate "Scan this QR code" %}</div>
+                                <div class="text-muted small">{% translate "Point the camera at the QR code displayed here." %}</div>
                             </div>
                         </li>
                         <li>
                             <div class="step-num">4</div>
                             <div>
-                                <div class="fw-semibold">Confirm check-in or check-out</div>
-                                <div class="text-muted small">The app will detect whether you are checking in or out and confirm the action.</div>
+                                <div class="fw-semibold">{% translate "Confirm check-in or check-out" %}</div>
+                                <div class="text-muted small">{% translate "The app will detect whether you are checking in or out and confirm the action." %}</div>
                             </div>
                         </li>
                     </ol>
@@ -194,8 +196,7 @@
                          style="background: rgba(243,156,18,0.08); border-radius: 8px; padding: 0.75rem !important;">
                         <i class="bi bi-exclamation-triangle-fill mt-1" style="color: var(--warning-color); flex-shrink: 0;"></i>
                         <div style="font-size: 0.82rem; color: #856404;">
-                            <strong>Note:</strong> Regenerating the QR code will immediately invalidate the old one.
-                            All staff must scan the new code for their next attendance action.
+                            <strong>{% translate "Note:" %}</strong> {% translate "Regenerating the QR code will immediately invalidate the old one. All staff must scan the new code for their next attendance action." %}
                         </div>
                     </div>
                 </div>

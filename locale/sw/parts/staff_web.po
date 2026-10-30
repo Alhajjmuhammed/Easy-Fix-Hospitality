@@ -1,0 +1,763 @@
+msgid "%(counter)s rating"
+msgid_plural "%(counter)s ratings"
+msgstr[0] "tathmini %(counter)s"
+msgstr[1] "tathmini %(counter)s"
+
+msgid "%(counter)s rating · %(u)s not replied"
+msgid_plural "%(counter)s ratings · %(u)s not replied"
+msgstr[0] "tathmini %(counter)s · %(u)s haijajibiwa"
+msgstr[1] "tathmini %(counter)s · %(u)s hazijajibiwa"
+
+msgid "%(counter)s receipt"
+msgid_plural "%(counter)s receipts"
+msgstr[0] "risiti %(counter)s"
+msgstr[1] "risiti %(counter)s"
+
+msgid "%(period)s Performance Metrics"
+msgstr "Vipimo vya Utendaji: %(period)s"
+
+msgid "(Happy Hour %(pct)s%% off)"
+msgstr "(Saa ya Punguzo: punguzo %(pct)s%%)"
+
+msgid "-- Select destination table --"
+msgstr "-- Chagua meza ya kuhamishia --"
+
+msgid "1 or 2 stars"
+msgstr "nyota 1 au 2"
+
+msgid "<strong>%(n)s</strong> item"
+msgid_plural "<strong>%(n)s</strong> items"
+msgstr[0] "bidhaa <strong>%(n)s</strong>"
+msgstr[1] "bidhaa <strong>%(n)s</strong>"
+
+msgid "All"
+msgstr "Zote"
+
+msgid "All Stations"
+msgstr "Vituo Vyote"
+
+msgid "All Sub Categories"
+msgstr "Makundi Madogo Yote"
+
+msgid "All Tables"
+msgstr "Meza Zote"
+
+msgid "All time"
+msgstr "Tangu mwanzo"
+
+msgid "Amount"
+msgstr "Kiasi"
+
+msgid "Amount Due"
+msgstr "Kiasi Kinachodaiwa"
+
+msgid "Amount Paid *"
+msgstr "Kiasi Kilicholipwa *"
+
+msgid "An error occurred while printing the bill"
+msgstr "Hitilafu imetokea wakati wa kuchapisha bili"
+
+msgid "Any additional notes..."
+msgstr "Maelezo yoyote ya ziada..."
+
+msgid "Are you sure you want to cancel order #%(n)s?"
+msgstr "Una uhakika unataka kughairi oda #%(n)s?"
+
+msgid "Assist customers with order issues"
+msgstr "Wasaidie wateja wenye matatizo ya oda"
+
+msgid "Auto-refresh in:"
+msgstr "Inapakia upya baada ya:"
+
+msgid "Avg. Prep Time"
+msgstr "Wastani wa Muda wa Kuandaa"
+
+msgid "Avg. Service Time"
+msgstr "Wastani wa Muda wa Huduma"
+
+msgid "BAR ITEMS"
+msgstr "BIDHAA ZA BAA"
+
+msgid "BAR ORDER TICKET"
+msgstr "TIKETI YA ODA YA BAA"
+
+msgid "BAR STATION"
+msgstr "KITUO CHA BAA"
+
+msgid "BAR STATION - PRIORITY ORDER"
+msgstr "KITUO CHA BAA - ODA YA KIPAUMBELE"
+
+msgid "BUFFET ITEMS"
+msgstr "BIDHAA ZA BUFEE"
+
+msgid "BUFFET ORDER TICKET"
+msgstr "TIKETI YA ODA YA BUFEE"
+
+msgid "BUFFET STATION"
+msgstr "KITUO CHA BUFEE"
+
+msgid "BUFFET STATION - PRIORITY ORDER"
+msgstr "KITUO CHA BUFEE - ODA YA KIPAUMBELE"
+
+msgid "Back to Bar Dashboard"
+msgstr "Rudi kwenye Dashibodi ya Baa"
+
+msgid "Back to Buffet Dashboard"
+msgstr "Rudi kwenye Dashibodi ya Bufee"
+
+msgid "Back to Kitchen"
+msgstr "Rudi Jikoni"
+
+msgid "Back to Payments"
+msgstr "Rudi kwenye Malipo"
+
+msgid "Back to Service Dashboard"
+msgstr "Rudi kwenye Dashibodi ya Huduma"
+
+msgid "Balance"
+msgstr "Salio"
+
+msgid "Bar Dashboard"
+msgstr "Dashibodi ya Baa"
+
+msgid "Bar Items"
+msgstr "Bidhaa za Baa"
+
+msgid "Bar Performance Report"
+msgstr "Ripoti ya Utendaji wa Baa"
+
+msgid "Bar Reports"
+msgstr "Ripoti za Baa"
+
+msgid "Bar Staff: %(name)s"
+msgstr "Mfanyakazi wa Baa: %(name)s"
+
+msgid "Bill print failed"
+msgstr "Kuchapisha bili kumeshindikana"
+
+msgid "Browse our menu and start your ordering experience."
+msgstr "Tazama menyu yetu na uanze kuagiza."
+
+msgid "Buffet Dashboard"
+msgstr "Dashibodi ya Bufee"
+
+msgid "Buffet Items"
+msgstr "Bidhaa za Bufee"
+
+msgid "Buffet Performance Report"
+msgstr "Ripoti ya Utendaji wa Bufee"
+
+msgid "Buffet Reports"
+msgstr "Ripoti za Bufee"
+
+msgid "Buffet Staff: %(name)s"
+msgstr "Mfanyakazi wa Bufee: %(name)s"
+
+msgid "Calculating..."
+msgstr "Inahesabu..."
+
+msgid "Cancellation Reason:"
+msgstr "Sababu ya Kughairi:"
+
+msgid "Cancelled"
+msgstr "Imeghairiwa"
+
+msgid "Cancelled Orders"
+msgstr "Oda Zilizoghairiwa"
+
+msgid "Card"
+msgstr "Kadi"
+
+msgid "Cash"
+msgstr "Taslimu"
+
+msgid "Clear"
+msgstr "Futa"
+
+msgid "Clear Filters"
+msgstr "Futa Vichujio"
+
+msgid "Complete"
+msgstr "Kamilisha"
+
+msgid "Completed"
+msgstr "Zilizokamilika"
+
+msgid "Completed Orders"
+msgstr "Oda Zilizokamilika"
+
+msgid "Confirm"
+msgstr "Thibitisha"
+
+msgid "Confirm this order?"
+msgstr "Uthibitishe oda hii?"
+
+msgid "Confirmed"
+msgstr "Imethibitishwa"
+
+msgid "Confirmed By:"
+msgstr "Imethibitishwa na:"
+
+msgid "Connection error. Please refresh the page and try again."
+msgstr "Hitilafu ya mtandao. Tafadhali pakia ukurasa upya kisha ujaribu tena."
+
+msgid "Customer Care Dashboard"
+msgstr "Dashibodi ya Huduma kwa Wateja"
+
+msgid "Customer Care Tips"
+msgstr "Vidokezo vya Huduma kwa Wateja"
+
+msgid "Customer Care:"
+msgstr "Huduma kwa Wateja:"
+
+msgid "Customer Feedback"
+msgstr "Maoni ya Wateja"
+
+msgid "Date & Time"
+msgstr "Tarehe na Saa"
+
+msgid "Date From"
+msgstr "Tarehe Kuanzia"
+
+msgid "Date To"
+msgstr "Tarehe Hadi"
+
+msgid "Delivery · last 30 days"
+msgstr "Usafirishaji · siku 30 zilizopita"
+
+msgid "Detailed Sales Data - %(n)s Orders"
+msgstr "Taarifa Kamili za Mauzo - Oda %(n)s"
+
+msgid "Drinks Served"
+msgstr "Vinywaji Vilivyohudumiwa"
+
+msgid "Duration"
+msgstr "Muda"
+
+msgid "Edit Order"
+msgstr "Hariri Oda"
+
+msgid "Enter order number or receipt ID"
+msgstr "Weka namba ya oda au namba ya risiti"
+
+msgid "Enter the amount customer is paying"
+msgstr "Weka kiasi ambacho mteja analipa"
+
+msgid "Entered By:"
+msgstr "Imewekwa na:"
+
+msgid "Error transferring order"
+msgstr "Hitilafu wakati wa kuhamisha oda"
+
+msgid "Export CSV"
+msgstr "Pakua CSV"
+
+msgid "Failed to confirm order."
+msgstr "Imeshindikana kuthibitisha oda."
+
+msgid "Failed to update status."
+msgstr "Imeshindikana kubadilisha hali."
+
+msgid "Filter"
+msgstr "Chuja"
+
+msgid "Filter Orders"
+msgstr "Chuja Oda"
+
+msgid "Food · last 30 days"
+msgstr "Chakula · siku 30 zilizopita"
+
+msgid "Handle special requests promptly"
+msgstr "Shughulikia maombi maalum haraka"
+
+msgid "ITEMS TO PREPARE"
+msgstr "BIDHAA ZA KUANDAA"
+
+msgid "ITEMS:"
+msgstr "BIDHAA:"
+
+msgid "Items Prepared"
+msgstr "Bidhaa Zilizoandaliwa"
+
+msgid "Items Served"
+msgstr "Bidhaa Zilizohudumiwa"
+
+msgid "Items Sold"
+msgstr "Bidhaa Zilizouzwa"
+
+msgid "Items:"
+msgstr "Bidhaa:"
+
+msgid "KITCHEN ORDER TICKET"
+msgstr "TIKETI YA ODA YA JIKONI"
+
+msgid "Kitchen Dashboard"
+msgstr "Dashibodi ya Jiko"
+
+msgid "Kitchen Items"
+msgstr "Bidhaa za Jiko"
+
+msgid "Kitchen Performance Report"
+msgstr "Ripoti ya Utendaji wa Jiko"
+
+msgid "Kitchen Reports"
+msgstr "Ripoti za Jiko"
+
+msgid "Kitchen Station"
+msgstr "Kituo cha Jiko"
+
+msgid "LIVE"
+msgstr "MUBASHARA"
+
+msgid "Live"
+msgstr "Mubashara"
+
+msgid "Low (1–2★)"
+msgstr "Za chini (1–2★)"
+
+msgid "Low ratings · 30 days"
+msgstr "Tathmini za chini · siku 30"
+
+msgid "Maintain excellent customer service"
+msgstr "Dumisha huduma bora kwa wateja"
+
+msgid "Mark Ready"
+msgstr "Weka: Iko Tayari"
+
+msgid "Mark Served"
+msgstr "Weka: Imehudumiwa"
+
+msgid "Mark this bill request as completed?"
+msgstr "Uweke ombi hili la bili kuwa limekamilika?"
+
+msgid "Mark this order as ready?"
+msgstr "Uweke oda hii kuwa iko tayari?"
+
+msgid "Mark this order as served?"
+msgstr "Uweke oda hii kuwa imehudumiwa?"
+
+msgid "Method"
+msgstr "Njia"
+
+msgid "Mobile Payment"
+msgstr "Malipo kwa Simu"
+
+msgid "Monitor order statuses regularly"
+msgstr "Fuatilia hali za oda mara kwa mara"
+
+msgid "Move to Table:"
+msgstr "Hamishia Meza:"
+
+msgid "My Completed Orders"
+msgstr "Oda Zangu Zilizokamilika"
+
+msgid "My Pending Orders"
+msgstr "Oda Zangu Zinazosubiri"
+
+msgid "My Recent Orders"
+msgstr "Oda Zangu za Karibuni"
+
+msgid "My Reports"
+msgstr "Ripoti Zangu"
+
+msgid "My Sales Reports"
+msgstr "Ripoti Zangu za Mauzo"
+
+msgid "NEW ORDER - PREPARE IMMEDIATELY"
+msgstr "ODA MPYA - ANDAA SASA HIVI"
+
+msgid "Need Attention"
+msgstr "Zinahitaji kushughulikiwa"
+
+msgid "Network error. Please try again."
+msgstr "Hitilafu ya mtandao. Tafadhali jaribu tena."
+
+msgid "No Orders Found"
+msgstr "Hakuna Oda Zilizopatikana"
+
+msgid "No Orders Yet"
+msgstr "Bado Hakuna Oda"
+
+msgid "No confirmed orders"
+msgstr "Hakuna oda zilizothibitishwa"
+
+msgid "No drinks prepared in this period."
+msgstr "Hakuna vinywaji vilivyoandaliwa katika kipindi hiki."
+
+msgid "No items prepared in this period."
+msgstr "Hakuna bidhaa zilizoandaliwa katika kipindi hiki."
+
+msgid "No items served in this period."
+msgstr "Hakuna bidhaa zilizohudumiwa katika kipindi hiki."
+
+msgid "No orders being prepared"
+msgstr "Hakuna oda zinazoandaliwa"
+
+msgid "No orders found for this period."
+msgstr "Hakuna oda zilizopatikana kwa kipindi hiki."
+
+msgid "No orders ready for service"
+msgstr "Hakuna oda zilizo tayari kuhudumiwa"
+
+msgid "No pending orders"
+msgstr "Hakuna oda zinazosubiri"
+
+msgid "No pending orders right now"
+msgstr "Hakuna oda zinazosubiri kwa sasa"
+
+msgid "No ratings match this filter."
+msgstr "Hakuna tathmini zinazolingana na kichujio hiki."
+
+msgid "No ratings yet. Customers can rate orders after they are served or delivered."
+msgstr "Bado hakuna tathmini. Wateja wanaweza kukadiria oda baada ya kuhudumiwa au kufikishwa."
+
+msgid "No receipts found"
+msgstr "Hakuna risiti zilizopatikana"
+
+msgid "No receipts have been generated yet."
+msgstr "Bado hakuna risiti zilizotolewa."
+
+msgid "No receipts match your current search criteria."
+msgstr "Hakuna risiti zinazolingana na vigezo vya utafutaji wako."
+
+msgid "No served orders yet today"
+msgstr "Bado hakuna oda zilizohudumiwa leo"
+
+msgid "Not replied"
+msgstr "Hazijajibiwa"
+
+msgid "Note:"
+msgstr "Kumbuka:"
+
+msgid "Notes (Optional)"
+msgstr "Maelezo (si lazima)"
+
+msgctxt "order number column"
+msgid "Order"
+msgstr "Oda"
+
+msgid "Order #:"
+msgstr "Oda #:"
+
+msgid "Order %(n)s"
+msgstr "Oda %(n)s"
+
+msgid "Order List"
+msgstr "Orodha ya Oda"
+
+msgid "Order Number or Receipt ID"
+msgstr "Namba ya Oda au Namba ya Risiti"
+
+msgid "Order Status Breakdown"
+msgstr "Mchanganuo wa Hali za Oda"
+
+msgid "Order Time"
+msgstr "Saa ya Oda"
+
+msgid "Order Time:"
+msgstr "Saa ya Oda:"
+
+msgid "Order:"
+msgstr "Oda:"
+
+msgid "Ordered"
+msgstr "Imeagizwa"
+
+msgid "Ordered By"
+msgstr "Imeagizwa na"
+
+msgid "Ordered By:"
+msgstr "Imeagizwa na:"
+
+msgid "Orders will appear here once customers start placing them."
+msgstr "Oda zitaonekana hapa wateja wakianza kuagiza."
+
+msgid "Page %(n)s of %(total)s"
+msgstr "Ukurasa %(n)s kati ya %(total)s"
+
+msgid "Pay"
+msgstr "Lipa"
+
+msgid "Payment Management"
+msgstr "Usimamizi wa Malipo"
+
+msgid "Payment Method *"
+msgstr "Njia ya Malipo *"
+
+msgid "Payment Status"
+msgstr "Hali ya Malipo"
+
+msgid "Payment processed successfully!"
+msgstr "Malipo yamepokelewa!"
+
+msgid "Payment processing failed. Please try again."
+msgstr "Malipo yameshindikana. Tafadhali jaribu tena."
+
+msgid "Pending Bill Requests"
+msgstr "Maombi ya Bili Yanayosubiri"
+
+msgid "Period"
+msgstr "Kipindi"
+
+msgid "Place New Order"
+msgstr "Weka Oda Mpya"
+
+msgid "Please come again"
+msgstr "Karibu tena"
+
+msgid "Please select a destination table."
+msgstr "Tafadhali chagua meza ya kuhamishia."
+
+msgid "Preparing"
+msgstr "Inaandaliwa"
+
+msgid "Print Bill"
+msgstr "Chapisha Bili"
+
+msgid "Print Kitchen Order Ticket"
+msgstr "Chapisha Tiketi ya Oda ya Jikoni"
+
+msgid "Print Receipt"
+msgstr "Chapisha Risiti"
+
+msgid "Print bill for Order #{number}?"
+msgstr "Uchapishe bili ya Oda #{number}?"
+
+msgid "Printed: %(time)s"
+msgstr "Imechapishwa: %(time)s"
+
+msgid "Process Payment"
+msgstr "Pokea Malipo"
+
+msgid "Processed By"
+msgstr "Imepokelewa na"
+
+msgid "RECEIPT"
+msgstr "RISITI"
+
+msgid "Ready"
+msgstr "Iko tayari"
+
+msgid "Ready to Place an Order?"
+msgstr "Uko Tayari Kuweka Oda?"
+
+msgid "Receipt #"
+msgstr "Risiti #"
+
+msgid "Receipt Management"
+msgstr "Usimamizi wa Risiti"
+
+msgid "Recent Bar Orders (%(period)s)"
+msgstr "Oda za Baa za Karibuni (%(period)s)"
+
+msgid "Recent Buffet Orders (%(period)s)"
+msgstr "Oda za Bufee za Karibuni (%(period)s)"
+
+msgid "Recent Kitchen Orders (%(period)s)"
+msgstr "Oda za Jiko za Karibuni (%(period)s)"
+
+msgid "Recent Service Orders (%(period)s)"
+msgstr "Oda za Huduma za Karibuni (%(period)s)"
+
+msgid "Refresh"
+msgstr "Onyesha upya"
+
+msgid "Refresh in"
+msgstr "Inapakia upya baada ya"
+
+msgid "Reply"
+msgstr "Jibu"
+
+msgid "Reply to the customer (they get a notification)"
+msgstr "Mjibu mteja (atapata taarifa)"
+
+msgid "Report Filters"
+msgstr "Vichujio vya Ripoti"
+
+msgid "Reprint"
+msgstr "Chapisha tena"
+
+msgid "Requested by: %(name)s"
+msgstr "Imeombwa na: %(name)s"
+
+msgid "SERVICE ITEMS"
+msgstr "BIDHAA ZA HUDUMA"
+
+msgid "SERVICE ORDER TICKET"
+msgstr "TIKETI YA ODA YA HUDUMA"
+
+msgid "SERVICE STATION"
+msgstr "KITUO CHA HUDUMA"
+
+msgid "SERVICE STATION - PRIORITY ORDER"
+msgstr "KITUO CHA HUDUMA - ODA YA KIPAUMBELE"
+
+msgid "SPECIAL INSTRUCTIONS"
+msgstr "MAELEKEZO MAALUM"
+
+msgid "Search"
+msgstr "Tafuta"
+
+msgid "Search Receipts"
+msgstr "Tafuta Risiti"
+
+msgid "Select Payment Method"
+msgstr "Chagua Njia ya Malipo"
+
+msgid "Send reply"
+msgstr "Tuma jibu"
+
+msgid "Served"
+msgstr "Imehudumiwa"
+
+msgid "Served at"
+msgstr "Imehudumiwa saa"
+
+msgid "Served orders pagination"
+msgstr "Kurasa za oda zilizohudumiwa"
+
+msgid "Service Dashboard"
+msgstr "Dashibodi ya Huduma"
+
+msgid "Service Items"
+msgstr "Bidhaa za Huduma"
+
+msgid "Service Performance Report"
+msgstr "Ripoti ya Utendaji wa Huduma"
+
+msgid "Service Reports"
+msgstr "Ripoti za Huduma"
+
+msgid "Service Staff: %(name)s"
+msgstr "Mhudumu: %(name)s"
+
+msgid "Session expired or access denied. Please refresh the page and try again."
+msgstr "Muda wa kuingia umeisha au huna ruhusa. Tafadhali pakia ukurasa upya kisha ujaribu tena."
+
+msgid "Showing first 50 results. Use filters to narrow your search."
+msgstr "Inaonyesha matokeo 50 ya kwanza. Tumia vichujio kupunguza utafutaji wako."
+
+msgid "Start"
+msgstr "Anza"
+
+msgid "Start Ordering"
+msgstr "Anza Kuagiza"
+
+msgid "Start Preparing"
+msgstr "Anza Kuandaa"
+
+msgid "Start preparing this order?"
+msgstr "Uanze kuandaa oda hii?"
+
+msgid "TOTAL:"
+msgstr "JUMLA:"
+
+msgid "Tel:"
+msgstr "Simu:"
+
+msgid "Thank you for your service!"
+msgstr "Asante kwa huduma yako!"
+
+msgid "The bill will be sent to the receipt printer."
+msgstr "Bili itatumwa kwa printa ya risiti."
+
+msgid "There are no orders matching your filters."
+msgstr "Hakuna oda zinazolingana na vichujio vyako."
+
+msgid "This Month"
+msgstr "Mwezi Huu"
+
+msgid "This Week"
+msgstr "Wiki Hii"
+
+msgid "This action will restore the product stock."
+msgstr "Hatua hii itarudisha bidhaa kwenye stoo."
+
+msgid "This is a kitchen copy only - Not for billing"
+msgstr "Hii ni nakala ya jikoni tu - Si kwa ajili ya bili"
+
+msgid "This table is currently occupied. The order will still be transferred."
+msgstr "Meza hii ina wateja kwa sasa. Oda bado itahamishwa."
+
+msgid "Time:"
+msgstr "Saa:"
+
+msgid "Today"
+msgstr "Leo"
+
+msgid "Top 10 Most Popular Drinks"
+msgstr "Vinywaji 10 Vinavyopendwa Zaidi"
+
+msgid "Top 10 Most Prepared Items"
+msgstr "Bidhaa 10 Zilizoandaliwa Zaidi"
+
+msgid "Top 10 Most Served Items"
+msgstr "Bidhaa 10 Zilizohudumiwa Zaidi"
+
+msgid "Total Amount"
+msgstr "Jumla ya Kiasi"
+
+msgid "Total Amount:"
+msgstr "Jumla ya Kiasi:"
+
+msgid "Total Items:"
+msgstr "Jumla ya Bidhaa:"
+
+msgid "Total Items: %(n)s"
+msgstr "Jumla ya Bidhaa: %(n)s"
+
+msgid "Total Quantity: %(n)s"
+msgstr "Jumla ya Idadi: %(n)s"
+
+msgid "Transfer"
+msgstr "Hamisha"
+
+msgid "Transfer Order"
+msgstr "Hamisha Oda"
+
+msgid "Transfer Order to Another Table"
+msgstr "Hamishia Oda Meza Nyingine"
+
+msgid "Transferring"
+msgstr "Unahamisha"
+
+msgid "Update order status?"
+msgstr "Ubadilishe hali ya oda?"
+
+msgid "View All"
+msgstr "Ona Zote"
+
+msgid "View Reports"
+msgstr "Angalia Ripoti"
+
+msgid "View your order history and sales performance"
+msgstr "Angalia historia ya oda zako na utendaji wa mauzo"
+
+msgid "You are about to cancel order %(n)s for Table %(t)s."
+msgstr "Unakaribia kughairi oda %(n)s ya Meza %(t)s."
+
+msgid "You are about to cancel order %(n)s."
+msgstr "Unakaribia kughairi oda %(n)s."
+
+msgid "You haven't created any orders for the selected filters."
+msgstr "Hujaweka oda yoyote kwa vichujio ulivyochagua."
+
+msgid "You haven't created any orders yet."
+msgstr "Bado hujaweka oda yoyote."
+
+msgid "You haven't placed any orders yet. Start by selecting a restaurant and table."
+msgstr "Bado hujaweka oda yoyote. Anza kwa kuchagua mgahawa na meza."
+
+msgid "by %(name)s"
+msgstr "na %(name)s"
+
+msgid "delivery orders only"
+msgstr "oda za kuletewa tu"
+
+msgctxt "transfer table"
+msgid "from"
+msgstr "kutoka"
+
+msgctxt "seconds"
+msgid "s"
+msgstr "s"

@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Tables Management - Admin Panel{% endblock %}
+{% block title %}{% translate "Tables Management" %} - {% translate "Admin Panel" %}{% endblock %}
 
-{% block page_title %}Tables Management{% endblock %}
-{% block page_description %}Manage restaurant tables and seating arrangements{% endblock %}
+{% block page_title %}{% translate "Tables Management" %}{% endblock %}
+{% block page_description %}{% translate "Manage restaurant tables and seating arrangements" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -64,11 +65,11 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h4 class="mb-1">Tables Management</h4>
-                    <p class="text-muted mb-0">Manage restaurant tables and seating arrangements</p>
+                    <h4 class="mb-1">{% translate "Tables Management" %}</h4>
+                    <p class="text-muted mb-0">{% translate "Manage restaurant tables and seating arrangements" %}</p>
                 </div>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTableModal">
-                    <i class="fas fa-plus"></i> Add Table
+                    <i class="fas fa-plus"></i> {% translate "Add Table" %}
                 </button>
             </div>
         </div>
@@ -82,25 +83,25 @@
                     <!-- Search Input -->
                     <div class="col-md-4">
                         <label for="tableSearch" class="form-label">
-                            <i class="fas fa-search"></i> Search Tables
+                            <i class="fas fa-search"></i> {% translate "Search Tables" %}
                         </label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="tableSearch" name="search" 
-                                   value="{{ request.GET.search }}" placeholder="Search by table number...">
+                                   value="{{ request.GET.search }}" placeholder="{% translate "Search by table number..." %}">
                             <span class="input-group-text">
                                 <i class="fas fa-search"></i>
                             </span>
                         </div>
-                        <small class="text-muted">Press ESC to clear search</small>
+                        <small class="text-muted">{% translate "Press ESC to clear search" %}</small>
                     </div>
 
                     <!-- Restaurant Filter -->
                     <div class="col-md-3">
                         <label for="restaurantFilter" class="form-label">
-                            <i class="fas fa-building"></i> Restaurant
+                            <i class="fas fa-building"></i> {% translate "Restaurant" %}
                         </label>
                         <select class="form-select" id="restaurantFilter" name="restaurant">
-                            <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                            <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>{% translate "All Restaurants" %}</option>
                             {% for restaurant in accessible_restaurants %}
                             <option value="{{ restaurant.id }}" 
                                 {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
@@ -115,19 +116,19 @@
                     <!-- Status Filter -->
                     <div class="col-md-3">
                         <label for="statusFilter" class="form-label">
-                            <i class="fas fa-toggle-on"></i> Status
+                            <i class="fas fa-toggle-on"></i> {% translate "Status" %}
                         </label>
                         <select class="form-select" id="statusFilter" name="status">
-                            <option value="">All Status</option>
-                            <option value="available" {% if request.GET.status == 'available' %}selected{% endif %}>Available</option>
-                            <option value="occupied" {% if request.GET.status == 'occupied' %}selected{% endif %}>Occupied</option>
+                            <option value="">{% translate "All Status" %}</option>
+                            <option value="available" {% if request.GET.status == 'available' %}selected{% endif %}>{% translate "Available" %}</option>
+                            <option value="occupied" {% if request.GET.status == 'occupied' %}selected{% endif %}>{% translate "Occupied" %}</option>
                         </select>
                     </div>
 
                     <!-- Items Per Page -->
                     <div class="col-md-2">
                         <label for="perPageSelect" class="form-label">
-                            <i class="fas fa-list"></i> Per Page
+                            <i class="fas fa-list"></i> {% translate "Per Page" %}
                         </label>
                         <select class="form-select" id="perPageSelect" name="per_page">
                             <option value="5" {% if request.GET.per_page == '5' %}selected{% endif %}>5</option>
@@ -142,7 +143,7 @@
             <!-- Results Summary -->
             <div class="mt-3">
                 <small class="text-muted">
-                    Showing {{ tables|length }} table{{ tables|length|pluralize }} total
+                    {% blocktranslate count counter=tables|length %}Showing {{ counter }} table total{% plural %}Showing {{ counter }} tables total{% endblocktranslate %}
                 </small>
             </div>
         </div>
@@ -157,9 +158,9 @@
                     <div class="table-icon text-primary">
                         <i class="fas fa-chair"></i>
                     </div>
-                    <h5 class="card-title mb-1">Table {{ table.tbl_no }}</h5>
+                    <h5 class="card-title mb-1">{% blocktranslate with number=table.tbl_no %}Table {{ number }}{% endblocktranslate %}</h5>
                     <p class="card-text text-muted mb-2">
-                        <i class="fas fa-users"></i> Capacity: {{ table.capacity }}
+                        <i class="fas fa-users"></i> {% blocktranslate with capacity=table.capacity %}Capacity: {{ capacity }}{% endblocktranslate %}
                     </p>
                     <p class="card-text mb-2" style="font-size: 0.75rem;">
                         <i class="fas fa-store"></i> 
@@ -173,22 +174,22 @@
                     </p>
                     <div class="mb-2">
                         <span class="badge status-badge {% if table.is_available %}bg-success{% else %}bg-danger{% endif %}">
-                            {% if table.is_available %}Available{% else %}Occupied{% endif %}
+                            {% if table.is_available %}{% translate "Available" %}{% else %}{% translate "Occupied" %}{% endif %}
                         </span>
                     </div>
                     <div class="action-buttons">
                         <button type="button" class="btn btn-sm btn-outline-primary edit-table-btn" 
-                                data-table-id="{{ table.id }}" title="Edit Table">
+                                data-table-id="{{ table.id }}" title="{% translate "Edit Table" %}">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-{% if table.is_available %}warning{% else %}success{% endif %} toggle-status-btn"
                                 data-table-id="{{ table.id }}"
                                 data-is-available="{{ table.is_available|yesno:'true,false' }}"
-                                title="{% if table.is_available %}Mark as Occupied{% else %}Mark as Available{% endif %}">
+                                title="{% if table.is_available %}{% translate "Mark as Occupied" %}{% else %}{% translate "Mark as Available" %}{% endif %}">
                             <i class="fas fa-{% if table.is_available %}lock{% else %}unlock{% endif %}"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-danger delete-table-btn" 
-                                data-table-id="{{ table.id }}" title="Delete Table">
+                                data-table-id="{{ table.id }}" title="{% translate "Delete Table" %}">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -199,10 +200,10 @@
         <div class="col-12" id="noTablesMessage">
             <div class="text-center py-5">
                 <i class="fas fa-chair text-muted" style="font-size: 4rem;"></i>
-                <h4 class="mt-3 text-muted">No Tables Found</h4>
-                <p class="text-muted">Start by adding your first table to the restaurant.</p>
+                <h4 class="mt-3 text-muted">{% translate "No Tables Found" %}</h4>
+                <p class="text-muted">{% translate "Start by adding your first table to the restaurant." %}</p>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTableModal">
-                    <i class="fas fa-plus"></i> Add First Table
+                    <i class="fas fa-plus"></i> {% translate "Add First Table" %}
                 </button>
             </div>
         </div>
@@ -211,11 +212,11 @@
 
     <!-- Pagination Controls -->
     {% if page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="Tables pagination" class="mt-4">
+    <nav aria-label="{% translate "Tables pagination" %}" class="mt-4">
         <div class="row align-items-center">
             <div class="col-md-6">
                 <p class="text-muted mb-2">
-                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} tables
+                    {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }} to {{ end }} of {{ total }} tables{% endblocktranslate %}
                 </p>
             </div>
             <div class="col-md-6">
@@ -271,61 +272,61 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addTableModalLabel">
-                    <i class="fas fa-plus-circle"></i> Add New Table
+                    <i class="fas fa-plus-circle"></i> {% translate "Add New Table" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="addTableForm">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="addTableNo" class="form-label">Table Number <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="addTableNo" name="tbl_no" required placeholder="e.g., T01, T02, 1, 2, etc.">
+                        <label for="addTableNo" class="form-label">{% translate "Table Number" %} <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="addTableNo" name="tbl_no" required placeholder="{% translate "e.g., T01, T02, 1, 2, etc." %}">
                         <div class="invalid-feedback" id="addTableNoError"></div>
-                        <small class="form-text text-muted">Enter table identifier (letters and numbers allowed)</small>
+                        <small class="form-text text-muted">{% translate "Enter table identifier (letters and numbers allowed)" %}</small>
                     </div>
                     <div class="form-group">
-                        <label for="addTableCapacity" class="form-label">Capacity <span class="text-danger">*</span></label>
+                        <label for="addTableCapacity" class="form-label">{% translate "Capacity" %} <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="addTableCapacity" name="capacity" required min="1" max="20">
                         <div class="invalid-feedback" id="addTableCapacityError"></div>
-                        <small class="form-text text-muted">Maximum number of people this table can accommodate</small>
+                        <small class="form-text text-muted">{% translate "Maximum number of people this table can accommodate" %}</small>
                     </div>
                     <div class="form-group">
-                        <label for="addTableRestaurant" class="form-label">Restaurant/Branch</label>
+                        <label for="addTableRestaurant" class="form-label">{% translate "Restaurant/Branch" %}</label>
                         <select class="form-select" id="addTableRestaurant" name="restaurant_id" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
                             {% if view_all_restaurants %}
-                                <option value="">Select Restaurant/Branch</option>
+                                <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}">
-                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 {% endfor %}
                             {% elif current_restaurant %}
                                 <option value="{{ current_restaurant.id }}" selected>
-                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                             {% else %}
-                                <option value="">No Restaurant Available</option>
+                                <option value="">{% translate "No Restaurant Available" %}</option>
                             {% endif %}
                         </select>
                         {% if current_restaurant and not view_all_restaurants %}
                         <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
-                        <small class="form-text text-muted">Table will be assigned to: {{ current_restaurant.name }}</small>
+                        <small class="form-text text-muted">{% blocktranslate with name=current_restaurant.name %}Table will be assigned to: {{ name }}{% endblocktranslate %}</small>
                         {% endif %}
                     </div>
                     <div class="form-group">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="addTableAvailable" name="is_available" checked>
                             <label class="form-check-label" for="addTableAvailable">
-                                Table is available
+                                {% translate "Table is available" %}
                             </label>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Add Table
+                        <i class="fas fa-save"></i> {% translate "Add Table" %}
                     </button>
                 </div>
             </form>
@@ -339,42 +340,42 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="editTableModalLabel">
-                    <i class="fas fa-edit"></i> Edit Table
+                    <i class="fas fa-edit"></i> {% translate "Edit Table" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <form id="editTableForm">
                 {% csrf_token %}
                 <input type="hidden" id="editTableId" name="table_id">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label for="editTableNo" class="form-label">Table Number <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="editTableNo" name="tbl_no" required placeholder="e.g., T01, T02, 1, 2, etc.">
+                        <label for="editTableNo" class="form-label">{% translate "Table Number" %} <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editTableNo" name="tbl_no" required placeholder="{% translate "e.g., T01, T02, 1, 2, etc." %}">
                         <div class="invalid-feedback" id="editTableNoError"></div>
-                        <small class="form-text text-muted">Enter table identifier (letters and numbers allowed)</small>
+                        <small class="form-text text-muted">{% translate "Enter table identifier (letters and numbers allowed)" %}</small>
                     </div>
                     <div class="form-group">
-                        <label for="editTableCapacity" class="form-label">Capacity <span class="text-danger">*</span></label>
+                        <label for="editTableCapacity" class="form-label">{% translate "Capacity" %} <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="editTableCapacity" name="capacity" required min="1" max="20">
                         <div class="invalid-feedback" id="editTableCapacityError"></div>
-                        <small class="form-text text-muted">Maximum number of people this table can accommodate</small>
+                        <small class="form-text text-muted">{% translate "Maximum number of people this table can accommodate" %}</small>
                     </div>
                     <div class="form-group">
-                        <label for="editTableRestaurant" class="form-label">Restaurant/Branch</label>
+                        <label for="editTableRestaurant" class="form-label">{% translate "Restaurant/Branch" %}</label>
                         <select class="form-select" id="editTableRestaurant" name="restaurant" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
                             {% if view_all_restaurants %}
-                                <option value="">Select Restaurant/Branch</option>
+                                <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}">
-                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                                 {% endfor %}
                             {% elif current_restaurant %}
                                 <option value="{{ current_restaurant.id }}" selected>
-                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} ({% translate "Main" %}){% else %} ({% translate "Branch" %}){% endif %}
                                 </option>
                             {% else %}
-                                <option value="">No Restaurant Available</option>
+                                <option value="">{% translate "No Restaurant Available" %}</option>
                             {% endif %}
                         </select>
                         {% if current_restaurant and not view_all_restaurants %}
@@ -385,15 +386,15 @@
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="editTableAvailable" name="is_available">
                             <label class="form-check-label" for="editTableAvailable">
-                                Table is available
+                                {% translate "Table is available" %}
                             </label>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Update Table
+                        <i class="fas fa-save"></i> {% translate "Update Table" %}
                     </button>
                 </div>
             </form>
@@ -407,18 +408,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="deleteTableModalLabel">
-                    <i class="fas fa-exclamation-triangle text-danger"></i> Confirm Delete
+                    <i class="fas fa-exclamation-triangle text-danger"></i> {% translate "Confirm Delete" %}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete <strong id="deleteTableInfo"></strong>?</p>
-                <p class="text-muted mb-0">This action cannot be undone.</p>
+                <p>{% blocktranslate %}Are you sure you want to delete <strong id="deleteTableInfo"></strong>?{% endblocktranslate %}</p>
+                <p class="text-muted mb-0">{% translate "This action cannot be undone." %}</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteTable">
-                    <i class="fas fa-trash"></i> Delete Table
+                    <i class="fas fa-trash"></i> {% translate "Delete Table" %}
                 </button>
             </div>
         </div>
@@ -427,6 +428,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "An error occurred while adding the table." as t_err_add %}{% translate "Failed to load table data." as t_fail_load %}{% translate "An error occurred while loading table data." as t_err_load %}{% translate "An error occurred while updating the table." as t_err_update %}{% translate "Failed to update table status." as t_fail_status %}{% translate "An error occurred while updating table status." as t_err_status %}{% translate "Failed to delete table." as t_fail_delete %}{% translate "An error occurred while deleting the table." as t_err_delete %}
 <script>
 $(document).ready(function() {
     // Filter form auto-submit
@@ -490,7 +492,7 @@ $(document).ready(function() {
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while adding the table.');
+                showAlert('danger', '{{ t_err_add|escapejs }}');
             }
         });
     });
@@ -518,11 +520,11 @@ $(document).ready(function() {
                     
                     $('#editTableModal').modal('show');
                 } else {
-                    showAlert('danger', response.message || 'Failed to load table data.');
+                    showAlert('danger', response.message || '{{ t_fail_load|escapejs }}');
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while loading table data.');
+                showAlert('danger', '{{ t_err_load|escapejs }}');
             }
         });
     });
@@ -560,7 +562,7 @@ $(document).ready(function() {
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while updating the table.');
+                showAlert('danger', '{{ t_err_update|escapejs }}');
             }
         });
     });
@@ -583,11 +585,11 @@ $(document).ready(function() {
                 if (response.success) {
                     location.reload();
                 } else {
-                    showAlert('danger', response.message || 'Failed to update table status.');
+                    showAlert('danger', response.message || '{{ t_fail_status|escapejs }}');
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while updating table status.');
+                showAlert('danger', '{{ t_err_status|escapejs }}');
             }
         });
     });
@@ -619,11 +621,11 @@ $(document).ready(function() {
                     $('#deleteTableModal').modal('hide');
                     location.reload();
                 } else {
-                    showAlert('danger', response.message || 'Failed to delete table.');
+                    showAlert('danger', response.message || '{{ t_fail_delete|escapejs }}');
                 }
             },
             error: function() {
-                showAlert('danger', 'An error occurred while deleting the table.');
+                showAlert('danger', '{{ t_err_delete|escapejs }}');
             }
         });
     });
@@ -640,7 +642,7 @@ $(document).ready(function() {
         const alertHtml = `
             <div class="alert alert-${type} alert-dismissible fade show" role="alert">
                 ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{% translate "Close" %}"></button>
             </div>
         `;
         

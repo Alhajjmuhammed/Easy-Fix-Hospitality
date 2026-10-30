@@ -1,15 +1,16 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}My Orders - Cashier{% endblock %}
+{% block title %}{% translate "My Orders" %} - {% translate "Cashier" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-md-12">
-            <h2 class="mb-0"><i class="fas fa-list-ul"></i> My Orders</h2>
-            <p class="text-muted">Orders you have created</p>
+            <h2 class="mb-0"><i class="fas fa-list-ul"></i> {% translate "My Orders" %}</h2>
+            <p class="text-muted">{% translate "Orders you have created" %}</p>
         </div>
     </div>
 
@@ -22,15 +23,15 @@
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
-                                        <th style="width: 5%;">SN</th>
-                                        <th style="width: 15%;">Order #</th>
-                                        <th style="width: 10%;">Table</th>
-                                        <th style="width: 20%;">Items</th>
-                                        <th style="width: 10%;">Total</th>
-                                        <th style="width: 10%;">Paid</th>
-                                        <th style="width: 10%;">Balance</th>
-                                        <th style="width: 10%;">Status</th>
-                                        <th style="width: 10%;">Actions</th>
+                                        <th style="width: 5%;">{% translate "SN" %}</th>
+                                        <th style="width: 15%;">{% translate "Order #" %}</th>
+                                        <th style="width: 10%;">{% translate "Table" %}</th>
+                                        <th style="width: 20%;">{% translate "Items" %}</th>
+                                        <th style="width: 10%;">{% translate "Total" %}</th>
+                                        <th style="width: 10%;">{% translate "Paid" %}</th>
+                                        <th style="width: 10%;">{% translate "Balance" %}</th>
+                                        <th style="width: 10%;">{% translate "Status" %}</th>
+                                        <th style="width: 10%;">{% translate "Actions" %}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -42,11 +43,11 @@
                                                 <small class="text-muted">{{ order.created_at|date:"M d, H:i" }}</small>
                                             </td>
                                             <td>
-                                                <span class="badge bg-secondary">{% if order.table_info %}Table {{ order.table_info.tbl_no }}{% else %}{{ order.get_order_type_display }}{% endif %}</span>
+                                                <span class="badge bg-secondary">{% if order.table_info %}{% blocktranslate with n=order.table_info.tbl_no %}Table {{ n }}{% endblocktranslate %}{% else %}{% translate order.get_order_type_display %}{% endif %}</span>
                                             </td>
                                             <td>
                                                 <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#items-{{ order.id }}" aria-expanded="false">
-                                                    <span class="badge bg-primary">{{ order.order_items.all|length }} items</span> View
+                                                    <span class="badge bg-primary">{% blocktranslate count counter=order.order_items.all|length %}{{ counter }} item{% plural %}{{ counter }} items{% endblocktranslate %}</span> {% translate "View" %}
                                                 </button>
                                                 <div class="collapse mt-2" id="items-{{ order.id }}">
                                                     <ul class="list-unstyled mb-0 small">
@@ -57,7 +58,7 @@
                                                                 {% with feats=request.user.visible_features %}
                                                                 {% if request.user.is_cashier and 'cancel_orders' in feats and order.status != 'cancelled' and order.payment_status != 'paid' and order.order_items.all|length > 1 %}
                                                                     <button class="btn btn-xs btn-danger btn-sm ms-2" onclick="cancelItem({{ item.id }}, '{{ item.product.name }}', {{ item.quantity }})">
-                                                                        <i class="fas fa-times"></i> Cancel
+                                                                        <i class="fas fa-times"></i> {% translate "Cancel" %}
                                                                     </button>
                                                                 {% endif %}
                                                                 {% endwith %}
@@ -83,23 +84,23 @@
                                             </td>
                                             <td>
                                                 {% if order.payment_status == 'paid' %}
-                                                    <span class="badge bg-success">Paid</span>
+                                                    <span class="badge bg-success">{% translate "Paid" %}</span>
                                                 {% elif order.payment_status == 'partial' %}
-                                                    <span class="badge bg-warning">Partial</span>
+                                                    <span class="badge bg-warning">{% translate "Partial" %}</span>
                                                 {% else %}
-                                                    <span class="badge bg-danger">Unpaid</span>
+                                                    <span class="badge bg-danger">{% translate "Unpaid" %}</span>
                                                 {% endif %}
                                                 <br>
                                                 {% if order.status == 'cancelled' %}
-                                                    <span class="badge bg-secondary mt-1">Cancelled</span>
+                                                    <span class="badge bg-secondary mt-1">{% translate "Cancelled" %}</span>
                                                 {% else %}
-                                                    <span class="badge bg-primary mt-1">{{ order.get_status_display }}</span>
+                                                    <span class="badge bg-primary mt-1">{% translate order.get_status_display %}</span>
                                                 {% endif %}
                                             </td>
                                             <td>
                                                 <div class="btn-group-vertical btn-group-sm" role="group">
                                                     <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-info btn-sm">
-                                                        <i class="fas fa-eye"></i> View
+                                                        <i class="fas fa-eye"></i> {% translate "View" %}
                                                     </a>
                                                 </div>
                                             </td>
@@ -112,8 +113,8 @@
                         <div class="text-center py-5">
                             <div class="text-muted">
                                 <i class="fas fa-receipt fa-3x mb-3"></i>
-                                <h5>No orders found</h5>
-                                <p>You haven't created any orders yet.</p>
+                                <h5>{% translate "No orders found" %}</h5>
+                                <p>{% translate "You haven't created any orders yet." %}</p>
                             </div>
                         </div>
                     {% endif %}
@@ -123,9 +124,10 @@
     </div>
 </div>
 
+{% autoescape off %}{% translate "Are you sure you want to cancel {item}?" as t_confirm_cancel_item %}{% translate "Error" as t_error %}{% translate "An error occurred while canceling the item." as t_cancel_item_error %}{% endautoescape %}
 <script>
 function cancelItem(itemId, itemName, quantity) {
-    if (!confirm(`Are you sure you want to cancel ${quantity}x ${itemName}?`)) {
+    if (!confirm("{{ t_confirm_cancel_item|escapejs }}".replace('{item}', () => `${quantity}x ${itemName}`))) {
         return;
     }
 
@@ -142,12 +144,12 @@ function cancelItem(itemId, itemName, quantity) {
             alert(data.message);
             location.reload();
         } else {
-            alert('Error: ' + data.message);
+            alert("{{ t_error|escapejs }}" + ': ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while canceling the item.');
+        alert("{{ t_cancel_item_error|escapejs }}");
     });
 }
 </script>

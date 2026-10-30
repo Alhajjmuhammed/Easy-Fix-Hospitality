@@ -1,8 +1,9 @@
 {% extends 'cashier_base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}Receipt Management - Customer Care{% endblock %}
+{% block title %}{% translate "Receipt Management" %} - {% translate "Customer Care" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -10,37 +11,37 @@
         <div class="col-12">
             <!-- Header -->
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-                <h2 class="mb-0">🧾 Receipt Management</h2>
+                <h2 class="mb-0">🧾 {% translate "Receipt Management" %}</h2>
                 <a href="{% url 'orders:customer_care_dashboard' %}" class="btn btn-outline-secondary flex-shrink-0">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    <i class="fas fa-arrow-left"></i> {% translate "Back to Dashboard" %}
                 </a>
             </div>
             
             <!-- Search Filters -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0">🔍 Search Receipts</h5>
+                    <h5 class="mb-0">🔍 {% translate "Search Receipts" %}</h5>
                 </div>
                 <div class="card-body">
                     <form method="GET" class="row g-3">
                         <div class="col-12 col-md-4">
-                            <label for="search" class="form-label">Order Number or Receipt ID</label>
+                            <label for="search" class="form-label">{% translate "Order Number or Receipt ID" %}</label>
                             <input type="text" name="search" id="search" class="form-control" 
-                                   value="{{ search_query }}" placeholder="Enter order number or receipt ID">
+                                   value="{{ search_query }}" placeholder="{% translate "Enter order number or receipt ID" %}">
                         </div>
                         <div class="col-6 col-md-3">
-                            <label for="date_from" class="form-label">Date From</label>
+                            <label for="date_from" class="form-label">{% translate "Date From" %}</label>
                             <input type="date" name="date_from" id="date_from" class="form-control" 
                                    value="{{ date_from }}">
                         </div>
                         <div class="col-6 col-md-3">
-                            <label for="date_to" class="form-label">Date To</label>
+                            <label for="date_to" class="form-label">{% translate "Date To" %}</label>
                             <input type="date" name="date_to" id="date_to" class="form-control" 
                                    value="{{ date_to }}">
                         </div>
                         <div class="col-12 col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary me-2">Search</button>
-                            <a href="{% url 'orders:customer_care_receipt_management' %}" class="btn btn-outline-secondary">Clear</a>
+                            <button type="submit" class="btn btn-primary me-2">{% translate "Search" %}</button>
+                            <a href="{% url 'orders:customer_care_receipt_management' %}" class="btn btn-outline-secondary">{% translate "Clear" %}</a>
                         </div>
                     </form>
                 </div>
@@ -49,8 +50,8 @@
             <!-- Receipts Table -->
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">📋 Receipts</h5>
-                    <span class="badge bg-info">{{ payments|length }} receipt{{ payments|length|pluralize }}</span>
+                    <h5 class="mb-0">📋 {% translate "Receipts" %}</h5>
+                    <span class="badge bg-info">{% blocktranslate count counter=payments|length %}{{ counter }} receipt{% plural %}{{ counter }} receipts{% endblocktranslate %}</span>
                 </div>
                 <div class="card-body">
                     {% if payments %}
@@ -58,14 +59,14 @@
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Receipt #</th>
-                                        <th>Order #</th>
-                                        <th>Date & Time</th>
-                                        <th>Table</th>
-                                        <th>Amount</th>
-                                        <th>Method</th>
-                                        <th>Processed By</th>
-                                        <th>Actions</th>
+                                        <th>{% translate "Receipt #" %}</th>
+                                        <th>{% translate "Order #" %}</th>
+                                        <th>{% translate "Date & Time" %}</th>
+                                        <th>{% translate "Table" %}</th>
+                                        <th>{% translate "Amount" %}</th>
+                                        <th>{% translate "Method" %}</th>
+                                        <th>{% translate "Processed By" %}</th>
+                                        <th>{% translate "Actions" %}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -82,7 +83,7 @@
                                                 <small class="text-muted">{{ payment.created_at|date:"H:i" }}</small>
                                             </td>
                                             <td>
-                                                <span class="badge bg-secondary">Table {{ payment.order.table_info.tbl_no|default:payment.order.get_order_type_display }}</span>
+                                                <span class="badge bg-secondary">{% blocktranslate with n=payment.order.table_info.tbl_no|default:payment.order.get_order_type_display %}Table {{ n }}{% endblocktranslate %}</span>
                                             </td>
                                             <td>
                                                 <strong>{% currency_symbol %}{{ payment.amount|floatformat:2 }}</strong>
@@ -95,11 +96,11 @@
                                                 <br>
                                                 <small class="text-muted">
                                                     {% if payment.processed_by.is_cashier %}
-                                                        (Cashier)
+                                                        ({% translate "Cashier" %})
                                                     {% elif payment.processed_by.is_customer_care %}
-                                                        (Customer Care)
+                                                        ({% translate "Customer Care" %})
                                                     {% elif payment.processed_by.is_owner %}
-                                                        (Owner)
+                                                        ({% translate "Owner" %})
                                                     {% endif %}
                                                 </small>
                                             </td>
@@ -107,11 +108,11 @@
                                                 <div class="btn-group btn-group-sm">
                                                     <a href="{% url 'orders:customer_care_receipt' payment.id %}" 
                                                        class="btn btn-primary" target="_blank">
-                                                        <i class="fas fa-receipt"></i> View
+                                                        <i class="fas fa-receipt"></i> {% translate "View" %}
                                                     </a>
                                                     <a href="{% url 'orders:customer_care_reprint_receipt' payment.id %}" 
                                                        class="btn btn-info" target="_blank">
-                                                        <i class="fas fa-print"></i> Print
+                                                        <i class="fas fa-print"></i> {% translate "Print" %}
                                                     </a>
                                                 </div>
                                             </td>
@@ -124,7 +125,7 @@
                         {% if payments|length == 50 %}
                             <div class="alert alert-info mt-3">
                                 <i class="fas fa-info-circle"></i>
-                                Showing first 50 results. Use filters to narrow your search.
+                                {% translate "Showing first 50 results. Use filters to narrow your search." %}
                             </div>
                         {% endif %}
                         
@@ -132,14 +133,14 @@
                         <div class="text-center py-5">
                             <div class="text-muted">
                                 <i class="fas fa-receipt fa-3x mb-3"></i>
-                                <h5>No receipts found</h5>
+                                <h5>{% translate "No receipts found" %}</h5>
                                 {% if search_query or date_from or date_to %}
-                                    <p>No receipts match your current search criteria.</p>
+                                    <p>{% translate "No receipts match your current search criteria." %}</p>
                                     <a href="{% url 'orders:customer_care_receipt_management' %}" class="btn btn-outline-primary">
-                                        Clear Filters
+                                        {% translate "Clear Filters" %}
                                     </a>
                                 {% else %}
-                                    <p>No receipts have been generated yet.</p>
+                                    <p>{% translate "No receipts have been generated yet." %}</p>
                                 {% endif %}
                             </div>
                         </div>

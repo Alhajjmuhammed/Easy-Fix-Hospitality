@@ -1,0 +1,12 @@
+{% load i18n %}{% get_current_language as LANG %}
+<form method="post" action="{% url 'set_language' %}" class="d-inline-flex align-items-center gap-1 {{ switch_class|default:'' }}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <label class="visually-hidden" for="langSelect{{ switch_id|default:'' }}">{% translate "Language" %}</label>
+    <i class="bi bi-translate" aria-hidden="true"></i>
+    <select id="langSelect{{ switch_id|default:'' }}" name="language" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+        <option value="en" {% if LANG != 'sw' %}selected{% endif %}>English</option>
+        <option value="sw" {% if LANG == 'sw' %}selected{% endif %}>Kiswahili</option>
+    </select>
+    <noscript><button class="btn btn-sm btn-outline-secondary">OK</button></noscript>
+</form>

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 
-{% block title %}My Orders{% endblock %}
+{% block title %}{% translate "My Orders" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -169,27 +169,27 @@
 <div class="orders-hero">
     <div class="d-flex justify-content-between align-items-start gap-2">
         <div style="min-width:0">
-            <h2><i class="bi bi-receipt me-2"></i>My Orders</h2>
-            <p>Dine-in, delivery &amp; pickup — all in one place.</p>
+            <h2><i class="bi bi-receipt me-2"></i>{% translate "My Orders" %}</h2>
+            <p>{% translate "Dine-in, delivery &amp; pickup — all in one place." %}</p>
         </div>
         <div class="dropdown flex-shrink-0">
             <button class="new-order-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-plus-circle"></i> New Order
+                <i class="bi bi-plus-circle"></i> {% translate "New Order" %}
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li>
                     <a class="dropdown-item py-2" href="{% url 'orders:scan_qr' %}">
                         <i class="bi bi-qr-code-scan me-2" style="color:#d63384"></i>
-                        <strong>Dine-In</strong>
-                        <div class="text-muted small ms-4">Scan table QR code</div>
+                        <strong>{% translate "Dine-In" %}</strong>
+                        <div class="text-muted small ms-4">{% translate "Scan table QR code" %}</div>
                     </a>
                 </li>
                 <li><hr class="dropdown-divider my-1"></li>
                 <li>
                     <a class="dropdown-item py-2" href="{% url 'restaurant:browse_restaurants' %}">
                         <i class="bi bi-bicycle me-2 text-success"></i>
-                        <strong>Delivery / Pickup</strong>
-                        <div class="text-muted small ms-4">Order from anywhere</div>
+                        <strong>{% translate "Delivery / Pickup" %}</strong>
+                        <div class="text-muted small ms-4">{% translate "Order from anywhere" %}</div>
                     </a>
                 </li>
             </ul>
@@ -202,10 +202,10 @@
 <!-- Tab bar -->
 <div class="tab-bar">
     <button class="tab-btn" id="tab-active-btn" onclick="switchTab('active', this)">
-        Active {% if active_count %}<span class="active-badge">{{ active_count }}</span>{% endif %}
+        {% translate "Active" context "orders" %} {% if active_count %}<span class="active-badge">{{ active_count }}</span>{% endif %}
     </button>
     <button class="tab-btn" id="tab-all-btn" onclick="switchTab('all', this)">
-        All Orders
+        {% translate "All Orders" %}
     </button>
 </div>
 
@@ -213,8 +213,8 @@
 {% if active_count %}
 <div class="active-notice d-none" id="cross-page-notice">
     <i class="bi bi-info-circle me-1"></i>
-    You have <strong>{{ active_count }} active order{% if active_count > 1 %}s{% endif %}</strong>.
-    Switch to <strong>All Orders</strong> and browse pages to find them.
+    {% blocktranslate count counter=active_count %}You have <strong>{{ counter }} active order</strong>.{% plural %}You have <strong>{{ counter }} active orders</strong>.{% endblocktranslate %}
+    {% blocktranslate %}Switch to <strong>All Orders</strong> and browse pages to find them.{% endblocktranslate %}
 </div>
 {% endif %}
 
@@ -245,11 +245,11 @@
             <!-- Row 2: type/location -->
             <div class="order-meta mb-1">
                 {% if order.order_type == 'delivery' %}
-                    <i class="bi bi-geo-alt me-1"></i>{% if order.delivery_address %}{{ order.delivery_address|truncatechars:40 }}{% else %}Delivery{% endif %}
+                    <i class="bi bi-geo-alt me-1"></i>{% if order.delivery_address %}{{ order.delivery_address|truncatechars:40 }}{% else %}{% translate "Delivery" %}{% endif %}
                 {% elif order.order_type == 'pickup' %}
-                    <i class="bi bi-bag-check me-1"></i>Pickup order
+                    <i class="bi bi-bag-check me-1"></i>{% translate "Pickup order" %}
                 {% else %}
-                    <i class="bi bi-table me-1"></i>Table {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}—{% endif %}{% if is_customer_care and order.table_info %} · {{ order.table_info.owner.restaurant_name|default:"Restaurant"|truncatechars:20 }}{% endif %}
+                    <i class="bi bi-table me-1"></i>{% translate "Table" %} {% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}—{% endif %}{% if is_customer_care and order.table_info %} · {{ order.table_info.owner.restaurant_name|default:"Restaurant"|truncatechars:20 }}{% endif %}
                 {% endif %}
             </div>
 
@@ -277,9 +277,9 @@
             <div class="order-body-total">
                 <span class="order-total">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</span>
                 {% if order.payment_status == 'paid' %}
-                <span class="pay-chip pay-paid"><i class="bi bi-check-circle-fill"></i> Paid</span>
+                <span class="pay-chip pay-paid"><i class="bi bi-check-circle-fill"></i> {% translate "Paid" %}</span>
                 {% else %}
-                <span class="pay-chip pay-pend">Unpaid</span>
+                <span class="pay-chip pay-pend">{% translate "Unpaid" %}</span>
                 {% endif %}
             </div>
         </div>
@@ -288,11 +288,11 @@
         <div class="order-amount-col">
             <div class="order-total">{% currency_symbol %}{{ order.total_amount|floatformat:2 }}</div>
             {% if order.payment_status == 'paid' %}
-            <span class="pay-chip pay-paid"><i class="bi bi-check-circle-fill me-1"></i>Paid</span>
+            <span class="pay-chip pay-paid"><i class="bi bi-check-circle-fill me-1"></i>{% translate "Paid" %}</span>
             {% else %}
-            <span class="pay-chip pay-pend">Unpaid</span>
+            <span class="pay-chip pay-pend">{% translate "Unpaid" %}</span>
             {% endif %}
-            <span class="view-arrow">View ›</span>
+            <span class="view-arrow">{% translate "View" %} ›</span>
         </div>
 
     </div>
@@ -308,18 +308,18 @@
         <i class="bi bi-chevron-double-left"></i>
     </a>
     <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-sm btn-outline-secondary pg-btn" data-page="{{ page_obj.previous_page_number }}">
-        <i class="bi bi-chevron-left"></i> Prev
+        <i class="bi bi-chevron-left"></i> {% translate "Prev" %}
     </a>
     {% endif %}
 
     <span class="pg-info">
         {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-        <span class="text-muted fw-normal">&middot; {{ page_obj.paginator.count }} orders</span>
+        <span class="text-muted fw-normal">&middot; {% blocktranslate count counter=page_obj.paginator.count %}{{ counter }} order{% plural %}{{ counter }} orders{% endblocktranslate %}</span>
     </span>
 
     {% if page_obj.has_next %}
     <a href="?page={{ page_obj.next_page_number }}" class="btn btn-sm btn-outline-secondary pg-btn" data-page="{{ page_obj.next_page_number }}">
-        Next <i class="bi bi-chevron-right"></i>
+        {% translate "Next" %} <i class="bi bi-chevron-right"></i>
     </a>
     <a href="?page={{ page_obj.paginator.num_pages }}" class="btn btn-sm btn-outline-secondary pg-btn" data-page="{{ page_obj.paginator.num_pages }}">
         <i class="bi bi-chevron-double-right"></i>
@@ -331,20 +331,20 @@
 <!-- Empty active state (shown by JS) -->
 <div class="empty-state d-none" id="no-active-msg">
     <i class="bi bi-moon-stars"></i>
-    <h5 class="h6">No active orders on this page</h5>
+    <h5 class="h6">{% translate "No active orders on this page" %}</h5>
     {% if active_count %}
-    <p class="small mb-3">Your {{ active_count }} active order{% if active_count > 1 %}s{% endif %} are on another page.</p>
+    <p class="small mb-3">{% blocktranslate count counter=active_count %}Your {{ counter }} active order is on another page.{% plural %}Your {{ counter }} active orders are on another page.{% endblocktranslate %}</p>
     <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="switchTab('all', document.getElementById('tab-all-btn'))">
-        <i class="bi bi-list-ul me-1"></i>Show All Orders
+        <i class="bi bi-list-ul me-1"></i>{% translate "Show All Orders" %}
     </button>
     {% else %}
-    <p class="small mb-3">All your orders are complete. Ready for another?</p>
+    <p class="small mb-3">{% translate "All your orders are complete. Ready for another?" %}</p>
     <div class="d-flex gap-2 justify-content-center flex-wrap">
         <a href="{% url 'orders:scan_qr' %}" class="btn btn-sm btn-outline-danger rounded-pill">
-            <i class="bi bi-qr-code-scan me-1"></i>Dine-In
+            <i class="bi bi-qr-code-scan me-1"></i>{% translate "Dine-In" %}
         </a>
         <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-sm btn-outline-success rounded-pill">
-            <i class="bi bi-bicycle me-1"></i>Delivery / Pickup
+            <i class="bi bi-bicycle me-1"></i>{% translate "Delivery / Pickup" %}
         </a>
     </div>
     {% endif %}
@@ -354,14 +354,14 @@
 <!-- Zero orders -->
 <div class="empty-state">
     <i class="bi bi-receipt"></i>
-    <h5 class="h6">No orders yet</h5>
-    <p class="small mb-3">Your order history will appear here once you start ordering.</p>
+    <h5 class="h6">{% translate "No orders yet" %}</h5>
+    <p class="small mb-3">{% translate "Your order history will appear here once you start ordering." %}</p>
     <div class="d-flex gap-3 justify-content-center flex-wrap">
         <a href="{% url 'orders:scan_qr' %}" class="btn btn-danger rounded-pill px-4">
-            <i class="bi bi-qr-code-scan me-1"></i>Dine-In
+            <i class="bi bi-qr-code-scan me-1"></i>{% translate "Dine-In" %}
         </a>
         <a href="{% url 'restaurant:browse_restaurants' %}" class="btn btn-success rounded-pill px-4">
-            <i class="bi bi-bicycle me-1"></i>Delivery / Pickup
+            <i class="bi bi-bicycle me-1"></i>{% translate "Delivery / Pickup" %}
         </a>
     </div>
 </div>

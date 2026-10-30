@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% load i18n %}
 
-{% block title %}Event Menu - Manage Events{% endblock %}
+{% block title %}{% translate "Event Menu - Manage Events" %}{% endblock %}
 
 {% block content %}
 <!-- Success Message Popup -->
@@ -20,7 +21,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL EVENTS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "TOTAL EVENTS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ summary.total_events }}</div>
                         </div>
                         <div class="col-auto">
@@ -37,7 +38,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">UPCOMING EVENTS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "UPCOMING EVENTS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ summary.upcoming_events }}</div>
                         </div>
                         <div class="col-auto">
@@ -54,7 +55,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL REVENUE</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "TOTAL REVENUE" %}</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ currency_symbol }}{{ summary.total_revenue|floatformat:2 }}</div>
                         </div>
                         <div class="col-auto">
@@ -71,7 +72,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PAID ({{ summary.paid_events }})</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% blocktranslate with n=summary.paid_events %}PAID ({{ n }}){% endblocktranslate %}</div>
                             <div class="h5 mb-0 font-weight-bold text-success">{{ currency_symbol }}{{ summary.paid_amount|floatformat:2 }}</div>
                         </div>
                         <div class="col-auto">
@@ -88,7 +89,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">UNPAID ({{ summary.unpaid_events }})</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% blocktranslate with n=summary.unpaid_events %}UNPAID ({{ n }}){% endblocktranslate %}</div>
                             <div class="h5 mb-0 font-weight-bold text-danger">{{ currency_symbol }}{{ summary.unpaid_amount|floatformat:2 }}</div>
                         </div>
                         <div class="col-auto">
@@ -105,7 +106,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TODAY'S EVENTS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "TODAY'S EVENTS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ summary.today_events }}</div>
                         </div>
                         <div class="col-auto">
@@ -121,20 +122,20 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-filter mr-2"></i>Event Filters
+                <i class="fas fa-filter mr-2"></i>{% translate "Event Filters" %}
             </h6>
         </div>
         <div class="card-body">
             <form method="get" class="row g-3" id="eventFilterForm">
                 <div class="col-lg-2 col-md-4">
-                    <label for="search" class="form-label font-weight-bold">Search</label>
-                    <input type="text" class="form-control" id="search" name="search" placeholder="Event title, contact..." value="{{ search_query }}">
+                    <label for="search" class="form-label font-weight-bold">{% translate "Search" %}</label>
+                    <input type="text" class="form-control" id="search" name="search" placeholder="{% translate "Event title, contact..." %}" value="{{ search_query }}">
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="status" class="form-label font-weight-bold">Status</label>
+                    <label for="status" class="form-label font-weight-bold">{% translate "Status" %}</label>
                     <select class="form-control" id="status" name="status" onchange="this.form.submit()">
-                        <option value="">All Status</option>
+                        <option value="">{% translate "All Status" %}</option>
                         {% for value, label in status_choices %}
                         <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
@@ -142,9 +143,9 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="event_type" class="form-label font-weight-bold">Event Type</label>
+                    <label for="event_type" class="form-label font-weight-bold">{% translate "Event Type" %}</label>
                     <select class="form-control" id="event_type" name="event_type" onchange="this.form.submit()">
-                        <option value="">All Types</option>
+                        <option value="">{% translate "All Types" %}</option>
                         {% for value, label in event_types %}
                         <option value="{{ value }}" {% if event_type_filter == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
@@ -152,31 +153,31 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="date_filter" class="form-label font-weight-bold">Period</label>
+                    <label for="date_filter" class="form-label font-weight-bold">{% translate "Period" %}</label>
                     <select class="form-control" id="date_filter" name="date_filter" onchange="this.form.submit()">
-                        <option value="all" {% if date_filter == 'all' %}selected{% endif %}>All Time</option>
-                        <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Today</option>
-                        <option value="week" {% if date_filter == 'week' %}selected{% endif %}>This Week</option>
-                        <option value="month" {% if date_filter == 'month' %}selected{% endif %}>This Month</option>
-                        <option value="upcoming" {% if date_filter == 'upcoming' %}selected{% endif %}>Upcoming</option>
-                        <option value="past" {% if date_filter == 'past' %}selected{% endif %}>Past</option>
+                        <option value="all" {% if date_filter == 'all' %}selected{% endif %}>{% translate "All Time" %}</option>
+                        <option value="today" {% if date_filter == 'today' %}selected{% endif %}>{% translate "Today" %}</option>
+                        <option value="week" {% if date_filter == 'week' %}selected{% endif %}>{% translate "This Week" %}</option>
+                        <option value="month" {% if date_filter == 'month' %}selected{% endif %}>{% translate "This Month" %}</option>
+                        <option value="upcoming" {% if date_filter == 'upcoming' %}selected{% endif %}>{% translate "Upcoming" %}</option>
+                        <option value="past" {% if date_filter == 'past' %}selected{% endif %}>{% translate "Past" %}</option>
                     </select>
                 </div>
                 
                 <div class="col-lg-2 col-md-4 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary me-2">
-                        <i class="fas fa-search"></i> Search
+                        <i class="fas fa-search"></i> {% translate "Search" %}
                     </button>
                     <a href="{% url 'restaurant:manage_events' %}" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Clear
+                        <i class="fas fa-times"></i> {% translate "Clear" %}
                     </a>
                 </div>
                 
                 <div class="col-lg-2 col-md-4 d-flex align-items-end justify-content-end gap-2">
-                    <a href="{% url 'restaurant:export_events_csv' %}?status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}" class="btn btn-outline-success" title="Export CSV">
+                    <a href="{% url 'restaurant:export_events_csv' %}?status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}" class="btn btn-outline-success" title="{% translate "Export CSV" %}">
                         <i class="fas fa-file-csv"></i> CSV
                     </a>
-                    <a href="{% url 'restaurant:export_events_pdf' %}?status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}" class="btn btn-outline-danger" title="Export PDF">
+                    <a href="{% url 'restaurant:export_events_pdf' %}?status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}" class="btn btn-outline-danger" title="{% translate "Export PDF" %}">
                         <i class="fas fa-file-pdf"></i> PDF
                     </a>
                 </div>
@@ -188,11 +189,11 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-calendar-alt mr-2"></i>Events List
-                <span class="badge bg-primary ms-2">{{ events.paginator.count }} event{{ events.paginator.count|pluralize }}</span>
+                <i class="fas fa-calendar-alt mr-2"></i>{% translate "Events List" %}
+                <span class="badge bg-primary ms-2">{% blocktranslate count counter=events.paginator.count %}{{ counter }} event{% plural %}{{ counter }} events{% endblocktranslate %}</span>
             </h6>
             <a href="{% url 'restaurant:add_event' %}" class="btn btn-success btn-sm">
-                <i class="fas fa-plus"></i> New Event
+                <i class="fas fa-plus"></i> {% translate "New Event" %}
             </a>
         </div>
         <div class="card-body">
@@ -201,15 +202,15 @@
                 <table class="table table-hover" id="eventsTable">
                     <thead class="table-light">
                         <tr>
-                            <th>Date</th>
-                            <th>Event</th>
-                            <th>Type</th>
-                            <th>PAX</th>
-                            <th>Total</th>
-                            <th>Contact</th>
-                            <th>Status</th>
-                            <th>Payment</th>
-                            <th class="text-center">Actions</th>
+                            <th>{% translate "Date" %}</th>
+                            <th>{% translate "Event" %}</th>
+                            <th>{% translate "Type" %}</th>
+                            <th>{% translate "PAX" %}</th>
+                            <th>{% translate "Total" %}</th>
+                            <th>{% translate "Contact" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th>{% translate "Payment" %}</th>
+                            <th class="text-center">{% translate "Actions" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -224,7 +225,7 @@
                             <td>
                                 <strong>{{ event.title }}</strong>
                                 {% if event.is_today %}
-                                <span class="badge bg-danger ms-1">TODAY</span>
+                                <span class="badge bg-danger ms-1">{% translate "TODAY" %}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -235,7 +236,7 @@
                             </td>
                             <td>
                                 <strong class="text-success">{{ currency_symbol }}{{ event.total_amount|floatformat:2 }}</strong>
-                                <br><small class="text-muted">{{ currency_symbol }}{{ event.price_per_pax }}/pax</small>
+                                <br><small class="text-muted">{{ currency_symbol }}{{ event.price_per_pax }}/{% translate "pax" %}</small>
                             </td>
                             <td>
                                 <div>{{ event.contact_name }}</div>
@@ -246,38 +247,38 @@
                             </td>
                             <td>
                                 {% if event.payment_status == 'fully_paid' %}
-                                    <span class="badge bg-success">Paid</span>
+                                    <span class="badge bg-success">{% translate "Paid" %}</span>
                                 {% elif event.payment_status == 'partially_paid' %}
-                                    <span class="badge bg-warning">Partial</span>
+                                    <span class="badge bg-warning">{% translate "Partial" %}</span>
                                 {% elif event.payment_status == 'deposit_paid' %}
-                                    <span class="badge bg-info">Deposit</span>
+                                    <span class="badge bg-info">{% translate "Deposit" %}</span>
                                 {% elif event.payment_status == 'refunded' %}
-                                    <span class="badge bg-secondary">Refunded</span>
+                                    <span class="badge bg-secondary">{% translate "Refunded" %}</span>
                                 {% else %}
-                                    <span class="badge bg-danger">Unpaid</span>
+                                    <span class="badge bg-danger">{% translate "Unpaid" %}</span>
                                 {% endif %}
                                 {% if event.balance_due > 0 %}
-                                <br><small class="text-danger">Due: {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}</small>
+                                <br><small class="text-danger">{% translate "Due:" %} {{ currency_symbol }}{{ event.balance_due|floatformat:2 }}</small>
                                 {% endif %}
                             </td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <a href="{% url 'restaurant:view_event' event.id %}" class="btn btn-outline-primary" title="View">
+                                    <a href="{% url 'restaurant:view_event' event.id %}" class="btn btn-outline-primary" title="{% translate "View" %}">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="{% url 'restaurant:edit_event' event.id %}" class="btn btn-outline-warning" title="Edit">
+                                    <a href="{% url 'restaurant:edit_event' event.id %}" class="btn btn-outline-warning" title="{% translate "Edit" %}">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <button class="btn btn-outline-danger" title="Delete" onclick="confirmDelete({{ event.id }}, '{{ event.title|escapejs }}')">
+                                    <button class="btn btn-outline-danger" title="{% translate "Delete" %}" onclick="confirmDelete({{ event.id }}, '{{ event.title|escapejs }}')">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                     {% if event.payment_status in 'deposit_paid,partially_paid' and event.status != 'cancelled' %}
-                                    <button class="btn btn-info" title="Approve Payment" onclick="approvePayment({{ event.id }}, '{{ event.title|escapejs }}')">
+                                    <button class="btn btn-info" title="{% translate "Approve Payment" %}" onclick="approvePayment({{ event.id }}, '{{ event.title|escapejs }}')">
                                         <i class="fas fa-check"></i>
                                     </button>
                                     {% endif %}
                                     {% if event.payment_status != 'fully_paid' and event.status != 'cancelled' %}
-                                    <button class="btn btn-success" title="Record Payment" onclick="openPaymentModal({{ event.id }}, '{{ event.title|escapejs }}', {{ event.total_amount }}, {{ event.amount_paid }}, {{ event.balance_due }}, '{{ currency_symbol }}')">
+                                    <button class="btn btn-success" title="{% translate "Record Payment" %}" onclick="openPaymentModal({{ event.id }}, '{{ event.title|escapejs }}', {{ event.total_amount }}, {{ event.amount_paid }}, {{ event.balance_due }}, '{{ currency_symbol }}')">
                                         <i class="fas fa-money-bill-wave"></i>
                                     </button>
                                     {% endif %}
@@ -296,19 +297,19 @@
                     {% if events.has_previous %}
                     <li class="page-item">
                         <a class="page-link" href="?page={{ events.previous_page_number }}&status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}">
-                            <i class="fas fa-chevron-left"></i> Previous
+                            <i class="fas fa-chevron-left"></i> {% translate "Previous" %}
                         </a>
                     </li>
                     {% endif %}
                     
                     <li class="page-item disabled">
-                        <span class="page-link">Page {{ events.number }} of {{ events.paginator.num_pages }}</span>
+                        <span class="page-link">{% blocktranslate with page=events.number pages=events.paginator.num_pages %}Page {{ page }} of {{ pages }}{% endblocktranslate %}</span>
                     </li>
                     
                     {% if events.has_next %}
                     <li class="page-item">
                         <a class="page-link" href="?page={{ events.next_page_number }}&status={{ status_filter }}&event_type={{ event_type_filter }}&date_filter={{ date_filter }}&search={{ search_query }}">
-                            Next <i class="fas fa-chevron-right"></i>
+                            {% translate "Next" %} <i class="fas fa-chevron-right"></i>
                         </a>
                     </li>
                     {% endif %}
@@ -320,16 +321,16 @@
             <!-- Empty State -->
             <div class="text-center py-5">
                 <i class="fas fa-calendar-plus fa-4x text-muted mb-3"></i>
-                <h4 class="text-muted">No Events Found</h4>
+                <h4 class="text-muted">{% translate "No Events Found" %}</h4>
                 <p class="text-muted mb-4">
                     {% if search_query or status_filter or event_type_filter or date_filter != 'all' %}
-                    No events match your current filters. Try adjusting your search criteria.
+                    {% translate "No events match your current filters. Try adjusting your search criteria." %}
                     {% else %}
-                    Start managing your banquets, parties, and special events.
+                    {% translate "Start managing your banquets, parties, and special events." %}
                     {% endif %}
                 </p>
                 <a href="{% url 'restaurant:add_event' %}" class="btn btn-primary btn-lg">
-                    <i class="fas fa-plus me-2"></i>Create Your First Event
+                    <i class="fas fa-plus me-2"></i>{% translate "Create Your First Event" %}
                 </a>
             </div>
             {% endif %}
@@ -343,18 +344,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>Delete Event
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>{% translate "Delete Event" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete <strong id="deleteEventName"></strong>?</p>
-                <p class="text-muted small mb-0">This action cannot be undone.</p>
+                <p>{% blocktranslate %}Are you sure you want to delete <strong id="deleteEventName"></strong>?{% endblocktranslate %}</p>
+                <p class="text-muted small mb-0">{% translate "This action cannot be undone." %}</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
-                    <i class="fas fa-trash me-1"></i>Delete
+                    <i class="fas fa-trash me-1"></i>{% translate "Delete" %}
                 </button>
             </div>
         </div>
@@ -367,7 +368,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-money-bill-wave text-success me-2"></i>Record Payment
+                    <i class="fas fa-money-bill-wave text-success me-2"></i>{% translate "Record Payment" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -376,46 +377,46 @@
                 
                 <div class="row mb-3">
                     <div class="col-6">
-                        <div class="text-muted small">Total Amount</div>
+                        <div class="text-muted small">{% translate "Total Amount" %}</div>
                         <div class="h5" id="paymentTotalAmount"></div>
                     </div>
                     <div class="col-6">
-                        <div class="text-muted small">Already Paid</div>
+                        <div class="text-muted small">{% translate "Already Paid" %}</div>
                         <div class="h5 text-success" id="paymentAmountPaid"></div>
                     </div>
                 </div>
                 
                 <div class="alert alert-warning mb-3">
-                    <strong>Balance Due: <span id="paymentBalanceDue"></span></strong>
+                    <strong>{% translate "Balance Due:" %} <span id="paymentBalanceDue"></span></strong>
                 </div>
                 
                 <div class="mb-3">
-                    <label for="paymentAmount" class="form-label font-weight-bold">Payment Amount <span class="text-danger">*</span></label>
+                    <label for="paymentAmount" class="form-label font-weight-bold">{% translate "Payment Amount" %} <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text" id="paymentCurrencySymbol"></span>
                         <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0.01" placeholder="0.00" required>
                     </div>
-                    <small class="text-muted">Amount is pre-filled with full balance. Change it for partial payment.</small>
+                    <small class="text-muted">{% translate "Amount is pre-filled with full balance. Change it for partial payment." %}</small>
                 </div>
                 
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="isDepositPayment">
                     <label class="form-check-label" for="isDepositPayment">
-                        This is a deposit payment
+                        {% translate "This is a deposit payment" %}
                     </label>
                 </div>
                 
                 <div class="mb-3">
-                    <label for="paymentNotes" class="form-label">Notes (Optional)</label>
-                    <textarea class="form-control" id="paymentNotes" rows="2" placeholder="Payment method, reference number, etc."></textarea>
+                    <label for="paymentNotes" class="form-label">{% translate "Notes (Optional)" %}</label>
+                    <textarea class="form-control" id="paymentNotes" rows="2" placeholder="{% translate "Payment method, reference number, etc." %}"></textarea>
                 </div>
                 
                 <div id="paymentErrorMsg" class="alert alert-danger d-none"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-success" id="confirmPaymentBtn">
-                    <i class="fas fa-check me-1"></i>Record Payment
+                    <i class="fas fa-check me-1"></i>{% translate "Record Payment" %}
                 </button>
             </div>
         </div>
@@ -424,6 +425,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Record Payment" as t_record_payment %}{% translate "Processing..." as t_processing %}{% translate "Approve" as t_approve %}{% translate 'Approve payment for "{title}"?' as t_approve_for %}{% translate "Session expired. Please refresh the page and try again." as t_session %}{% translate "Error approving payment" as t_err_approve %}{% translate "Connection error. Please refresh the page and try again." as t_conn %}{% translate "Error deleting event" as t_err_delete %}{% translate "Please enter a valid payment amount" as t_valid_amount %}{% translate "Error: No event selected" as t_no_event %}{% translate "Error recording payment" as t_err_record %}{% translate "Error recording payment. Please try again." as t_err_record_retry %}
 <script>
 let deleteEventId = null;
 let paymentEventId = null;
@@ -485,7 +487,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const btn = document.getElementById('confirmPaymentBtn');
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-check me-1"></i>Record Payment';
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>' + "{{ t_record_payment|escapejs }}";
             }
             
             // Clear form with null checks
@@ -553,7 +555,7 @@ function openPaymentModal(eventId, eventTitle, totalAmount, amountPaid, balanceD
     // Reset button state
     if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check me-1"></i>Record Payment';
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>' + "{{ t_record_payment|escapejs }}";
     }
     
     // Use getOrCreateInstance to avoid creating multiple modal instances
@@ -562,10 +564,10 @@ function openPaymentModal(eventId, eventTitle, totalAmount, amountPaid, balanceD
 }
 
 function approvePayment(eventId, eventTitle) {
-    if (confirm(`Approve payment for "${eventTitle}"?`)) {
+    if (confirm("{{ t_approve_for|escapejs }}".replace('{title}', eventTitle))) {
         const btn = event.target;
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + "{{ t_processing|escapejs }}";
         
         const csrftoken = getCookie('csrftoken');
         fetch(`/restaurant/events/${eventId}/approve-payment/`, {
@@ -577,7 +579,7 @@ function approvePayment(eventId, eventTitle) {
         })
         .then(response => {
             if (response.status === 403) {
-                alert('Session expired. Please refresh the page and try again.');
+                alert("{{ t_session|escapejs }}");
                 location.reload();
                 return null;
             }
@@ -590,18 +592,18 @@ function approvePayment(eventId, eventTitle) {
                 sessionStorage.setItem('paymentSuccess', data.message);
                 location.reload();
             } else {
-                alert(data.message || 'Error approving payment');
+                alert(data.message || "{{ t_err_approve|escapejs }}");
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-check"></i> Approve';
+                    btn.innerHTML = '<i class="fas fa-check"></i> ' + "{{ t_approve|escapejs }}";
                 }
             }
         })
         .catch(() => {
-            alert('Connection error. Please refresh the page and try again.');
+            alert("{{ t_conn|escapejs }}");
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-check"></i> Approve';
+                btn.innerHTML = '<i class="fas fa-check"></i> ' + "{{ t_approve|escapejs }}";
             }
         });
     }
@@ -622,11 +624,11 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', function()
             if (data.success) {
                 location.reload();
             } else {
-                alert(data.message || 'Error deleting event');
+                alert(data.message || "{{ t_err_delete|escapejs }}");
             }
         })
         .catch(() => {
-            alert('Error deleting event');
+            alert("{{ t_err_delete|escapejs }}");
         });
     }
 });
@@ -653,7 +655,7 @@ document.getElementById('confirmPaymentBtn').addEventListener('click', function(
     // Validation
     if (!amount || amount <= 0) {
         if (errorMsg) {
-            errorMsg.textContent = 'Please enter a valid payment amount';
+            errorMsg.textContent = "{{ t_valid_amount|escapejs }}";
             errorMsg.classList.remove('d-none');
         }
         return;
@@ -661,7 +663,7 @@ document.getElementById('confirmPaymentBtn').addEventListener('click', function(
     
     if (!paymentEventId) {
         if (errorMsg) {
-            errorMsg.textContent = 'Error: No event selected';
+            errorMsg.textContent = "{{ t_no_event|escapejs }}";
             errorMsg.classList.remove('d-none');
         }
         return;
@@ -675,7 +677,7 @@ document.getElementById('confirmPaymentBtn').addEventListener('click', function(
     }
     const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + "{{ t_processing|escapejs }}";
     
     const url = `/restaurant/events/${paymentEventId}/record-payment/`;
     console.log('Posting to:', url);
@@ -698,7 +700,7 @@ document.getElementById('confirmPaymentBtn').addEventListener('click', function(
     })
     .then(response => {
         if (response.status === 403) {
-            alert('Session expired. Please refresh the page and try again.');
+            alert("{{ t_session|escapejs }}");
             location.reload();
             return null;
         }
@@ -724,7 +726,7 @@ document.getElementById('confirmPaymentBtn').addEventListener('click', function(
             const btn = document.getElementById('confirmPaymentBtn');
             
             if (errorMsg) {
-                errorMsg.textContent = data.message || 'Error recording payment';
+                errorMsg.textContent = data.message || "{{ t_err_record|escapejs }}";
                 errorMsg.classList.remove('d-none');
             }
             if (btn) {
@@ -739,7 +741,7 @@ document.getElementById('confirmPaymentBtn').addEventListener('click', function(
         const btn = document.getElementById('confirmPaymentBtn');
         
         if (errorMsg) {
-            errorMsg.textContent = 'Error recording payment. Please try again.';
+            errorMsg.textContent = "{{ t_err_record_retry|escapejs }}";
             errorMsg.classList.remove('d-none');
         }
         if (btn) {

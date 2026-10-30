@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Home - Restaurant System{% endblock %}
+{% block title %}{% translate "Home" %} - Restaurant System{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -127,22 +128,22 @@
 
 <!-- Hero -->
 <section class="hero">
-    <h1>Welcome to<br><span>Restaurant System</span></h1>
-    <p>Orders, inventory, reports and money flow — all in one place.</p>
+    <h1>{% translate "Welcome to" %}<br><span>Restaurant System</span></h1>
+    <p>{% translate "Orders, inventory, reports and money flow — all in one place." %}</p>
     <div class="d-flex flex-wrap gap-3 justify-content-center">
         {% if not user.is_authenticated %}
             <a href="{% url 'accounts:register' %}" class="btn-hero-primary">
-                <i class="bi bi-person-plus me-1"></i> Get Started
+                <i class="bi bi-person-plus me-1"></i> {% translate "Get Started" %}
             </a>
             <a href="{% url 'accounts:login' %}" class="btn-hero-outline">
-                <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+                <i class="bi bi-box-arrow-in-right me-1"></i> {% translate "Sign In" %}
             </a>
         {% else %}
             <a href="{% url 'orders:scan_qr' %}" class="btn-hero-primary">
-                <i class="bi bi-qr-code-scan me-1"></i> Dine-In (Scan QR)
+                <i class="bi bi-qr-code-scan me-1"></i> {% translate "Dine-In (Scan QR)" %}
             </a>
             <a href="{% url 'restaurant:browse_restaurants' %}" class="btn-hero-outline">
-                <i class="bi bi-bicycle me-1"></i> Order from Anywhere
+                <i class="bi bi-bicycle me-1"></i> {% translate "Order from Anywhere" %}
             </a>
         {% endif %}
     </div>
@@ -154,22 +155,22 @@
         <div class="col-12 col-sm-4">
             <div class="feature-card">
                 <div class="feature-icon"><i class="bi bi-menu-button-wide"></i></div>
-                <h5>Digital Menu</h5>
-                <p>Browse categories, descriptions and prices in real time.</p>
+                <h5>{% translate "Digital Menu" %}</h5>
+                <p>{% translate "Browse categories, descriptions and prices in real time." %}</p>
             </div>
         </div>
         <div class="col-12 col-sm-4">
             <div class="feature-card">
                 <div class="feature-icon"><i class="bi bi-receipt-cutoff"></i></div>
-                <h5>Easy Ordering</h5>
-                <p>Place and track orders from any table instantly.</p>
+                <h5>{% translate "Easy Ordering" %}</h5>
+                <p>{% translate "Place and track orders from any table instantly." %}</p>
             </div>
         </div>
         <div class="col-12 col-sm-4">
             <div class="feature-card">
                 <div class="feature-icon"><i class="bi bi-graph-up-arrow"></i></div>
-                <h5>Real-time Reports</h5>
-                <p>Revenue, tax and money flow — always accurate.</p>
+                <h5>{% translate "Real-time Reports" %}</h5>
+                <p>{% translate "Revenue, tax and money flow — always accurate." %}</p>
             </div>
         </div>
     </div>

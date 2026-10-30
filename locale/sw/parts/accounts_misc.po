@@ -1,0 +1,142 @@
+# Kiswahili: account notice pages (rate limit, lockout, access blocked) and owner registration.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Access Blocked"
+msgstr "Ufikiaji Umezuiwa"
+
+msgid "Restaurant Access Restricted"
+msgstr "Ufikiaji wa Mgahawa Umezuiwa"
+
+msgid "Your restaurant subscription has expired or access has been restricted."
+msgstr "Usajili wa mgahawa wako umeisha au ufikiaji umezuiwa."
+
+msgid "What can you do?"
+msgstr "Unaweza kufanya nini?"
+
+msgid "Contact your system administrator"
+msgstr "Wasiliana na msimamizi wa mfumo"
+
+msgid "Request subscription renewal"
+msgstr "Omba kuhuisha usajili"
+
+msgid "Update your payment information"
+msgstr "Sasisha taarifa zako za malipo"
+
+msgid "Need immediate assistance? Please contact your system administrator to restore access."
+msgstr "Unahitaji msaada wa haraka? Tafadhali wasiliana na msimamizi wa mfumo ili kurejesha ufikiaji."
+
+msgid "System Time: %(time)s"
+msgstr "Muda wa Mfumo: %(time)s"
+
+msgid "Account Temporarily Locked"
+msgstr "Akaunti Imefungwa kwa Muda"
+
+msgid "Security Protection Active"
+msgstr "Ulinzi wa Usalama Umewashwa"
+
+msgid "Too many failed login attempts detected!"
+msgstr "Majaribio mengi ya kuingia yameshindwa!"
+
+msgid "Your account has been temporarily locked for security reasons."
+msgstr "Akaunti yako imefungwa kwa muda kwa sababu za usalama."
+
+msgid "What happened?"
+msgstr "Nini kimetokea?"
+
+msgid "We detected multiple failed login attempts from your IP address or account. This is a security measure to protect your account from unauthorized access."
+msgstr "Tumegundua majaribio mengi ya kuingia yaliyoshindwa kutoka kwenye anwani yako ya IP au akaunti yako. Hii ni hatua ya usalama ya kulinda akaunti yako dhidi ya watu wasioruhusiwa."
+
+msgid "Wait for the cooldown period (typically 1-2 hours)"
+msgstr "Subiri muda wa kusubiri uishe (kwa kawaida saa 1-2)"
+
+msgid "Make sure you're using the correct password"
+msgstr "Hakikisha unatumia nenosiri sahihi"
+
+msgid "Contact support if you've forgotten your password or believe this is an error"
+msgstr "Wasiliana na msaada ikiwa umesahau nenosiri lako au unaamini hili ni kosa"
+
+msgid "Security Tip:"
+msgstr "Ushauri wa Usalama:"
+
+msgid "Never share your password with anyone. Restaurant system staff will never ask for your password."
+msgstr "Usimpe mtu yeyote nenosiri lako. Wafanyakazi wa mfumo wa mgahawa hawatakuuliza nenosiri lako kamwe."
+
+msgid "Return to Home"
+msgstr "Rudi Mwanzo"
+
+msgid "If you need immediate assistance, please contact your system administrator."
+msgstr "Ikiwa unahitaji msaada wa haraka, tafadhali wasiliana na msimamizi wa mfumo."
+
+msgid "Rate Limit Exceeded"
+msgstr "Kikomo cha Maombi Kimezidi"
+
+msgid "Too Many Requests"
+msgstr "Maombi Mengi Mno"
+
+msgid "Please Slow Down"
+msgstr "Tafadhali Punguza Kasi"
+
+msgid "You've made too many requests!"
+msgstr "Umetuma maombi mengi mno!"
+
+msgid "You've exceeded the rate limit for this action. Please wait before trying again."
+msgstr "Umezidi kikomo cha maombi kwa kitendo hiki. Tafadhali subiri kabla ya kujaribu tena."
+
+msgid "Why did this happen?"
+msgstr "Kwa nini hili limetokea?"
+
+msgid "Our system has rate limits to ensure fair usage and protect against abuse. You've temporarily exceeded the allowed number of requests."
+msgstr "Mfumo wetu una vikomo vya maombi ili kuhakikisha matumizi ya haki na kuzuia matumizi mabaya. Kwa muda umezidi idadi ya maombi inayoruhusiwa."
+
+msgid "Please wait"
+msgstr "Tafadhali subiri"
+
+msgid "You can try again after this time has passed."
+msgstr "Unaweza kujaribu tena baada ya muda huu kupita."
+
+msgid "If you're experiencing issues, try clearing your browser cache or waiting a few minutes before trying again."
+msgstr "Ikiwa una matatizo, jaribu kufuta akiba (cache) ya kivinjari chako au subiri dakika chache kabla ya kujaribu tena."
+
+msgid "Rate limits help us keep the system fast and secure for everyone."
+msgstr "Vikomo vya maombi vinatusaidia kuweka mfumo uwe wa haraka na salama kwa kila mtu."
+
+msgid "{n} seconds"
+msgstr "sekunde {n}"
+
+msgid "%(n)s seconds"
+msgstr "sekunde %(n)s"
+
+msgid "You can try again now!"
+msgstr "Unaweza kujaribu tena sasa!"
+
+msgid "Restaurant Owner Registration"
+msgstr "Usajili wa Mmiliki wa Mgahawa"
+
+msgid "Owner Registration"
+msgstr "Usajili wa Mmiliki"
+
+msgid "Register Your Restaurant"
+msgstr "Sajili Mgahawa Wako"
+
+msgid "Join our platform and start managing your restaurant digitally"
+msgstr "Jiunge na mfumo wetu na uanze kusimamia mgahawa wako kidijitali"
+
+msgid "Restaurant Information"
+msgstr "Taarifa za Mgahawa"
+
+msgid "Account Security"
+msgstr "Usalama wa Akaunti"
+
+msgid "Register Restaurant"
+msgstr "Sajili Mgahawa"
+
+msgid "Login Here"
+msgstr "Ingia Hapa"
+
+msgid "Want to register as staff or customer?"
+msgstr "Unataka kujisajili kama mfanyakazi au mteja?"
+
+msgid "Regular Registration"
+msgstr "Usajili wa Kawaida"

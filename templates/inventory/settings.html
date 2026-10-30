@@ -1,18 +1,19 @@
 ﻿{% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Inventory Settings{% endblock %}
+{% block title %}{% translate "Inventory Settings" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-sliders-h mr-2"></i>Inventory Settings</h1>
+        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-sliders-h mr-2"></i>{% translate "Inventory Settings" %}</h1>
         <div>
             <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary btn-sm mr-2">
-                <i class="fas fa-arrow-left mr-1"></i> Dashboard
+                <i class="fas fa-arrow-left mr-1"></i> {% translate "Dashboard" %}
             </a>
             <a href="{% url 'inventory:items' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-boxes mr-1"></i> Manage Items
+                <i class="fas fa-boxes mr-1"></i> {% translate "Manage Items" %}
             </a>
         </div>
     </div>
@@ -60,14 +61,14 @@
                 <li class="nav-item">
                     <a class="nav-link active" id="categories-tab"
                        data-bs-toggle="tab" href="#categories" role="tab">
-                        <i class="fas fa-tag mr-2"></i>Categories
+                        <i class="fas fa-tag mr-2"></i>{% translate "Categories" %}
                         <span class="badge ml-1" style="background:#2c3e50;color:#fff;">{{ cat_data|length }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" id="units-tab"
                        data-bs-toggle="tab" href="#units" role="tab">
-                        <i class="fas fa-balance-scale mr-2"></i>Units of Measure
+                        <i class="fas fa-balance-scale mr-2"></i>{% translate "Units of Measure" %}
                         <span class="badge ml-1" style="background:#2c3e50;color:#fff;">{{ unit_data|length }}</span>
                     </a>
                 </li>
@@ -79,9 +80,9 @@
             <!-- ===== CATEGORIES TAB ===== -->
             <div class="tab-pane fade show active" id="categories" role="tabpanel">
                 <div class="d-flex align-items-center justify-content-between px-4 py-3" style="border-bottom:1px solid #f0f0f0;">
-                    <span class="text-muted small">Manage the categories used to organise your inventory items.</span>
+                    <span class="text-muted small">{% translate "Manage the categories used to organise your inventory items." %}</span>
                     <button class="btn btn-primary btn-sm" onclick="openAddModal('category')">
-                        <i class="fas fa-plus mr-1"></i> Add Category
+                        <i class="fas fa-plus mr-1"></i> {% translate "Add Category" %}
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -90,9 +91,9 @@
                         <thead class="thead-light">
                             <tr>
                                 <th style="width:50px;" class="text-center">#</th>
-                                <th>Name</th>
-                                <th class="text-center" style="width:130px;">Items Using</th>
-                                <th class="text-right" style="width:100px;">Actions</th>
+                                <th>{% translate "Name" %}</th>
+                                <th class="text-center" style="width:130px;">{% translate "Items Using" %}</th>
+                                <th class="text-right" style="width:100px;">{% translate "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody id="categoryTableBody">
@@ -101,15 +102,15 @@
                                 <td class="text-center text-muted align-middle">{{ forloop.counter }}</td>
                                 <td class="font-weight-bold align-middle">{{ row.obj.name }}</td>
                                 <td class="text-center align-middle">
-                                    <span class="badge px-2 py-1" style="font-size:.85em;background:{% if row.in_use > 0 %}#4e73df{% else %}#5a5c69{% endif %};color:#fff;">{{ row.in_use }} item{% if row.in_use != 1 %}s{% endif %}</span>
+                                    <span class="badge px-2 py-1" style="font-size:.85em;background:{% if row.in_use > 0 %}#4e73df{% else %}#5a5c69{% endif %};color:#fff;">{% blocktranslate count counter=row.in_use %}{{ counter }} item{% plural %}{{ counter }} items{% endblocktranslate %}</span>
                                 </td>
                                 <td class="text-right align-middle" style="white-space:nowrap;">
                                     <button class="btn btn-outline-primary btn-action mr-1"
-                                        onclick="openEditModal('category', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}')" title="Edit">
+                                        onclick="openEditModal('category', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}')" title="{% translate "Edit" %}">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline-danger btn-action"
-                                        onclick="deleteEntry('category', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use }})" title="Delete">
+                                        onclick="deleteEntry('category', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use }})" title="{% translate "Delete" %}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -120,9 +121,9 @@
                     {% else %}
                     <div class="text-center py-5 text-muted" id="catEmpty">
                         <i class="fas fa-tag fa-2x mb-2" style="opacity:.3;"></i>
-                        <p class="mb-2">No categories yet.</p>
+                        <p class="mb-2">{% translate "No categories yet." %}</p>
                         <button class="btn btn-sm btn-primary" onclick="openAddModal('category')">
-                            <i class="fas fa-plus mr-1"></i> Add First Category
+                            <i class="fas fa-plus mr-1"></i> {% translate "Add First Category" %}
                         </button>
                     </div>
                     {% endif %}
@@ -132,9 +133,9 @@
             <!-- ===== UNITS TAB ===== -->
             <div class="tab-pane fade" id="units" role="tabpanel">
                 <div class="d-flex align-items-center justify-content-between px-4 py-3" style="border-bottom:1px solid #f0f0f0;">
-                    <span class="text-muted small">Manage the units of measure used when tracking stock quantities.</span>
+                    <span class="text-muted small">{% translate "Manage the units of measure used when tracking stock quantities." %}</span>
                     <button class="btn btn-primary btn-sm" onclick="openAddModal('unit')">
-                        <i class="fas fa-plus mr-1"></i> Add Unit
+                        <i class="fas fa-plus mr-1"></i> {% translate "Add Unit" %}
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -143,9 +144,9 @@
                         <thead class="thead-light">
                             <tr>
                                 <th style="width:50px;" class="text-center">#</th>
-                                <th>Name</th>
-                                <th class="text-center" style="width:130px;">Items Using</th>
-                                <th class="text-right" style="width:100px;">Actions</th>
+                                <th>{% translate "Name" %}</th>
+                                <th class="text-center" style="width:130px;">{% translate "Items Using" %}</th>
+                                <th class="text-right" style="width:100px;">{% translate "Actions" %}</th>
                             </tr>
                         </thead>
                         <tbody id="unitTableBody">
@@ -154,15 +155,15 @@
                                 <td class="text-center text-muted align-middle">{{ forloop.counter }}</td>
                                 <td class="font-weight-bold align-middle">{{ row.obj.name }}</td>
                                 <td class="text-center align-middle">
-                                    <span class="badge px-2 py-1" style="font-size:.85em;background:{% if row.in_use > 0 %}#1cc88a{% else %}#5a5c69{% endif %};color:#fff;">{{ row.in_use }} item{% if row.in_use != 1 %}s{% endif %}</span>
+                                    <span class="badge px-2 py-1" style="font-size:.85em;background:{% if row.in_use > 0 %}#1cc88a{% else %}#5a5c69{% endif %};color:#fff;">{% blocktranslate count counter=row.in_use %}{{ counter }} item{% plural %}{{ counter }} items{% endblocktranslate %}</span>
                                 </td>
                                 <td class="text-right align-middle" style="white-space:nowrap;">
                                     <button class="btn btn-outline-primary btn-action mr-1"
-                                        onclick="openEditModal('unit', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}')" title="Edit">
+                                        onclick="openEditModal('unit', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}')" title="{% translate "Edit" %}">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline-danger btn-action"
-                                        onclick="deleteEntry('unit', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use }})" title="Delete">
+                                        onclick="deleteEntry('unit', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use }})" title="{% translate "Delete" %}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -173,9 +174,9 @@
                     {% else %}
                     <div class="text-center py-5 text-muted" id="unitEmpty">
                         <i class="fas fa-balance-scale fa-2x mb-2" style="opacity:.3;"></i>
-                        <p class="mb-2">No units yet.</p>
+                        <p class="mb-2">{% translate "No units yet." %}</p>
                         <button class="btn btn-sm btn-primary" onclick="openAddModal('unit')">
-                            <i class="fas fa-plus mr-1"></i> Add First Unit
+                            <i class="fas fa-plus mr-1"></i> {% translate "Add First Unit" %}
                         </button>
                     </div>
                     {% endif %}
@@ -191,8 +192,8 @@
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="entryModalTitle">Add</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="entryModalTitle">{% translate "Add" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate "Close" %}"></button>
             </div>
             <div class="modal-body">
                 <div id="entryModalError" style="display:none;padding:8px 12px;margin-bottom:8px;border-radius:4px;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;font-size:.9em;"></div>
@@ -200,20 +201,34 @@
                 <input type="hidden" id="entryModalAction">
                 <input type="hidden" id="entryModalId">
                 <div class="form-group mb-0">
-                    <label class="font-weight-bold" id="entryModalLabel">Name</label>
-                    <input type="text" id="entryModalName" class="form-control" placeholder="Enter name" autocomplete="off">
+                    <label class="font-weight-bold" id="entryModalLabel">{% translate "Name" %}</label>
+                    <input type="text" id="entryModalName" class="form-control" placeholder="{% translate "Enter name" %}" autocomplete="off">
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
                 <button type="button" class="btn btn-primary btn-sm" id="entryModalSave" onclick="saveEntry()">
-                    <i class="fas fa-save mr-1"></i> Save
+                    <i class="fas fa-save mr-1"></i> {% translate "Save" %}
                 </button>
             </div>
         </div>
     </div>
 </div>
 
+{% translate "Add Category" as t_add_cat %}
+{% translate "Add Unit" as t_add_unit %}
+{% translate "Edit Category" as t_edit_cat %}
+{% translate "Edit Unit" as t_edit_unit %}
+{% translate "Category Name" as t_cat_name %}
+{% translate "Unit Name" as t_unit_name %}
+{% translate "e.g. Fresh Produce, Japanese Spirits" as t_ph_cat %}
+{% translate "e.g. kg, bottles (720ml), trays" as t_ph_unit %}
+{% translate "Name is required." as t_name_required %}
+{% translate "Error." as t_error %}
+{% translate "Request failed." as t_req_failed %}
+{% translate 'Delete "{name}"?' as t_delete_q %}
+{% translate "{n} item(s) are currently using this category. They will keep their existing value but it won't appear in the dropdown list anymore." as t_inuse_cat %}
+{% translate "{n} item(s) are currently using this unit. They will keep their existing value but it won't appear in the dropdown list anymore." as t_inuse_unit %}
 <script>
 const SETTINGS_URL = "{% url 'inventory:settings' %}";
 
@@ -228,9 +243,9 @@ function openAddModal(kind) {
     document.getElementById('entryModalId').value     = '';
     document.getElementById('entryModalName').value   = '';
     document.getElementById('entryModalError').style.display = 'none';
-    document.getElementById('entryModalTitle').textContent = 'Add ' + (kind === 'category' ? 'Category' : 'Unit');
-    document.getElementById('entryModalLabel').textContent = kind === 'category' ? 'Category Name' : 'Unit Name';
-    document.getElementById('entryModalName').placeholder  = kind === 'category' ? 'e.g. Fresh Produce, Japanese Spirits' : 'e.g. kg, bottles (720ml), trays';
+    document.getElementById('entryModalTitle').textContent = kind === 'category' ? "{{ t_add_cat|escapejs }}" : "{{ t_add_unit|escapejs }}";
+    document.getElementById('entryModalLabel').textContent = kind === 'category' ? "{{ t_cat_name|escapejs }}" : "{{ t_unit_name|escapejs }}";
+    document.getElementById('entryModalName').placeholder  = kind === 'category' ? "{{ t_ph_cat|escapejs }}" : "{{ t_ph_unit|escapejs }}";
     document.getElementById('entryModalSave').className = kind === 'category'
         ? 'btn btn-primary btn-sm' : 'btn btn-primary btn-sm';
     bootstrap.Modal.getOrCreateInstance(document.getElementById('entryModal')).show();
@@ -243,8 +258,8 @@ function openEditModal(kind, id, currentName) {
     document.getElementById('entryModalId').value     = id;
     document.getElementById('entryModalName').value   = currentName;
     document.getElementById('entryModalError').style.display = 'none';
-    document.getElementById('entryModalTitle').textContent = 'Edit ' + (kind === 'category' ? 'Category' : 'Unit');
-    document.getElementById('entryModalLabel').textContent = kind === 'category' ? 'Category Name' : 'Unit Name';
+    document.getElementById('entryModalTitle').textContent = kind === 'category' ? "{{ t_edit_cat|escapejs }}" : "{{ t_edit_unit|escapejs }}";
+    document.getElementById('entryModalLabel').textContent = kind === 'category' ? "{{ t_cat_name|escapejs }}" : "{{ t_unit_name|escapejs }}";
     document.getElementById('entryModalName').placeholder  = '';
     document.getElementById('entryModalSave').className = kind === 'category'
         ? 'btn btn-primary btn-sm' : 'btn btn-primary btn-sm';
@@ -260,7 +275,7 @@ function saveEntry() {
     const errEl  = document.getElementById('entryModalError');
     errEl.style.display = 'none';
 
-    if (!name) { errEl.textContent = 'Name is required.'; errEl.style.display = 'block'; return; }
+    if (!name) { errEl.textContent = "{{ t_name_required|escapejs }}"; errEl.style.display = 'block'; return; }
 
     const fd = new FormData();
     fd.append('kind', kind);
@@ -271,17 +286,17 @@ function saveEntry() {
     fetch(SETTINGS_URL, { method: 'POST', headers: { 'X-CSRFToken': getCsrf() }, body: fd })
         .then(r => r.json())
         .then(d => {
-            if (!d.success) { errEl.textContent = d.error || 'Error.'; errEl.style.display = 'block'; return; }
+            if (!d.success) { errEl.textContent = d.error || "{{ t_error|escapejs }}"; errEl.style.display = 'block'; return; }
             bootstrap.Modal.getOrCreateInstance(document.getElementById('entryModal')).hide();
             location.reload();
         })
-        .catch(() => { errEl.textContent = 'Request failed.'; errEl.style.display = 'block'; });
+        .catch(() => { errEl.textContent = "{{ t_req_failed|escapejs }}"; errEl.style.display = 'block'; });
 }
 
 function deleteEntry(kind, id, name, inUse) {
-    let msg = `Delete "${name}"?`;
+    let msg = "{{ t_delete_q|escapejs }}".replace('{name}', name);
     if (inUse > 0) {
-        msg += `\n\nâš ï¸ ${inUse} item(s) are currently using this ${kind}. They will keep their existing value but it won't appear in the dropdown list anymore.`;
+        msg += `\n\nâš ï¸ ` + (kind === 'category' ? "{{ t_inuse_cat|escapejs }}" : "{{ t_inuse_unit|escapejs }}").replace('{n}', inUse);
     }
     if (!confirm(msg)) return;
 
@@ -293,11 +308,11 @@ function deleteEntry(kind, id, name, inUse) {
     fetch(SETTINGS_URL, { method: 'POST', headers: { 'X-CSRFToken': getCsrf() }, body: fd })
         .then(r => r.json())
         .then(d => {
-            if (!d.success) { alert(d.error || 'Error.'); return; }
+            if (!d.success) { alert(d.error || "{{ t_error|escapejs }}"); return; }
             const row = document.getElementById((kind === 'category' ? 'cat' : 'unit') + '-row-' + id);
             if (row) row.remove();
         })
-        .catch(() => alert('Request failed.'));
+        .catch(() => alert("{{ t_req_failed|escapejs }}"));
 }
 
 document.getElementById('entryModalName').addEventListener('keydown', function(e) {

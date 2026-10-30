@@ -1,7 +1,8 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Sales Reports{% endblock %}
+{% block title %}{% translate "Sales Reports" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -33,14 +34,14 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL REVENUE</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "TOTAL REVENUE" %}</div>
                             <div class="summary-card-value mb-0">{% currency_symbol %}{{ total_revenue|floatformat:2 }}</div>
                             {% if total_tax %}
                             <div class="text-xs text-muted mt-1">
-                                <i class="fas fa-plus-circle"></i> Tax ({{ tax_rate_percentage|floatformat:1 }}%): {% currency_symbol %}{{ total_tax|floatformat:2 }}
+                                <i class="fas fa-plus-circle"></i> {% blocktranslate with rate=tax_rate_percentage|floatformat:1 %}Tax ({{ rate }}%):{% endblocktranslate %} {% currency_symbol %}{{ total_tax|floatformat:2 }}
                             </div>
                             <div class="text-xs font-weight-bold text-success mt-1">
-                                <i class="fas fa-calculator"></i> With Tax: {% currency_symbol %}{{ total_revenue_with_tax|floatformat:2 }}
+                                <i class="fas fa-calculator"></i> {% translate "With Tax:" %} {% currency_symbol %}{{ total_revenue_with_tax|floatformat:2 }}
                             </div>
                             {% endif %}
                         </div>
@@ -58,7 +59,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">TOTAL ORDERS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "TOTAL ORDERS" %}</div>
                             <div class="summary-card-value mb-0">{{ total_orders }}</div>
                         </div>
                         <div class="col-auto summary-card-icon">
@@ -75,7 +76,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">ITEMS SOLD</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "ITEMS SOLD" %}</div>
                             <div class="summary-card-value mb-0">{{ total_items }}</div>
                         </div>
                         <div class="col-auto summary-card-icon">
@@ -92,11 +93,11 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">AVG ORDER VALUE</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "AVG ORDER VALUE" %}</div>
                             <div class="summary-card-value mb-0">{% currency_symbol %}{{ avg_order_value|floatformat:2 }}</div>
                             {% if total_tax %}
                             <div class="text-xs font-weight-bold text-success mt-1">
-                                <i class="fas fa-calculator"></i> With Tax: {% currency_symbol %}{{ avg_order_value_with_tax|floatformat:2 }}
+                                <i class="fas fa-calculator"></i> {% translate "With Tax:" %} {% currency_symbol %}{{ avg_order_value_with_tax|floatformat:2 }}
                             </div>
                             {% endif %}
                         </div>
@@ -118,12 +119,12 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PAID ORDERS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "PAID ORDERS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ paid_orders_count }}</div>
-                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ paid_revenue|floatformat:2 }}</div>
+                            <div class="text-xs text-muted">{% translate "Subtotal:" %} {% currency_symbol %}{{ paid_revenue|floatformat:2 }}</div>
                             {% if total_tax %}
-                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ paid_tax|floatformat:2 }}</div>
-                            <div class="text-xs font-weight-bold text-success">Total: {% currency_symbol %}{{ paid_revenue_with_tax|floatformat:2 }}</div>
+                            <div class="text-xs text-muted">{% translate "Tax:" %} {% currency_symbol %}{{ paid_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-success">{% translate "Total:" %} {% currency_symbol %}{{ paid_revenue_with_tax|floatformat:2 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-auto">
@@ -140,12 +141,12 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">UNPAID ORDERS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "UNPAID ORDERS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ unpaid_orders_count }}</div>
-                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ unpaid_revenue|floatformat:2 }}</div>
+                            <div class="text-xs text-muted">{% translate "Subtotal:" %} {% currency_symbol %}{{ unpaid_revenue|floatformat:2 }}</div>
                             {% if total_tax %}
-                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ unpaid_tax|floatformat:2 }}</div>
-                            <div class="text-xs font-weight-bold text-danger">Total: {% currency_symbol %}{{ unpaid_revenue_with_tax|floatformat:2 }}</div>
+                            <div class="text-xs text-muted">{% translate "Tax:" %} {% currency_symbol %}{{ unpaid_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-danger">{% translate "Total:" %} {% currency_symbol %}{{ unpaid_revenue_with_tax|floatformat:2 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-auto">
@@ -162,12 +163,12 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">PARTIAL PAYMENTS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "PARTIAL PAYMENTS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ partial_orders_count }}</div>
-                            <div class="text-xs text-muted">Subtotal: {% currency_symbol %}{{ partial_revenue|floatformat:2 }}</div>
+                            <div class="text-xs text-muted">{% translate "Subtotal:" %} {% currency_symbol %}{{ partial_revenue|floatformat:2 }}</div>
                             {% if total_tax %}
-                            <div class="text-xs text-muted">Tax: {% currency_symbol %}{{ partial_tax|floatformat:2 }}</div>
-                            <div class="text-xs font-weight-bold text-warning">Total: {% currency_symbol %}{{ partial_revenue_with_tax|floatformat:2 }}</div>
+                            <div class="text-xs text-muted">{% translate "Tax:" %} {% currency_symbol %}{{ partial_tax|floatformat:2 }}</div>
+                            <div class="text-xs font-weight-bold text-warning">{% translate "Total:" %} {% currency_symbol %}{{ partial_revenue_with_tax|floatformat:2 }}</div>
                             {% endif %}
                         </div>
                         <div class="col-auto">
@@ -189,7 +190,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">KITCHEN ORDERS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "KITCHEN ORDERS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ kitchen_orders_count }}</div>
                         </div>
                         <div class="col-auto">
@@ -206,7 +207,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">BAR ORDERS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "BAR ORDERS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ bar_orders_count }}</div>
                         </div>
                         <div class="col-auto">
@@ -223,7 +224,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">MIXED ORDERS</div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "MIXED ORDERS" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">{{ mixed_orders_count }}</div>
                         </div>
                         <div class="col-auto">
@@ -243,7 +244,7 @@
             <div class="card shadow">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-trophy mr-2"></i>Top Selling Products
+                        <i class="fas fa-trophy mr-2"></i>{% translate "Top Selling Products" %}
                     </h6>
                 </div>
                 <div class="card-body">
@@ -258,10 +259,10 @@
                                                 {{ product.product__name }}
                                             </div>
                                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                                {{ product.total_quantity }} sold
+                                                {% blocktranslate with n=product.total_quantity %}{{ n }} sold{% endblocktranslate %}
                                             </div>
                                             <div class="text-xs text-muted">
-                                                Revenue: {% currency_symbol %}{{ product.total_revenue|floatformat:0 }}
+                                                {% translate "Revenue:" %} {% currency_symbol %}{{ product.total_revenue|floatformat:0 }}
                                             </div>
                                         </div>
                                         <div class="col-auto">
@@ -287,15 +288,15 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-filter mr-2"></i>Report Filters
+                <i class="fas fa-filter mr-2"></i>{% translate "Report Filters" %}
             </h6>
         </div>
         <div class="card-body">
             <form method="get" class="row g-3" id="reportFilterForm">
                 <div class="col-lg-2 col-md-4">
-                    <label for="restaurant" class="form-label font-weight-bold">Restaurant</label>
+                    <label for="restaurant" class="form-label font-weight-bold">{% translate "Restaurant" %}</label>
                     <select class="form-control" id="restaurant" name="restaurant" onchange="this.form.submit()">
-                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>{% translate "All Restaurants" %}</option>
                         {% for restaurant in accessible_restaurants %}
                         <option value="{{ restaurant.id }}" 
                             {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
@@ -308,21 +309,21 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="period" class="form-label font-weight-bold">Period</label>
+                    <label for="period" class="form-label font-weight-bold">{% translate "Period" %}</label>
                     <select class="form-control" id="period" name="period" onchange="toggleDateFields(); this.form.submit();">
-                        <option value="today" {% if request.GET.period == 'today' or not request.GET.period %}selected{% endif %}>Today</option>
-                        <option value="weekly" {% if request.GET.period == 'weekly' %}selected{% endif %}>Weekly</option>
-                        <option value="monthly" {% if request.GET.period == 'monthly' %}selected{% endif %}>Monthly</option>
-                        <option value="yearly" {% if request.GET.period == 'yearly' %}selected{% endif %}>Yearly</option>
-                        <option value="all" {% if request.GET.period == 'all' %}selected{% endif %}>All Time</option>
-                        <option value="custom" {% if request.GET.period == 'custom' %}selected{% endif %}>Custom Range</option>
+                        <option value="today" {% if request.GET.period == 'today' or not request.GET.period %}selected{% endif %}>{% translate "Today" %}</option>
+                        <option value="weekly" {% if request.GET.period == 'weekly' %}selected{% endif %}>{% translate "Weekly" %}</option>
+                        <option value="monthly" {% if request.GET.period == 'monthly' %}selected{% endif %}>{% translate "Monthly" %}</option>
+                        <option value="yearly" {% if request.GET.period == 'yearly' %}selected{% endif %}>{% translate "Yearly" %}</option>
+                        <option value="all" {% if request.GET.period == 'all' %}selected{% endif %}>{% translate "All Time" %}</option>
+                        <option value="custom" {% if request.GET.period == 'custom' %}selected{% endif %}>{% translate "Custom Range" %}</option>
                     </select>
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="category_id" class="form-label font-weight-bold">Category</label>
+                    <label for="category_id" class="form-label font-weight-bold">{% translate "Category" %}</label>
                     <select class="form-control" id="category_id" name="category_id" onchange="this.form.submit()">
-                        <option value="all" {% if selected_category == 'all' %}selected{% endif %}>All Categories</option>
+                        <option value="all" {% if selected_category == 'all' %}selected{% endif %}>{% translate "All Categories" %}</option>
                         {% for category in categories %}
                             <option value="{{ category.id }}" {% if selected_category == category.id|stringformat:"s" %}selected{% endif %}>
                                 {{ category.name }}
@@ -332,9 +333,9 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="subcategory_id" class="form-label font-weight-bold">Sub Category</label>
+                    <label for="subcategory_id" class="form-label font-weight-bold">{% translate "Sub Category" %}</label>
                     <select class="form-control" id="subcategory_id" name="subcategory_id" onchange="this.form.submit()">
-                        <option value="all" {% if selected_subcategory == 'all' %}selected{% endif %}>All Sub Categories</option>
+                        <option value="all" {% if selected_subcategory == 'all' %}selected{% endif %}>{% translate "All Sub Categories" %}</option>
                         {% for subcategory in subcategories %}
                             <option value="{{ subcategory.id }}" {% if selected_subcategory == subcategory.id|stringformat:"s" %}selected{% endif %}>
                                 {{ subcategory.name }}
@@ -344,20 +345,20 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="station_filter" class="form-label font-weight-bold">Station</label>
+                    <label for="station_filter" class="form-label font-weight-bold">{% translate "Station" %}</label>
                     <select class="form-control" id="station_filter" name="station_filter" onchange="this.form.submit()">
-                        <option value="all" {% if station_filter == 'all' %}selected{% endif %}>All Stations</option>
-                        <option value="kitchen" {% if station_filter == 'kitchen' %}selected{% endif %}>Kitchen</option>
-                        <option value="bar" {% if station_filter == 'bar' %}selected{% endif %}>Bar</option>
-                        <option value="buffet" {% if station_filter == 'buffet' %}selected{% endif %}>Buffet</option>
-                        <option value="service" {% if station_filter == 'service' %}selected{% endif %}>Service</option>
+                        <option value="all" {% if station_filter == 'all' %}selected{% endif %}>{% translate "All Stations" %}</option>
+                        <option value="kitchen" {% if station_filter == 'kitchen' %}selected{% endif %}>{% translate "Kitchen" %}</option>
+                        <option value="bar" {% if station_filter == 'bar' %}selected{% endif %}>{% translate "Bar" %}</option>
+                        <option value="buffet" {% if station_filter == 'buffet' %}selected{% endif %}>{% translate "Buffet" %}</option>
+                        <option value="service" {% if station_filter == 'service' %}selected{% endif %}>{% translate "Service" %}</option>
                     </select>
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="staff_filter" class="form-label font-weight-bold">Staff Member</label>
+                    <label for="staff_filter" class="form-label font-weight-bold">{% translate "Staff Member" %}</label>
                     <select class="form-control" id="staff_filter" name="staff_filter" onchange="this.form.submit()">
-                        <option value="all" {% if staff_filter == 'all' %}selected{% endif %}>All Staff</option>
+                        <option value="all" {% if staff_filter == 'all' %}selected{% endif %}>{% translate "All Staff" %}</option>
                         {% for staff in staff_users %}
                             <option value="{{ staff.id }}" {% if staff_filter == staff.id|stringformat:"s" %}selected{% endif %}>
                                 {{ staff.first_name }} {{ staff.last_name }} ({{ staff.role.get_name_display }})
@@ -367,21 +368,21 @@
                 </div>
 
                 <div class="col-lg-2 col-md-4">
-                    <label class="form-label font-weight-bold">Product</label>
+                    <label class="form-label font-weight-bold">{% translate "Product" %}</label>
                     <div class="dropdown w-100" id="productDropdownWrap">
                         <button class="btn btn-outline-secondary btn-sm w-100 text-start d-flex justify-content-between align-items-center"
                                 type="button" id="productDropdownBtn"
                                 data-bs-toggle="dropdown" data-toggle="dropdown"
                                 aria-haspopup="true" aria-expanded="false">
                             <span id="productBtnLabel" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">
-                                {% if selected_product_names %}{{ selected_product_names|join:", " }}{% else %}All Products{% endif %}
+                                {% if selected_product_names %}{{ selected_product_names|join:", " }}{% else %}{% translate "All Products" %}{% endif %}
                             </span>
                             <i class="fas fa-chevron-down ms-1 ml-1" style="font-size:0.7rem;flex-shrink:0;"></i>
                         </button>
                         <div class="dropdown-menu p-2 shadow" aria-labelledby="productDropdownBtn"
                              style="min-width:240px;max-height:280px;overflow-y:auto;">
                             {% if not products %}
-                                <span class="text-muted small px-2">No products available</span>
+                                <span class="text-muted small px-2">{% translate "No products available" %}</span>
                             {% else %}
                                 {% for product in products %}
                                 <div class="form-check py-1 px-3">
@@ -396,49 +397,49 @@
                                 {% endfor %}
                             {% endif %}
                             <div class="d-flex gap-1 mt-2 px-2">
-                                <button type="button" class="btn btn-sm btn-primary flex-fill" onclick="applyProducts()">Apply</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="clearProducts()">Clear</button>
+                                <button type="button" class="btn btn-sm btn-primary flex-fill" onclick="applyProducts()">{% translate "Apply" %}</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="clearProducts()">{% translate "Clear" %}</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-lg-2 col-md-4">
-                    <label for="table_id" class="form-label font-weight-bold">Table</label>
+                    <label for="table_id" class="form-label font-weight-bold">{% translate "Table" %}</label>
                     <select class="form-control" id="table_id" name="table_id" onchange="this.form.submit()">
-                        <option value="all" {% if selected_table == 'all' or not selected_table %}selected{% endif %}>All Tables</option>
+                        <option value="all" {% if selected_table == 'all' or not selected_table %}selected{% endif %}>{% translate "All Tables" %}</option>
                         {% for table in tables %}
                             <option value="{{ table.id }}" {% if selected_table == table.id|stringformat:"s" %}selected{% endif %}>
-                                Table {{ table.tbl_no }}{% if tables|length > 1 and table.restaurant %} ({{ table.restaurant.name }}){% endif %}
+                                {% blocktranslate with n=table.tbl_no %}Table {{ n }}{% endblocktranslate %}{% if tables|length > 1 and table.restaurant %} ({{ table.restaurant.name }}){% endif %}
                             </option>
                         {% endfor %}
                     </select>
                 </div>
 
                 <div class="col-lg-2 col-md-4">
-                    <label for="payment_status" class="form-label font-weight-bold">Payment Status</label>
+                    <label for="payment_status" class="form-label font-weight-bold">{% translate "Payment Status" %}</label>
                     <select class="form-control" id="payment_status" name="payment_status" onchange="this.form.submit()">
-                        <option value="all" {% if payment_status == 'all' %}selected{% endif %}>All</option>
-                        <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>Paid</option>
-                        <option value="unpaid" {% if payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
-                        <option value="partial" {% if payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                        <option value="all" {% if payment_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
+                        <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>{% translate "Paid" %}</option>
+                        <option value="unpaid" {% if payment_status == 'unpaid' %}selected{% endif %}>{% translate "Unpaid" %}</option>
+                        <option value="partial" {% if payment_status == 'partial' %}selected{% endif %}>{% translate "Partial" %}</option>
                     </select>
                 </div>
 
                 <div class="col-lg-2 col-md-4">
-                    <label for="payment_method" class="form-label font-weight-bold">Payment Type</label>
+                    <label for="payment_method" class="form-label font-weight-bold">{% translate "Payment Type" %}</label>
                     <select class="form-control" id="payment_method" name="payment_method" onchange="this.form.submit()">
-                        <option value="all" {% if payment_method == 'all' or not payment_method %}selected{% endif %}>All Types</option>
-                        <option value="cash"    {% if payment_method == 'cash'    %}selected{% endif %}>&#128181; Cash</option>
-                        <option value="card"    {% if payment_method == 'card'    %}selected{% endif %}>&#128179; Card</option>
-                        <option value="digital" {% if payment_method == 'digital' %}selected{% endif %}>&#128241; Digital</option>
-                        <option value="voucher" {% if payment_method == 'voucher' %}selected{% endif %}>&#127915; Voucher</option>
-                        <option value="loyalty" {% if payment_method == 'loyalty' %}selected{% endif %}>&#127873; Loyalty points</option>
+                        <option value="all" {% if payment_method == 'all' or not payment_method %}selected{% endif %}>{% translate "All Types" %}</option>
+                        <option value="cash"    {% if payment_method == 'cash'    %}selected{% endif %}>&#128181; {% translate "Cash" %}</option>
+                        <option value="card"    {% if payment_method == 'card'    %}selected{% endif %}>&#128179; {% translate "Card" %}</option>
+                        <option value="digital" {% if payment_method == 'digital' %}selected{% endif %}>&#128241; {% translate "Digital" %}</option>
+                        <option value="voucher" {% if payment_method == 'voucher' %}selected{% endif %}>&#127915; {% translate "Voucher" %}</option>
+                        <option value="loyalty" {% if payment_method == 'loyalty' %}selected{% endif %}>&#127873; {% translate "Loyalty points" %}</option>
                     </select>
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="from_date" class="form-label font-weight-bold">From Date</label>
+                    <label for="from_date" class="form-label font-weight-bold">{% translate "From Date" %}</label>
                     <input type="date" class="form-control" id="from_date" name="from_date" 
                            value="{% if request.GET.period == 'custom' %}{{ request.GET.from_date|default:today }}{% endif %}" 
                            {% if request.GET.period != 'custom' and request.GET.period != 'all' %}disabled{% endif %}
@@ -446,7 +447,7 @@
                 </div>
                 
                 <div class="col-lg-2 col-md-4">
-                    <label for="to_date" class="form-label font-weight-bold">To Date</label>
+                    <label for="to_date" class="form-label font-weight-bold">{% translate "To Date" %}</label>
                     <input type="date" class="form-control" id="to_date" name="to_date" 
                            value="{% if request.GET.period == 'custom' %}{{ request.GET.to_date|default:today }}{% endif %}"
                            {% if request.GET.period != 'custom' and request.GET.period != 'all' %}disabled{% endif %}
@@ -455,10 +456,10 @@
                 
                 <div class="col-lg-12 col-md-12 d-flex align-items-end justify-content-end">
                     <button type="button" class="btn btn-success me-3" onclick="exportReport('csv')">
-                        <i class="fas fa-download me-1"></i>Export CSV
+                        <i class="fas fa-download me-1"></i>{% translate "Export CSV" %}
                     </button>
                     <button type="button" class="btn btn-danger" onclick="exportReport('pdf')">
-                        <i class="fas fa-file-pdf me-1"></i>Export PDF
+                        <i class="fas fa-file-pdf me-1"></i>{% translate "Export PDF" %}
                     </button>
                 </div>
             </form>
@@ -469,10 +470,10 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-table mr-2"></i>Detailed Sales Data
+                <i class="fas fa-table mr-2"></i>{% translate "Detailed Sales Data" %}
             </h6>
             <div class="d-flex">
-                <span class="badge me-3" style="background-color: #343a40; color: white; font-weight: bold;">{{ total_orders }} Orders</span>
+                <span class="badge me-3" style="background-color: #343a40; color: white; font-weight: bold;">{% blocktranslate count counter=total_orders %}{{ counter }} Order{% plural %}{{ counter }} Orders{% endblocktranslate %}</span>
                 <span class="badge" style="background-color: #343a40; color: white; font-weight: bold;">{% currency_symbol %}{{ total_revenue|floatformat:0 }}</span>
             </div>
         </div>
@@ -481,20 +482,20 @@
                 <table class="table table-bordered" width="100%" cellspacing="0">
                     <thead class="thead-light">
                         <tr>
-                            <th>SN</th>
-                            <th>Order #</th>
-                            <th>Date & Time</th>
-                            <th>Table</th>
-                            <th>Customer</th>
-                            <th>Items</th>
-                            <th>Category</th>
-                            <th>Sub Category</th>
-                            <th>Station</th>
-                            <th>Total Amount</th>
-                            <th>Payment</th>
-                            <th>Status</th>
-                            <th>Order By</th>
-                            <th>Paid By</th>
+                            <th>{% translate "SN" %}</th>
+                            <th>{% translate "Order #" %}</th>
+                            <th>{% translate "Date & Time" %}</th>
+                            <th>{% translate "Table" %}</th>
+                            <th>{% translate "Customer" %}</th>
+                            <th>{% translate "Items" %}</th>
+                            <th>{% translate "Category" %}</th>
+                            <th>{% translate "Sub Category" %}</th>
+                            <th>{% translate "Station" %}</th>
+                            <th>{% translate "Total Amount" %}</th>
+                            <th>{% translate "Payment" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th>{% translate "Order By" %}</th>
+                            <th>{% translate "Paid By" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -514,7 +515,7 @@
                                 {% if order.ordered_by %}
                                     {{ order.ordered_by.first_name }} {{ order.ordered_by.last_name }}
                                 {% else %}
-                                    Walk-in Customer
+                                    {% translate "Walk-in Customer" %}
                                 {% endif %}
                             </td>
                             <td>
@@ -572,13 +573,13 @@
                             <td class="text-center">
                                 {% comment %}Show station based on filter OR all stations in the order{% endcomment %}
                                 {% if station_filter == 'kitchen' %}
-                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Kitchen</span>
+                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">{% translate "Kitchen" %}</span>
                                 {% elif station_filter == 'bar' %}
-                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Bar</span>
+                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">{% translate "Bar" %}</span>
                                 {% elif station_filter == 'buffet' %}
-                                    <span class="badge" style="color: white; background-color: #ffc107; font-weight: bold;">Buffet</span>
+                                    <span class="badge" style="color: white; background-color: #ffc107; font-weight: bold;">{% translate "Buffet" %}</span>
                                 {% elif station_filter == 'service' %}
-                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Service</span>
+                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">{% translate "Service" %}</span>
                                 {% else %}
                                     {% comment %}Show all stations present in the order{% endcomment %}
                                     {% with stations=order.order_items.all %}
@@ -586,17 +587,17 @@
                                             {% regroup stations by product.station as station_list %}
                                             {% for station in station_list %}
                                                 {% if station.grouper == 'kitchen' %}
-                                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Kitchen</span>
+                                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">{% translate "Kitchen" %}</span>
                                                 {% elif station.grouper == 'bar' %}
-                                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Bar</span>
+                                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">{% translate "Bar" %}</span>
                                                 {% elif station.grouper == 'buffet' %}
-                                                    <span class="badge" style="color: white; background-color: #ffc107; font-weight: bold;">Buffet</span>
+                                                    <span class="badge" style="color: white; background-color: #ffc107; font-weight: bold;">{% translate "Buffet" %}</span>
                                                 {% elif station.grouper == 'service' %}
-                                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Service</span>
+                                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">{% translate "Service" %}</span>
                                                 {% endif %}
                                             {% endfor %}
                                         {% else %}
-                                            <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Unknown</span>
+                                            <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">{% translate "Unknown" %}</span>
                                         {% endif %}
                                     {% endwith %}
                                 {% endif %}
@@ -604,11 +605,11 @@
                             <td class="font-weight-bold">{% currency_symbol %}{{ order.row_display_total|floatformat:2 }}</td>
                             <td class="text-center" style="min-width:110px;">
                                 {% if order.payment_status == 'paid' %}
-                                    <span style="display:inline-block;padding:3px 10px;border-radius:20px;background:linear-gradient(135deg,#28a745,#20c963);color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px;box-shadow:0 2px 6px rgba(40,167,69,.35);">&#10003; PAID</span>
+                                    <span style="display:inline-block;padding:3px 10px;border-radius:20px;background:linear-gradient(135deg,#28a745,#20c963);color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px;box-shadow:0 2px 6px rgba(40,167,69,.35);">&#10003; {% translate "PAID" %}</span>
                                 {% elif order.payment_status == 'unpaid' %}
-                                    <span style="display:inline-block;padding:3px 10px;border-radius:20px;background:linear-gradient(135deg,#dc3545,#ff4d5e);color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px;box-shadow:0 2px 6px rgba(220,53,69,.35);">&#10007; UNPAID</span>
+                                    <span style="display:inline-block;padding:3px 10px;border-radius:20px;background:linear-gradient(135deg,#dc3545,#ff4d5e);color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px;box-shadow:0 2px 6px rgba(220,53,69,.35);">&#10007; {% translate "UNPAID" %}</span>
                                 {% else %}
-                                    <span style="display:inline-block;padding:3px 10px;border-radius:20px;background:linear-gradient(135deg,#fd7e14,#ffc107);color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px;box-shadow:0 2px 6px rgba(255,193,7,.4);">&#9900; PARTIAL</span>
+                                    <span style="display:inline-block;padding:3px 10px;border-radius:20px;background:linear-gradient(135deg,#fd7e14,#ffc107);color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px;box-shadow:0 2px 6px rgba(255,193,7,.4);">&#9900; {% translate "PARTIAL" %}</span>
                                 {% endif %}
                                 {% for payment in order.payments.all %}
                                     {% if not payment.is_voided %}
@@ -616,22 +617,22 @@
                                         {% if payment.payment_method == 'cash' %}
                                             <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;background:#d4edda;color:#155724;border:1px solid #b1dfbb;font-size:10px;font-weight:600;">
                                                 <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 11H9V9h2v4zm0-6H9V5h2v2z"/></svg>
-                                                Cash
+                                                {% translate "Cash" %}
                                             </span>
                                         {% elif payment.payment_method == 'card' %}
                                             <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;background:#cce5ff;color:#004085;border:1px solid #b8daff;font-size:10px;font-weight:600;">
                                                 <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="4" width="18" height="12" rx="2"/><rect x="1" y="8" width="18" height="3" fill="white" opacity=".4"/></svg>
-                                                Card
+                                                {% translate "Card" %}
                                             </span>
                                         {% elif payment.payment_method == 'digital' %}
                                             <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;background:#e2d9f3;color:#4a0e8f;border:1px solid #c5b3e8;font-size:10px;font-weight:600;">
                                                 <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="2" width="12" height="16" rx="2"/><circle cx="10" cy="15" r="1" fill="white"/></svg>
-                                                Digital
+                                                {% translate "Digital" %}
                                             </span>
                                         {% elif payment.payment_method == 'voucher' %}
                                             <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;background:#fff3cd;color:#856404;border:1px solid #ffd877;font-size:10px;font-weight:600;">
                                                 <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 000-4V6z"/></svg>
-                                                Voucher
+                                                {% translate "Voucher" %}
                                             </span>
                                         {% else %}
                                             <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;background:#f8f9fa;color:#495057;border:1px solid #dee2e6;font-size:10px;font-weight:600;">
@@ -644,17 +645,17 @@
                             </td>
                             <td class="text-center">
                                 {% if order.status == 'served' %}
-                                    <span class="badge" style="color: white; background-color: #28a745; font-weight: bold;">Served</span>
+                                    <span class="badge" style="color: white; background-color: #28a745; font-weight: bold;">{% translate "Served" %}</span>
                                 {% elif order.status == 'ready' %}
-                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">Ready</span>
+                                    <span class="badge" style="color: white; background-color: #17a2b8; font-weight: bold;">{% translate "Ready" %}</span>
                                 {% elif order.status == 'preparing' %}
-                                    <span class="badge" style="color: black; background-color: #ffc107; font-weight: bold;">Preparing</span>
+                                    <span class="badge" style="color: black; background-color: #ffc107; font-weight: bold;">{% translate "Preparing" %}</span>
                                 {% elif order.status == 'confirmed' %}
-                                    <span class="badge" style="color: white; background-color: #007bff; font-weight: bold;">Confirmed</span>
+                                    <span class="badge" style="color: white; background-color: #007bff; font-weight: bold;">{% translate "Confirmed" %}</span>
                                 {% elif order.status == 'pending' %}
-                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">Pending</span>
+                                    <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">{% translate "Pending" %}</span>
                                 {% elif order.status == 'cancelled' %}
-                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">Cancelled</span>
+                                    <span class="badge" style="color: white; background-color: #dc3545; font-weight: bold;">{% translate "Cancelled" %}</span>
                                 {% else %}
                                     <span class="badge" style="color: white; background-color: #6c757d; font-weight: bold;">{{ order.status|capfirst }}</span>
                                 {% endif %}
@@ -685,7 +686,7 @@
                         <tr>
                             <td colspan="14" class="text-center text-muted py-4">
                                 <i class="fas fa-inbox fa-3x mb-3 text-muted"></i><br>
-                                No orders found for the selected filters
+                                {% translate "No orders found for the selected filters" %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -697,9 +698,9 @@
             {% if page_obj.has_other_pages %}
             <div class="d-flex justify-content-between align-items-center mt-4">
                 <div class="text-muted">
-                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} orders
+                    {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }} to {{ end }} of {{ total }} orders{% endblocktranslate %}
                 </div>
-                <nav aria-label="Orders pagination">
+                <nav aria-label="{% translate "Orders pagination" %}">
                     <ul class="pagination mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
@@ -746,6 +747,7 @@
     </div>
 </div>
 
+{% translate "All Products" as t_all_products %}
 <script>
 function toggleDateFields() {
     const periodSelect = document.getElementById('period');
@@ -791,7 +793,7 @@ function updateProductBtnLabel() {
     var label = document.getElementById('productBtnLabel');
     if (!label) return;
     if (checked.length === 0) {
-        label.textContent = 'All Products';
+        label.textContent = "{{ t_all_products|escapejs }}";
     } else {
         var names = Array.from(checked).map(function(cb) {
             var lbl = document.querySelector('label[for="' + cb.id + '"]');

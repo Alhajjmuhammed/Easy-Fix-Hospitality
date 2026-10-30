@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Manage Happy Hour Promotions - Restaurant System{% endblock %}
+{% block title %}{% translate "Manage Happy Hour Promotions" %} - {% translate "Restaurant System" %}{% endblock %}
 
-{% block page_title %}Happy Hour Promotions{% endblock %}
-{% block page_description %}Manage time-based promotional pricing for your restaurant{% endblock %}
+{% block page_title %}{% translate "Happy Hour Promotions" %}{% endblock %}
+{% block page_description %}{% translate "Manage time-based promotional pricing for your restaurant" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -84,7 +85,7 @@
 {% block content %}
 <div class="d-flex justify-content-end mb-4">
     <a href="{% url 'restaurant:add_promotion' %}" class="btn btn-primary">
-        <i class="fas fa-plus-circle"></i> Create New Promotion
+        <i class="fas fa-plus-circle"></i> {% translate "Create New Promotion" %}
     </a>
 </div>
 
@@ -96,25 +97,25 @@
                 <!-- Search Input -->
                 <div class="col-md-4">
                     <label for="promotionSearch" class="form-label">
-                        <i class="fas fa-search"></i> Search Promotions
+                        <i class="fas fa-search"></i> {% translate "Search Promotions" %}
                     </label>
                     <div class="input-group">
                         <input type="text" class="form-control" id="promotionSearch" name="search" 
-                               value="{{ request.GET.search }}" placeholder="Search by name, description...">
+                               value="{{ request.GET.search }}" placeholder="{% translate "Search by name, description..." %}">
                         <span class="input-group-text">
                             <i class="fas fa-search"></i>
                         </span>
                     </div>
-                    <small class="text-muted">Press ESC to clear search</small>
+                    <small class="text-muted">{% translate "Press ESC to clear search" %}</small>
                 </div>
 
                 <!-- Restaurant Filter -->
                 <div class="col-md-3">
                     <label for="restaurantFilter" class="form-label">
-                        <i class="fas fa-building"></i> Restaurant
+                        <i class="fas fa-building"></i> {% translate "Restaurant" %}
                     </label>
                     <select class="form-select" id="restaurantFilter" name="restaurant">
-                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>All Restaurants</option>
+                        <option value="" {% if not request.GET.restaurant and view_all_restaurants %}selected{% endif %}>{% translate "All Restaurants" %}</option>
                         {% for restaurant in accessible_restaurants %}
                         <option value="{{ restaurant.id }}" 
                             {% if request.GET.restaurant == restaurant.id|stringformat:'s' %}selected
@@ -129,19 +130,19 @@
                 <!-- Status Filter -->
                 <div class="col-md-3">
                     <label for="statusFilter" class="form-label">
-                        <i class="fas fa-toggle-on"></i> Status
+                        <i class="fas fa-toggle-on"></i> {% translate "Status" %}
                     </label>
                     <select class="form-select" id="statusFilter" name="status">
-                        <option value="">All Status</option>
-                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
-                        <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                        <option value="">{% translate "All Status" %}</option>
+                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
+                        <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
                     </select>
                 </div>
 
                 <!-- Items Per Page -->
                 <div class="col-md-2">
                     <label for="perPageSelect" class="form-label">
-                        <i class="fas fa-list"></i> Per Page
+                        <i class="fas fa-list"></i> {% translate "Per Page" %}
                     </label>
                     <select class="form-select" id="perPageSelect" name="per_page">
                         <option value="5" {% if request.GET.per_page == '5' %}selected{% endif %}>5</option>
@@ -156,7 +157,7 @@
         <!-- Results Summary -->
         <div class="mt-3">
             <small class="text-muted">
-                Showing {{ promotions|length }} promotion{{ promotions|length|pluralize }} total
+                {% blocktranslate count counter=promotions|length %}Showing {{ counter }} promotion total{% plural %}Showing {{ counter }} promotions total{% endblocktranslate %}
             </small>
         </div>
     </div>
@@ -170,7 +171,7 @@
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Total Promotions</div>
+                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "Total Promotions" %}</div>
                         <div class="h4 mb-0 font-weight-bold text-gray-800">{{ total_promotions }}</div>
                     </div>
                     <div class="col-auto">
@@ -186,7 +187,7 @@
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Active Promotions</div>
+                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "Active Promotions" %}</div>
                         <div class="h4 mb-0 font-weight-bold text-gray-800">{{ active_promotions }}</div>
                     </div>
                     <div class="col-auto">
@@ -202,7 +203,7 @@
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Currently Running LIVE</div>
+                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "Currently Running LIVE" %}</div>
                         <div class="h4 mb-0 font-weight-bold text-gray-800">{{ currently_running }}</div>
                     </div>
                     <div class="col-auto">
@@ -217,7 +218,7 @@
             <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;"></div>
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
-                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">Products Affected</div>
+                        <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "Products Affected" %}</div>
                         <div class="h4 mb-0 font-weight-bold text-gray-800">
                             {% for promotion in promotions %}
                                 {% if forloop.first %}{{ promotion.get_affected_products_count }}{% endif %}
@@ -244,7 +245,7 @@
                             {{ promotion.name }}
                             {% if promotion.is_currently_active %}
                                 <span class="currently-active ms-2">
-                                    <i class="fas fa-fire"></i> LIVE NOW
+                                    <i class="fas fa-fire"></i> {% translate "LIVE NOW" %}
                                 </span>
                             {% endif %}
                         </h5>
@@ -254,27 +255,27 @@
                             </button>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'restaurant:edit_promotion' promotion.id %}">
-                                    <i class="fas fa-edit"></i> Edit
+                                    <i class="fas fa-edit"></i> {% translate "Edit" %}
                                 </a></li>
                                 <li><a class="dropdown-item" href="{% url 'restaurant:promotion_preview' promotion.id %}">
-                                    <i class="fas fa-eye"></i> Preview
+                                    <i class="fas fa-eye"></i> {% translate "Preview" %}
                                 </a></li>
                                 <li><button class="dropdown-item" onclick="togglePromotion({{ promotion.id }})">
                                     <i class="fas fa-toggle-{% if promotion.is_active %}off{% else %}on{% endif %}"></i> 
-                                    {% if promotion.is_active %}Deactivate{% else %}Activate{% endif %}
+                                    {% if promotion.is_active %}{% translate "Deactivate" %}{% else %}{% translate "Activate" %}{% endif %}
                                 </button></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="{% url 'restaurant:delete_promotion' promotion.id %}">
-                                    <i class="fas fa-trash"></i> Delete
+                                    <i class="fas fa-trash"></i> {% translate "Delete" %}
                                 </a></li>
                             </ul>
                         </div>
                     </div>
                     
                     <div class="mb-3">
-                        <span class="discount-badge">{{ promotion.discount_percentage }}% OFF</span>
+                        <span class="discount-badge">{% blocktranslate with pct=promotion.discount_percentage %}{{ pct }}% OFF{% endblocktranslate %}</span>
                         <span class="promotion-status {% if promotion.is_active %}active{% else %}inactive{% endif %} ms-2">
-                            {% if promotion.is_active %}Active{% else %}Inactive{% endif %}
+                            {% if promotion.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %}
                         </span>
                     </div>
                     
@@ -284,13 +285,13 @@
                     
                     <div class="row">
                         <div class="col-6">
-                            <strong>Time:</strong><br>
+                            <strong>{% translate "Time:" %}</strong><br>
                             <div class="time-range">
                                 {{ promotion.start_time|time:"H:i" }} - {{ promotion.end_time|time:"H:i" }}
                             </div>
                         </div>
                         <div class="col-6">
-                            <strong>Days:</strong><br>
+                            <strong>{% translate "Days:" %}</strong><br>
                             <small class="text-primary">{{ promotion.get_days_display }}</small>
                         </div>
                     </div>
@@ -316,10 +317,10 @@
                     
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="text-muted">
-                            <i class="fas fa-utensils"></i> {{ promotion.get_affected_products_count }} product{{ promotion.get_affected_products_count|pluralize }} affected
+                            <i class="fas fa-utensils"></i> {% blocktranslate count counter=promotion.get_affected_products_count %}{{ counter }} product affected{% plural %}{{ counter }} products affected{% endblocktranslate %}
                         </small>
                         <small class="text-muted">
-                            Created {{ promotion.created_at|date:"M d, Y" }}
+                            {% blocktranslate with date=promotion.created_at|date:"M d, Y" %}Created {{ date }}{% endblocktranslate %}
                         </small>
                     </div>
                 </div>
@@ -329,11 +330,11 @@
 
     <!-- Pagination Controls -->
     {% if page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="Promotions pagination" class="mt-4">
+    <nav aria-label="{% translate "Promotions pagination" %}" class="mt-4">
         <div class="row align-items-center">
             <div class="col-md-6">
                 <p class="text-muted mb-2">
-                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} promotions
+                    {% blocktranslate with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }} to {{ end }} of {{ total }} promotions{% endblocktranslate %}
                 </p>
             </div>
             <div class="col-md-6">
@@ -384,16 +385,17 @@
 {% else %}
     <div class="text-center py-5">
         <i class="fas fa-clock display-1 text-muted mb-3"></i>
-        <h4>No Happy Hour Promotions Yet</h4>
-        <p class="text-muted">Create your first time-based promotion to attract customers during specific hours!</p>
+        <h4>{% translate "No Happy Hour Promotions Yet" %}</h4>
+        <p class="text-muted">{% translate "Create your first time-based promotion to attract customers during specific hours!" %}</p>
         <a href="{% url 'restaurant:add_promotion' %}" class="btn btn-primary btn-lg">
-            <i class="fas fa-plus-circle"></i> Create First Promotion
+            <i class="fas fa-plus-circle"></i> {% translate "Create First Promotion" %}
         </a>
     </div>
 {% endif %}
 {% endblock %}
 
 {% block extra_js %}
+{% translate "An error occurred while updating the promotion." as t_toggle_error %}
 <script>
 // Filter form auto-submit
 const promotionFilterSelects = document.querySelectorAll('#restaurantFilter, #statusFilter, #perPageSelect');
@@ -444,7 +446,7 @@ function togglePromotion(promotionId) {
         }
     })
     .catch(error => {
-        showNotification('An error occurred while updating the promotion.', 'error');
+        showNotification("{{ t_toggle_error|escapejs }}", 'error');
     });
 }
 

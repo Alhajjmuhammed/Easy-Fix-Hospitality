@@ -1,9 +1,10 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Create Happy Hour Promotion - Restaurant System{% endblock %}
+{% block title %}{% translate "Create Happy Hour Promotion" %} - {% translate "Restaurant System" %}{% endblock %}
 
-{% block page_title %}Create Happy Hour Promotion{% endblock %}
-{% block page_description %}Set up time-based promotional pricing for your products{% endblock %}
+{% block page_title %}{% translate "Create Happy Hour Promotion" %}{% endblock %}
+{% block page_description %}{% translate "Set up time-based promotional pricing for your products" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -89,7 +90,7 @@
 {% block content %}
 <div class="d-flex justify-content-end mb-4">
     <a href="{% url 'restaurant:manage_promotions' %}" class="btn btn-outline-secondary">
-        <i class="fas fa-arrow-left"></i> Back to Promotions
+        <i class="fas fa-arrow-left"></i> {% translate "Back to Promotions" %}
     </a>
 </div>
 
@@ -100,7 +101,7 @@
             
             <!-- Basic Information Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-info-circle"></i> Basic Information</h4>
+                <h4 class="section-title"><i class="fas fa-info-circle"></i> {% translate "Basic Information" %}</h4>
                 
                 <div class="row">
                     <div class="col-md-8 mb-3">
@@ -109,7 +110,7 @@
                         {% if form.name.errors %}
                             <div class="text-danger small">{{ form.name.errors.0 }}</div>
                         {% endif %}
-                        <div class="help-text">Choose a descriptive name for your promotion</div>
+                        <div class="help-text">{% translate "Choose a descriptive name for your promotion" %}</div>
                     </div>
                     
                     <div class="col-md-4 mb-3">
@@ -118,30 +119,30 @@
                         {% if form.discount_percentage.errors %}
                             <div class="text-danger small">{{ form.discount_percentage.errors.0 }}</div>
                         {% endif %}
-                        <div class="help-text">Enter discount from 1% to 99%</div>
+                        <div class="help-text">{% translate "Enter discount from 1% to 99%" %}</div>
                     </div>
                     
                     <div class="col-md-12 mb-3">
-                        <label for="restaurant_id" class="form-label">Restaurant/Branch</label>
+                        <label for="restaurant_id" class="form-label">{% translate "Restaurant/Branch" %}</label>
                         <select class="form-select" id="restaurant_id" name="restaurant_id" {% if current_restaurant and not view_all_restaurants %}disabled{% endif %}>
                             {% if view_all_restaurants %}
-                                <option value="">Select Restaurant/Branch</option>
+                                <option value="">{% translate "Select Restaurant/Branch" %}</option>
                                 {% for restaurant in accessible_restaurants %}
                                 <option value="{{ restaurant.id }}">
-                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ restaurant.name }}{% if restaurant.is_main_restaurant %} {% translate "(Main)" %}{% else %} {% translate "(Branch)" %}{% endif %}
                                 </option>
                                 {% endfor %}
                             {% elif current_restaurant %}
                                 <option value="{{ current_restaurant.id }}" selected>
-                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} (Main){% else %} (Branch){% endif %}
+                                    {{ current_restaurant.name }}{% if current_restaurant.is_main_restaurant %} {% translate "(Main)" %}{% else %} {% translate "(Branch)" %}{% endif %}
                                 </option>
                                 <input type="hidden" name="restaurant_id" value="{{ current_restaurant.id }}">
                             {% else %}
-                                <option value="">No Restaurant Available</option>
+                                <option value="">{% translate "No Restaurant Available" %}</option>
                             {% endif %}
                         </select>
                         {% if current_restaurant and not view_all_restaurants %}
-                        <div class="help-text">Promotion will be assigned to: {{ current_restaurant.name }}</div>
+                        <div class="help-text">{% blocktranslate with name=current_restaurant.name %}Promotion will be assigned to: {{ name }}{% endblocktranslate %}</div>
                         {% endif %}
                     </div>
                 </div>
@@ -152,13 +153,13 @@
                     {% if form.description.errors %}
                         <div class="text-danger small">{{ form.description.errors.0 }}</div>
                     {% endif %}
-                    <div class="help-text">Optional description visible to customers</div>
+                    <div class="help-text">{% translate "Optional description visible to customers" %}</div>
                 </div>
             </div>
             
             <!-- Timing Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-clock"></i> Timing & Schedule</h4>
+                <h4 class="section-title"><i class="fas fa-clock"></i> {% translate "Timing & Schedule" %}</h4>
                 
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -179,7 +180,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label">Days of Week</label>
+                    <label class="form-label">{% translate "Days of Week" %}</label>
                     <div class="days-checkbox-container">
                         {% for choice in form.days_selection %}
                             <div class="day-checkbox">
@@ -191,20 +192,20 @@
                     {% if form.days_selection.errors %}
                         <div class="text-danger small mt-2">{{ form.days_selection.errors.0 }}</div>
                     {% endif %}
-                    <div class="help-text">Select the days when this promotion should be active</div>
+                    <div class="help-text">{% translate "Select the days when this promotion should be active" %}</div>
                 </div>
             </div>
             
             <!-- Target Products Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-bullseye"></i> Target Products</h4>
-                <p class="text-muted">Select which products, categories, or subcategories this promotion applies to. You can mix and match different levels.</p>
+                <h4 class="section-title"><i class="fas fa-bullseye"></i> {% translate "Target Products" %}</h4>
+                <p class="text-muted">{% translate "Select which products, categories, or subcategories this promotion applies to. You can mix and match different levels." %}</p>
                 
                 <div class="row">
                     <!-- Specific Products -->
                     <div class="col-md-4">
                         <div class="target-section">
-                            <h6><i class="fas fa-utensils"></i> Specific Products</h6>
+                            <h6><i class="fas fa-utensils"></i> {% translate "Specific Products" %}</h6>
                             <div class="checkbox-grid">
                                 {% for choice in form.products %}
                                     <div class="form-check">
@@ -214,20 +215,20 @@
                                         </label>
                                     </div>
                                 {% empty %}
-                                    <p class="text-muted small">No products available</p>
+                                    <p class="text-muted small">{% translate "No products available" %}</p>
                                 {% endfor %}
                             </div>
                             {% if form.products.errors %}
                                 <div class="text-danger small">{{ form.products.errors.0 }}</div>
                             {% endif %}
-                            <div class="help-text">Individual products to include</div>
+                            <div class="help-text">{% translate "Individual products to include" %}</div>
                         </div>
                     </div>
                     
                     <!-- Main Categories -->
                     <div class="col-md-4">
                         <div class="target-section">
-                            <h6><i class="fas fa-tags"></i> Main Categories</h6>
+                            <h6><i class="fas fa-tags"></i> {% translate "Main Categories" %}</h6>
                             <div class="checkbox-grid">
                                 {% for choice in form.main_categories %}
                                     <div class="form-check">
@@ -237,20 +238,20 @@
                                         </label>
                                     </div>
                                 {% empty %}
-                                    <p class="text-muted small">No categories available</p>
+                                    <p class="text-muted small">{% translate "No categories available" %}</p>
                                 {% endfor %}
                             </div>
                             {% if form.main_categories.errors %}
                                 <div class="text-danger small">{{ form.main_categories.errors.0 }}</div>
                             {% endif %}
-                            <div class="help-text">All products in these categories</div>
+                            <div class="help-text">{% translate "All products in these categories" %}</div>
                         </div>
                     </div>
                     
                     <!-- Sub Categories -->
                     <div class="col-md-4">
                         <div class="target-section">
-                            <h6><i class="fas fa-tag"></i> Sub Categories</h6>
+                            <h6><i class="fas fa-tag"></i> {% translate "Sub Categories" %}</h6>
                             <div class="checkbox-grid">
                                 {% for choice in form.sub_categories %}
                                     <div class="form-check">
@@ -260,13 +261,13 @@
                                         </label>
                                     </div>
                                 {% empty %}
-                                    <p class="text-muted small">No subcategories available</p>
+                                    <p class="text-muted small">{% translate "No subcategories available" %}</p>
                                 {% endfor %}
                             </div>
                             {% if form.sub_categories.errors %}
                                 <div class="text-danger small">{{ form.sub_categories.errors.0 }}</div>
                             {% endif %}
-                            <div class="help-text">All products in these subcategories</div>
+                            <div class="help-text">{% translate "All products in these subcategories" %}</div>
                         </div>
                     </div>
                 </div>
@@ -280,7 +281,7 @@
             
             <!-- Status Section -->
             <div class="form-section">
-                <h4 class="section-title"><i class="fas fa-toggle-on"></i> Status</h4>
+                <h4 class="section-title"><i class="fas fa-toggle-on"></i> {% translate "Status" %}</h4>
                 <div class="form-check">
                     {{ form.is_active }}
                     <label for="{{ form.is_active.id_for_label }}" class="form-check-label">
@@ -289,14 +290,14 @@
                     {% if form.is_active.errors %}
                         <div class="text-danger small">{{ form.is_active.errors.0 }}</div>
                     {% endif %}
-                    <div class="help-text">Enable this promotion immediately after creation</div>
+                    <div class="help-text">{% translate "Enable this promotion immediately after creation" %}</div>
                 </div>
             </div>
             
             <!-- Submit Button -->
             <div class="text-end">
                 <button type="submit" class="btn btn-primary btn-lg">
-                    <i class="fas fa-check-circle"></i> Create Promotion
+                    <i class="fas fa-check-circle"></i> {% translate "Create Promotion" %}
                 </button>
             </div>
         </form>
@@ -305,27 +306,27 @@
     <!-- Preview Card -->
     <div class="col-lg-4">
         <div class="preview-card">
-            <h5><i class="fas fa-eye"></i> Preview</h5>
-            <div class="discount-preview" id="discountPreview">0% OFF</div>
-            <p class="mb-0 text-center" id="promoNamePreview">Promotion Name</p>
+            <h5><i class="fas fa-eye"></i> {% translate "Preview" %}</h5>
+            <div class="discount-preview" id="discountPreview">{% blocktranslate with pct=0 %}{{ pct }}% OFF{% endblocktranslate %}</div>
+            <p class="mb-0 text-center" id="promoNamePreview">{% translate "Promotion Name" %}</p>
             <hr>
             <div id="timePreview">
-                <strong>Time:</strong> 00:00 - 00:00<br>
-                <strong>Days:</strong> None selected
+                <strong>{% translate "Time:" %}</strong> 00:00 - 00:00<br>
+                <strong>{% translate "Days:" %}</strong> {% translate "None selected" %}
             </div>
         </div>
         
         <div class="card">
             <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-lightbulb"></i> Tips</h6>
+                <h6 class="mb-0"><i class="fas fa-lightbulb"></i> {% translate "Tips" %}</h6>
             </div>
             <div class="card-body">
                 <ul class="small mb-0">
-                    <li>Higher discounts attract more customers but reduce profit margins</li>
-                    <li>Target slow periods to maximize restaurant utilization</li>
-                    <li>Categories apply to all current and future products in that category</li>
-                    <li>You can combine products, categories, and subcategories in one promotion</li>
-                    <li>Promotions can span midnight (e.g., 22:00 to 02:00)</li>
+                    <li>{% translate "Higher discounts attract more customers but reduce profit margins" %}</li>
+                    <li>{% translate "Target slow periods to maximize restaurant utilization" %}</li>
+                    <li>{% translate "Categories apply to all current and future products in that category" %}</li>
+                    <li>{% translate "You can combine products, categories, and subcategories in one promotion" %}</li>
+                    <li>{% translate "Promotions can span midnight (e.g., 22:00 to 02:00)" %}</li>
                 </ul>
             </div>
         </div>
@@ -334,6 +335,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{% translate "Loading..." as t_loading %}{% translate "No products available" as t_no_products %}{% translate "No categories available" as t_no_categories %}{% translate "No subcategories available" as t_no_subcategories %}{% translate "Error loading products:" as t_err_loading %}{% translate "Failed to load products. Please try again." as t_load_failed %}
+{% translate "Promotion Name" as t_promo_name %}{% translate "Time:" as t_time %}{% translate "Days:" as t_days %}{% translate "None selected" as t_none_selected %}{% blocktranslate with pct="__PCT__" asvar t_pct_off %}{{ pct }}% OFF{% endblocktranslate %}{% translate "Mon" as t_mon %}{% translate "Tue" as t_tue %}{% translate "Wed" as t_wed %}{% translate "Thu" as t_thu %}{% translate "Fri" as t_fri %}{% translate "Sat" as t_sat %}{% translate "Sun" as t_sun %}
 <script>
 // Real-time preview updates
 document.addEventListener('DOMContentLoaded', function() {
@@ -347,19 +350,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update preview
     function updatePreview() {
         const discount = discountInput.value || '0';
-        const name = nameInput.value || 'Promotion Name';
+        const name = nameInput.value || "{{ t_promo_name|escapejs }}";
         const startTime = startTimeInput.value || '00:00';
         const endTime = endTimeInput.value || '00:00';
         
         // Update discount display
-        document.getElementById('discountPreview').textContent = discount + '% OFF';
+        document.getElementById('discountPreview').textContent = "{{ t_pct_off|escapejs }}".replace('__PCT__', discount);
         document.getElementById('promoNamePreview').textContent = name;
         
         // Update days
         const selectedDays = [];
         const dayNames = {
-            '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu',
-            '5': 'Fri', '6': 'Sat', '7': 'Sun'
+            '1': "{{ t_mon|escapejs }}", '2': "{{ t_tue|escapejs }}", '3': "{{ t_wed|escapejs }}", '4': "{{ t_thu|escapejs }}",
+            '5': "{{ t_fri|escapejs }}", '6': "{{ t_sat|escapejs }}", '7': "{{ t_sun|escapejs }}"
         };
         
         dayCheckboxes.forEach(checkbox => {
@@ -369,8 +372,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         document.getElementById('timePreview').innerHTML = 
-            `<strong>Time:</strong> ${startTime} - ${endTime}<br>
-             <strong>Days:</strong> ${selectedDays.length ? selectedDays.join(', ') : 'None selected'}`;
+            `<strong>{{ t_time|escapejs }}</strong> ${startTime} - ${endTime}<br>
+             <strong>{{ t_days|escapejs }}</strong> ${selectedDays.length ? selectedDays.join(', ') : "{{ t_none_selected|escapejs }}"}`;
     }
     
     // Dynamic loading of products/categories when restaurant changes
@@ -385,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show loading state
             const productsContainer = document.querySelector('.checkbox-grid');
             if (productsContainer) {
-                productsContainer.innerHTML = '<p class="text-muted small">Loading...</p>';
+                productsContainer.innerHTML = '<p class="text-muted small">' + "{{ t_loading|escapejs }}" + '</p>';
             }
             
             // Fetch products for selected restaurant
@@ -394,21 +397,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     if (data.success) {
                         // Update Products
-                        updateCheckboxList('products', data.products, 'No products available');
+                        updateCheckboxList('products', data.products, "{{ t_no_products|escapejs }}");
                         
                         // Update Main Categories
-                        updateCheckboxList('main_categories', data.main_categories, 'No categories available');
+                        updateCheckboxList('main_categories', data.main_categories, "{{ t_no_categories|escapejs }}");
                         
                         // Update Sub Categories
-                        updateCheckboxList('sub_categories', data.sub_categories, 'No subcategories available');
+                        updateCheckboxList('sub_categories', data.sub_categories, "{{ t_no_subcategories|escapejs }}");
                     } else {
                         console.error('Error loading products:', data.message);
-                        alert('Error loading products: ' + data.message);
+                        alert("{{ t_err_loading|escapejs }} " + data.message);
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Failed to load products. Please try again.');
+                    alert("{{ t_load_failed|escapejs }}");
                 });
         });
     }

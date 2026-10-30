@@ -1,18 +1,19 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 
-{% block title %}Add Inventory Record{% endblock %}
+{% block title %}{% translate "Add Inventory Record" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
 
     <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-clipboard-check mr-2"></i>Add Inventory Record</h1>
+        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-clipboard-check mr-2"></i>{% translate "Add Inventory Record" %}</h1>
         <div>
             <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary btn-sm mr-2">
-                <i class="fas fa-arrow-left mr-1"></i> Dashboard
+                <i class="fas fa-arrow-left mr-1"></i> {% translate "Dashboard" %}
             </a>
             <a href="{% url 'inventory:history' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-history mr-1"></i> History
+                <i class="fas fa-history mr-1"></i> {% translate "History" %}
             </a>
         </div>
     </div>
@@ -21,7 +22,7 @@
         <div class="col-lg-7">
             <div class="card shadow" style="border-radius:8px;border:none;">
                 <div class="card-header py-3" style="background:#fff;border-bottom:2px solid #f0f0f0;">
-                    <h6 class="m-0 font-weight-bold text-primary">Record a Stock Movement</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">{% translate "Record a Stock Movement" %}</h6>
                 </div>
                 <div class="card-body">
                     {% if errors %}
@@ -36,9 +37,9 @@
                         {% csrf_token %}
 
                         <div class="form-group">
-                            <label class="font-weight-bold">Inventory Item <span class="text-danger">*</span></label>
+                            <label class="font-weight-bold">{% translate "Inventory Item" %} <span class="text-danger">*</span></label>
                             <select name="item_id" id="itemSelect" class="form-control" required onchange="fetchItemStock(this.value)">
-                                <option value="">-- Select an item --</option>
+                                <option value="">{% translate "-- Select an item --" %}</option>
                                 {% regroup items by category as item_groups %}
                                 {% for group in item_groups %}
                                 <optgroup label="{{ group.grouper }}">
@@ -54,15 +55,15 @@
                         </div>
 
                         <div id="currentStockBadge" class="mb-3 d-none">
-                            <span class="text-muted small">Current stock: </span>
+                            <span class="text-muted small">{% translate "Current stock:" %} </span>
                             <strong id="stockValue"></strong>
                             <span id="stockUnit" class="text-muted small"></span>
                         </div>
 
                         <div class="form-group">
-                            <label class="font-weight-bold">Record Type <span class="text-danger">*</span></label>
+                            <label class="font-weight-bold">{% translate "Record Type" %} <span class="text-danger">*</span></label>
                             <select name="record_type" id="recordType" class="form-control" required onchange="updateQuantityHint(); updateCostField();">
-                                <option value="">-- Select type --</option>
+                                <option value="">{% translate "-- Select type --" %}</option>
                                 {% for value, label in record_type_choices %}
                                 <option value="{{ value }}"
                                     {% if form_data.record_type == value %}selected{% endif %}>
@@ -74,40 +75,40 @@
                         </div>
 
                         <div class="form-group">
-                            <label class="font-weight-bold">Quantity <span class="text-danger">*</span></label>
+                            <label class="font-weight-bold">{% translate "Quantity" %} <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <input type="number" name="quantity" id="quantityInput" class="form-control"
-                                    placeholder="Enter quantity (always positive)"
+                                    placeholder="{% translate "Enter quantity (always positive)" %}"
                                     step="0.01" min="0.01" required
                                     value="{{ form_data.quantity }}">
                                 <div class="input-group-append">
-                                    <span class="input-group-text" id="unitLabel">units</span>
+                                    <span class="input-group-text" id="unitLabel">{% translate "units" %}</span>
                                 </div>
                             </div>
-                            <small class="text-muted">Always enter a positive number. Stock-out types (Used, Waste, Returned) will automatically be recorded as negative.</small>
+                            <small class="text-muted">{% translate "Always enter a positive number. Stock-out types (Used, Waste, Returned) will automatically be recorded as negative." %}</small>
                         </div>
 
                         <div class="form-group" id="costFieldGroup">
-                            <label id="costLabel" class="font-weight-bold">Cost <span class="text-muted fw-normal">(optional)</span></label>
+                            <label id="costLabel" class="font-weight-bold">{% translate "Cost" %} <span class="text-muted fw-normal">{% translate "(optional)" %}</span></label>
                             <div class="input-group">
                                 <span class="input-group-text" id="costPrefix">{{ currency_symbol }}</span>
                                 <input type="number" name="unit_price" id="unitPriceInput" class="form-control"
-                                    placeholder="e.g. 50.00"
+                                    placeholder="{% translate "e.g. 50.00" %}"
                                     step="0.01" min="0">
                             </div>
-                            <small id="costHint" class="text-muted">Total cost paid for this transaction. Leave empty if not tracking cost.</small>
+                            <small id="costHint" class="text-muted">{% translate "Total cost paid for this transaction. Leave empty if not tracking cost." %}</small>
                         </div>
 
                         <div class="form-group">
-                            <label class="font-weight-bold">Notes <span class="text-muted">(optional)</span></label>
+                            <label class="font-weight-bold">{% translate "Notes" %} <span class="text-muted">{% translate "(optional)" %}</span></label>
                             <textarea name="notes" class="form-control" rows="3"
-                                placeholder="Supplier name, batch number, reason for adjustment…">{{ form_data.notes }}</textarea>
+                                placeholder="{% translate "Supplier name, batch number, reason for adjustment…" %}">{{ form_data.notes }}</textarea>
                         </div>
 
                         <div class="d-flex justify-content-between mt-4">
-                            <a href="{% url 'inventory:dashboard' %}" class="btn btn-secondary">Cancel</a>
+                            <a href="{% url 'inventory:dashboard' %}" class="btn btn-secondary">{% translate "Cancel" %}</a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save mr-1"></i> Save Record
+                                <i class="fas fa-save mr-1"></i> {% translate "Save Record" %}
                             </button>
                         </div>
                     </form>
@@ -119,17 +120,17 @@
         <div class="col-lg-4">
             <div class="card shadow" style="border-radius:8px;border:none;">
                 <div class="card-header py-3" style="background:#fff;border-bottom:2px solid #f0f0f0;">
-                    <h6 class="m-0 font-weight-bold text-secondary"><i class="fas fa-info-circle mr-1"></i>Record Types Guide</h6>
+                    <h6 class="m-0 font-weight-bold text-secondary"><i class="fas fa-info-circle mr-1"></i>{% translate "Record Types Guide" %}</h6>
                 </div>
                 <div class="card-body p-0">
                     <ul class="list-group list-group-flush">
-                        <li class="list-group-item"><span class="badge badge-success mr-2">+</span><strong>Opening Stock</strong> — Initial stock entry</li>
-                        <li class="list-group-item"><span class="badge badge-success mr-2">+</span><strong>Stock Received</strong> — Delivery from supplier</li>
-                        <li class="list-group-item"><span class="badge badge-info mr-2">±</span><strong>Closing Count</strong> — End-of-day counted quantity (sets absolute level via adjustment)</li>
-                        <li class="list-group-item"><span class="badge badge-warning mr-2">±</span><strong>Manual Adjustment</strong> — Corrections, audits</li>
-                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>Used / Consumed</strong> — Removed for service</li>
-                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>Waste / Spoilage</strong> — Thrown away</li>
-                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>Returned to Supplier</strong> — Sent back</li>
+                        <li class="list-group-item"><span class="badge badge-success mr-2">+</span><strong>{% translate "Opening Stock" %}</strong> — {% translate "Initial stock entry" %}</li>
+                        <li class="list-group-item"><span class="badge badge-success mr-2">+</span><strong>{% translate "Stock Received" %}</strong> — {% translate "Delivery from supplier" %}</li>
+                        <li class="list-group-item"><span class="badge badge-info mr-2">±</span><strong>{% translate "Closing Count" %}</strong> — {% translate "End-of-day counted quantity (sets absolute level via adjustment)" %}</li>
+                        <li class="list-group-item"><span class="badge badge-warning mr-2">±</span><strong>{% translate "Manual Adjustment" %}</strong> — {% translate "Corrections, audits" %}</li>
+                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>{% translate "Used / Consumed" %}</strong> — {% translate "Removed for service" %}</li>
+                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>{% translate "Waste / Spoilage" %}</strong> — {% translate "Thrown away" %}</li>
+                        <li class="list-group-item"><span class="badge badge-danger mr-2">−</span><strong>{% translate "Returned to Supplier" %}</strong> — {% translate "Sent back" %}</li>
                     </ul>
                 </div>
             </div>
@@ -137,6 +138,24 @@
     </div>
 </div>
 
+{% translate "units" as t_units %}
+{% translate "This type removes stock (will be recorded as negative automatically)." as t_hint_out %}
+{% translate "This type adds stock." as t_hint_in %}
+{% translate "Refund Received" as t_refund_received %}
+{% translate "(optional)" as t_optional %}
+{% translate "e.g. 30.00 — amount the supplier refunded you" as t_ph_refund %}
+{% translate "Money coming back to you." as t_money_back %}
+{% translate "Enter the refund amount if the supplier paid you back." as t_enter_refund %}
+{% translate "Cost" as t_cost %}
+{% translate "(not usually applicable)" as t_not_applicable %}
+{% translate "Usually leave empty — no cash transaction" as t_ph_usually_empty %}
+{% translate "Used/Waste records are internal movements — no new cash is paid. Leave empty." as t_hint_internal %}
+{% translate "Amount Paid" as t_amount_paid %}
+{% translate "e.g. 50.00 — total you paid for this delivery" as t_ph_paid %}
+{% translate "Money going out." as t_money_out %}
+{% translate "Enter what you paid the supplier." as t_enter_paid %}
+{% translate "e.g. 50.00" as t_ph_default %}
+{% translate "Total cost for this transaction. Leave empty if not tracking cost." as t_hint_default %}
 <script>
 const ITEM_API_BASE = "{% url 'inventory:item_detail' 0 %}".replace('/0/', '/');
 const stockOutTypes = ['used', 'waste', 'returned'];
@@ -144,7 +163,7 @@ const stockOutTypes = ['used', 'waste', 'returned'];
 function fetchItemStock(itemId) {
     const badge = document.getElementById('currentStockBadge');
     const unitLabel = document.getElementById('unitLabel');
-    if (!itemId) { badge.classList.add('d-none'); unitLabel.textContent = 'units'; return; }
+    if (!itemId) { badge.classList.add('d-none'); unitLabel.textContent = "{{ t_units|escapejs }}"; return; }
     fetch(ITEM_API_BASE + itemId + '/')
         .then(r => r.json())
         .then(d => {
@@ -162,10 +181,10 @@ function updateQuantityHint() {
     const rt = document.getElementById('recordType').value;
     const hint = document.getElementById('typeHint');
     if (stockOutTypes.includes(rt)) {
-        hint.textContent = 'This type removes stock (will be recorded as negative automatically).';
+        hint.textContent = "{{ t_hint_out|escapejs }}";
         hint.className = 'text-danger small';
     } else if (rt) {
-        hint.textContent = 'This type adds stock.';
+        hint.textContent = "{{ t_hint_in|escapejs }}";
         hint.className = 'text-success small';
     } else {
         hint.textContent = '';
@@ -180,33 +199,33 @@ function updateCostField() {
     const group = document.getElementById('costFieldGroup');
 
     if (rt === 'returned') {
-        label.innerHTML = 'Refund Received <span class="text-muted fw-normal">(optional)</span>';
-        input.placeholder = 'e.g. 30.00 — amount the supplier refunded you';
-        hint.innerHTML = '<span class="text-success">&#8592; Money coming back to you.</span> Enter the refund amount if the supplier paid you back.';
+        label.innerHTML = "{{ t_refund_received|escapejs }}" + ' <span class="text-muted fw-normal">' + "{{ t_optional|escapejs }}" + '</span>';
+        input.placeholder = "{{ t_ph_refund|escapejs }}";
+        hint.innerHTML = '<span class="text-success">&#8592; ' + "{{ t_money_back|escapejs }}" + '</span> ' + "{{ t_enter_refund|escapejs }}";
         group.style.background = '#f0fdf4';
         group.style.border = '1px solid #86efac';
         group.style.borderRadius = '6px';
         group.style.padding = '12px';
     } else if (rt === 'used' || rt === 'waste') {
-        label.innerHTML = 'Cost <span class="text-muted fw-normal">(not usually applicable)</span>';
-        input.placeholder = 'Usually leave empty — no cash transaction';
-        hint.textContent = 'Used/Waste records are internal movements — no new cash is paid. Leave empty.';
+        label.innerHTML = "{{ t_cost|escapejs }}" + ' <span class="text-muted fw-normal">' + "{{ t_not_applicable|escapejs }}" + '</span>';
+        input.placeholder = "{{ t_ph_usually_empty|escapejs }}";
+        hint.textContent = "{{ t_hint_internal|escapejs }}";
         group.style.background = '';
         group.style.border = '';
         group.style.borderRadius = '';
         group.style.padding = '';
     } else if (rt === 'received' || rt === 'opening') {
-        label.innerHTML = 'Amount Paid <span class="text-muted fw-normal">(optional)</span>';
-        input.placeholder = 'e.g. 50.00 — total you paid for this delivery';
-        hint.innerHTML = '<span class="text-danger">&#8594; Money going out.</span> Enter what you paid the supplier.';
+        label.innerHTML = "{{ t_amount_paid|escapejs }}" + ' <span class="text-muted fw-normal">' + "{{ t_optional|escapejs }}" + '</span>';
+        input.placeholder = "{{ t_ph_paid|escapejs }}";
+        hint.innerHTML = '<span class="text-danger">&#8594; ' + "{{ t_money_out|escapejs }}" + '</span> ' + "{{ t_enter_paid|escapejs }}";
         group.style.background = '#fff8f8';
         group.style.border = '1px solid #fca5a5';
         group.style.borderRadius = '6px';
         group.style.padding = '12px';
     } else {
-        label.innerHTML = 'Cost <span class="text-muted fw-normal">(optional)</span>';
-        input.placeholder = 'e.g. 50.00';
-        hint.textContent = 'Total cost for this transaction. Leave empty if not tracking cost.';
+        label.innerHTML = "{{ t_cost|escapejs }}" + ' <span class="text-muted fw-normal">' + "{{ t_optional|escapejs }}" + '</span>';
+        input.placeholder = "{{ t_ph_default|escapejs }}";
+        hint.textContent = "{{ t_hint_default|escapejs }}";
         group.style.background = '';
         group.style.border = '';
         group.style.borderRadius = '';

@@ -1,0 +1,1114 @@
+# Kiswahili - owner/staff core layouts, dashboards and profiles. Please have a native speaker review.
+
+msgid "Management System"
+msgstr "Mfumo wa Usimamizi"
+
+msgid "Overview"
+msgstr "Muhtasari"
+
+msgid "Categories"
+msgstr "Makundi"
+
+msgid "Tables"
+msgstr "Meza"
+
+msgid "Events"
+msgstr "Matukio"
+
+msgid "Event Menu"
+msgstr "Menyu ya Matukio"
+
+msgid "Reservations"
+msgstr "Uhifadhi wa Meza"
+
+msgid "Sales Forecast"
+msgstr "Utabiri wa Mauzo"
+
+msgid "Loyalty Points"
+msgstr "Pointi za Uaminifu"
+
+msgid "Mobile Money"
+msgstr "Pesa kwa Simu"
+
+msgid "Branch Network"
+msgstr "Mtandao wa Matawi"
+
+msgid "Monitor All Branches"
+msgstr "Fuatilia Matawi Yote"
+
+msgid "Monitor Branches"
+msgstr "Fuatilia Matawi"
+
+msgid "All Branch Orders"
+msgstr "Oda za Matawi Yote"
+
+msgid "Operations"
+msgstr "Shughuli"
+
+msgid "Money Flow"
+msgstr "Mzunguko wa Pesa"
+
+msgid "Inventory"
+msgstr "Stoo"
+
+msgid "Purchase Orders"
+msgstr "Oda za Ununuzi"
+
+msgid "Recipes"
+msgstr "Mapishi"
+
+msgid "Suppliers"
+msgstr "Wasambazaji"
+
+msgid "Record Waste"
+msgstr "Rekodi Upotevu"
+
+msgid "Attendance"
+msgstr "Mahudhurio"
+
+msgid "Weekly Roster"
+msgstr "Ratiba ya Wiki"
+
+msgid "My Attendance"
+msgstr "Mahudhurio Yangu"
+
+msgid "System"
+msgstr "Mfumo"
+
+msgid "Printer Settings"
+msgstr "Mipangilio ya Printa"
+
+msgid "Overview of your restaurant system"
+msgstr "Muhtasari wa mfumo wa mgahawa wako"
+
+msgid "Select Table & View Menu"
+msgstr "Chagua meza na tazama menyu"
+
+msgid "Cashier Dashboard"
+msgstr "Dashibodi ya Keshia"
+
+msgid "CC Dashboard"
+msgstr "Dashibodi ya Huduma"
+
+msgid "Manage Receipts"
+msgstr "Simamia Risiti"
+
+msgid "Table Reservations"
+msgstr "Uhifadhi wa Meza"
+
+msgid "Feedback"
+msgstr "Maoni"
+
+msgid "Owner Dashboard"
+msgstr "Dashibodi ya Mmiliki"
+
+msgid "Record Food Waste"
+msgstr "Rekodi Upotevu wa Chakula"
+
+msgid "Product"
+msgstr "Bidhaa"
+
+msgid "Select Product"
+msgstr "Chagua Bidhaa"
+
+msgid "No Subcategory"
+msgstr "Hakuna Kikundi"
+
+msgid "Quantity Wasted"
+msgstr "Kiasi Kilichopotea"
+
+msgid "Waste Reason"
+msgstr "Sababu ya Upotevu"
+
+msgid "Select Reason"
+msgstr "Chagua Sababu"
+
+msgid "Customer Refused"
+msgstr "Mteja Amekataa"
+
+msgid "Customer Left Before Pickup"
+msgstr "Mteja Ameondoka Kabla ya Kuchukua"
+
+msgid "Wrong Order Made"
+msgstr "Oda Isiyo Sahihi Iliandaliwa"
+
+msgid "Quality Issue"
+msgstr "Tatizo la Ubora"
+
+msgid "Kitchen Error"
+msgstr "Kosa la Jikoni"
+
+msgid "Overcooking"
+msgstr "Kupikwa Kupita Kiasi"
+
+msgid "Undercooking"
+msgstr "Kupikwa Pungufu"
+
+msgid "Food Contamination"
+msgstr "Chakula Kuchafuliwa"
+
+msgid "Equipment Failure"
+msgstr "Hitilafu ya Kifaa"
+
+msgid "Expired Ingredients"
+msgstr "Viungo Vilivyokwisha Muda"
+
+msgid "Staff Error"
+msgstr "Kosa la Mfanyakazi"
+
+msgid "Customer Complaint"
+msgstr "Malalamiko ya Mteja"
+
+msgid "Other Reason"
+msgstr "Sababu Nyingine"
+
+msgid "Disposal Method"
+msgstr "Njia ya Kutupa"
+
+msgid "Waste Bin"
+msgstr "Pipa la Taka"
+
+msgid "Staff Meal"
+msgstr "Chakula cha Wafanyakazi"
+
+msgid "Compost"
+msgstr "Mbolea"
+
+msgid "Donated"
+msgstr "Kimetolewa Msaada"
+
+msgid "Returned to Supplier"
+msgstr "Kimerudishwa kwa Msambazaji"
+
+msgid "Notes"
+msgstr "Maelezo"
+
+msgid "Additional details about the waste incident..."
+msgstr "Maelezo zaidi kuhusu upotevu huu..."
+
+msgid "Please fill in all required fields"
+msgstr "Tafadhali jaza sehemu zote zinazohitajika"
+
+msgid "Waste record added successfully!"
+msgstr "Rekodi ya upotevu imeongezwa!"
+
+msgid "Error recording waste"
+msgstr "Imeshindikana kurekodi upotevu"
+
+msgid "Branch Location"
+msgstr "Tawi"
+
+msgid "All Locations"
+msgstr "Maeneo Yote"
+
+msgid "Switch Restaurant"
+msgstr "Badilisha Mgahawa"
+
+msgid "Total Users"
+msgstr "Jumla ya Watumiaji"
+
+msgid "Total Products"
+msgstr "Jumla ya Bidhaa"
+
+msgid "Performance Overview"
+msgstr "Muhtasari wa Utendaji"
+
+msgid "Orders (Last 7 Days)"
+msgstr "Oda (Siku 7 Zilizopita)"
+
+msgid "Today's Revenue"
+msgstr "Mapato ya Leo"
+
+msgid "Pending Orders"
+msgstr "Oda Zinazosubiri"
+
+msgid "Restaurant QR Code"
+msgstr "QR ya Mgahawa"
+
+msgid "Share this QR code with customers for direct access to your restaurant"
+msgstr "Wape wateja QR hii ili wafikie mgahawa wako moja kwa moja"
+
+msgid "QR Code URL"
+msgstr "Kiungo cha QR"
+
+msgid "Copy"
+msgstr "Nakili"
+
+msgid "Share QR Code"
+msgstr "Shiriki QR"
+
+msgid "View Full QR"
+msgstr "Tazama QR Kamili"
+
+msgid "QR Code"
+msgstr "QR"
+
+msgid "Scan this code to access your restaurant"
+msgstr "Skani QR hii kufikia mgahawa wako"
+
+msgid "Scan this QR code to access our restaurant menu and place orders!"
+msgstr "Skani QR hii kuona menyu ya mgahawa wetu na kuagiza!"
+
+msgid "QR URL copied to clipboard! Share it with your customers."
+msgstr "Kiungo cha QR kimenakiliwa! Kishiriki na wateja wako."
+
+msgid "Main Owner Dashboard"
+msgstr "Dashibodi ya Mmiliki Mkuu"
+
+msgid "Branch Monitoring Dashboard"
+msgstr "Dashibodi ya Kufuatilia Matawi"
+
+msgid "Monitor all your restaurant branches and performance"
+msgstr "Fuatilia matawi yote ya mgahawa wako na utendaji wake"
+
+msgid "Consolidated view of all restaurant locations (%(counter)s location)"
+msgid_plural "Consolidated view of all restaurant locations (%(counter)s locations)"
+msgstr[0] "Mwonekano wa pamoja wa maeneo yote ya mgahawa (eneo %(counter)s)"
+msgstr[1] "Mwonekano wa pamoja wa maeneo yote ya mgahawa (maeneo %(counter)s)"
+
+msgid "Total Locations"
+msgstr "Jumla ya Maeneo"
+
+msgid "Branch Performance Overview"
+msgstr "Muhtasari wa Utendaji wa Matawi"
+
+msgid "Detailed Reports"
+msgstr "Ripoti za Kina"
+
+msgid "Add Branch"
+msgstr "Ongeza Tawi"
+
+msgid "Branch Owner"
+msgstr "Mmiliki wa Tawi"
+
+msgid "Orders Today"
+msgstr "Oda za Leo"
+
+msgid "Revenue Today"
+msgstr "Mapato ya Leo"
+
+msgid "Deactivate Branch"
+msgstr "Simamisha Tawi"
+
+msgid "Activate Branch"
+msgstr "Washa Tawi"
+
+msgid "No branches found."
+msgstr "Hakuna matawi yaliyopatikana."
+
+msgid "Add your first branch"
+msgstr "Ongeza tawi lako la kwanza"
+
+msgid "Are you sure you want to delete this branch?"
+msgstr "Una uhakika unataka kufuta tawi hili?"
+
+msgid "This will permanently delete:"
+msgstr "Hii itafuta kabisa:"
+
+msgid "All branch data"
+msgstr "Taarifa zote za tawi"
+
+msgid "Tables and products"
+msgstr "Meza na bidhaa"
+
+msgid "Order history"
+msgstr "Historia ya oda"
+
+msgid "Branch owner access"
+msgstr "Ruhusa ya mmiliki wa tawi"
+
+msgid "Branch \"{name}\" and all its data will be permanently deleted."
+msgstr "Tawi \"{name}\" na taarifa zake zote zitafutwa kabisa."
+
+msgid "Are you sure you want to deactivate \"{name}\"?"
+msgstr "Una uhakika unataka kusimamisha \"{name}\"?"
+
+msgid "Are you sure you want to activate \"{name}\"?"
+msgstr "Una uhakika unataka kuwasha \"{name}\"?"
+
+msgid "An error occurred while updating restaurant status."
+msgstr "Hitilafu imetokea wakati wa kubadilisha hali ya mgahawa."
+
+msgid "Manage your account information and settings"
+msgstr "Simamia taarifa na mipangilio ya akaunti yako"
+
+msgid "Profile Information"
+msgstr "Taarifa za Wasifu"
+
+msgid "Username cannot be changed"
+msgstr "Jina la mtumiaji haliwezi kubadilishwa"
+
+msgid "Role is assigned by administrators"
+msgstr "Majukumu hupangwa na wasimamizi"
+
+msgid "Update Profile"
+msgstr "Sasisha Wasifu"
+
+msgid "Reset"
+msgstr "Rudisha"
+
+msgid "Account Summary"
+msgstr "Muhtasari wa Akaunti"
+
+msgid "Not set"
+msgstr "Haijawekwa"
+
+msgid "Restaurant Settings"
+msgstr "Mipangilio ya Mgahawa"
+
+msgid "Enter restaurant name"
+msgstr "Weka jina la mgahawa"
+
+msgid "QR Code is automatically generated"
+msgstr "QR hutengenezwa yenyewe"
+
+msgid "Tax Rate (%%)"
+msgstr "Kiwango cha Kodi (%%)"
+
+msgid "Enter tax rate"
+msgstr "Weka kiwango cha kodi"
+
+msgid "Enter tax rate as percentage (e.g., 8.00 for 8%%)"
+msgstr "Weka kiwango cha kodi kama asilimia (mf. 8.00 kwa 8%%)"
+
+msgid "Restaurant Description"
+msgstr "Maelezo ya Mgahawa"
+
+msgid "Describe your restaurant..."
+msgstr "Eleza mgahawa wako..."
+
+msgid "Accepted formats: JPEG, PNG, GIF, WebP (Max 5MB)"
+msgstr "Aina zinazokubalika: JPEG, PNG, GIF, WebP (Hadi 5MB)"
+
+msgid "Logo uploaded"
+msgstr "Nembo imepakiwa"
+
+msgid "WiFi Settings for Customers"
+msgstr "Mipangilio ya WiFi kwa Wateja"
+
+msgid "These WiFi credentials will be displayed to customers when they scan your Menu View QR code."
+msgstr "Taarifa hizi za WiFi zitaonyeshwa kwa wateja wanaposkani QR ya kutazama menyu."
+
+msgid "WiFi Network Name (SSID)"
+msgstr "Jina la Mtandao wa WiFi (SSID)"
+
+msgid "e.g., Restaurant_Guest"
+msgstr "mf. Restaurant_Guest"
+
+msgid "WiFi Password"
+msgstr "Nenosiri la WiFi"
+
+msgid "Enter WiFi password"
+msgstr "Weka nenosiri la WiFi"
+
+msgid "Leave empty if you don't want to share WiFi credentials with customers."
+msgstr "Acha wazi kama hutaki kuwapa wateja taarifa za WiFi."
+
+msgid "Customers can browse your restaurant in the app and place delivery or pickup orders without scanning a QR code."
+msgstr "Wateja wanaweza kuona mgahawa wako kwenye programu na kuweka oda za kuletewa au kuchukua mwenyewe bila kuskani QR."
+
+msgid "Delivery Charges"
+msgstr "Gharama za Kuletewa"
+
+msgid "Added to every delivery order. Use 0 for no fee."
+msgstr "Huongezwa kwa kila oda ya kuletewa. Weka 0 kama hakuna ada."
+
+msgid "Orders with food total at or above this amount get free delivery."
+msgstr "Oda zenye jumla ya chakula ya kiasi hiki au zaidi zinaletewa bure."
+
+msgid "If on, your tax rate is also applied to the delivery fee."
+msgstr "Ikiwashwa, kiwango chako cha kodi kinatumika pia kwenye ada ya kufikisha."
+
+msgid "Customers can book a table from the website and app."
+msgstr "Wateja wanaweza kuhifadhi meza kupitia tovuti na programu."
+
+msgid "If off, staff accept or decline each booking."
+msgstr "Ikizimwa, wafanyakazi wanakubali au kukataa kila uhifadhi."
+
+msgid "How long a booking holds its table. Used to warn about double-booking."
+msgstr "Muda ambao uhifadhi unashikilia meza. Hutumika kuonya kuhusu kuhifadhi meza mara mbili."
+
+msgid "Automatic Printing Settings"
+msgstr "Mipangilio ya Kuchapisha Yenyewe"
+
+msgid "Auto-Print KOT"
+msgstr "Chapisha KOT Yenyewe"
+
+msgid "Automatically print Kitchen Order Tickets when orders are placed"
+msgstr "Chapisha tiketi za oda za jikoni (KOT) yenyewe oda zinapowekwa"
+
+msgid "Auto-Print BOT"
+msgstr "Chapisha BOT Yenyewe"
+
+msgid "Automatically print Bar Order Tickets when orders are placed"
+msgstr "Chapisha tiketi za oda za baa (BOT) yenyewe oda zinapowekwa"
+
+msgid "When enabled, KOT/BOT will automatically open in print dialog when customers place orders. Make sure pop-ups are allowed in your browser."
+msgstr "Ikiwashwa, KOT/BOT zitafunguka zenyewe kwenye dirisha la kuchapisha wateja wanapoweka oda. Hakikisha madirisha ibukizi (pop-ups) yameruhusiwa kwenye kivinjari chako."
+
+msgid "Update Restaurant Info"
+msgstr "Sasisha Taarifa za Mgahawa"
+
+msgid "Tax Information:"
+msgstr "Taarifa za Kodi:"
+
+msgid "The tax rate you set here will be applied to all new orders. Current orders are not affected."
+msgstr "Kiwango cha kodi unachoweka hapa kitatumika kwa oda zote mpya. Oda zilizopo haziathiriwi."
+
+msgid "Tax Preview"
+msgstr "Mfano wa Kodi"
+
+msgid "Current Tax Rate"
+msgstr "Kiwango cha Kodi cha Sasa"
+
+msgid "Example Order:"
+msgstr "Mfano wa Oda:"
+
+msgid "Tax"
+msgstr "Kodi"
+
+msgid "Currency Settings"
+msgstr "Mipangilio ya Sarafu"
+
+msgid "Display Currency"
+msgstr "Sarafu ya Kuonyesha"
+
+msgid "US Dollar"
+msgstr "Dola ya Marekani"
+
+msgid "Euro"
+msgstr "Yuro"
+
+msgid "British Pound"
+msgstr "Pauni ya Uingereza"
+
+msgid "Kenyan Shilling"
+msgstr "Shilingi ya Kenya"
+
+msgid "Tanzanian Shilling"
+msgstr "Shilingi ya Tanzania"
+
+msgid "Ugandan Shilling"
+msgstr "Shilingi ya Uganda"
+
+msgid "Rwandan Franc"
+msgstr "Faranga ya Rwanda"
+
+msgid "South African Rand"
+msgstr "Randi ya Afrika Kusini"
+
+msgid "Nigerian Naira"
+msgstr "Naira ya Nigeria"
+
+msgid "Ghanaian Cedi"
+msgstr "Sedi ya Ghana"
+
+msgid "Indian Rupee"
+msgstr "Rupia ya India"
+
+msgid "UAE Dirham"
+msgstr "Dirham ya UAE"
+
+msgid "Saudi Riyal"
+msgstr "Riyal ya Saudia"
+
+msgid "Chinese Yuan"
+msgstr "Yuan ya China"
+
+msgid "Japanese Yen"
+msgstr "Yeni ya Japani"
+
+msgid "Select the currency symbol to display for all prices"
+msgstr "Chagua alama ya sarafu itakayoonyeshwa kwa bei zote"
+
+msgid "Current Currency Symbol"
+msgstr "Alama ya Sarafu ya Sasa"
+
+msgid "This only changes the display symbol. Price values remain unchanged."
+msgstr "Hii inabadilisha alama inayoonyeshwa tu. Bei zenyewe hazibadiliki."
+
+msgid "Save Currency"
+msgstr "Hifadhi Sarafu"
+
+msgid "Change Password"
+msgstr "Badilisha Nenosiri"
+
+msgid "Current Password"
+msgstr "Nenosiri la Sasa"
+
+msgid "Password must be at least 8 characters long"
+msgstr "Nenosiri lazima liwe na herufi 8 au zaidi"
+
+msgid "Confirm New Password"
+msgstr "Thibitisha Nenosiri Jipya"
+
+msgid "Passwords don't match"
+msgstr "Manenosiri hayalingani"
+
+msgid "Passwords do not match!"
+msgstr "Manenosiri hayalingani!"
+
+msgid "Are you sure you want to change your password?"
+msgstr "Una uhakika unataka kubadilisha nenosiri lako?"
+
+msgid "Restaurant name is required!"
+msgstr "Jina la mgahawa linahitajika!"
+
+msgid "Tax rate must be between 0%% and 99.99%%!"
+msgstr "Kiwango cha kodi lazima kiwe kati ya 0%% na 99.99%%!"
+
+msgid "Are you sure you want to update restaurant information and tax rate?"
+msgstr "Una uhakika unataka kusasisha taarifa za mgahawa na kiwango cha kodi?"
+
+msgid "Logo preview"
+msgstr "Mwonekano wa nembo"
+
+msgid "Logo Preview"
+msgstr "Mwonekano wa Nembo"
+
+msgid "This will be shown on the menu QR code page"
+msgstr "Hii itaonyeshwa kwenye ukurasa wa QR ya menyu"
+
+msgid "Configure your thermal printers for kitchen, bar, and receipts"
+msgstr "Weka printa zako za risiti kwa jikoni, baa na risiti"
+
+msgid "Configure different printers for kitchen orders, bar orders, and receipts"
+msgstr "Weka printa tofauti kwa oda za jikoni, oda za baa na risiti"
+
+msgid "Settings for:"
+msgstr "Mipangilio ya:"
+
+msgid "These printer settings are independent for each restaurant/branch."
+msgstr "Mipangilio hii ya printa ni tofauti kwa kila mgahawa/tawi."
+
+msgid "How Printing Works"
+msgstr "Jinsi Uchapishaji Unavyofanya Kazi"
+
+msgid "This system uses a <strong>Print Client</strong> application that runs on your Windows PC where printers are connected."
+msgstr "Mfumo huu unatumia programu ya <strong>Print Client</strong> inayoendeshwa kwenye kompyuta yako ya Windows iliyounganishwa na printa."
+
+msgid "Enter your printer names below (you can find them in Windows: Control Panel → Devices and Printers)"
+msgstr "Weka majina ya printa zako hapa chini (unaweza kuyapata kwenye Windows: Control Panel → Devices and Printers)"
+
+msgid "Download and run the Print Client on your Windows PC"
+msgstr "Pakua na endesha Print Client kwenye kompyuta yako ya Windows"
+
+msgid "Configure the Print Client with your API Token (shown below)"
+msgstr "Weka API Token yako kwenye Print Client (inaonyeshwa hapa chini)"
+
+msgid "The Print Client will automatically print orders to your configured printers"
+msgstr "Print Client itachapisha oda yenyewe kwenye printa ulizoweka"
+
+msgid "To find printer names on Windows:"
+msgstr "Kupata majina ya printa kwenye Windows:"
+
+msgid "Open Command Prompt and run:"
+msgstr "Fungua Command Prompt kisha endesha:"
+
+msgid "Print Client API Token"
+msgstr "API Token ya Print Client"
+
+msgid "Use this token in your Print Client <code>config.json</code> file:"
+msgstr "Tumia token hii kwenye faili ya <code>config.json</code> ya Print Client:"
+
+msgid "Token not generated"
+msgstr "Token bado haijatengenezwa"
+
+msgid "Regenerate Token"
+msgstr "Tengeneza Token Mpya"
+
+msgid "Regenerating will invalidate the old token"
+msgstr "Kutengeneza token mpya kutabatilisha token ya zamani"
+
+msgid "Print Client Configuration Example:"
+msgstr "Mfano wa Usanidi wa Print Client:"
+
+msgid "Download Print Client"
+msgstr "Pakua Print Client"
+
+msgid "Windows application - No Python installation required"
+msgstr "Programu ya Windows - Haihitaji kusakinisha Python"
+
+msgid "Download PrintClient.zip (15 MB)"
+msgstr "Pakua PrintClient.zip (15 MB)"
+
+msgid "Printer Detection"
+msgstr "Kutambua Printa"
+
+msgid "To detect printers connected to your Windows PC:"
+msgstr "Kutambua printa zilizounganishwa na kompyuta yako ya Windows:"
+
+msgid "Open <strong>Command Prompt</strong> on your Windows PC"
+msgstr "Fungua <strong>Command Prompt</strong> kwenye kompyuta yako ya Windows"
+
+msgid "Run:"
+msgstr "Endesha:"
+
+msgid "Copy the printer name and paste it in the fields below"
+msgstr "Nakili jina la printa na ulibandike kwenye sehemu zilizo hapa chini"
+
+msgid "Example printer names:"
+msgstr "Mifano ya majina ya printa:"
+
+msgid "Leave blank for auto-detect"
+msgstr "Acha wazi ili itambuliwe yenyewe"
+
+msgid "For Kitchen Order Tickets (KOT)"
+msgstr "Kwa tiketi za oda za jikoni (KOT)"
+
+msgid "For Bar Order Tickets (BOT)"
+msgstr "Kwa tiketi za oda za baa (BOT)"
+
+msgid "Buffet Printer"
+msgstr "Printa ya Bufe"
+
+msgid "For Buffet Order Tickets (BUFFET)"
+msgstr "Kwa tiketi za oda za bufe (BUFFET)"
+
+msgid "Service Printer"
+msgstr "Printa ya Huduma"
+
+msgid "For Service Order Tickets (SERVICE)"
+msgstr "Kwa tiketi za oda za huduma (SERVICE)"
+
+msgid "For payment receipts"
+msgstr "Kwa risiti za malipo"
+
+msgid "Auto-Print Settings"
+msgstr "Mipangilio ya Kuchapisha Yenyewe"
+
+msgid "Auto-print Kitchen Orders (KOT)"
+msgstr "Chapisha oda za jikoni (KOT) yenyewe"
+
+msgid "Automatically print when order is placed"
+msgstr "Chapisha yenyewe oda inapowekwa"
+
+msgid "Auto-print Bar Orders (BOT)"
+msgstr "Chapisha oda za baa (BOT) yenyewe"
+
+msgid "Auto-print Buffet Orders (BUFFET)"
+msgstr "Chapisha oda za bufe (BUFFET) yenyewe"
+
+msgid "Auto-print Service Orders (SERVICE)"
+msgstr "Chapisha oda za huduma (SERVICE) yenyewe"
+
+msgid "Save Printer Settings"
+msgstr "Hifadhi Mipangilio ya Printa"
+
+msgid "Current Configuration"
+msgstr "Usanidi wa Sasa"
+
+msgid "Kitchen Printer:"
+msgstr "Printa ya Jikoni:"
+
+msgid "Auto-detect"
+msgstr "Itambuliwe yenyewe"
+
+msgid "Bar Printer:"
+msgstr "Printa ya Baa:"
+
+msgid "Receipt Printer:"
+msgstr "Printa ya Risiti:"
+
+msgid "Auto-print KOT:"
+msgstr "Chapisha KOT yenyewe:"
+
+msgid "Enabled"
+msgstr "Imewashwa"
+
+msgid "Disabled"
+msgstr "Imezimwa"
+
+msgid "Auto-print BOT:"
+msgstr "Chapisha BOT yenyewe:"
+
+msgid "Error saving settings:"
+msgstr "Imeshindikana kuhifadhi mipangilio:"
+
+msgid "API Token copied to clipboard!"
+msgstr "API Token imenakiliwa!"
+
+msgid "Are you sure you want to regenerate the API token?"
+msgstr "Una uhakika unataka kutengeneza API token mpya?"
+
+msgid "This will invalidate your current token and you will need to update your Print Client config.json file."
+msgstr "Hii itabatilisha token yako ya sasa na utahitaji kusasisha faili ya config.json ya Print Client."
+
+msgid "Error regenerating token:"
+msgstr "Imeshindikana kutengeneza token mpya:"
+
+msgid "Select Restaurant"
+msgstr "Chagua Mgahawa"
+
+msgid "Choose which restaurant location you want to manage"
+msgstr "Chagua mgahawa au tawi unalotaka kusimamia"
+
+msgid "Currently Selected"
+msgstr "Uliochaguliwa Sasa"
+
+msgid "Consolidated View"
+msgstr "Mwonekano wa Pamoja"
+
+msgid "View combined data from all your restaurant locations for consolidated reporting and analytics."
+msgstr "Tazama taarifa za pamoja kutoka maeneo yote ya mgahawa wako kwa ripoti na uchambuzi wa pamoja."
+
+msgid "View All Data"
+msgstr "Tazama Taarifa Zote"
+
+msgid "Tax:"
+msgstr "Kodi:"
+
+msgid "Today's Orders"
+msgstr "Oda za Leo"
+
+msgid "Select Location"
+msgstr "Chagua Eneo"
+
+msgid "Switching..."
+msgstr "Inabadilisha..."
+
+msgid "An error occurred while switching to all restaurants view."
+msgstr "Hitilafu imetokea wakati wa kubadilisha kwenda mwonekano wa migahawa yote."
+
+msgid "Setup Main Restaurant"
+msgstr "Sanidi Mgahawa Mkuu"
+
+msgid "Back to Branches"
+msgstr "Rudi kwenye Matawi"
+
+msgid "Setup Your Main Restaurant"
+msgstr "Sanidi Mgahawa Wako Mkuu"
+
+msgid "Complete your restaurant setup to start managing your business"
+msgstr "Kamilisha usanidi wa mgahawa wako ili uanze kusimamia biashara yako"
+
+msgid "e.g., Taste of Italy"
+msgstr "mf. Ladha ya Pwani"
+
+msgid "Restaurant Address"
+msgstr "Anwani ya Mgahawa"
+
+msgid "Full address of your restaurant"
+msgstr "Anwani kamili ya mgahawa wako"
+
+msgid "Brief description of your restaurant (optional)"
+msgstr "Maelezo mafupi ya mgahawa wako (si lazima)"
+
+msgid "Choose Your Subscription Plan"
+msgstr "Chagua Mpango Wako wa Usajili"
+
+msgid "One restaurant location"
+msgstr "Eneo moja la mgahawa"
+
+msgid "All basic features"
+msgstr "Huduma zote za msingi"
+
+msgid "Staff management"
+msgstr "Usimamizi wa wafanyakazi"
+
+msgid "Orders & inventory"
+msgstr "Oda na stoo"
+
+msgid "Free forever"
+msgstr "Bure milele"
+
+msgid "RECOMMENDED"
+msgstr "INAPENDEKEZWA"
+
+msgid "Unlimited branches"
+msgstr "Matawi bila kikomo"
+
+msgid "Multi-location management"
+msgstr "Usimamizi wa maeneo mengi"
+
+msgid "Advanced analytics"
+msgstr "Uchambuzi wa hali ya juu"
+
+msgid "Consolidated reporting"
+msgstr "Ripoti za pamoja"
+
+msgid "Scale your business"
+msgstr "Kuza biashara yako"
+
+msgid "You can upgrade or downgrade your plan anytime from the branches management page."
+msgstr "Unaweza kupandisha au kushusha mpango wako wakati wowote kwenye ukurasa wa usimamizi wa matawi."
+
+msgid "Create Main Restaurant"
+msgstr "Unda Mgahawa Mkuu"
+
+msgid "Joined %(date)s"
+msgstr "Alijiunga %(date)s"
+
+msgid "Never logged in"
+msgstr "Hajawahi kuingia"
+
+msgid "No Role"
+msgstr "Hakuna jukumu"
+
+msgid "Manager / Owner"
+msgstr "Meneja / Mmiliki"
+
+msgid "Member Since"
+msgstr "Mwanachama tangu"
+
+msgid "Account created: %(date)s"
+msgstr "Akaunti iliundwa: %(date)s"
+
+msgid "Profile updated:"
+msgstr "Wasifu umesasishwa:"
+
+msgid "Owner Profile"
+msgstr "Wasifu wa Mmiliki"
+
+msgid "My Restaurant"
+msgstr "Mgahawa Wangu"
+
+msgid "Restaurant Management"
+msgstr "Usimamizi wa Mgahawa"
+
+msgid "Owner Capabilities"
+msgstr "Uwezo wa Mmiliki"
+
+msgid "Full restaurant management access"
+msgstr "Ruhusa kamili ya kusimamia mgahawa"
+
+msgid "Manage staff accounts and roles"
+msgstr "Simamia akaunti na majukumu ya wafanyakazi"
+
+msgid "Configure menu and pricing"
+msgstr "Panga menyu na bei"
+
+msgid "Access all financial reports"
+msgstr "Fikia ripoti zote za fedha"
+
+msgid "Manage promotions and discounts"
+msgstr "Simamia ofa na punguzo"
+
+msgid "Process and void payments"
+msgstr "Pokea na batilisha malipo"
+
+msgid "Configure tax rates and settings"
+msgstr "Weka viwango vya kodi na mipangilio"
+
+msgid "Manage delivery and riders"
+msgstr "Simamia usafirishaji na wasafirishaji"
+
+msgid "Staff Members"
+msgstr "Wafanyakazi"
+
+msgid "Total Staff"
+msgstr "Jumla ya Wafanyakazi"
+
+msgid "No staff members yet."
+msgstr "Bado hakuna wafanyakazi."
+
+msgid "Tax Rate Settings"
+msgstr "Mipangilio ya Kiwango cha Kodi"
+
+msgid "This tax rate applies to all orders at your restaurant."
+msgstr "Kiwango hiki cha kodi kinatumika kwa oda zote za mgahawa wako."
+
+msgid "Update"
+msgstr "Sasisha"
+
+msgid "Add Staff Member"
+msgstr "Ongeza Mfanyakazi"
+
+msgid "Add Staff"
+msgstr "Ongeza Mfanyakazi"
+
+msgid "Delete this staff member?"
+msgstr "Umfute mfanyakazi huyu?"
+
+msgid "Delete staff:"
+msgstr "Futa mfanyakazi:"
+
+msgid "Edit staff:"
+msgstr "Hariri mfanyakazi:"
+
+msgid "Cashier Profile"
+msgstr "Wasifu wa Keshia"
+
+msgid "Cashier Tools"
+msgstr "Zana za Keshia"
+
+msgid "Cashier Capabilities"
+msgstr "Uwezo wa Keshia"
+
+msgid "Process payments (Cash, Card, Digital)"
+msgstr "Pokea malipo (Taslimu, Kadi, Kidijitali)"
+
+msgid "Track orders by table number"
+msgstr "Fuatilia oda kwa namba ya meza"
+
+msgid "Handle split bills"
+msgstr "Shughulikia bili zilizogawanywa"
+
+msgid "Select individual items for payment"
+msgstr "Chagua bidhaa moja moja za kulipia"
+
+msgid "Void transactions and refunds"
+msgstr "Batilisha miamala na rejesha pesa"
+
+msgid "Cancel unpaid orders"
+msgstr "Ghairi oda ambazo hazijalipwa"
+
+msgid "View payment history"
+msgstr "Tazama historia ya malipo"
+
+msgid "Generate receipts and reports"
+msgstr "Toa risiti na ripoti"
+
+msgid "Quick Stats"
+msgstr "Takwimu za Haraka"
+
+msgid "Pending Payments"
+msgstr "Malipo Yanayosubiri"
+
+msgid "Completed Today"
+msgstr "Zilizokamilika Leo"
+
+msgid "Customer Care Profile"
+msgstr "Wasifu wa Huduma kwa Wateja"
+
+msgid "Customer Care Tools"
+msgstr "Zana za Huduma kwa Wateja"
+
+msgid "Take Order"
+msgstr "Chukua Oda"
+
+msgid "Order History"
+msgstr "Historia ya Oda"
+
+msgid "Customer Care Responsibilities"
+msgstr "Majukumu ya Huduma kwa Wateja"
+
+msgid "Take and manage customer orders"
+msgstr "Chukua na simamia oda za wateja"
+
+msgid "Assist guests and handle special requests"
+msgstr "Saidia wageni na shughulikia maombi maalum"
+
+msgid "Track tables and order status"
+msgstr "Fuatilia meza na hali ya oda"
+
+msgid "Coordinate with kitchen and cashier"
+msgstr "Shirikiana na jikoni na keshia"
+
+msgid "Process delivery and pickup orders"
+msgstr "Shughulikia oda za kuletewa na kuchukua mwenyewe"
+
+msgid "Cancel and modify pending orders"
+msgstr "Ghairi na badilisha oda zinazosubiri"
+
+msgid "Generate order reports"
+msgstr "Toa ripoti za oda"
+
+msgid "Today's Activity"
+msgstr "Shughuli za Leo"
+
+msgid "Orders Taken"
+msgstr "Oda Zilizochukuliwa"
+
+msgid "Tables Served"
+msgstr "Meza Zilizohudumiwa"
+
+msgid "Avg. Order Time"
+msgstr "Wastani wa Muda wa Oda"
+
+msgid "Recent Orders Assisted"
+msgstr "Oda za Karibuni Ulizosaidia"
+
+msgid "Order #%(id)s"
+msgstr "Oda #%(id)s"
+
+msgid "Kitchen Staff Profile"
+msgstr "Wasifu wa Mfanyakazi wa Jikoni"
+
+msgid "Kitchen Tools"
+msgstr "Zana za Jikoni"
+
+msgid "Restaurant Home"
+msgstr "Ukurasa wa Mgahawa"
+
+msgid "Kitchen Responsibilities"
+msgstr "Majukumu ya Jikoni"
+
+msgid "Manage incoming orders"
+msgstr "Simamia oda zinazoingia"
+
+msgid "Update order status (Confirmed, Preparing, Ready)"
+msgstr "Badilisha hali ya oda (Imethibitishwa, Inaandaliwa, Iko tayari)"
+
+msgid "Track preparation times"
+msgstr "Fuatilia muda wa maandalizi"
+
+msgid "Prioritize urgent orders"
+msgstr "Tanguliza oda za haraka"
+
+msgid "Monitor real-time order updates"
+msgstr "Fuatilia mabadiliko ya oda papo hapo"
+
+msgid "Communicate with customer care"
+msgstr "Wasiliana na huduma kwa wateja"
+
+msgid "View order details and special instructions"
+msgstr "Tazama maelezo ya oda na maelekezo maalum"
+
+msgid "Track daily kitchen performance"
+msgstr "Fuatilia utendaji wa jikoni kila siku"
+
+msgid "Administrator Profile"
+msgstr "Wasifu wa Msimamizi"
+
+msgid "System Administrator"
+msgstr "Msimamizi wa Mfumo"
+
+msgid "Access Level"
+msgstr "Kiwango cha Ruhusa"
+
+msgid "Full System Access"
+msgstr "Ruhusa Kamili ya Mfumo"
+
+msgid "Admin Tools"
+msgstr "Zana za Msimamizi"
+
+msgid "Restaurants"
+msgstr "Migahawa"
+
+msgid "All Users"
+msgstr "Watumiaji Wote"
+
+msgid "Statistics"
+msgstr "Takwimu"
+
+msgid "Administrator Capabilities"
+msgstr "Uwezo wa Msimamizi"
+
+msgid "Manage all restaurants and branches"
+msgstr "Simamia migahawa na matawi yote"
+
+msgid "Create, edit and delete any user"
+msgstr "Unda, hariri na futa mtumiaji yeyote"
+
+msgid "Access system-wide reports and statistics"
+msgstr "Fikia ripoti na takwimu za mfumo mzima"
+
+msgid "Manage subscriptions and billing"
+msgstr "Simamia usajili na malipo"
+
+msgid "Override all restaurant settings"
+msgstr "Badilisha mipangilio yoyote ya mgahawa"
+
+msgid "Manage role permissions and features"
+msgstr "Simamia ruhusa na huduma za majukumu"
+
+msgid "View and export all data"
+msgstr "Tazama na pakua taarifa zote"
+
+msgid "System configuration and maintenance"
+msgstr "Usanidi na matengenezo ya mfumo"
+
+msgctxt "group"
+msgid "Staff"
+msgstr "Wafanyakazi"

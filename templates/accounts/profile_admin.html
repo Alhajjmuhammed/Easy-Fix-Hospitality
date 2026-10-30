@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load restaurant_tags %}
+{% load restaurant_tags i18n %}
 
-{% block title %}Administrator Profile - EasyFix{% endblock %}
+{% block title %}{% translate "Administrator Profile" %} - EasyFix{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -17,12 +17,12 @@
     <div class="profile-avatar">{% if user.first_name %}{{ user.first_name|first|upper }}{% if user.last_name %}{{ user.last_name|first|upper }}{% endif %}{% else %}{{ user.username|first|upper }}{% endif %}</div>
     <div class="profile-hero-info">
       <h3>{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</h3>
-      <div class="profile-role-badge"><i class="fas fa-shield-alt me-1"></i>{{ user.role.get_name_display|default:"Administrator" }}</div>
-      <div class="profile-restaurant"><i class="fas fa-network-wired me-1"></i>System Administrator</div>
+      <div class="profile-role-badge"><i class="fas fa-shield-alt me-1"></i>{% translate "Administrator" as t_def %}{{ user.role.get_name_display|default:t_def }}</div>
+      <div class="profile-restaurant"><i class="fas fa-network-wired me-1"></i>{% translate "System Administrator" %}</div>
       <div class="profile-meta">
-        <span><i class="fas fa-calendar-alt me-1"></i>Joined {{ user.date_joined|date:"M Y" }}</span>
-        <span><i class="fas fa-clock me-1"></i>{{ user.last_login|date:"M d, Y H:i"|default:"Never logged in" }}</span>
-        {% if user.is_active %}<span class="profile-status">● Active</span>{% else %}<span class="profile-status">● Inactive</span>{% endif %}
+        <span><i class="fas fa-calendar-alt me-1"></i>{% blocktranslate with date=user.date_joined|date:"M Y" %}Joined {{ date }}{% endblocktranslate %}</span>
+        <span><i class="fas fa-clock me-1"></i>{% translate "Never logged in" as t_def %}{{ user.last_login|date:"M d, Y H:i"|default:t_def }}</span>
+        {% if user.is_active %}<span class="profile-status">● {% translate "Active" %}</span>{% else %}<span class="profile-status">● {% translate "Inactive" %}</span>{% endif %}
       </div>
     </div>
   </div>
@@ -30,57 +30,57 @@
   <div class="row g-3 mb-3">
     <div class="col-12 col-lg-6">
       <div class="profile-card">
-        <div class="profile-card-title"><i class="fas fa-user"></i> Personal Information</div>
-        <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
-        <div class="info-row"><span class="info-label">Username</span><span class="info-value">{{ user.username }}</span></div>
-        <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ user.email|default:"Not provided" }}</span></div>
-        <div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{ user.phone_number|default:"Not provided" }}</span></div>
-        {% if user.address %}<div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
+        <div class="profile-card-title"><i class="fas fa-user"></i> {% translate "Personal Information" %}</div>
+        <div class="info-row"><span class="info-label">{% translate "Full Name" %}</span><span class="info-value">{% if user.first_name %}{{ user.first_name }} {{ user.last_name }}{% else %}—{% endif %}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Username" %}</span><span class="info-value">{{ user.username }}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Email" %}</span><span class="info-value">{% translate "Not provided" as t_def %}{{ user.email|default:t_def }}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Phone" %}</span><span class="info-value">{% translate "Not provided" as t_def %}{{ user.phone_number|default:t_def }}</span></div>
+        {% if user.address %}<div class="info-row"><span class="info-label">{% translate "Address" %}</span><span class="info-value">{{ user.address }}</span></div>{% endif %}
       </div>
     </div>
     <div class="col-12 col-lg-6">
       <div class="profile-card">
-        <div class="profile-card-title"><i class="fas fa-shield-alt"></i> Account Details</div>
-        <div class="info-row"><span class="info-label">Role</span><span class="info-value"><span class="role-chip">{{ user.role.get_name_display|default:"Administrator" }}</span></span></div>
-        <div class="info-row"><span class="info-label">Access Level</span><span class="info-value">Full System Access</span></div>
-        <div class="info-row"><span class="info-label">Member Since</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
-        <div class="info-row"><span class="info-label">Last Login</span><span class="info-value">{{ user.last_login|date:"F d, Y H:i"|default:"Never" }}</span></div>
-        <div class="info-row"><span class="info-label">Status</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-danger">Inactive</span>{% endif %}</span></div>
+        <div class="profile-card-title"><i class="fas fa-shield-alt"></i> {% translate "Account Details" %}</div>
+        <div class="info-row"><span class="info-label">{% translate "Role" %}</span><span class="info-value"><span class="role-chip">{% translate "Administrator" as t_def %}{{ user.role.get_name_display|default:t_def }}</span></span></div>
+        <div class="info-row"><span class="info-label">{% translate "Access Level" %}</span><span class="info-value">{% translate "Full System Access" %}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Member Since" %}</span><span class="info-value">{{ user.date_joined|date:"F d, Y" }}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Last Login" %}</span><span class="info-value">{% translate "Never" as t_def %}{{ user.last_login|date:"F d, Y H:i"|default:t_def }}</span></div>
+        <div class="info-row"><span class="info-label">{% translate "Status" %}</span><span class="info-value">{% if user.is_active %}<span class="badge bg-success">{% translate "Active" %}</span>{% else %}<span class="badge bg-danger">{% translate "Inactive" %}</span>{% endif %}</span></div>
       </div>
     </div>
   </div>
 
   <div class="profile-card mb-3">
-    <div class="profile-card-title"><i class="fas fa-tools"></i> Admin Tools</div>
+    <div class="profile-card-title"><i class="fas fa-tools"></i> {% translate "Admin Tools" %}</div>
     <div class="row g-2">
-      <div class="col-6 col-md-3"><a href="{% url 'system_admin:dashboard' %}" class="action-btn action-btn-primary w-100"><i class="fas fa-tachometer-alt"></i> Dashboard</a></div>
-      <div class="col-6 col-md-3"><a href="{% url 'system_admin:manage_restaurants' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-store"></i> Restaurants</a></div>
-      <div class="col-6 col-md-3"><a href="{% url 'system_admin:manage_users' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-users"></i> All Users</a></div>
-      <div class="col-6 col-md-3"><a href="{% url 'system_admin:statistics' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-chart-line"></i> Statistics</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:dashboard' %}" class="action-btn action-btn-primary w-100"><i class="fas fa-tachometer-alt"></i> {% translate "Dashboard" %}</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:manage_restaurants' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-store"></i> {% translate "Restaurants" %}</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:manage_users' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-users"></i> {% translate "All Users" %}</a></div>
+      <div class="col-6 col-md-3"><a href="{% url 'system_admin:statistics' %}" class="action-btn action-btn-outline w-100"><i class="fas fa-chart-line"></i> {% translate "Statistics" %}</a></div>
     </div>
   </div>
 
   <div class="profile-card mb-3">
-    <div class="profile-card-title"><i class="fas fa-check-circle"></i> Administrator Capabilities</div>
+    <div class="profile-card-title"><i class="fas fa-check-circle"></i> {% translate "Administrator Capabilities" %}</div>
     <div class="row">
       <div class="col-12 col-md-6">
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage all restaurants and branches</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Create, edit and delete any user</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Access system-wide reports and statistics</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage subscriptions and billing</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Manage all restaurants and branches" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Create, edit and delete any user" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Access system-wide reports and statistics" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Manage subscriptions and billing" %}</div>
       </div>
       <div class="col-12 col-md-6">
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Override all restaurant settings</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>Manage role permissions and features</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>View and export all data</div>
-        <div class="capability-item"><i class="fas fa-check capability-icon"></i>System configuration and maintenance</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Override all restaurant settings" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "Manage role permissions and features" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "View and export all data" %}</div>
+        <div class="capability-item"><i class="fas fa-check capability-icon"></i>{% translate "System configuration and maintenance" %}</div>
       </div>
     </div>
   </div>
 
   <div class="profile-footer">
-    <span>Account created: {{ user.date_joined|date:"F d, Y" }}</span>
-    <span>Profile updated: {% now "F d, Y H:i" %}</span>
+    <span>{% blocktranslate with date=user.date_joined|date:"F d, Y" %}Account created: {{ date }}{% endblocktranslate %}</span>
+    <span>{% translate "Profile updated:" %} {% now "F d, Y H:i" %}</span>
   </div>
 
 </div>

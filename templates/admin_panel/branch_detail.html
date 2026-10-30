@@ -1,8 +1,9 @@
 {% extends 'admin_panel/base.html' %}
+{% load i18n %}
 {% load static %}
 {% load restaurant_tags %}
 
-{% block title %}{{ branch.name }} - Branch Details{% endblock %}
+{% block title %}{{ branch.name }} - {% translate "Branch Details" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -264,7 +265,7 @@
     <!-- Branch Header -->
     <div class="branch-header">
         <a href="{% url 'admin_panel:main_owner_dashboard' %}" class="btn btn-outline-light back-button">
-            <i class="fas fa-arrow-left"></i> Back to Dashboard
+            <i class="fas fa-arrow-left"></i> {% translate "Back to Dashboard" %}
         </a>
         
         <div class="row align-items-center">
@@ -283,23 +284,23 @@
                 <div class="mb-2">
                     {% if branch.is_active %}
                         <span class="badge bg-success px-3 py-2">
-                            <i class="fas fa-check"></i> Active Branch
+                            <i class="fas fa-check"></i> {% translate "Active Branch" %}
                         </span>
                     {% else %}
                         <span class="badge bg-danger px-3 py-2">
-                            <i class="fas fa-times"></i> Inactive Branch
+                            <i class="fas fa-times"></i> {% translate "Inactive Branch" %}
                         </span>
                     {% endif %}
                 </div>
                 <div>
                     {% if branch.performance_score >= 80 %}
-                        <span class="performance-indicator performance-excellent">Excellent Performance</span>
+                        <span class="performance-indicator performance-excellent">{% translate "Excellent Performance" %}</span>
                     {% elif branch.performance_score >= 60 %}
-                        <span class="performance-indicator performance-good">Good Performance</span>
+                        <span class="performance-indicator performance-good">{% translate "Good Performance" %}</span>
                     {% elif branch.performance_score >= 40 %}
-                        <span class="performance-indicator performance-average">Average Performance</span>
+                        <span class="performance-indicator performance-average">{% translate "Average Performance" %}</span>
                     {% else %}
-                        <span class="performance-indicator performance-poor">Needs Attention</span>
+                        <span class="performance-indicator performance-poor">{% translate "Needs Attention" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -311,11 +312,11 @@
         <!-- Contact & Location Info -->
         <div class="info-card">
             <h6>
-                <i class="fas fa-map-marker-alt text-primary"></i> Location & Contact
+                <i class="fas fa-map-marker-alt text-primary"></i> {% translate "Location & Contact" %}
             </h6>
             <div class="info-item">
                 <i class="fas fa-map-marker-alt"></i>
-                <span>{{ branch.address|default:"No address specified" }}</span>
+                {% translate "No address specified" as t_no_address %}<span>{{ branch.address|default:t_no_address }}</span>
             </div>
             {% if branch.phone %}
             <div class="info-item">
@@ -331,19 +332,19 @@
             {% endif %}
             <div class="info-item">
                 <i class="fas fa-calendar"></i>
-                <span>Opened: {{ branch.created_at|date:"M j, Y" }}</span>
+                <span>{% translate "Opened:" %} {{ branch.created_at|date:"M j, Y" }}</span>
             </div>
         </div>
 
         <!-- Management Info -->
         <div class="info-card">
             <h6>
-                <i class="fas fa-users text-success"></i> Management
+                <i class="fas fa-users text-success"></i> {% translate "Management" %}
             </h6>
             <div class="info-item">
                 <i class="fas fa-crown"></i>
                 <div>
-                    <strong>Main Owner:</strong><br>
+                    <strong>{% translate "Main Owner:" %}</strong><br>
                     {{ branch.main_owner.get_full_name|default:branch.main_owner.username }}
                     <br><small class="text-muted">{{ branch.main_owner.email }}</small>
                 </div>
@@ -352,7 +353,7 @@
             <div class="info-item">
                 <i class="fas fa-user-tie"></i>
                 <div>
-                    <strong>Branch Manager:</strong><br>
+                    <strong>{% translate "Branch Manager:" %}</strong><br>
                     {{ branch.branch_owner.get_full_name|default:branch.branch_owner.username }}
                     <br><small class="text-muted">{{ branch.branch_owner.email }}</small>
                 </div>
@@ -360,7 +361,7 @@
             {% else %}
             <div class="info-item">
                 <i class="fas fa-user-times"></i>
-                <span class="text-muted">No assigned branch manager</span>
+                <span class="text-muted">{% translate "No assigned branch manager" %}</span>
             </div>
             {% endif %}
         </div>
@@ -368,23 +369,23 @@
         <!-- Financial Info -->
         <div class="info-card">
             <h6>
-                <i class="fas fa-dollar-sign text-warning"></i> Financial Settings
+                <i class="fas fa-dollar-sign text-warning"></i> {% translate "Financial Settings" %}
             </h6>
             <div class="info-item">
                 <i class="fas fa-percentage"></i>
-                <span>Tax Rate: {{ branch.tax_rate_percentage|floatformat:1 }}%</span>
+                <span>{% translate "Tax Rate:" %} {{ branch.tax_rate_percentage|floatformat:1 }}%</span>
             </div>
             {% if branch.currency %}
             <div class="info-item">
                 <i class="fas fa-coins"></i>
-                <span>Currency: {{ branch.currency }}</span>
+                <span>{% translate "Currency:" %} {{ branch.currency }}</span>
             </div>
             {% endif %}
             {% if branch.parent_restaurant %}
             <div class="info-item">
                 <i class="fas fa-link"></i>
                 <div>
-                    <strong>Parent Restaurant:</strong><br>
+                    <strong>{% translate "Parent Restaurant:" %}</strong><br>
                     {{ branch.parent_restaurant.name }}
                 </div>
             </div>
@@ -399,7 +400,7 @@
                 <i class="fas fa-shopping-cart"></i>
             </div>
             <div class="stat-value text-primary">{{ branch.total_orders|default:0 }}</div>
-            <div class="stat-label">Total Orders</div>
+            <div class="stat-label">{% translate "Total Orders" %}</div>
         </div>
         
         <div class="stat-card">
@@ -407,7 +408,7 @@
                 <i class="fas fa-dollar-sign"></i>
             </div>
             <div class="stat-value text-success">{% currency_symbol %}{{ branch.total_revenue|floatformat:2|default:"0.00" }}</div>
-            <div class="stat-label">Total Revenue</div>
+            <div class="stat-label">{% translate "Total Revenue" %}</div>
         </div>
         
         <div class="stat-card">
@@ -415,7 +416,7 @@
                 <i class="fas fa-chart-line"></i>
             </div>
             <div class="stat-value text-info">{% currency_symbol %}{{ branch.avg_order_value|floatformat:2|default:"0.00" }}</div>
-            <div class="stat-label">Avg Order Value</div>
+            <div class="stat-label">{% translate "Avg Order Value" %}</div>
         </div>
         
         <div class="stat-card">
@@ -423,7 +424,7 @@
                 <i class="fas fa-utensils"></i>
             </div>
             <div class="stat-value text-warning">{{ branch.menu_items_count|default:0 }}</div>
-            <div class="stat-label">Menu Items</div>
+            <div class="stat-label">{% translate "Menu Items" %}</div>
         </div>
         
         <div class="stat-card">
@@ -431,14 +432,14 @@
                 <i class="fas fa-chair"></i>
             </div>
             <div class="stat-value text-secondary">{{ branch.tables_count|default:0 }}</div>
-            <div class="stat-label">Total Tables</div>
+            <div class="stat-label">{% translate "Total Tables" %}</div>
         </div>
     </div>
 
     <!-- Revenue Chart -->
     <div class="chart-container">
         <h5 class="mb-3">
-            <i class="fas fa-chart-line text-primary"></i> Revenue Performance (Last 30 Days)
+            <i class="fas fa-chart-line text-primary"></i> {% translate "Revenue Performance (Last 30 Days)" %}
         </h5>
         <canvas id="revenueChart"></canvas>
     </div>
@@ -448,10 +449,10 @@
         <div class="recent-orders-header">
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="fas fa-clock text-primary"></i> Recent Orders
+                    <i class="fas fa-clock text-primary"></i> {% translate "Recent Orders" %}
                 </h5>
                 <a href="{% url 'admin_panel:view_all_orders' %}?branch={{ branch.id }}" class="btn btn-outline-primary btn-sm">
-                    View All Orders <i class="fas fa-arrow-right"></i>
+                    {% translate "View All Orders" %} <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
         </div>
@@ -460,13 +461,13 @@
             <table class="table table-hover orders-table mb-0">
                 <thead>
                     <tr>
-                        <th>Order #</th>
-                        <th>Customer</th>
-                        <th>Items</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Actions</th>
+                        <th>{% translate "Order #" %}</th>
+                        <th>{% translate "Customer" %}</th>
+                        <th>{% translate "Items" %}</th>
+                        <th>{% translate "Total" %}</th>
+                        <th>{% translate "Status" %}</th>
+                        <th>{% translate "Date" %}</th>
+                        <th>{% translate "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -475,7 +476,7 @@
                         <td>
                             <strong>#{{ order.id|stringformat:"05d" }}</strong>
                             {% if order.table_info %}
-                                <br><small class="text-muted">Table: {{ order.table_info.tbl_no }}</small>
+                                <br><small class="text-muted">{% translate "Table:" %} {{ order.table_info.tbl_no }}</small>
                             {% endif %}
                         </td>
                         <td>
@@ -487,7 +488,7 @@
                                     {% endif %}
                                 </div>
                             {% else %}
-                                <span class="text-muted">Walk-in Customer</span>
+                                <span class="text-muted">{% translate "Walk-in Customer" %}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -496,7 +497,7 @@
                                     <div>{{ item.quantity }}x {{ item.product.name }}</div>
                                 {% endfor %}
                                 {% if order.orderitem_set.all|length > 2 %}
-                                    <small class="text-muted">+{{ order.orderitem_set.all|length|add:"-2" }} more...</small>
+                                    <small class="text-muted">{% blocktranslate with count=order.orderitem_set.all|length|add:"-2" %}+{{ count }} more...{% endblocktranslate %}</small>
                                 {% endif %}
                             </div>
                         </td>
@@ -518,7 +519,7 @@
                             </div>
                         </td>
                         <td>
-                            <button class="btn btn-outline-primary btn-sm" onclick="viewOrderDetails({{ order.id }})" title="View Details">
+                            <button class="btn btn-outline-primary btn-sm" onclick="viewOrderDetails({{ order.id }})" title="{% translate "View Details" %}">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </td>
@@ -528,7 +529,7 @@
                         <td colspan="7" class="text-center py-4">
                             <div class="text-muted">
                                 <i class="fas fa-shopping-cart fa-2x mb-2"></i>
-                                <div>No recent orders for this branch</div>
+                                <div>{% translate "No recent orders for this branch" %}</div>
                             </div>
                         </td>
                     </tr>
@@ -545,7 +546,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-receipt"></i> Order Details
+                    <i class="fas fa-receipt"></i> {% translate "Order Details" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -561,6 +562,8 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% translate "Daily Revenue" as t_daily_revenue %}
+{% translate "Error loading order details" as t_err_order_details %}
 <script>
 // Currency symbol for JavaScript
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
@@ -577,7 +580,7 @@ $(document).ready(function() {
             labels: chartLabels,
             datasets: [
                 {
-                    label: 'Daily Revenue',
+                    label: "{{ t_daily_revenue|escapejs }}",
                     data: chartData,
                     borderColor: 'rgb(102, 126, 234)',
                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
@@ -643,7 +646,7 @@ function viewOrderDetails(orderId) {
         $('#orderDetailsContent').html(data);
         $('#orderDetailsModal').modal('show');
     }).fail(function() {
-        alert('Error loading order details');
+        alert("{{ t_err_order_details|escapejs }}");
     });
 }
 </script>

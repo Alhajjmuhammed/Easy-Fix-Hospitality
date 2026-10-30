@@ -3,7 +3,7 @@ export default {
   // Kitchen / bar station
   'Kitchen': 'Jiko',
   'Bar': 'Baa',
-  'Buffet': 'Bufe',
+  'Buffet': 'Bufee',
   'Service': 'Huduma',
   '{station} Station': 'Kituo cha {station}',
   'Loading {station} orders…': 'Inapakia oda za {station}…',

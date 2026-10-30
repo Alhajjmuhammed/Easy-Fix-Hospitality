@@ -1,0 +1,423 @@
+# Kiswahili — customer order pages: my_orders, order_detail, rate_order, receipt,
+# customer_cancel_order and the mobile money box (cashier/_mobile_money_js.html).
+# Words follow the mobile app (mobile_app/src/i18n/sw). Please have a native speaker review.
+
+# "Active" tab on My Orders (translated with context "orders"; \x04 joins context and text)
+msgid "orders\x04Active"
+msgstr "Zinaendelea"
+
+msgid "Dine-in, delivery &amp; pickup — all in one place."
+msgstr "Kula hapa, kuletewa na kuchukua mwenyewe — vyote mahali pamoja."
+
+msgid "New Order"
+msgstr "Oda Mpya"
+
+msgid "Dine-In"
+msgstr "Kula hapa"
+
+msgid "Scan table QR code"
+msgstr "Skani QR ya meza"
+
+msgid "Delivery / Pickup"
+msgstr "Kuletewa / Kuchukua mwenyewe"
+
+msgid "Order from anywhere"
+msgstr "Agiza ukiwa popote"
+
+msgid "All Orders"
+msgstr "Oda Zote"
+
+msgid "Paid"
+msgstr "Imelipwa"
+
+msgid "Unpaid"
+msgstr "Haijalipwa"
+
+msgid "View"
+msgstr "Angalia"
+
+msgid "Prev"
+msgstr "Nyuma"
+
+msgid "Next"
+msgstr "Mbele"
+
+msgid "No active orders on this page"
+msgstr "Hakuna oda zinazoendelea kwenye ukurasa huu"
+
+msgid "Show All Orders"
+msgstr "Onyesha Oda Zote"
+
+msgid "All your orders are complete. Ready for another?"
+msgstr "Oda zako zote zimekamilika. Uko tayari kuagiza tena?"
+
+msgid "No orders yet"
+msgstr "Bado huna oda"
+
+msgid "Your order history will appear here once you start ordering."
+msgstr "Historia ya oda zako itaonekana hapa utakapoanza kuagiza."
+
+msgid "You have <strong>%(counter)s active order</strong>."
+msgid_plural "You have <strong>%(counter)s active orders</strong>."
+msgstr[0] "Una <strong>oda %(counter)s inayoendelea</strong>."
+msgstr[1] "Una <strong>oda %(counter)s zinazoendelea</strong>."
+
+msgid "Switch to <strong>All Orders</strong> and browse pages to find them."
+msgstr "Nenda kwenye <strong>Oda Zote</strong> kisha pitia kurasa ili kuzipata."
+
+msgid "%(counter)s order"
+msgid_plural "%(counter)s orders"
+msgstr[0] "oda %(counter)s"
+msgstr[1] "oda %(counter)s"
+
+msgid "Your %(counter)s active order is on another page."
+msgid_plural "Your %(counter)s active orders are on another page."
+msgstr[0] "Oda yako %(counter)s inayoendelea iko kwenye ukurasa mwingine."
+msgstr[1] "Oda zako %(counter)s zinazoendelea ziko kwenye ukurasa mwingine."
+
+msgid "Order Cancelled"
+msgstr "Oda imeghairiwa"
+
+msgid "Reason:"
+msgstr "Sababu:"
+
+msgid "Pay now from your phone"
+msgstr "Lipa sasa kwa simu yako"
+
+msgid "How was your order?"
+msgstr "Oda yako ilikuwaje?"
+
+msgid "Your rating helps the restaurant improve."
+msgstr "Tathmini yako inasaidia mgahawa kuboresha huduma."
+
+msgid "Rate your order"
+msgstr "Kadiria oda yako"
+
+msgid "Your rating"
+msgstr "Tathmini yako"
+
+msgid "Customer rating"
+msgstr "Tathmini ya mteja"
+
+msgid "food"
+msgstr "chakula"
+
+msgid "delivery"
+msgstr "usafirishaji"
+
+msgid "Reply from the restaurant:"
+msgstr "Jibu kutoka mgahawa:"
+
+msgid "Order Progress"
+msgstr "Hatua za oda"
+
+msgid "Your order is ready!"
+msgstr "Oda yako iko tayari!"
+
+msgid "A staff member will bring it to your table shortly."
+msgstr "Mhudumu ataileta mezani kwako hivi punde."
+
+msgid "Ready for pickup!"
+msgstr "Iko tayari kuchukuliwa!"
+
+msgid "Please collect your order at the counter."
+msgstr "Tafadhali chukua oda yako kaunta."
+
+msgid "Out for delivery!"
+msgstr "Iko njiani!"
+
+msgid "Your order is on the way."
+msgstr "Oda yako iko njiani."
+
+msgid "Delivered!"
+msgstr "Imefikishwa!"
+
+msgid "Enjoy your meal."
+msgstr "Furahia chakula chako."
+
+msgid "Picked up!"
+msgstr "Imechukuliwa!"
+
+msgid "Thank you for your order."
+msgstr "Asante kwa oda yako."
+
+msgid "Served!"
+msgstr "Imehudumiwa!"
+
+msgid "Thank you for dining with us. Enjoy your meal!"
+msgstr "Asante kwa kula nasi. Furahia chakula chako!"
+
+msgid "Connecting to rider…"
+msgstr "Inaunganisha na msafirishaji…"
+
+msgid "Waiting for rider location…"
+msgstr "Inasubiri mahali alipo msafirishaji…"
+
+msgid "Map appears once the rider starts moving"
+msgstr "Ramani itaonekana msafirishaji akianza safari"
+
+msgid "Order Delivered!"
+msgstr "Oda imefikishwa!"
+
+msgid "Your order has arrived. Enjoy!"
+msgstr "Oda yako imefika. Furahia!"
+
+msgid "Order Items"
+msgstr "Bidhaa za oda"
+
+msgid "Order Info"
+msgstr "Taarifa za oda"
+
+msgid "Phone"
+msgstr "Simu"
+
+msgid "Items"
+msgstr "Bidhaa"
+
+msgid "Payment"
+msgstr "Malipo"
+
+msgid "Partial"
+msgstr "Imelipwa kiasi"
+
+msgid "Pending"
+msgstr "Inasubiri"
+
+msgid "Special Instructions"
+msgstr "Maelekezo maalum"
+
+msgid "Actions"
+msgstr "Vitendo"
+
+msgid "View Receipt"
+msgstr "Angalia risiti"
+
+msgid "Cancel Order"
+msgstr "Ghairi oda"
+
+msgid "Bill Requested"
+msgstr "Bili imeombwa"
+
+msgid "Request Bill"
+msgstr "Omba bili"
+
+msgid "Order Again"
+msgstr "Agiza tena"
+
+msgid "New Dine-In Order"
+msgstr "Oda mpya ya kula hapa"
+
+msgid "Rider"
+msgstr "Msafirishaji"
+
+msgid "Delivery address"
+msgstr "Anwani ya kuletewa"
+
+msgid "Order delivered!"
+msgstr "Oda imefikishwa!"
+
+msgid "Track Order #%(n)s"
+msgstr "Fuatilia oda #%(n)s"
+
+msgid "%(n)s out of 5 stars for the food"
+msgstr "Nyota %(n)s kati ya 5 kwa chakula"
+
+msgid "Cancel order #%(n)s?"
+msgstr "Ghairi oda #%(n)s?"
+
+msgid "Requested %(t)s ago. Staff will bring your bill."
+msgstr "Uliomba %(t)s zilizopita. Mhudumu atakuletea bili."
+
+msgid "Food"
+msgstr "Chakula"
+
+msgid "Comment"
+msgstr "Maoni"
+
+msgid "(optional)"
+msgstr "(si lazima)"
+
+msgid "What did you like? What could be better?"
+msgstr "Ulipenda nini? Nini kingeweza kuwa bora zaidi?"
+
+msgid "Send rating"
+msgstr "Tuma tathmini"
+
+msgid "Back to order"
+msgstr "Rudi kwenye oda"
+
+msgid "Rate Order #%(n)s"
+msgstr "Kadiria oda #%(n)s"
+
+msgid "Order #%(n)s"
+msgstr "Oda #%(n)s"
+
+msgid "%(counter)s star"
+msgid_plural "%(counter)s stars"
+msgstr[0] "Nyota %(counter)s"
+msgstr[1] "Nyota %(counter)s"
+
+msgid "Delivery <span class=\"text-muted fw-normal small\">(optional)</span>"
+msgstr "Usafirishaji <span class=\"text-muted fw-normal small\">(si lazima)</span>"
+
+msgid "Receipt"
+msgstr "Risiti"
+
+msgid "Order Information"
+msgstr "Taarifa za oda"
+
+msgid "Order Number:"
+msgstr "Namba ya oda:"
+
+msgid "Table:"
+msgstr "Meza:"
+
+msgid "Date & Time:"
+msgstr "Tarehe na saa:"
+
+msgid "Customer:"
+msgstr "Mteja:"
+
+msgid "Payment:"
+msgstr "Malipo:"
+
+msgid "Subtotal:"
+msgstr "Jumla ndogo:"
+
+msgid "Discount:"
+msgstr "Punguzo:"
+
+msgid "Delivery fee:"
+msgstr "Ada ya kufikisha:"
+
+msgid "Total Paid:"
+msgstr "Jumla iliyolipwa:"
+
+msgid "Payment Information"
+msgstr "Taarifa za malipo"
+
+msgid "Payment Method:"
+msgstr "Njia ya malipo:"
+
+msgid "Amount:"
+msgstr "Kiasi:"
+
+msgid "Processed by:"
+msgstr "Imepokelewa na:"
+
+msgid "Date:"
+msgstr "Tarehe:"
+
+msgid "Reference:"
+msgstr "Kumbukumbu:"
+
+msgid "Notes:"
+msgstr "Maelezo:"
+
+msgid "Back to My Orders"
+msgstr "Rudi kwenye Oda Zangu"
+
+msgid "Share on WhatsApp"
+msgstr "Tuma kwa WhatsApp"
+
+msgid "Thank you for dining with us!"
+msgstr "Asante kwa kula nasi!"
+
+msgid "Receipt - Order #%(n)s"
+msgstr "Risiti - Oda #%(n)s"
+
+msgid "Tax (%(rate)s%%):"
+msgstr "Kodi (%(rate)s%%):"
+
+msgid "Cannot Cancel Order"
+msgstr "Oda haiwezi kughairiwa"
+
+msgid "Back to Dashboard"
+msgstr "Rudi kwenye Dashibodi"
+
+msgid "Type:"
+msgstr "Aina:"
+
+msgid "Order Date:"
+msgstr "Tarehe ya oda:"
+
+msgid "Total:"
+msgstr "Jumla:"
+
+msgid "Reason for Cancellation"
+msgstr "Sababu ya kughairi"
+
+msgid "Please provide a reason for cancelling this order..."
+msgstr "Tafadhali eleza sababu ya kughairi oda hii..."
+
+msgid "Please Note:"
+msgstr "Tafadhali kumbuka:"
+
+msgid "Cancelling this order will restore the items back to inventory"
+msgstr "Kughairi oda hii kutarudisha bidhaa kwenye stoo"
+
+msgid "Once cancelled, this action cannot be undone"
+msgstr "Ikishaghairiwa, hatua hii haiwezi kurudishwa nyuma"
+
+msgid "You can only cancel orders that haven't been confirmed by the kitchen"
+msgstr "Unaweza kughairi oda ambazo jiko bado halijazithibitisha tu"
+
+msgid "Are you sure you want to cancel this order? This action cannot be undone."
+msgstr "Una uhakika unataka kughairi oda hii? Hatua hii haiwezi kurudishwa nyuma."
+
+msgid "Are you sure you want to cancel this order?"
+msgstr "Una uhakika unataka kughairi oda hii?"
+
+msgid "This action cannot be undone and the items will be returned to inventory."
+msgstr "Hatua hii haiwezi kurudishwa nyuma na bidhaa zitarudishwa kwenye stoo."
+
+msgid "Cancel Order #%(n)s"
+msgstr "Ghairi oda #%(n)s"
+
+msgid "This order has already been %(status)s by the kitchen and cannot be cancelled."
+msgstr "Hali ya oda hii jikoni ni: %(status)s, kwa hiyo haiwezi kughairiwa tena."
+
+msgid "Mobile money"
+msgstr "Pesa kwa simu"
+
+msgid "Phone number"
+msgstr "Namba ya simu"
+
+msgid "Customer mobile money number"
+msgstr "Namba ya pesa kwa simu ya mteja"
+
+msgid "Mobile network"
+msgstr "Mtandao wa simu"
+
+msgid "Send payment request"
+msgstr "Tuma ombi la malipo"
+
+msgid "M-Pesa takes whole amounts only."
+msgstr "M-Pesa inapokea kiasi kamili tu (bila senti)."
+
+msgid "The customer must open this link to approve:"
+msgstr "Mteja lazima afungue kiungo hiki ili kuidhinisha:"
+
+msgid "Request sent to {phone}. Waiting for the customer to enter their PIN…"
+msgstr "Ombi limetumwa kwa {phone}. Inasubiri mteja aweke PIN yake…"
+
+msgid "Still not confirmed. It will be recorded automatically if the customer pays."
+msgstr "Bado haijathibitishwa. Itarekodiwa yenyewe mteja akilipa."
+
+msgid "Paid, but more than was due: {message}"
+msgstr "Imelipwa, lakini zaidi ya kiasi kinachodaiwa: {message}"
+
+msgid "Paid — receipt {receipt}."
+msgstr "Imelipwa — risiti {receipt}."
+
+msgid "Paid."
+msgstr "Imelipwa."
+
+msgid "You can try again."
+msgstr "Unaweza kujaribu tena."
+
+msgid "Sending…"
+msgstr "Inatuma…"
+
+msgid "Connection error. Please try again."
+msgstr "Hitilafu ya mtandao. Tafadhali jaribu tena."

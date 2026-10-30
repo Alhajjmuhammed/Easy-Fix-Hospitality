@@ -1,14 +1,15 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load restaurant_tags %}
 
-{% block title %}Manage Staff{% endblock %}
+{% block title %}{% translate "Manage Staff" %}{% endblock %}
 
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Staff Members</h2>
+        <h2>{% translate "Staff Members" %}</h2>
         <a href="{% url 'restaurant:owner_dashboard' %}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+            <i class="fas fa-arrow-left me-1"></i> {% translate "Back to Dashboard" %}
         </a>
     </div>
 
@@ -28,11 +29,11 @@
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Name</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Status</th>
+                            <th>{% translate "Name" %}</th>
+                            <th>{% translate "Username" %}</th>
+                            <th>{% translate "Email" %}</th>
+                            <th>{% translate "Role" %}</th>
+                            <th>{% translate "Status" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -50,9 +51,9 @@
                             </td>
                             <td>
                                 {% if member.is_active %}
-                                    <span class="badge bg-success">Active</span>
+                                    <span class="badge bg-success">{% translate "Active" %}</span>
                                 {% else %}
-                                    <span class="badge bg-danger">Inactive</span>
+                                    <span class="badge bg-danger">{% translate "Inactive" %}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -63,7 +64,7 @@
             {% else %}
             <div class="text-center py-5 text-muted">
                 <i class="fas fa-users fa-3x mb-3 opacity-50"></i>
-                <p class="mb-0">No staff members found.</p>
+                <p class="mb-0">{% translate "No staff members found." %}</p>
             </div>
             {% endif %}
         </div>

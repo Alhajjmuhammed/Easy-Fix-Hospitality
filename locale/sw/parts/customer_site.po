@@ -1,0 +1,373 @@
+# Kiswahili - customer site (base, login/register, profile, QR access, error pages). Please have a native speaker review.
+
+msgid "Restaurant Ordering System"
+msgstr "Mfumo wa Kuagiza Chakula"
+
+msgid "Multi-tenant restaurant ordering system with real-time order tracking"
+msgstr "Mfumo wa kuagiza chakula kwa migahawa mingi, wenye ufuatiliaji wa oda papo hapo"
+
+msgid "Restaurant System"
+msgstr "Mfumo wa Mgahawa"
+
+msgid "Toggle navigation"
+msgstr "Fungua au funga menyu"
+
+msgid "Home"
+msgstr "Mwanzo"
+
+msgid "Dashboard"
+msgstr "Dashibodi"
+
+msgid "Payments"
+msgstr "Malipo"
+
+msgid "Receipts"
+msgstr "Risiti"
+
+msgid "Sales Reports"
+msgstr "Ripoti za Mauzo"
+
+msgid "Waste Management"
+msgstr "Usimamizi wa Upotevu"
+
+msgid "Reports"
+msgstr "Ripoti"
+
+msgid "Cost Settings"
+msgstr "Mipangilio ya Gharama"
+
+msgid "Admin Panel"
+msgstr "Paneli ya Msimamizi"
+
+msgid "System Waste Reports"
+msgstr "Ripoti za Upotevu za Mfumo"
+
+msgid "All Restaurants Dashboard"
+msgstr "Dashibodi ya Migahawa Yote"
+
+msgid "System Wide Reports"
+msgstr "Ripoti za Mfumo Mzima"
+
+msgid "Kitchen"
+msgstr "Jiko"
+
+msgid "Bar"
+msgstr "Baa"
+
+msgid "Buffet"
+msgstr "Bufee"
+
+msgid "Service"
+msgstr "Huduma"
+
+msgid "My Orders"
+msgstr "Oda Zangu"
+
+msgid "My Reservations"
+msgstr "Meza Nilizohifadhi"
+
+msgid "My Points"
+msgstr "Pointi Zangu"
+
+msgid "Customer Care"
+msgstr "Huduma kwa Wateja"
+
+msgid "Process Payments"
+msgstr "Pokea Malipo"
+
+msgid "Cashier"
+msgstr "Keshia"
+
+msgid "Owner"
+msgstr "Mmiliki"
+
+msgid "Manager"
+msgstr "Meneja"
+
+msgid "Administrator"
+msgstr "Msimamizi"
+
+msgid "Kitchen Staff"
+msgstr "Mfanyakazi wa Jikoni"
+
+msgid "Bar Staff"
+msgstr "Mfanyakazi wa Baa"
+
+msgid "Buffet Staff"
+msgstr "Mfanyakazi wa Bufee"
+
+msgid "Service Staff"
+msgstr "Mhudumu"
+
+msgid "Staff"
+msgstr "Mfanyakazi"
+
+msgid "Profile"
+msgstr "Wasifu"
+
+msgid "Logout"
+msgstr "Toka"
+
+msgid "Login"
+msgstr "Ingia"
+
+msgid "Register"
+msgstr "Jisajili"
+
+msgid "Restaurant Ordering System. All rights reserved."
+msgstr "Mfumo wa Kuagiza Chakula. Haki zote zimehifadhiwa."
+
+msgid "Connecting..."
+msgstr "Inaunganisha..."
+
+msgid "Your complete restaurant<br>management platform"
+msgstr "Mfumo wako kamili wa<br>kusimamia mgahawa"
+
+msgid "Real-time Reports"
+msgstr "Ripoti za Papo Hapo"
+
+msgid "Inventory Control"
+msgstr "Udhibiti wa Stoo"
+
+msgid "Order Management"
+msgstr "Usimamizi wa Oda"
+
+msgid "Money Flow Tracking"
+msgstr "Ufuatiliaji wa Mapato na Matumizi"
+
+msgid "Welcome back!"
+msgstr "Karibu tena!"
+
+msgid "Sign in to continue to your dashboard"
+msgstr "Ingia ili uendelee kwenye dashibodi yako"
+
+msgid "Username"
+msgstr "Jina la mtumiaji"
+
+msgid "Enter your username"
+msgstr "Weka jina lako la mtumiaji"
+
+msgid "Password"
+msgstr "Nenosiri"
+
+msgid "Enter your password"
+msgstr "Weka nenosiri lako"
+
+msgid "Toggle password visibility"
+msgstr "Onyesha au ficha nenosiri"
+
+msgid "Sign In"
+msgstr "Ingia"
+
+msgid "Don't have an account?"
+msgstr "Huna akaunti?"
+
+msgid "Sign up here"
+msgstr "Jisajili hapa"
+
+msgid "Create your customer account to start ordering"
+msgstr "Fungua akaunti yako ya mteja ili uanze kuagiza"
+
+msgid "QR Access Detected!"
+msgstr "Umeingia kwa QR!"
+
+msgid "You've accessed %(name)s via QR code."
+msgstr "Umefungua %(name)s kupitia QR."
+
+msgid "First Name"
+msgstr "Jina la kwanza"
+
+msgid "Last Name"
+msgstr "Jina la mwisho"
+
+msgid "Email Address"
+msgstr "Barua pepe"
+
+msgid "Phone Number"
+msgstr "Namba ya simu"
+
+msgid "Confirm Password"
+msgstr "Thibitisha nenosiri"
+
+msgid "Create Account & Start Ordering"
+msgstr "Fungua Akaunti na Uanze Kuagiza"
+
+msgid "Already have an account?"
+msgstr "Una akaunti tayari?"
+
+msgid "Sign in here"
+msgstr "Ingia hapa"
+
+msgid "Creating an account for %(name)s"
+msgstr "Unafungua akaunti ya %(name)s"
+
+msgid "Create Account"
+msgstr "Fungua Akaunti"
+
+msgid "Join our restaurant community"
+msgstr "Jiunge na jamii ya mgahawa wetu"
+
+msgid "Address"
+msgstr "Anwani"
+
+msgid "My Profile"
+msgstr "Wasifu Wangu"
+
+msgid "Personal Information"
+msgstr "Taarifa Binafsi"
+
+msgid "Name:"
+msgstr "Jina:"
+
+msgid "Username:"
+msgstr "Jina la mtumiaji:"
+
+msgid "Email:"
+msgstr "Barua pepe:"
+
+msgid "Phone:"
+msgstr "Simu:"
+
+msgid "Not provided"
+msgstr "Haijawekwa"
+
+msgid "Account Details"
+msgstr "Taarifa za akaunti"
+
+msgid "Role:"
+msgstr "Jukumu:"
+
+msgid "Customer"
+msgstr "Mteja"
+
+msgid "Restaurant:"
+msgstr "Mgahawa:"
+
+msgid "Member Since:"
+msgstr "Mwanachama tangu:"
+
+msgid "Last Login:"
+msgstr "Kuingia mara ya mwisho:"
+
+msgid "Never"
+msgstr "Bado"
+
+msgid "Status:"
+msgstr "Hali:"
+
+msgid "Active"
+msgstr "Inatumika"
+
+msgid "Inactive"
+msgstr "Imesimamishwa"
+
+msgid "Quick Actions"
+msgstr "Vitendo vya Haraka"
+
+msgid "Order Food"
+msgstr "Agiza Chakula"
+
+msgid "Access"
+msgstr "Kuingia"
+
+msgid "QR Code Detected!"
+msgstr "QR Imetambuliwa!"
+
+msgid "Please login or register to place an order"
+msgstr "Tafadhali ingia au jisajili ili uweke oda"
+
+msgid "Restaurant Unavailable"
+msgstr "Mgahawa Haupatikani"
+
+msgid "Restaurant"
+msgstr "Mgahawa"
+
+msgid "Restaurant Temporarily Unavailable"
+msgstr "Mgahawa Haupatikani kwa Muda"
+
+msgid "What you can do:"
+msgstr "Unachoweza kufanya:"
+
+msgid "Try again later"
+msgstr "Jaribu tena baadaye"
+
+msgid "Contact the restaurant directly"
+msgstr "Wasiliana na mgahawa moja kwa moja"
+
+msgid "Call:"
+msgstr "Piga simu:"
+
+msgid "This restaurant's online ordering system is temporarily offline. Normal service will resume once their subscription is renewed."
+msgstr "Mfumo wa kuagiza mtandaoni wa mgahawa huu umezimwa kwa muda. Huduma itarudi kama kawaida baada ya usajili wao kulipiwa upya."
+
+msgid "This restaurant's online ordering is temporarily suspended. Please contact them directly for ordering options."
+msgstr "Kuagiza mtandaoni kwa mgahawa huu kumesimamishwa kwa muda. Tafadhali wasiliana nao moja kwa moja ujue njia nyingine za kuagiza."
+
+msgid "Thank you for your understanding. We apologize for any inconvenience."
+msgstr "Asante kwa kuelewa. Tunaomba radhi kwa usumbufu wowote."
+
+msgid "Go to Login"
+msgstr "Nenda Kuingia"
+
+msgid "Go Back"
+msgstr "Rudi nyuma"
+
+msgid "QR Code:"
+msgstr "Msimbo wa QR:"
+
+msgid "Try Again"
+msgstr "Jaribu tena"
+
+msgid "Access Denied"
+msgstr "Ruhusa Imekataliwa"
+
+msgid "You don't have permission to access this page."
+msgstr "Huna ruhusa ya kufungua ukurasa huu."
+
+msgid "Go Home"
+msgstr "Nenda Mwanzo"
+
+msgid "Page Not Found"
+msgstr "Ukurasa Haupatikani"
+
+msgid "The page you're looking for doesn't exist or has been moved."
+msgstr "Ukurasa unaoutafuta haupo au umehamishwa."
+
+msgid "Server Error"
+msgstr "Hitilafu ya Seva"
+
+msgid "Something went wrong on our end. Please try again later."
+msgstr "Kuna tatizo upande wetu. Tafadhali jaribu tena baadaye."
+
+msgid "Offline"
+msgstr "Nje ya mtandao"
+
+msgid "You're Offline"
+msgstr "Huna Mtandao"
+
+msgid "It looks like you're not connected to the internet. You can still browse previously loaded content while offline."
+msgstr "Inaonekana hujaunganishwa na intaneti. Bado unaweza kuangalia vitu vilivyopakiwa awali ukiwa huna mtandao."
+
+msgid "What you can do offline:"
+msgstr "Unachoweza kufanya bila mtandao:"
+
+msgid "View previously loaded menu items"
+msgstr "Kuangalia bidhaa za menyu zilizopakiwa awali"
+
+msgid "Browse your order history"
+msgstr "Kuangalia historia ya oda zako"
+
+msgid "Prepare orders (they'll sync when online)"
+msgstr "Kuandaa oda (zitatumwa mtandao ukirudi)"
+
+msgid "Place new orders"
+msgstr "Kuweka oda mpya"
+
+msgid "Receive real-time updates"
+msgstr "Kupokea taarifa za papo hapo"
+
+msgid "Your data will automatically sync when you're back online."
+msgstr "Taarifa zako zitatumwa zenyewe mtandao ukirudi."
+
+msgid "Connection restored! Refreshing..."
+msgstr "Mtandao umerudi! Inapakia upya..."
