@@ -2,6 +2,8 @@ import csv
 from io import BytesIO
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import ProtectedError, RestrictedError
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum, Value
 from django.db.models.functions import Abs, Coalesce
 from django.http import HttpResponse, JsonResponse
@@ -255,7 +257,12 @@ def manage_items(request):
                 item = InventoryItem.objects.filter(id=item_id).first()
             if item is None:
                 return JsonResponse({'success': False, 'error': 'Item not found.'})
-            item.delete()
+            try:
+                with transaction.atomic():
+                    item.delete()
+            except (ProtectedError, RestrictedError):
+                return JsonResponse({'success': False, 'error':
+                                     'This item is on purchase orders, so it cannot be deleted. Deactivate it instead.'})
             return JsonResponse({'success': True})
 
         return JsonResponse({'success': False, 'error': 'Unknown action.'})

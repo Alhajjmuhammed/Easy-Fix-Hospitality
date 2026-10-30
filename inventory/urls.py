@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_purchasing
 
 app_name = 'inventory'
 
@@ -10,4 +10,11 @@ urlpatterns = [
     path('history/', views.history, name='history'),
     path('settings/', views.manage_settings, name='settings'),
     path('api/item/<int:item_id>/', views.item_detail_ajax, name='item_detail'),
+    path('suppliers/', views_purchasing.suppliers, name='suppliers'),
+    path('purchase-orders/', views_purchasing.po_list, name='po_list'),
+    path('purchase-orders/new/', views_purchasing.po_form, name='po_new'),
+    path('purchase-orders/<int:pk>/', views_purchasing.po_detail, name='po_detail'),
+    path('purchase-orders/<int:pk>/edit/', views_purchasing.po_form, name='po_edit'),
+    path('purchase-orders/<int:pk>/action/', views_purchasing.po_action, name='po_action'),
+    path('purchase-orders/<int:pk>/pdf/', views_purchasing.po_pdf, name='po_pdf'),
 ]

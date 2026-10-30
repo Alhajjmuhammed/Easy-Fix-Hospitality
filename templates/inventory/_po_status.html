@@ -1,0 +1,1 @@
+<span class="badge {% if status == 'draft' %}bg-secondary{% elif status == 'sent' %}bg-info text-dark{% elif status == 'partial' %}bg-warning text-dark{% elif status == 'received' %}bg-success{% elif status == 'closed' %}bg-dark{% else %}bg-danger{% endif %}">{{ label }}</span>

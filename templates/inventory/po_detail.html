@@ -1,0 +1,192 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}{{ order.code }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-1"><i class="fas fa-file-invoice me-2"></i>{{ order.code }}
+                {% include 'inventory/_po_status.html' with status=order.status label=order.get_status_display %}
+                {% if order.status != 'cancelled' %}{% include 'inventory/_po_payment.html' with ps=order.payment_status label=order.get_payment_status_display %}{% endif %}
+            </h1>
+            <div class="text-muted small">
+                {{ order.supplier.name }} · ordered {{ order.order_date|date:"j M Y" }}
+                {% if order.expected_date %} · deliver by {{ order.expected_date|date:"j M Y" }}{% endif %}
+                {% if order.supplier.phone %} · {{ order.supplier.phone }}{% endif %}
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'inventory:po_pdf' order.pk %}" target="_blank" rel="noopener"><i class="fas fa-print me-1"></i>Print / PDF</a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#shareModal"><i class="fab fa-whatsapp me-1"></i>Share text</button>
+            {% if can_manage and order.status != 'cancelled' %}
+                <form method="post" action="{% url 'inventory:po_action' order.pk %}" class="d-inline">
+                    {% csrf_token %}<input type="hidden" name="action" value="email">
+                    <button class="btn btn-sm btn-outline-secondary" {% if not order.supplier.email or not email_ready %}disabled title="{% if not order.supplier.email %}Add the supplier's email on the Suppliers page{% else %}Email is not set up on this system yet{% endif %}"{% endif %}><i class="fas fa-envelope me-1"></i>Email</button>
+                </form>
+                {% if order.is_editable %}
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'inventory:po_edit' order.pk %}"><i class="fas fa-pen me-1"></i>Edit</a>
+                {% endif %}
+                {% if order.status == 'draft' %}
+                <form method="post" action="{% url 'inventory:po_action' order.pk %}" class="d-inline">
+                    {% csrf_token %}<input type="hidden" name="action" value="send">
+                    <button class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>Mark as sent</button>
+                </form>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% include 'inventory/_purchasing_nav.html' %}
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <form method="post" action="{% url 'inventory:po_action' order.pk %}" id="receiveForm">
+                {% csrf_token %}<input type="hidden" name="action" value="receive">
+                <div class="card shadow-sm border-0 mb-3"><div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light"><tr>
+                                <th class="ps-3">Item</th><th class="text-end">Ordered</th><th class="text-end">Received</th>
+                                <th class="text-end">Unit price</th><th class="text-end">Total</th>
+                                {% if can_receive %}<th style="width:140px">Arrived now</th>{% endif %}
+                            </tr></thead>
+                            <tbody>
+                                {% for l in lines %}
+                                <tr>
+                                    <td class="ps-3 fw-semibold">{{ l.item.name }}{% if l.item.unit %} <span class="text-muted small">({{ l.item.unit }})</span>{% endif %}</td>
+                                    <td class="text-end">{{ l.quantity|floatformat:"-2" }}</td>
+                                    <td class="text-end {% if l.received_quantity >= l.quantity %}text-success{% elif l.received_quantity %}text-warning{% endif %}">{{ l.received_quantity|floatformat:"-2" }}</td>
+                                    <td class="text-end">{{ currency_symbol }}{{ l.unit_price|floatformat:2 }}</td>
+                                    <td class="text-end">{{ currency_symbol }}{{ l.line_total|floatformat:2 }}</td>
+                                    {% if can_receive %}
+                                    <td>{% if l.remaining %}<input name="recv_{{ l.id }}" class="form-control form-control-sm" inputmode="decimal" placeholder="max {{ l.remaining|floatformat:'-2' }}" aria-label="Arrived now {{ l.item.name }}">{% else %}<span class="text-success small"><i class="fas fa-check"></i> Done</span>{% endif %}</td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr><td class="ps-3 fw-semibold" colspan="4">Order total</td><td class="text-end fw-bold">{{ currency_symbol }}{{ order.ordered_total|floatformat:2 }}</td>{% if can_receive %}<td></td>{% endif %}</tr>
+                                <tr><td class="ps-3 text-muted" colspan="4">Value received so far</td><td class="text-end">{{ currency_symbol }}{{ order.received_total|floatformat:2 }}</td>{% if can_receive %}<td></td>{% endif %}</tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div></div>
+                {% if can_receive %}
+                <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+                    <h6 class="fw-bold mb-2"><i class="fas fa-dolly me-1"></i>Receive a delivery</h6>
+                    <p class="small text-muted mb-2">Enter what actually arrived (it can be less than ordered). It is added to your stock straight away at the order price.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <input name="note" class="form-control form-control-sm" style="max-width:320px" maxlength="500" placeholder="Delivery note / invoice number (optional)">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="fillAll">Everything arrived</button>
+                        <button class="btn btn-sm btn-success" id="receiveBtn"><i class="fas fa-check me-1"></i>Receive into stock</button>
+                    </div>
+                </div></div>
+                {% endif %}
+            </form>
+            {% if order.notes %}<div class="card shadow-sm border-0 mb-3"><div class="card-body small"><strong>Notes:</strong> {{ order.notes|linebreaksbr }}</div></div>{% endif %}
+
+            {% if can_manage %}
+            <div class="d-flex flex-wrap gap-2">
+                {% if order.status == 'partial' %}
+                <form method="post" action="{% url 'inventory:po_action' order.pk %}" onsubmit="return confirm('Close this order? Nothing more will be expected from the supplier.');">
+                    {% csrf_token %}<input type="hidden" name="action" value="close">
+                    <button class="btn btn-sm btn-outline-dark">Close order (rest not coming)</button>
+                </form>
+                {% endif %}
+                {% if order.is_editable %}
+                <form method="post" action="{% url 'inventory:po_action' order.pk %}" onsubmit="return confirm('Cancel this order?');">
+                    {% csrf_token %}<input type="hidden" name="action" value="cancel">
+                    <button class="btn btn-sm btn-outline-danger">Cancel order</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3"><i class="fas fa-money-bill-wave me-1"></i>Payments</h6>
+                    <dl class="row small mb-2">
+                        <dt class="col-7 fw-normal text-muted">Received value</dt><dd class="col-5 text-end mb-1">{{ currency_symbol }}{{ order.received_total|floatformat:2 }}</dd>
+                        <dt class="col-7 fw-normal text-muted">Paid</dt><dd class="col-5 text-end mb-1">{{ currency_symbol }}{{ order.paid_total|floatformat:2 }}</dd>
+                        <dt class="col-7">We owe</dt><dd class="col-5 text-end fw-bold mb-0 {% if order.amount_owed %}text-danger{% endif %}">{{ currency_symbol }}{{ order.amount_owed|floatformat:2 }}</dd>
+                        {% if order.supplier_credit %}
+                        <dt class="col-7 text-success">Supplier owes us back</dt><dd class="col-5 text-end fw-bold text-success mb-0">{{ currency_symbol }}{{ order.supplier_credit|floatformat:2 }}</dd>
+                        {% endif %}
+                    </dl>
+                    {% for p in payments %}
+                    <div class="d-flex justify-content-between align-items-center border-top py-2 small">
+                        <div>
+                            <div class="fw-semibold">{{ currency_symbol }}{{ p.amount|floatformat:2 }} · {{ p.get_method_display }}</div>
+                            <div class="text-muted">{{ p.paid_on|date:"j M Y" }}{% if p.reference %} · {{ p.reference }}{% endif %}{% if p.recorded_by %} · {{ p.recorded_by.get_full_name|default:p.recorded_by.username }}{% endif %}</div>
+                        </div>
+                        {% if can_manage %}
+                        <form method="post" action="{% url 'inventory:po_action' order.pk %}" onsubmit="return confirm('Remove this payment?');">
+                            {% csrf_token %}<input type="hidden" name="action" value="delete_payment"><input type="hidden" name="payment_id" value="{{ p.id }}">
+                            <button class="btn btn-sm btn-link text-danger p-0" title="Remove"><i class="fas fa-trash"></i></button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if can_manage and order.status != 'cancelled' %}
+                    <form method="post" action="{% url 'inventory:po_action' order.pk %}" class="border-top pt-3 mt-2">
+                        {% csrf_token %}<input type="hidden" name="action" value="pay">
+                        <div class="row g-2">
+                            <div class="col-6"><input name="amount" class="form-control form-control-sm" inputmode="decimal" placeholder="Amount" required aria-label="Amount"></div>
+                            <div class="col-6"><input type="date" name="paid_on" class="form-control form-control-sm" value="{{ today|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" aria-label="Paid on"></div>
+                            <div class="col-6"><select name="method" class="form-select form-select-sm" aria-label="Method">{% for k, label in method_choices %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></div>
+                            <div class="col-6"><input name="reference" class="form-control form-control-sm" maxlength="100" placeholder="Reference" aria-label="Reference"></div>
+                            <div class="col-12"><button class="btn btn-sm btn-primary w-100">Record payment</button></div>
+                        </div>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Share {{ order.code }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <textarea id="shareText" class="form-control" rows="12" readonly>{{ share_text }}</textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="copyShare"><i class="fas fa-copy me-1"></i>Copy</button>
+                <a class="btn btn-success" id="waShare" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>Open WhatsApp</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var text = document.getElementById('shareText').value;
+    // wa.me needs the international format: only use numbers saved as +255… or 00255…;
+    // for local numbers (0712…) WhatsApp opens and asks who to send it to.
+    var raw = '{{ order.supplier.phone|escapejs }}'.trim(), phone = '';
+    if (/^(\+|00)/.test(raw)) phone = raw.replace(/^00/, '').replace(/[^0-9]/g, '');
+    document.getElementById('waShare').href = 'https://wa.me/' + (phone.length >= 9 ? phone : '') + '?text=' + encodeURIComponent(text);
+    document.getElementById('copyShare').addEventListener('click', function () {
+        var btn = this, ta = document.getElementById('shareText');
+        function done() { btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied'; }
+        if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () { ta.select(); document.execCommand('copy'); done(); });
+        else { ta.select(); document.execCommand('copy'); done(); }
+    });
+    var fill = document.getElementById('fillAll');
+    if (fill) fill.addEventListener('click', function () {
+        document.querySelectorAll('#receiveForm input[name^=recv_]').forEach(function (i) {
+            i.value = i.placeholder.replace('max ', '');
+        });
+    });
+    var rf = document.getElementById('receiveForm');
+    if (rf) rf.addEventListener('submit', function () {
+        var b = document.getElementById('receiveBtn');
+        if (b) setTimeout(function () { b.disabled = true; }, 0);
+    });
+})();
+</script>
+{% endblock %}

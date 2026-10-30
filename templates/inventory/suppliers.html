@@ -1,0 +1,107 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Suppliers{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h1 class="h3 mb-0"><i class="fas fa-truck me-2"></i>Suppliers</h1>
+        {% if can_manage %}
+        <button class="btn btn-primary btn-sm" onclick="openSupplier()"><i class="fas fa-plus me-1"></i>Add Supplier</button>
+        {% endif %}
+    </div>
+    {% include 'inventory/_purchasing_nav.html' %}
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            {% if rows %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th class="ps-3">Supplier</th><th>Contact</th><th class="text-center">Orders</th><th class="text-end">We owe</th><th class="text-end pe-3"></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}{% with s=row.supplier %}
+                        <tr {% if not s.is_active %}class="text-muted"{% endif %}>
+                            <td class="ps-3">
+                                <div class="fw-semibold">{{ s.name }}{% if not s.is_active %} <span class="badge bg-secondary">Archived</span>{% endif %}</div>
+                                {% if s.address %}<div class="small text-muted">{{ s.address }}</div>{% endif %}
+                            </td>
+                            <td class="small">
+                                {% if s.contact_person %}{{ s.contact_person }}<br>{% endif %}
+                                {% if s.phone %}<i class="fas fa-phone me-1"></i>{{ s.phone }}<br>{% endif %}
+                                {% if s.email %}<i class="fas fa-envelope me-1"></i>{{ s.email }}{% endif %}
+                            </td>
+                            <td class="text-center"><a href="{% url 'inventory:po_list' %}?supplier={{ s.id }}">{{ row.orders }}</a></td>
+                            <td class="text-end fw-semibold {% if row.owed %}text-danger{% endif %}">{{ currency_symbol }}{{ row.owed|floatformat:2 }}</td>
+                            <td class="text-end pe-3 text-nowrap">
+                                {% if can_manage %}
+                                {% if s.is_active %}<a class="btn btn-sm btn-outline-primary" href="{% url 'inventory:po_new' %}?supplier={{ s.id }}" title="New order"><i class="fas fa-file-invoice"></i></a>{% endif %}
+                                <button class="btn btn-sm btn-outline-secondary" title="Edit"
+                                        data-id="{{ s.id }}" data-name="{{ s.name }}" data-contact="{{ s.contact_person }}"
+                                        data-phone="{{ s.phone }}" data-email="{{ s.email }}" data-address="{{ s.address }}"
+                                        data-notes="{{ s.notes }}" onclick="openSupplier(this.dataset)"><i class="fas fa-pen"></i></button>
+                                <form method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="toggle">
+                                    <input type="hidden" name="supplier_id" value="{{ s.id }}">
+                                    <button class="btn btn-sm btn-outline-{% if s.is_active %}danger{% else %}success{% endif %}" title="{% if s.is_active %}Archive{% else %}Reactivate{% endif %}">
+                                        <i class="fas fa-{% if s.is_active %}archive{% else %}undo{% endif %}"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endwith %}{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-truck fa-3x mb-3" style="opacity:.3"></i>
+                <p class="mb-0">No suppliers yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if can_manage %}
+<div class="modal fade" id="supplierModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" class="modal-content">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="supAction" value="add">
+            <input type="hidden" name="supplier_id" id="supId">
+            <div class="modal-header"><h5 class="modal-title" id="supTitle">Add Supplier</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-2"><label class="form-label small fw-semibold">Name *</label><input name="name" id="supName" class="form-control" maxlength="200" required></div>
+                <div class="mb-2"><label class="form-label small fw-semibold">Contact person</label><input name="contact_person" id="supContact" class="form-control" maxlength="120"></div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6"><label class="form-label small fw-semibold">Phone / WhatsApp</label><input name="phone" id="supPhone" class="form-control" maxlength="40"></div>
+                    <div class="col-6"><label class="form-label small fw-semibold">Email</label><input type="email" name="email" id="supEmail" class="form-control" maxlength="254"></div>
+                </div>
+                <div class="mb-2"><label class="form-label small fw-semibold">Address</label><input name="address" id="supAddress" class="form-control" maxlength="255"></div>
+                <div><label class="form-label small fw-semibold">Notes</label><textarea name="notes" id="supNotes" class="form-control" rows="2" maxlength="2000"></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+        </form>
+    </div>
+</div>
+<script>
+function openSupplier(d) {
+    d = d || {};
+    document.getElementById('supAction').value = d.id ? 'edit' : 'add';
+    document.getElementById('supTitle').textContent = d.id ? 'Edit Supplier' : 'Add Supplier';
+    document.getElementById('supId').value = d.id || '';
+    document.getElementById('supName').value = d.name || '';
+    document.getElementById('supContact').value = d.contact || '';
+    document.getElementById('supPhone').value = d.phone || '';
+    document.getElementById('supEmail').value = d.email || '';
+    document.getElementById('supAddress').value = d.address || '';
+    document.getElementById('supNotes').value = d.notes || '';
+    new bootstrap.Modal(document.getElementById('supplierModal')).show();
+}
+</script>
+{% endif %}
+{% endblock %}
