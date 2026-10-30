@@ -22,6 +22,7 @@ import { saveOfflineBillRequest, getOrderById, cacheOrders } from '../../databas
 import NetInfo from '@react-native-community/netinfo';
 import { useSyncStore } from '../../store/useSyncStore';
 import { useCurrency } from '../../hooks/useCurrency';
+import OrderRatingCard from '../../components/OrderRatingCard';
 
 const STATUS_COLORS = {
   pending:          '#FFA000',
@@ -466,6 +467,11 @@ export default function OrderTrackingScreen({ route }) {
             Request Bill
           </Button>
         )
+      )}
+
+      {/* Rate the order – once served / delivered (customer only; hidden otherwise) */}
+      {!isOffline && (
+        <OrderRatingCard orderId={order.id} status={order.status} orderType={order.order_type} onMessage={setSnack} />
       )}
 
       {/* View Receipt – when paid */}

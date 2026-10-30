@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from . import views, views_feedback
+from cashier import views_loyalty as loyalty_views
 from .api_printjob import PrintJobViewSet
 
 app_name = 'orders'
@@ -48,6 +49,10 @@ urlpatterns = [
     # Customer order management
     path('my-orders/', views.my_orders, name='my_orders'),
     path('order/<int:order_id>/', views.order_detail, name='order_detail'),
+    path('order/<int:order_id>/rate/', views_feedback.rate_order, name='rate_order'),
+    path('feedback/', views_feedback.feedback_list, name='feedback'),
+    path('my-points/', loyalty_views.my_points_web, name='my_points'),
+    path('feedback/<int:rating_id>/reply/', views_feedback.feedback_reply, name='feedback_reply'),
     path('receipt/<int:order_id>/', views.view_receipt, name='view_receipt'),
     path('track/<str:order_number>/', views.track_order, name='track_order'),
     path('customer-cancel/<int:order_id>/', views.customer_cancel_order, name='customer_cancel_order'),

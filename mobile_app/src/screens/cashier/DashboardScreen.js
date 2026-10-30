@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, Alert, ScrollView } from 'react-native';
 import {
   Text, Card, Button, TextInput, Dialog, Portal, Chip,
@@ -18,6 +18,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
+import LoyaltyPayBox from '../../components/LoyaltyPayBox';
 
 const PAYMENT_METHODS = [
   { value: 'cash',    label: 'Cash' },
@@ -57,6 +58,7 @@ export default function CashierDashboardScreen({ navigation }) {
   const [payDialog,  setPayDialog]  = useState(null);
   const [amount,     setAmount]     = useState('');
   const [method,     setMethod]     = useState('cash');
+  const [loyaltyCode, setLoyaltyCode] = useState('');
   const [reference,  setReference]  = useState('');
   const [paying,     setPaying]     = useState(false);
 
@@ -184,6 +186,11 @@ export default function CashierDashboardScreen({ navigation }) {
     if (!payDialog || !amount) return;
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed <= 0) { setSnack('Enter a valid amount'); return; }
+    if (method === 'loyalty') {
+      // Points are checked and taken by the server, so they can't be used offline
+      const netNow = await NetInfo.fetch();
+      if (payDialog._is_offline_pending || !netNow.isConnected) { setSnack('Loyalty points need an internet connection'); return; }
+    }
     setPaying(true);
     try {
       if (payDialog._is_offline_pending) {
@@ -220,6 +227,7 @@ export default function CashierDashboardScreen({ navigation }) {
       const net = await NetInfo.fetch();
       if (!mountedRef.current) return;
       if (!net.isConnected) {
+        if (method === 'loyalty') { setSnack('Loyalty points need an internet connection'); return; }
         await saveOfflinePayment({
           order_id:         payDialog.id,
           order_number:     payDialog.order_number,
@@ -249,7 +257,7 @@ export default function CashierDashboardScreen({ navigation }) {
         }
         return;
       }
-      const payRes = await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim() });
+      const payRes = await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim(), ...(method === 'loyalty' ? { loyalty_code: loyaltyCode } : {}) });
       if (!mountedRef.current) return;
       const paidOrder   = payDialog;
       const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: payRes?.payment?.id ?? null };
@@ -706,6 +714,11 @@ export default function CashierDashboardScreen({ navigation }) {
             <TextInput label="Amount" value={amount} onChangeText={setAmount}
               keyboardType="decimal-pad" mode="outlined" style={{ marginBottom: 12 }}
               autoFocus returnKeyType="done" onSubmitEditing={handlePayment} />
+            <LoyaltyPayBox order={payDialog} balanceDue={payDialog?.balance_due ?? payDialog?.total ?? 0} format={format}
+              onMessage={setSnack} onCode={setLoyaltyCode} onUsePoints={(amt, code) => { setAmount(amt); setLoyaltyCode(code); setMethod('loyalty'); }} />
+            {method === 'loyalty' && (
+              <Text variant="bodySmall" style={{ marginBottom: 8, color: '#C2185B' }}>Paying with loyalty points. Choose another method below to change.</Text>
+            )}
             <Text variant="labelMedium" style={{ marginBottom: 6 }}>Payment Method</Text>
             <SegmentedButtons value={method} onValueChange={setMethod}
               buttons={PAYMENT_METHODS} style={{ marginBottom: 12 }} />

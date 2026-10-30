@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_loyalty
 
 app_name = 'cashier'
 
@@ -16,4 +16,6 @@ urlpatterns = [
     path('receipts/', views.receipt_management, name='receipt_management'),
     path('print-bill/<int:order_id>/', views.print_bill, name='print_bill'),
     path('reports/', views.cashier_reports, name='cashier_reports'),
+    path('order-loyalty/<int:order_id>/', views_loyalty.order_loyalty_web, name='order_loyalty'),
+    path('loyalty/', views_loyalty.loyalty_settings, name='loyalty_settings'),
 ]

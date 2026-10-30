@@ -18,6 +18,7 @@ import ProfileScreen             from '../screens/customer/ProfileScreen';
 import DeliveryTrackingScreen    from '../screens/customer/DeliveryTrackingScreen';
 import BookTableScreen           from '../screens/customer/BookTableScreen';
 import MyReservationsScreen      from '../screens/customer/MyReservationsScreen';
+import MyPointsScreen            from '../screens/customer/MyPointsScreen';
 import CustomerHeader            from '../components/CustomerHeader';
 
 const Tab            = createBottomTabNavigator();
@@ -78,6 +79,7 @@ function MyOrdersStackNavigator() {
       <MyOrdersStack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} options={{ title: 'Track Delivery' }} />
       <MyOrdersStack.Screen name="Receipt"         component={ReceiptScreen} />
       <MyOrdersStack.Screen name="MyReservations"  component={MyReservationsScreen} />
+      <MyOrdersStack.Screen name="MyPoints"        component={MyPointsScreen} />
     </MyOrdersStack.Navigator>
   );
 }

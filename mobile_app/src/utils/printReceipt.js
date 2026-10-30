@@ -72,7 +72,7 @@ export function buildReceiptHtml({
   // Receipt: payment details
   let paymentSection = '';
   if (payment) {
-    const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
+    const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher', loyalty: 'Loyalty points' };
     const methodLabel = METHOD_LABELS[payment.payment_method] || payment.payment_method || '';
     const amtPaid = parseFloat(payment.amount || 0);
     const change  = amtPaid > total ? amtPaid - total : 0;

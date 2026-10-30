@@ -11,6 +11,7 @@ class Payment(models.Model):
         ('card', 'Card'),
         ('digital', 'Digital Payment'),
         ('voucher', 'Voucher'),
+        ('loyalty', 'Loyalty points'),
     ]
     
     order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='payments')  # PROTECT: never lose payment history
@@ -68,3 +69,5 @@ class VoidTransaction(models.Model):
     
     def __str__(self):
         return f"Void ${self.refund_amount} for Payment {self.original_payment.id}"
+
+from .models_loyalty import LoyaltyOrderCustomer, LoyaltyProgram, LoyaltyTransaction  # noqa: E402,F401

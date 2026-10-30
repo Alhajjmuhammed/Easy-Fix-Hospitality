@@ -9,6 +9,21 @@ from .models import Order, OrderItem
 def _remember_status(sender, instance, **kwargs):
     # __dict__ lookup: never triggers a query when 'status' was deferred (.only()/.defer()).
     instance._loaded_status = instance.__dict__.get('status')
+    instance._loaded_payment_status = instance.__dict__.get('payment_status')
+
+
+@receiver(post_save, sender=Order)
+def _payment_status_changed(sender, instance, created, update_fields=None, **kwargs):
+    """Loyalty points follow whether the order is fully paid (earned, or taken back after a void)."""
+    if update_fields is not None and 'payment_status' not in update_fields:
+        return
+    old = None if created else getattr(instance, '_loaded_payment_status', None)
+    instance._loaded_payment_status = instance.payment_status
+    if old == instance.payment_status or (not created and old is None):
+        return
+    if instance.payment_status == 'paid' or old == 'paid':
+        from cashier.loyalty import sync_order_points  # never raises
+        sync_order_points(instance)
 
 
 @receiver(post_save, sender=Order)

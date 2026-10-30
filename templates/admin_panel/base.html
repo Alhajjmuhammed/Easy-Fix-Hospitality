@@ -674,6 +674,18 @@
                         <span>Reservations</span>
                     </a>
                     {% endif %}{% endif %}
+                    {% if user.is_any_owner %}
+                    <a class="nav-link {% if request.resolver_match.namespace == 'cashier' and request.resolver_match.url_name == 'loyalty_settings' %}active{% endif %}" href="{% url 'cashier:loyalty_settings' %}" data-tooltip="Loyalty Points">
+                        <i class="fas fa-gift text-danger"></i>
+                        <span>Loyalty Points</span>
+                    </a>
+                    {% endif %}
+                    {% if 'view_feedback' in feats %}{% if not user.is_administrator %}
+                    <a class="nav-link {% if request.resolver_match.namespace == 'orders' and 'feedback' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'orders:feedback' %}" data-tooltip="Customer Feedback">
+                        <i class="fas fa-star-half-alt text-warning"></i>
+                        <span>Customer Feedback</span>
+                    </a>
+                    {% endif %}{% endif %}
                 </div>
 
                 <!-- Branch Network Section (only for main owners with PRO plan) -->

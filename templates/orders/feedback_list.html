@@ -1,0 +1,88 @@
+{% extends base_template %}
+
+{% block title %}Customer Feedback{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h1 class="h3 mb-0"><i class="bi bi-star-half me-2" style="color:#f5a623"></i>Customer Feedback</h1>
+        <div class="btn-group btn-group-sm">
+            <a class="btn btn-outline-secondary {% if not show %}active{% endif %}" href="?">All</a>
+            <a class="btn btn-outline-secondary {% if show == 'low' %}active{% endif %}" href="?show=low">Low (1–2★)</a>
+            <a class="btn btn-outline-secondary {% if show == 'unreplied' %}active{% endif %}" href="?show=unreplied">Not replied</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body">
+            <div class="small text-uppercase text-muted fw-semibold">Food · last 30 days</div>
+            <div class="h4 mb-0 fw-bold">{% if last30.avg is not None %}{{ last30.avg }} ★{% else %}—{% endif %}</div>
+            <div class="small text-muted">{{ last30.count }} rating{{ last30.count|pluralize }}</div>
+        </div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body">
+            <div class="small text-uppercase text-muted fw-semibold">Delivery · last 30 days</div>
+            <div class="h4 mb-0 fw-bold">{% if last30.delivery_avg is not None %}{{ last30.delivery_avg }} ★{% else %}—{% endif %}</div>
+            <div class="small text-muted">delivery orders only</div>
+        </div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body">
+            <div class="small text-uppercase text-muted fw-semibold">Low ratings · 30 days</div>
+            <div class="h4 mb-0 fw-bold {% if last30.low %}text-danger{% endif %}">{{ last30.low }}</div>
+            <div class="small text-muted">1 or 2 stars</div>
+        </div></div></div>
+        <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm"><div class="card-body">
+            <div class="small text-uppercase text-muted fw-semibold">All time</div>
+            <div class="h4 mb-0 fw-bold">{% if all_time.avg is not None %}{{ all_time.avg }} ★{% else %}—{% endif %}</div>
+            <div class="small text-muted">{{ all_time.count }} rating{{ all_time.count|pluralize }} · {{ all_time.unreplied }} not replied</div>
+        </div></div></div>
+    </div>
+
+    {% for r in page %}
+    <div class="card border-0 shadow-sm mb-2 {% if r.is_low %}border-start border-4 border-danger{% endif %}">
+        <div class="card-body">
+            <div class="d-flex justify-content-between flex-wrap gap-2">
+                <div>
+                    <span style="color:#f5a623" title="Food">{% for i in "12345" %}<i class="bi bi-star{% if forloop.counter <= r.food_stars %}-fill{% endif %}"></i>{% endfor %}</span>
+                    <span class="small text-muted ms-1">food</span>
+                    {% if r.delivery_stars %}
+                    <span class="ms-3" style="color:#f5a623" title="Delivery">{% for i in "12345" %}<i class="bi bi-star{% if forloop.counter <= r.delivery_stars %}-fill{% endif %}"></i>{% endfor %}</span>
+                    <span class="small text-muted ms-1">delivery</span>
+                    {% endif %}
+                </div>
+                <div class="small text-muted">
+                    {{ r.customer.get_full_name|default:r.customer.username }} ·
+                    <a href="{% url 'orders:order_detail' r.order_id %}">#{{ r.order.order_number }}</a> ({{ r.order.get_order_type_display }}) ·
+                    {{ r.created_at|date:"j M Y, H:i" }}
+                </div>
+            </div>
+            {% if r.comment %}<p class="mb-2 mt-2">“{{ r.comment }}”</p>{% endif %}
+            {% if r.reply %}
+            <div class="p-2 rounded small" style="background:#f1f8ff">
+                <strong>Reply</strong>{% if r.replied_by %} by {{ r.replied_by.get_full_name|default:r.replied_by.username }}{% endif %} · {{ r.replied_at|date:"j M, H:i" }}<br>{{ r.reply|linebreaksbr }}
+            </div>
+            {% elif can_reply %}
+            <form method="post" action="{% url 'orders:feedback_reply' r.id %}" class="d-flex gap-2 mt-2"
+                  onsubmit="var b=this.querySelector('button'); setTimeout(function(){ b.disabled = true; }, 0);">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <input name="reply" class="form-control form-control-sm" maxlength="1000" placeholder="Reply to the customer (they get a notification)" required aria-label="Reply">
+                <button class="btn btn-sm btn-primary text-nowrap">Send reply</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5">
+        <i class="bi bi-star display-5 d-block mb-2" style="opacity:.3"></i>
+        No ratings {% if show %}match this filter{% else %}yet. Customers can rate orders after they are served or delivered{% endif %}.
+    </div>
+    {% endfor %}
+
+    {% if page.has_other_pages %}
+    <nav class="mt-3"><ul class="pagination pagination-sm">
+        {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?show={{ show }}&page={{ page.previous_page_number }}">Previous</a></li>{% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ page.number }} of {{ page.paginator.num_pages }}</span></li>
+        {% if page.has_next %}<li class="page-item"><a class="page-link" href="?show={{ show }}&page={{ page.next_page_number }}">Next</a></li>{% endif %}
+    </ul></nav>
+    {% endif %}
+</div>
+{% endblock %}

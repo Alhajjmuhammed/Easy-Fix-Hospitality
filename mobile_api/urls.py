@@ -1,6 +1,7 @@
 from django.urls import path
-from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants, delivery, reservations
+from .views import auth, menu, tables, orders, payments, bill_requests, sync, reports, waste, restaurants, delivery, reservations, feedback
 from attendance import views_mobile as attendance
+from cashier import views_loyalty as loyalty
 
 app_name = 'mobile_api'
 
@@ -75,6 +76,9 @@ urlpatterns = [
     path('reservations/<int:pk>/status/',       reservations.reservation_status, name='reservation_status'),
     path('reservations/<int:pk>/table/',        reservations.reservation_table,  name='reservation_table'),
     path('reservations/<int:pk>/cancel/',       reservations.reservation_cancel, name='reservation_cancel'),
+    path('orders/<int:order_id>/rating/',       feedback.order_rating,           name='order_rating'),
+    path('orders/<int:order_id>/loyalty/',      loyalty.order_loyalty_api,       name='order_loyalty'),
+    path('loyalty/me/',                         loyalty.my_points_api,           name='my_loyalty_points'),
 
     # ── Attendance ────────────────────────────────────────────────────────
     path('attendance/scan/',    attendance.attendance_scan,    name='attendance_scan'),

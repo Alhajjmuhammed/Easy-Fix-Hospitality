@@ -162,6 +162,17 @@ def _process_payment(request):
                 status=400,
             )
 
+        loyalty_redeem = None
+        if data['payment_method'] == 'loyalty':
+            if offline_id:
+                return Response({'error': 'Loyalty points can only be used online.'}, status=400)
+            from cashier import loyalty as loyalty_svc
+            from django.core.exceptions import ValidationError as _VE
+            try:
+                loyalty_redeem = loyalty_svc.prepare_redeem(order, amount, data.get('loyalty_code'))
+            except _VE as e:
+                return Response({'error': ' '.join(e.messages)}, status=400)
+
         payment = Payment.objects.create(
             order=order,
             amount=amount,
@@ -171,6 +182,9 @@ def _process_payment(request):
             notes=notes,
             is_voided=False,
         )
+        if loyalty_redeem:
+            program, customer, points = loyalty_redeem
+            loyalty_svc.record_redeem(program, customer, payment, points, request.user)
 
         # Update order payment status
         new_total = total_paid + amount

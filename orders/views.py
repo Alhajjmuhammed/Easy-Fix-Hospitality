@@ -1143,7 +1143,11 @@ def order_detail(request, order_id):
         'pending_bill_request': pending_bill_request,
         'base_template': base_template,
     }
-    
+    from .feedback import can_rate
+    from .models_feedback import OrderRating
+    context['rating'] = OrderRating.objects.filter(order=order).first()
+    context['can_rate'] = context['rating'] is None and can_rate(order, request.user)
+
     return render(request, 'orders/order_detail.html', context)
 
 @login_required

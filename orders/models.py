@@ -86,6 +86,8 @@ class Order(models.Model):
         # Keep the status-change push signal's baseline in step with the database.
         if fields is None or 'status' in fields:
             self._loaded_status = self.__dict__.get('status')
+        if fields is None or 'payment_status' in fields:
+            self._loaded_payment_status = self.__dict__.get('payment_status')
 
     @property
     def display_instructions(self):
@@ -348,3 +350,6 @@ class DeliveryAssignment(models.Model):
 
     class Meta:
         ordering = ['-assigned_at']
+
+
+from .models_feedback import OrderRating  # noqa: E402,F401  (customer ratings)

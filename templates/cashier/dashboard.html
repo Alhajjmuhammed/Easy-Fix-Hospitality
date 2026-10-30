@@ -654,9 +654,11 @@ function processPayment(orderId) {
                         </div>
                     </div>
                     
+                    <div id="loyaltyPanel" class="mb-3"></div>
+
                     <div class="mb-3">
                         <label class="form-label">
-                            <input type="checkbox" id="splitBill" onchange="toggleSplitBill()"> 
+                            <input type="checkbox" id="splitBill" onchange="toggleSplitBill()">
                             Split Bill - Select Individual Items
                         </label>
                     </div>
@@ -700,13 +702,118 @@ function processPayment(orderId) {
                     </div>
                 </form>
             `;
-            
+
             modal.show();
+            loadLoyalty(orderId, parseFloat(data.balance_due));
         })
         .catch(error => {
             console.error('Error:', error);
             alert('Error loading payment form');
         });
+}
+
+// ── Loyalty points: show the customer's points, link a walk-in customer, pay with points ──
+function loadLoyalty(orderId, balanceDue, info) {
+    const panel = document.getElementById('loyaltyPanel');
+    if (!panel) return;
+    const render = (d) => {
+        panel.innerHTML = '';
+        if (!d || !d.enabled) return;
+        const box = document.createElement('div');
+        box.className = 'border rounded p-2 small';
+        const title = document.createElement('div');
+        title.className = 'fw-semibold mb-1';
+        title.innerHTML = '<i class="fas fa-gift me-1"></i>Loyalty points';
+        box.appendChild(title);
+        const method = document.getElementById('paymentMethod');
+        let opt = method.querySelector('option[value="loyalty"]');
+        if (d.customer) {
+            const c = d.customer;
+            const line = document.createElement('div');
+            line.textContent = `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}: ${c.points} points, worth ${CURRENCY_SYMBOL}${c.worth}`;
+            box.appendChild(line);
+            const value = parseFloat(d.point_value);
+            const usable = Math.min(balanceDue, parseFloat(c.worth));
+            const needed = Math.ceil(usable / value - 1e-9);
+            if (c.points >= d.min_redeem_points && needed >= d.min_redeem_points && usable > 0) {
+                if (!opt) {
+                    opt = document.createElement('option');
+                    opt.value = 'loyalty';
+                    opt.textContent = 'Loyalty points';
+                    method.appendChild(opt);
+                }
+                const row = document.createElement('div');
+                row.className = 'd-flex gap-1 mt-1 align-items-center flex-wrap';
+                const code = document.createElement('input');
+                code.id = 'loyaltyCode';
+                code.className = 'form-control form-control-sm';
+                code.style.width = '140px';
+                code.inputMode = 'numeric';
+                code.maxLength = 6;
+                code.placeholder = "Customer's code";
+                code.setAttribute('aria-label', "Customer's points code");
+                const use = document.createElement('button');
+                use.type = 'button';
+                use.className = 'btn btn-sm btn-outline-success';
+                use.textContent = `Pay ${CURRENCY_SYMBOL}${usable.toFixed(2)} with ${needed} points`;
+                use.onclick = () => {
+                    method.value = 'loyalty';
+                    document.getElementById('paymentAmount').value = usable.toFixed(2);
+                    const split = document.getElementById('splitBill');
+                    if (split && split.checked) { split.checked = false; toggleSplitBill(); }
+                    code.focus();
+                };
+                row.appendChild(code);
+                row.appendChild(use);
+                box.appendChild(row);
+                const hint = document.createElement('div');
+                hint.className = 'text-muted';
+                hint.textContent = "The customer finds the code in their app or on the web under 'My Points'.";
+                box.appendChild(hint);
+            } else {
+                const hint = document.createElement('div');
+                hint.className = 'text-muted';
+                hint.textContent = `Points can be used from ${d.min_redeem_points} points. This order will earn points when fully paid.`;
+                box.appendChild(hint);
+            }
+        } else {
+            const hint = document.createElement('div');
+            hint.className = 'text-muted mb-1';
+            hint.textContent = 'Registered customer? Enter their phone number so they earn points.';
+            box.appendChild(hint);
+            const row = document.createElement('div');
+            row.className = 'd-flex gap-1';
+            const phone = document.createElement('input');
+            phone.type = 'tel';
+            phone.className = 'form-control form-control-sm';
+            phone.placeholder = 'Customer phone';
+            phone.setAttribute('aria-label', 'Customer phone');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-primary';
+            btn.textContent = 'Link';
+            btn.onclick = () => {
+                btn.disabled = true;
+                fetch(`/cashier/order-loyalty/${orderId}/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                    body: JSON.stringify({ phone: phone.value }),
+                })
+                .then(r => r.json())
+                .then(res => { if (res.error) { alert(res.error); btn.disabled = false; } else { render(res); } })
+                .catch(() => { alert('Connection error.'); btn.disabled = false; });
+            };
+            row.appendChild(phone);
+            row.appendChild(btn);
+            box.appendChild(row);
+        }
+        panel.appendChild(box);
+    };
+    if (info) { render(info); return; }
+    fetch(`/cashier/order-loyalty/${orderId}/`)
+        .then(r => r.ok ? r.json() : null)
+        .then(render)
+        .catch(() => { /* loyalty is optional: payment still works */ });
 }
 
 function toggleSplitBill() {
@@ -772,7 +879,8 @@ function submitPayment() {
             payment_method: paymentMethod,
             reference_number: referenceNumber,
             notes: notes,
-            selected_items: selectedItems
+            selected_items: selectedItems,
+            loyalty_code: (document.getElementById('loyaltyCode') || {}).value || ''
         })
     })
     .then(handleCashierResponse)
@@ -837,7 +945,7 @@ function viewPaymentHistory(orderId) {
                                     <td>
                                         ${!payment.is_voided ?
                                             `<div class="btn-group btn-group-sm">
-                                                ${CAN_VOID ? `<button class="btn btn-danger" onclick="voidPayment(${payment.id})">Void</button>` : ''}
+                                                ${CAN_VOID ? `<button class="btn btn-danger" onclick="voidPayment(${payment.id}, ${payment.payment_method === 'loyalty'})">Void</button>` : ''}
                                                 ${CAN_PRINT_RECEIPT ? `<button class="btn btn-info" onclick="generateReceipt(${payment.id})">Receipt</button>` : ''}
                                             </div>` :
                                             `${CAN_PRINT_RECEIPT ? `<button class="btn btn-sm btn-secondary" onclick="generateReceipt(${payment.id})">View Receipt</button>` : ''}`
@@ -859,11 +967,12 @@ function viewPaymentHistory(orderId) {
         });
 }
 
-function voidPayment(paymentId) {
+function voidPayment(paymentId, isLoyalty) {
     const reason = prompt('Enter reason for voiding this payment:');
     if (!reason) return;
-    
-    const refundMethod = prompt('Refund method (cash/card/digital/voucher):', 'cash');
+
+    // Points payments: the points go back to the customer automatically — no money is refunded
+    const refundMethod = isLoyalty ? 'loyalty' : prompt('Refund method (cash/card/digital/voucher):', 'cash');
     if (!refundMethod) return;
     
     fetch(`/cashier/void-payment/${paymentId}/`, {

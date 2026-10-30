@@ -26,6 +26,7 @@ DEFAULT_ROLE_FEATURES = {
         'view_staff', 'manage_staff',
         # Reports
         'view_reports', 'export_reports',
+        'view_feedback', 'reply_feedback',
         # Operations
         'view_waste', 'log_waste', 'manage_waste',
         'view_inventory', 'add_inventory', 'manage_inventory',
@@ -37,6 +38,7 @@ DEFAULT_ROLE_FEATURES = {
         'request_bill', 'process_payments', 'view_receipts',
         'view_waste', 'log_waste', 'view_reports', 'view_attendance',
         'view_reservations', 'manage_reservations',
+        'view_feedback', 'reply_feedback',
     ],
     'kitchen': ['kitchen_dashboard'],
     'bar': ['bar_dashboard'],
@@ -96,6 +98,8 @@ ALL_FEATURES = [
     # Reports
     ('view_reports',      'View Reports',             'Access sales, cashier and performance reports', 'reports'),
     ('export_reports',    'Export Reports',           'Export reports as CSV or PDF files', 'reports'),
+    ('view_feedback',     'View Customer Feedback',   'See customer ratings and comments, and get alerts for low ratings', 'reports'),
+    ('reply_feedback',    'Reply to Feedback',        'Reply to customer ratings (includes view)', 'reports'),
     # Operations
     ('view_waste',        'View Waste Records',       'View food waste reports and incident history', 'operations'),
     ('log_waste',         'Log Waste',                'Record new food waste incidents', 'operations'),

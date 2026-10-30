@@ -583,7 +583,8 @@ class PaymentSerializer(serializers.ModelSerializer):
 class ProcessPaymentSerializer(serializers.Serializer):
     order_id = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)
-    payment_method = serializers.ChoiceField(choices=['cash', 'card', 'digital', 'voucher'])
+    payment_method = serializers.ChoiceField(choices=['cash', 'card', 'digital', 'voucher', 'loyalty'])
+    loyalty_code = serializers.CharField(allow_blank=True, required=False, default='', max_length=12)
     reference_number = serializers.CharField(allow_blank=True, required=False, default='', max_length=100)
     notes = serializers.CharField(allow_blank=True, required=False, default='', max_length=500)
     offline_id = serializers.CharField(allow_blank=True, required=False, default='', max_length=64)

@@ -214,6 +214,14 @@ export default function MyOrdersScreen() {
         >
           My Reservations
         </Chip>
+        <Chip
+          icon="gift-outline"
+          onPress={() => navigation.navigate('MyPoints')}
+          style={styles.filterChip}
+          textStyle={styles.filterChipText}
+        >
+          My Points
+        </Chip>
       </ScrollView>
 
       <FlatList

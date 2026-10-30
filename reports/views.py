@@ -971,10 +971,11 @@ def export_csv(request):
     _csv_method_map = {r['payment_method']: r for r in _csv_method_qs}
     writer.writerow(['PAYMENT METHOD BREAKDOWN'])
     writer.writerow(['Method', 'Transactions', 'Total Amount'])
-    for _method in ['cash', 'card', 'digital', 'voucher']:
+    for _method in ['cash', 'card', 'digital', 'voucher', 'loyalty']:
         _row = _csv_method_map.get(_method, {})
         if _row:
-            writer.writerow([_method.title(), f"{_row['count']:,}", f"{currency_symbol}{_row['total']:,.2f}"])
+            writer.writerow(['Loyalty points' if _method == 'loyalty' else _method.title(),
+                             f"{_row['count']:,}", f"{currency_symbol}{_row['total']:,.2f}"])
     writer.writerow([])  # Empty row
     
     # Branch Performance Analysis (only when viewing all restaurants for PRO plan)

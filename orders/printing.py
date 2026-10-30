@@ -2628,6 +2628,7 @@ def _generate_receipt_content(payment):
         'card':    'Card',
         'digital': 'Digital / Mobile',
         'voucher': 'Voucher',
+        'loyalty': 'Loyalty points',
     }
     all_payments = list(order.payments.filter(is_voided=False).order_by('id'))
     if len(all_payments) == 1:

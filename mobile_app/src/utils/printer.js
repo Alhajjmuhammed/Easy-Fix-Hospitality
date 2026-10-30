@@ -1,4 +1,4 @@
-﻿/**
+/**
  * printer.js — Universal Print Engine
  * =====================================
  * Supports ALL printing scenarios with automatic smart fallback.
@@ -270,7 +270,7 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol, 
   // Receipt: payment section
   if (!isBill && payment) {
     await BluetoothEscposPrinter.printText(dash + '\n\r', {});
-    const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
+    const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher', loyalty: 'Loyalty points' };
     const methodLabel = METHOD_LABELS[payment.payment_method] || payment.payment_method || '';
     const amtPaid = parseFloat(payment.amount || 0);
     const change  = amtPaid > total ? amtPaid - total : 0;

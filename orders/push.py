@@ -11,6 +11,7 @@ import threading
 import urllib.request
 
 from django.db import transaction
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,29 @@ def notify_reservation_status(res):
     send_push([customer.expo_push_token], title,
               body.format(party=f'{res.party_size} people', when=_reservation_when(res)),
               {'kind': 'reservation', 'reservationId': res.id, 'status': res.status})
+
+
+def notify_low_rating(rating):
+    """Owner + front-of-house staff of that restaurant allowed to see feedback (never other owners)."""
+    from accounts.models import User
+    from .feedback import FEEDBACK_ROLES
+    owner = rating.restaurant_owner
+    people = (User.objects.filter(Q(pk=owner.pk) | Q(owner=owner, role__name__in=FEEDBACK_ROLES),
+                                  is_active=True, expo_push_token__isnull=False)
+              .exclude(expo_push_token='').select_related('role', 'custom_role'))
+    tokens = [u.expo_push_token for u in people if u.has_feature('view_feedback')]
+    stars = f'{rating.food_stars}★ food' + (f', {rating.delivery_stars}★ delivery' if rating.delivery_stars else '')
+    send_push(tokens, f'Low rating on order #{rating.order.order_number}',
+              f'{stars}' + (f' — "{rating.comment[:80]}"' if rating.comment else ''),
+              {'kind': 'low_rating', 'orderId': rating.order_id})
+
+
+def notify_rating_reply(rating):
+    customer = rating.customer
+    if not customer.expo_push_token:
+        return
+    send_push([customer.expo_push_token], 'The restaurant replied 💬', rating.reply[:120],
+              {'kind': 'rating_reply', 'orderId': rating.order_id})
 
 
 def notify_roster(staff_ids, title, body, week_start):

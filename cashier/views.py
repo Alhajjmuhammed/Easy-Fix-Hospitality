@@ -316,16 +316,34 @@ def process_payment(request, order_id):
             return JsonResponse({
                 'error': f'Payment amount ({cur}{amount}) exceeds remaining balance ({cur}{remaining_balance})'
             }, status=400)
-        
-        # Create payment record
-        payment = Payment.objects.create(
-            order=order,
-            amount=amount,
-            payment_method=payment_method,
-            processed_by=request.user,
-            reference_number=reference_number,
-            notes=notes
-        )
+
+        # 'mobile' is still sent by the Customer Care payments page and stored as before
+        if payment_method not in dict(Payment.PAYMENT_METHOD_CHOICES) and payment_method != 'mobile':
+            return JsonResponse({'error': 'Invalid payment method'}, status=400)
+        loyalty_redeem = None
+        if payment_method == 'loyalty':
+            from . import loyalty as loyalty_svc
+            from django.core.exceptions import ValidationError as _VE
+            if selected_items:
+                return JsonResponse({'error': 'Loyalty points pay an amount, not selected items.'}, status=400)
+            try:
+                loyalty_redeem = loyalty_svc.prepare_redeem(order, amount, data.get('loyalty_code'))
+            except _VE as e:
+                return JsonResponse({'error': ' '.join(e.messages)}, status=400)
+
+        # Create payment record (and take the points in the same step: both happen or neither)
+        with transaction.atomic():
+            payment = Payment.objects.create(
+                order=order,
+                amount=amount,
+                payment_method=payment_method,
+                processed_by=request.user,
+                reference_number=reference_number,
+                notes=notes
+            )
+            if loyalty_redeem:
+                program, customer, points = loyalty_redeem
+                loyalty_svc.record_redeem(program, customer, payment, points, request.user)
         
         # If specific items selected, create item payment records
         if selected_items:
@@ -438,6 +456,9 @@ def process_payment(request, order_id):
         
     except Exception as e:
         logger.error(f'Error processing payment for order {order_id}: {str(e)}', exc_info=True)
+        # The client is told it failed, so nothing from this attempt may be kept (a retry
+        # would otherwise record the payment, or spend loyalty points, twice).
+        transaction.set_rollback(True)
         return JsonResponse({'error': 'Error processing payment. Please try again.'}, status=400)
 
 
@@ -470,6 +491,10 @@ def void_payment(request, payment_id):
         data = json.loads(request.body)
         void_reason = data.get('reason', '')
         refund_method = data.get('refund_method', payment.payment_method)
+        if payment.payment_method == 'loyalty':
+            refund_method = 'loyalty'   # the points go back to the customer; never hand out money for them
+        elif refund_method not in dict(Payment.PAYMENT_METHOD_CHOICES) and refund_method != 'mobile':
+            refund_method = payment.payment_method
         
         # Create void transaction record
         void_transaction = VoidTransaction.objects.create(
@@ -529,7 +554,9 @@ def void_payment(request, payment_id):
         
         return JsonResponse({
             'success': True,
-            'message': f'Payment voided successfully. Refund: ${payment.amount}',
+            'message': ('Payment voided. The loyalty points were returned to the customer (no money to refund).'
+                        if payment.payment_method == 'loyalty'
+                        else f'Payment voided successfully. Refund: ${payment.amount}'),
             'void_id': void_transaction.id
         })
         
