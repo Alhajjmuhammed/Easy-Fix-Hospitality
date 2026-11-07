@@ -548,3 +548,70 @@ class MobileMoneyTests(TestCase):
         self.fake.calls.clear()
         svc.sweep(seconds=0)
         self.assertFalse([c for c in self.fake.calls if c[1].endswith('/query')])
+
+    # ---------- second review of the fixes ----------
+    def _stk_answer(self, status, answer_body):
+        def answer(method, url, headers=None, body=None, form=None, timeout=None):
+            if url.endswith('processrequest'):
+                self.fake.calls.append((method, url, headers or {}, body))
+                return status, answer_body
+            return self.fake(method, url, headers, body, form)
+        return mock.patch('cashier.mobile_money._http', side_effect=answer)
+
+    def test_definite_refusal_sent_as_http_500_is_a_failure_not_uncertain(self):
+        o = self._order()
+        with self._stk_answer(500, {'errorCode': '500.001.1001', 'errorMessage': 'Unable to lock subscriber'}):
+            r = self._start(o)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('Unable to lock subscriber', r.json()['error'])
+        self.assertEqual(MobileMoneyCharge.objects.get().status, 'failed')
+        with self._stk_answer(401, {}):                                # e.g. an HTML 401 page
+            self.assertEqual(self._start(o).status_code, 400)
+        with self._stk_answer(503, {}):                                # gateway down: may still have gone out
+            self.assertIn('warning', self._start(o).json())
+        self.assertEqual(MobileMoneyCharge.objects.order_by('-id').first().status, 'unknown')
+
+    def test_slow_provider_pauses_screen_polls_but_not_callbacks(self):
+        o = self._order()
+        cid = self._start(o).json()['id']
+        with self._timeout_on('/query'):
+            self._poll(cid)
+        self.fake.calls.clear()
+        self._poll(cid)                                                # paused: nobody waits on Safaricom
+        self.assertFalse([c for c in self.fake.calls if c[1].endswith('/query')])
+        self.fake.stk_result = '0'
+        self._daraja_callback()                                        # a callback still checks at once
+        self.assertEqual(Order.objects.get(pk=o.pk).payment_status, 'paid')
+
+    def test_unknown_request_stops_blocking_screens_after_the_server_window(self):
+        o = self._order()
+        with self._timeout_on('processrequest'):
+            cid = self._start(o).json()['id']
+        self.assertTrue(self._poll(cid)['still_open'])
+        MobileMoneyCharge.objects.filter(pk=cid).update(created_at=timezone.now() - datetime.timedelta(minutes=11))
+        self.assertFalse(self._poll(cid)['still_open'])
+        self.assertEqual(self._start(o).status_code, 200)              # a new request is accepted again
+        svc.sweep()                                                    # nothing to ask about the id-less one
+        self.assertIsNone(MobileMoneyCharge.objects.get(pk=cid).last_checked_at)
+
+    def test_mpesa_cents_left_over_do_not_keep_the_order_open(self):
+        o = self._order(total='1250.50')
+        self._start(o, user=self.cust, phone='0712345678')
+        self.fake.stk_result = '0'
+        self._daraja_callback()
+        self.assertEqual((Payment.objects.get().amount, Order.objects.get(pk=o.pk).payment_status),
+                         (Decimal('1250.00'), 'paid'))
+        self.client.force_login(self.cust)
+        self.assertFalse(self.client.get(f'/orders/order/{o.id}/mobile-money/').json()['enabled'])
+
+    def test_cannot_change_keys_or_environment_while_a_request_is_open(self):
+        self._start(self._order())
+        self.client.force_login(self.main)
+        base = {'provider': 'mpesa_daraja', 'consumer_key': 'ck', 'consumer_secret': '', 'shortcode': '174379',
+                'passkey': '', 'till_number': '', 'enabled': 'on'}
+        self.client.post('/cashier/mobile-money/settings/', dict(base, environment='live'))
+        self.client.post('/cashier/mobile-money/settings/', dict(base, shortcode='600000'))
+        acc = MobileMoneyAccount.objects.get(owner=self.main)
+        self.assertEqual((acc.environment, acc.credentials['shortcode']), ('sandbox', '174379'))
+        self.client.post('/cashier/mobile-money/settings/', dict(base, allow_customer_payments='on'))
+        self.assertTrue(MobileMoneyAccount.objects.get(owner=self.main).allow_customer_payments)  # other edits fine

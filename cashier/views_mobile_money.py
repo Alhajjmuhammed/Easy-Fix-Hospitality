@@ -57,12 +57,18 @@ def mobile_money_settings(request):
             return redirect('cashier:mobile_money_settings')
         if account is None:
             account = MobileMoneyAccount(owner=user, provider=provider)
-        if account.pk and account.provider != provider and MobileMoneyCharge.objects.filter(
+        new_env = 'live' if request.POST.get('environment') == 'live' else 'sandbox'
+        old_creds = account.credentials if account.pk else {}
+        changes_connection = account.provider != provider or account.environment != new_env or any(
+            (request.POST.get(key) or '').strip() not in ('', old_creds.get(key, ''))
+            for key, _ in CREDENTIAL_FIELDS[provider] if key != 'till_number')
+        if account.pk and changes_connection and MobileMoneyCharge.objects.filter(
                 account=account, status__in=MobileMoneyCharge.LATE_SUCCESS_OK,
                 created_at__gte=timezone.now() - svc.GIVE_UP_AFTER).exists():
-            # Their answers are checked with the current keys: switching now could lose a payment
-            messages.error(request, 'Some payment requests are still open. Switch provider after they are '
-                                    'finished (at most 24 hours).')
+            # Their answers are checked with the current provider, keys and environment:
+            # changing them now could lose a payment that is still on its way
+            messages.error(request, 'Some payment requests are still open. Change the provider, keys or '
+                                    'sandbox/live after they are finished (at most 24 hours).')
             return redirect('cashier:mobile_money_settings')
         if account.provider != provider:
             account.credentials = {}          # switching provider: old keys don't apply
@@ -73,7 +79,7 @@ def mobile_money_settings(request):
             if value or key not in SECRET_FIELDS:   # empty secret field = keep the saved one
                 creds[key] = value
         account.credentials = creds
-        account.environment = 'live' if request.POST.get('environment') == 'live' else 'sandbox'
+        account.environment = new_env
         account.enabled = request.POST.get('enabled') == 'on'
         account.allow_customer_payments = request.POST.get('allow_customer_payments') == 'on'
         missing = [label for key, label in CREDENTIAL_FIELDS[provider]
@@ -183,13 +189,14 @@ def availability(order, user=None):
     # Opening the pay screen also settles any request whose answer we may have missed
     for open_charge in MobileMoneyCharge.objects.filter(order=order, status='pending').select_related('account'):
         svc.refresh_charge(open_charge)
-    window = timezone.now() - max(svc.PENDING_LIMIT.get(account.provider, timedelta(minutes=5)),
-                                  timedelta(minutes=10))
+    window = timezone.now() - svc.request_window(account.provider)
     still_open = MobileMoneyCharge.objects.filter(order=order, status__in=('pending', 'unknown'),
                                                   created_at__gte=window).first()
     is_customer = user is not None and user.is_customer()
+    # Nothing left that a customer can pay this way (e.g. only cents left for M-Pesa): no button
+    payable = not is_customer or still_open is not None or _customer_amount(order) > 0
     return {
-        'enabled': currency in svc.PROVIDER_CURRENCIES[account.provider],
+        'enabled': currency in svc.PROVIDER_CURRENCIES[account.provider] and payable,
         'provider': account.get_provider_display(),
         'currency': currency,
         'networks': list(svc.FLW_NETWORKS.get(currency, ())) if account.provider == 'flutterwave' else [],

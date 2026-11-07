@@ -53,10 +53,13 @@ export default function MobileMoneyBox({ orderId, amount, onPaid, onMessage }) {
         if (!alive.current) return;
         setCharge((prev) => ({ ...prev, ...c }));
         // 'unknown' = no answer from M-Pesa yet; its callback can still settle it, so keep watching
-        if (c.status === 'pending' || c.status === 'unknown') { poll(id, startedAt); return; }
+        // until the server would accept a new request (still_open false)
+        if (c.status === 'pending' || (c.status === 'unknown' && c.still_open !== false)) { poll(id, startedAt); return; }
         setFollowing(false);
-        if (c.status === 'successful' && c.needs_refund) onMessage?.(t('Paid, but more than was due: {message}', { message: c.message }));
-        if (c.status === 'successful') onPaid?.(c);
+        if (c.status === 'successful' && c.needs_refund) {
+          // Money arrived but must (partly) be given back: say so, and don't report "payment received"
+          onMessage?.(t('Paid, but more than was due: {message}', { message: c.message }));
+        } else if (c.status === 'successful') onPaid?.(c);
         else onMessage?.(`${c.status_display}${c.message ? `: ${c.message}` : ''}`);
       } catch (err) {
         const code = err?.response?.status;

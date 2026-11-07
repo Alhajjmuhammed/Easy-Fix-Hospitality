@@ -35,6 +35,7 @@ CHECK_TIMEOUT = 5                    # status checks run inside screen polls: ke
 CHECK_EVERY = timedelta(seconds=10)  # ask a provider about one charge at most this often
 SWEEP_SECONDS = 120                  # one background run stops in time for the next (cron every 3 min)
 EXPIRED_RECHECK = timedelta(minutes=15)   # timed-out charges: look again now and then, for 24 h
+SLOW_PROVIDER_PAUSE = 60             # seconds screen polls skip a provider that just timed out
 PENDING_LIMIT = {'mpesa_daraja': timedelta(minutes=5),     # the M-Pesa prompt dies after ~1-2 min
                  'flutterwave': timedelta(minutes=20)}     # approval pages can take longer
 GIVE_UP_AFTER = timedelta(hours=24)  # stop asking the provider about a charge after this
@@ -117,8 +118,16 @@ def _http(method, url, headers=None, body=None, form=None, timeout=TIMEOUT):
 
 
 def _start_answer_unclear(status, data):
-    """A server error or an unreadable answer to a payment request: it may still have gone out."""
-    return status >= 500 or not data
+    """No readable answer to a payment request, or a gateway error without the provider's own error
+    message: it may still have gone out. A 4xx, or any answer carrying the provider's error
+    (Daraja sends many definite refusals as HTTP 500 + errorCode), is a plain "no"."""
+    if 400 <= status < 500:
+        return False
+    if not data:
+        return True
+    has_error = any(data.get(k) for k in ('errorCode', 'errorMessage', 'ResponseCode')) \
+        or (data.get('status') == 'error' and data.get('message'))
+    return status in (502, 503, 504) and not has_error
 
 
 def restaurant_currency(owner):
@@ -414,7 +423,7 @@ def start_charge(order, phone, amount, user, callback_url, network=''):
         if amount <= 0 or amount > due:
             raise ValidationError(f'The amount must be between 0 and the balance due ({due}).')
         # One open request at a time, for as long as an answer can still realistically come
-        window = max(PENDING_LIMIT.get(account.provider, timedelta(minutes=5)), timedelta(minutes=10))
+        window = request_window(account.provider)
         if MobileMoneyCharge.objects.filter(order=locked, status__in=('pending', 'unknown'),
                                             created_at__gte=timezone.now() - window).exists():
             raise ValidationError('A mobile money request for this order is still open. Wait for it to finish '
@@ -474,6 +483,12 @@ def refresh_charge(charge, force=False, callback_receipt=''):
     if not charge.provider_ref and charge.provider == 'mpesa_daraja':
         return charge                            # nothing to ask M-Pesa about yet
     now = timezone.now()
+    slow_key = f'mm-provider-slow:{charge.account_id}:{charge.provider}'
+    if not force and cache.get(slow_key):
+        # The provider just timed out: screen polls stop waiting on it for a minute (web workers
+        # are shared by every restaurant); callbacks and the background job keep checking.
+        charge.refresh_from_db()
+        return charge
     from django.db.models import Q
     claim = MobileMoneyCharge.objects.filter(pk=charge.pk, status=charge.status)
     if not force:
@@ -485,6 +500,8 @@ def refresh_charge(charge, force=False, callback_receipt=''):
         state, receipt, reason = provider_for(charge.account, charge.provider or None).check(charge)
     except Exception as e:  # provider down, bad answer, unreadable keys … → keep waiting
         logger.warning('Mobile money check failed for %s: %s', charge.reference, e)
+        if isinstance(e, ProviderError) and e.uncertain:
+            cache.set(slow_key, 1, SLOW_PROVIDER_PAUSE)
         state, receipt, reason = 'pending', '', ''
     if charge.status == 'pending' and state == 'pending' \
             and now - charge.created_at > PENDING_LIMIT.get(charge.provider, timedelta(minutes=5)):
@@ -531,7 +548,10 @@ def settle_charge(charge_id, state, receipt='', reason='', provider_ref=''):
                     reference_number=ref[:50],
                     notes=f'Mobile money ({charge.account.get_provider_display()}) {charge.phone} ref {charge.reference}')
                 paid = Payment.objects.filter(order=order, is_voided=False).aggregate(t=Sum('amount'))['t'] or 0
-                order.payment_status = 'paid' if paid >= order.total_amount else 'partial'
+                # M-Pesa takes whole shillings only: cents left over can never be paid this way,
+                # so they don't keep the order (and its table) open
+                cents_only = charge.provider == 'mpesa_daraja' and order.total_amount - paid < 1
+                order.payment_status = 'paid' if paid >= order.total_amount or cents_only else 'partial'
                 if order.payment_status == 'paid':
                     order.release_table()
                 order.save(update_fields=['payment_status', 'updated_at'])
@@ -603,6 +623,9 @@ def sweep(limit=200, seconds=SWEEP_SECONDS):
         status__in=('pending', 'unknown', 'expired'), created_at__gte=now - GIVE_UP_AFTER,
     ).filter(
         ~Q(status='expired') | Q(last_checked_at__isnull=True) | Q(last_checked_at__lt=now - EXPIRED_RECHECK)
+    ).exclude(
+        # M-Pesa requests we never got an id for: only their callback can settle them, nothing to ask
+        status='unknown', provider='mpesa_daraja', provider_ref='',
     ).select_related('account').order_by(F('last_checked_at').asc(nulls_first=True), 'created_at')[:limit]
     started, done = time.monotonic(), 0
     for charge in open_charges:
@@ -642,10 +665,18 @@ def _after_paid(charge_id):
         logger.warning('Mobile money audit log failed for charge %s', charge_id, exc_info=True)
 
 
+def request_window(provider):
+    """How long a request blocks a new one for the same order (an answer can still realistically come)."""
+    return max(PENDING_LIMIT.get(provider, timedelta(minutes=5)), timedelta(minutes=10))
+
+
 def charge_to_dict(charge, extra=None):
     data = {
         'id': charge.id,
         'status': charge.status,
+        # Screens keep following while True; after that a new request may be sent
+        'still_open': charge.status == 'pending' or (
+            charge.status == 'unknown' and charge.created_at >= timezone.now() - request_window(charge.provider)),
         'status_display': charge.get_status_display(),
         'amount': str(charge.amount),
         'currency': charge.currency,

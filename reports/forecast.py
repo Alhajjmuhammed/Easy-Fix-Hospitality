@@ -49,8 +49,10 @@ def build(owner, today=None):
              .annotate(revenue=Sum('total_amount'), n=Count('id', distinct=True))}
     # The restaurant's first sale ever (not just within the window): a quiet day 8 weeks ago must not
     # make an old restaurant look new
-    first_sale = orders_for_owner(owner).filter(created_at__lt=_start_of(today)).order_by() \
-        .aggregate(m=Min('created_at'))['m'] if daily else None
+    # (no DISTINCT: a repeated row can't change the minimum, and DISTINCT over all history is slow)
+    from cashier.views_loyalty import _staff_order_q
+    first_sale = Order.objects.filter(_staff_order_q(owner), created_at__lt=_start_of(today)) \
+        .exclude(status__in=NOT_SOLD).order_by().aggregate(m=Min('created_at'))['m'] if daily else None
     first_day = timezone.localtime(first_sale).date() if first_sale else None
     days_of_history = (today - first_day).days if first_day else 0
 

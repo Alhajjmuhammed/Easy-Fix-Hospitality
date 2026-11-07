@@ -88,7 +88,7 @@ function mountMobileMoney(container, opts) {
                         .then(c => {
                             if (stopped) return;
                             if (c.status === 'pending') { timer = setTimeout(poll, 4000); return; }
-                            if (c.status === 'unknown') {
+                            if (c.status === 'unknown' && c.still_open !== false) {
                                 // No answer from M-Pesa yet: its callback can still settle it, so keep watching
                                 show(c.status_display + '.', 'text-warning');
                                 timer = setTimeout(poll, 6000);
