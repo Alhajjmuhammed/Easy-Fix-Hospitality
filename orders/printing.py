@@ -274,17 +274,21 @@ def create_print_job(restaurant, job_type, content, order=None, payment=None, pr
     Create a print job for remote printing
     Used when server is hosted and printer is on restaurant's local computer
     """
+    from django.db import transaction
     from .models_printjob import PrintJob
-    
-    job = PrintJob.objects.create(
-        restaurant=restaurant,
-        job_type=job_type,
-        content=content,
-        order=order,
-        payment=payment,
-        printer_name=printer_name,
-        status='pending'
-    )
+
+    # Own savepoint: if this insert fails, only the print job is lost — never the payment or
+    # order being saved around it (callers catch the error and carry on)
+    with transaction.atomic():
+        job = PrintJob.objects.create(
+            restaurant=restaurant,
+            job_type=job_type,
+            content=content,
+            order=order,
+            payment=payment,
+            printer_name=printer_name,
+            status='pending'
+        )
     
     restaurant_name = getattr(restaurant, 'restaurant_name', 'Unknown')
     logger.info(f" Created print job #{job.id} ({job_type}) for {restaurant_name} (printer: {printer_name or 'auto-detect'})")
@@ -1672,12 +1676,9 @@ def _generate_bill_content(order, printed_by=None):
                     break
             _prod._active_promotion_cache = _best
 
+    # Happy-hour prices are already in each line's unit price (and so in the subtotal):
+    # a discount worked out from today's promotion would count it twice
     discount = _D('0')
-    for item in _items:
-        if item.product and hasattr(item.product, 'get_active_promotion'):
-            _promo = item.product.get_active_promotion()
-            if _promo:
-                discount += item.product.price * (_promo.discount_percentage / _D('100')) * item.quantity
 
     tax_amount, tax_percentage, total = _charged_amounts(order, subtotal)
     
@@ -2584,12 +2585,9 @@ def _generate_receipt_content(payment):
     lines.append("-" * width)
     # Totals — computed from already-fetched items (no extra SQL)
     subtotal = sum(item.get_subtotal() for item in _items)
+    # Happy-hour prices are already in each line's unit price (and so in the subtotal):
+    # a discount worked out from today's promotion would count it twice
     discount = Decimal('0')
-    for item in _items:
-        if item.product and hasattr(item.product, 'get_active_promotion'):
-            _promo = item.product.get_active_promotion()
-            if _promo:
-                discount += item.product.price * (_promo.discount_percentage / Decimal('100')) * item.quantity
     tax_amount, tax_percentage, total = _charged_amounts(order, subtotal)
 
     # Subtotal - right-aligned EXACTLY like HTML

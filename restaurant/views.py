@@ -15,6 +15,7 @@ from django.contrib import messages
 from django.db import models, transaction
 from django.db.models import Count, Q, Prefetch, Sum, Avg, F
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
 from django.utils import timezone
 from decimal import Decimal
@@ -64,7 +65,9 @@ def browse_restaurants(request):
             Q(address__icontains=search)
         )
     from restaurant.reservations import open_for_bookings
-    restaurants = [r for r in qs if r.allow_remote_orders or open_for_bookings(r)]
+    # Only restaurants customers may use right now (not expired/blocked/deactivated)
+    restaurants = [r for r in qs
+                   if (r.allow_remote_orders or open_for_bookings(r)) and r.open_owner() is not None]
     return render(request, 'restaurant/browse_restaurants.html', {
         'restaurants': restaurants,
         'search': search,
@@ -100,6 +103,9 @@ def select_order_type(request, restaurant_id):
         id=restaurant_id,
         is_active=True,
     )
+    if restaurant_obj.open_owner() is None:  # expired/blocked subscription or owner off
+        from django.http import Http404
+        raise Http404
     owner = _remote_order_owner(restaurant_obj)
     from restaurant.reservations import open_for_bookings
     can_book = open_for_bookings(restaurant_obj)
@@ -116,7 +122,9 @@ def select_order_type(request, restaurant_id):
             # order_type is only set once delivery_info has captured address + phone
             return redirect('restaurant:delivery_info', restaurant_id=restaurant_obj.id)
 
-        request.session['selected_restaurant_id'] = owner.id
+        # A different restaurant empties the cart (items never mix restaurants)
+        from accounts.security_utils import set_session_restaurant
+        set_session_restaurant(request.session, owner.id)
         request.session['selected_restaurant_name'] = restaurant_obj.name
         request.session['order_type'] = 'pickup'
         request.session['delivery_address'] = ''
@@ -142,6 +150,9 @@ def delivery_info(request, restaurant_id):
         allow_remote_orders=True,
         is_active=True,
     )
+    if restaurant_obj.open_owner() is None:  # expired/blocked subscription or owner off
+        from django.http import Http404
+        raise Http404
     owner = _remote_order_owner(restaurant_obj)
 
     if request.method == 'POST':
@@ -152,7 +163,9 @@ def delivery_info(request, restaurant_id):
         elif not phone:
             messages.error(request, 'Please enter your phone number so the rider can contact you.')
         else:
-            request.session['selected_restaurant_id'] = owner.id
+            # A different restaurant empties the cart (items never mix restaurants)
+            from accounts.security_utils import set_session_restaurant
+            set_session_restaurant(request.session, owner.id)
             request.session['selected_restaurant_name'] = restaurant_obj.name
             request.session['order_type'] = 'delivery'
             request.session['delivery_address'] = address
@@ -248,19 +261,14 @@ def menu(request):
         restaurant_obj = None
         
         try:
-            # Check if this user has a Restaurant object (PRO plan)
-            # Priority: branch_owner first (for branch staff), then main restaurant (for main owner)
-            restaurant_obj = Restaurant.objects.filter(
-                Q(branch_owner=current_restaurant)
-            ).first()
-            
+            # Dine-in: the chosen table's restaurant. Otherwise the owner's own restaurant
+            # (a branch owner's branch, or the main restaurant for a main owner) — the same rule
+            # the cart and checkout use, so the menu never shows dishes they would refuse.
+            table_id = request.session.get('selected_table_id')                 if request.session.get('order_type', 'dine-in') == 'dine-in' else None
+            if table_id:
+                restaurant_obj = Restaurant.objects.filter(tables__id=table_id).first()
             if not restaurant_obj:
-                # Not a branch owner, check if they own a main restaurant
-                restaurant_obj = Restaurant.objects.filter(
-                    Q(main_owner=current_restaurant),
-                    Q(is_main_restaurant=True)
-                ).first()
-            
+                restaurant_obj = Restaurant.for_owner(current_restaurant)
         except Exception as e:
             pass
         
@@ -269,13 +277,15 @@ def menu(request):
             # PRO plan: filter by Restaurant object OR by User owner
             # Create filtered prefetches for subcategories and products
             # Note: SubCategory and Product inherit owner/restaurant through main_category
+            # This restaurant's menu, plus legacy categories that carry only the owner. Not
+            # "owner=…" alone: a main owner also owns his branches' categories.
             subcategory_filter = (
-                Q(main_category__restaurant=restaurant_obj) | 
-                Q(main_category__owner=current_restaurant)
+                Q(main_category__restaurant=restaurant_obj) |
+                Q(main_category__restaurant__isnull=True, main_category__owner=current_restaurant)
             )
             product_filter = (
-                Q(sub_category__main_category__restaurant=restaurant_obj) | 
-                Q(sub_category__main_category__owner=current_restaurant)
+                Q(sub_category__main_category__restaurant=restaurant_obj) |
+                Q(sub_category__main_category__restaurant__isnull=True, sub_category__main_category__owner=current_restaurant)
             )
             
             subcategories_prefetch = Prefetch(
@@ -288,7 +298,7 @@ def menu(request):
             )
             
             categories = MainCategory.objects.filter(
-                Q(restaurant=restaurant_obj) | Q(owner=current_restaurant),
+                Q(restaurant=restaurant_obj) | Q(restaurant__isnull=True, owner=current_restaurant),
                 is_active=True
             ).prefetch_related(subcategories_prefetch, products_prefetch).order_by('name')
             
@@ -403,20 +413,30 @@ def menu(request):
 
         # Force queryset evaluation and attach cached promotion data to each product
         categories = list(categories)
+        # Products saved without a sub-category are listed under their category
+        _loose = {}
+        for _p in Product.objects.filter(
+                main_category__in=[c.id for c in categories], sub_category__isnull=True,
+                is_available=True).select_related('main_category').order_by('name'):
+            _loose.setdefault(_p.main_category_id, []).append(_p)
         for _cat in categories:
-            for _subcat in _cat.subcategories.all():
-                for _product in _subcat.products.all():
-                    _promo = (
-                        _promo_by_product.get(_product.id) or
-                        _promo_by_maincategory.get(_product.main_category_id) or
-                        (_promo_by_subcategory.get(_product.sub_category_id) if _product.sub_category_id else None)
-                    )
-                    _product._active_promotion_cache = _promo
-                    if _promo:
-                        _disc = _product.price * (_promo.discount_percentage / Decimal('100'))
-                        _product._calculated_price_cache = max(_product.price - _disc, Decimal('0.01'))
-                    else:
-                        _product._calculated_price_cache = _product.price
+            _cat.loose_products = _loose.get(_cat.id, [])
+            _cat_products = [p for _subcat in _cat.subcategories.all() for p in _subcat.products.all()]
+            for _product in _cat_products + _cat.loose_products:
+                # Same rule as Product.get_active_promotion() (cart and checkout):
+                # the highest discount among product / category / sub-category promotions
+                _candidates = [x for x in (
+                    _promo_by_product.get(_product.id),
+                    _promo_by_maincategory.get(_product.main_category_id),
+                    _promo_by_subcategory.get(_product.sub_category_id) if _product.sub_category_id else None,
+                ) if x is not None]
+                _promo = max(_candidates, key=lambda x: x.discount_percentage) if _candidates else None
+                _product._active_promotion_cache = _promo
+                if _promo:
+                    _disc = _product.price * (_promo.discount_percentage / Decimal('100'))
+                    _product._calculated_price_cache = max(_product.price - _disc, Decimal('0.01'))
+                else:
+                    _product._calculated_price_cache = _product.price
 
     # Determine base template based on user role
     if request.user.is_authenticated:
@@ -1404,6 +1424,7 @@ def view_event(request, event_id):
 
 
 @login_required
+@require_POST
 def delete_event(request, event_id):
     """Delete an event"""
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
@@ -1623,7 +1644,13 @@ def record_event_payment(request, event_id):
             logger.error(f"JSON decode error: {str(e)}")
             return JsonResponse({'success': False, 'message': 'Invalid JSON data.'})
             
-        payment_amount = Decimal(str(data.get('amount', 0)))
+        from decimal import InvalidOperation
+        try:
+            payment_amount = Decimal(str(data.get('amount', 0)))
+        except (InvalidOperation, ValueError, TypeError):
+            return JsonResponse({'success': False, 'message': 'Invalid payment amount. Please enter a valid number.'})
+        if not payment_amount.is_finite():  # NaN / Infinity
+            return JsonResponse({'success': False, 'message': 'Invalid payment amount. Please enter a valid number.'})
         is_deposit = data.get('is_deposit', False)
         
         logger.info(f"Recording payment: Event {event_id}, Amount {payment_amount}, Is Deposit {is_deposit}")

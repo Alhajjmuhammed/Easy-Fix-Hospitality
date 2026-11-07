@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from .restaurant_utils import get_restaurant_context, get_current_restaurant, filter_data_by_restaurant
+from .restaurant_utils import restaurant_orders_q, restaurant_tables_products_q, NON_REVENUE_STATUSES
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 
@@ -26,6 +27,7 @@ from django.template.loader import render_to_string
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import ProtectedError
 import json
+import math
 import qrcode
 import io
 import csv
@@ -159,46 +161,12 @@ def admin_dashboard(request):
         view_all_restaurants = request.session.get('view_all_restaurants', False)
         selected_restaurant_id = request.session.get('selected_restaurant_id')
         
-        if selected_restaurant_id and not view_all_restaurants:
-            # selected_restaurant_id stores User (owner) ID, not Restaurant ID
-            try:
-                selected_user = User.objects.get(id=selected_restaurant_id)
-                
-                # Get the Restaurant object for this user
-                if selected_user.is_branch_owner():
-                    current_restaurant = Restaurant.objects.filter(branch_owner=selected_user, is_main_restaurant=False).first()
-                else:
-                    current_restaurant = Restaurant.objects.filter(main_owner=selected_user, is_main_restaurant=True).first()
-                
-                # Verify user can access this restaurant
-                if current_restaurant and not current_restaurant.can_user_access(request.user):
-                    current_restaurant = None
-                    if 'selected_restaurant_id' in request.session:
-                        del request.session['selected_restaurant_id']
-            except User.DoesNotExist:
-                current_restaurant = None
-                if 'selected_restaurant_id' in request.session:
-                    del request.session['selected_restaurant_id']
-        
-        # If no current restaurant selected, auto-select for non-main owners
-        if not current_restaurant and not view_all_restaurants:
-            if request.user.is_branch_owner():
-                # Branch owners should see their restaurant by default
-                user_restaurants = Restaurant.objects.filter(branch_owner=request.user)
-                if user_restaurants.exists():
-                    current_restaurant = user_restaurants.first()
-                    request.session['selected_restaurant_id'] = request.user.id  # Store User ID (convention)
-            elif request.user.is_owner() and not request.user.is_main_owner():
-                # Legacy owners - try to find their restaurant via TableInfo
-                owner_filter = get_owner_filter(request.user)
-                if owner_filter:
-                    # Try to find restaurant associated with this owner
-                    user_restaurants = Restaurant.objects.filter(
-                        Q(main_owner=request.user) | Q(branch_owner=request.user)
-                    )
-                    if user_restaurants.exists():
-                        current_restaurant = user_restaurants.first()
-                        request.session['selected_restaurant_id'] = request.user.id  # Store User ID (convention)
+        if not view_all_restaurants:
+            # Same resolution as every other admin-panel page (managers, branch owners,
+            # and branches the main owner runs himself), so the numbers always match the
+            # restaurant whose name the dashboard shows.
+            current_restaurant = get_restaurant_context(
+                request.user, selected_restaurant_id, request)['current_restaurant']
         
         # Calculate statistics based on context
         if request.user.is_administrator():
@@ -219,20 +187,10 @@ def admin_dashboard(request):
                 else:
                     staff_count = User.objects.filter(owner=current_restaurant.branch_owner).count()
                     total_users = 1 + staff_count  # branch owner + staff
-                total_orders = Order.objects.filter(
-                    Q(table_info__restaurant=current_restaurant) |
-                    Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner]) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=current_restaurant.main_owner)) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=current_restaurant.main_owner))
-                ).count()
-                total_products = Product.objects.filter(
-                    Q(main_category__restaurant=current_restaurant) |
-                    Q(main_category__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner])
-                ).count()
-                total_tables = TableInfo.objects.filter(
-                    Q(restaurant=current_restaurant) |
-                    Q(owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner])
-                ).count()
+                _tables_q, _products_q = restaurant_tables_products_q(current_restaurant)
+                total_orders = Order.objects.filter(restaurant_orders_q(current_restaurant)).count()
+                total_products = Product.objects.filter(_products_q).count()
+                total_tables = TableInfo.objects.filter(_tables_q).count()
                 context_name = f"{current_restaurant.name} (Admin)"
                 
         elif request.user.is_main_owner():
@@ -281,20 +239,10 @@ def admin_dashboard(request):
                 else:
                     # Branch: count branch owner + their staff
                     total_users = 1 + User.objects.filter(owner=current_restaurant.branch_owner).count()
-                total_orders = Order.objects.filter(
-                    Q(table_info__restaurant=current_restaurant) |
-                    Q(table_info__owner=current_restaurant.branch_owner) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=request.user)) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=request.user))
-                ).count()
-                total_products = Product.objects.filter(
-                    Q(main_category__restaurant=current_restaurant) |
-                    Q(main_category__owner=current_restaurant.branch_owner)
-                ).count()
-                total_tables = TableInfo.objects.filter(
-                    Q(restaurant=current_restaurant) |
-                    Q(owner=current_restaurant.branch_owner)
-                ).count()
+                _tables_q, _products_q = restaurant_tables_products_q(current_restaurant)
+                total_orders = Order.objects.filter(restaurant_orders_q(current_restaurant)).count()
+                total_products = Product.objects.filter(_products_q).count()
+                total_tables = TableInfo.objects.filter(_tables_q).count()
                 context_name = current_restaurant.name
                 
         elif request.user.is_manager():
@@ -310,20 +258,10 @@ def admin_dashboard(request):
                 staff_count = User.objects.filter(owner=manager_owner).count()
                 total_users = 1 + staff_count
                 
-                total_orders = Order.objects.filter(
-                    Q(table_info__restaurant=current_restaurant) |
-                    Q(table_info__owner=manager_owner) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=manager_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=manager_owner)) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=manager_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=manager_owner))
-                ).count()
-                total_products = Product.objects.filter(
-                    Q(main_category__restaurant=current_restaurant) |
-                    Q(main_category__owner=manager_owner)
-                ).count()
-                total_tables = TableInfo.objects.filter(
-                    Q(restaurant=current_restaurant) |
-                    Q(owner=manager_owner)
-                ).count()
+                _tables_q, _products_q = restaurant_tables_products_q(current_restaurant)
+                total_orders = Order.objects.filter(restaurant_orders_q(current_restaurant)).count()
+                total_products = Product.objects.filter(_products_q).count()
+                total_tables = TableInfo.objects.filter(_tables_q).count()
                 context_name = current_restaurant.name
             else:
                 # Fallback - use manager's owner
@@ -360,20 +298,10 @@ def admin_dashboard(request):
                 # Count: owner themselves (1) + their staff
                 staff_count = User.objects.filter(owner=request.user).count()
                 total_users = 1 + staff_count
-                total_orders = Order.objects.filter(
-                    Q(table_info__restaurant=current_restaurant) |
-                    Q(table_info__owner=request.user) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=request.user)) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=request.user) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=request.user))
-                ).count()
-                total_products = Product.objects.filter(
-                    Q(main_category__restaurant=current_restaurant) |
-                    Q(main_category__owner=request.user)
-                ).count()
-                total_tables = TableInfo.objects.filter(
-                    Q(restaurant=current_restaurant) |
-                    Q(owner=request.user)
-                ).count()
+                _tables_q, _products_q = restaurant_tables_products_q(current_restaurant)
+                total_orders = Order.objects.filter(restaurant_orders_q(current_restaurant)).count()
+                total_products = Product.objects.filter(_products_q).count()
+                total_tables = TableInfo.objects.filter(_tables_q).count()
                 context_name = current_restaurant.name
             else:
                 # Fallback to legacy owner filter
@@ -408,15 +336,11 @@ def admin_dashboard(request):
         
         if current_restaurant and not view_all_restaurants:
             # Single restaurant stats — 1 aggregate instead of 3 queries
-            _restaurant_q = (
-                Q(table_info__restaurant=current_restaurant) |
-                Q(table_info__owner__in=[current_restaurant.main_owner, current_restaurant.branch_owner]) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=current_restaurant.main_owner)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=current_restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=current_restaurant.main_owner))
-            )
+            # Only this restaurant's orders (not sister branches, not network-wide pickups)
+            _restaurant_q = restaurant_orders_q(current_restaurant)
             _stats = Order.objects.filter(_restaurant_q).aggregate(
                 recent_orders=Count('id', filter=Q(created_at__gte=seven_days_ago)),
-                today_revenue=Sum('total_amount', filter=Q(created_at__date=today)),
+                today_revenue=Sum('total_amount', filter=Q(created_at__date=today) & ~Q(status__in=NON_REVENUE_STATUSES)),
                 pending_orders=Count('id', filter=Q(status='pending')),
             )
             recent_orders = _stats['recent_orders'] or 0
@@ -434,7 +358,7 @@ def admin_dashboard(request):
             )
             _stats = Order.objects.filter(_owner_q).aggregate(
                 recent_orders=Count('id', filter=Q(created_at__gte=seven_days_ago)),
-                today_revenue=Sum('total_amount', filter=Q(created_at__date=today)),
+                today_revenue=Sum('total_amount', filter=Q(created_at__date=today) & ~Q(status__in=NON_REVENUE_STATUSES)),
                 pending_orders=Count('id', filter=Q(status='pending')),
             )
             recent_orders = _stats['recent_orders'] or 0
@@ -454,7 +378,7 @@ def admin_dashboard(request):
                 )
                 _stats = Order.objects.filter(_oq_fb).aggregate(
                     recent_orders=Count('id', filter=Q(created_at__gte=seven_days_ago)),
-                    today_revenue=Sum('total_amount', filter=Q(created_at__date=today)),
+                    today_revenue=Sum('total_amount', filter=Q(created_at__date=today) & ~Q(status__in=NON_REVENUE_STATUSES)),
                     pending_orders=Count('id', filter=Q(status='pending')),
                 )
                 recent_orders = _stats['recent_orders'] or 0
@@ -464,7 +388,7 @@ def admin_dashboard(request):
                 # Administrator - all data — 1 aggregate instead of 3 queries
                 _stats = Order.objects.aggregate(
                     recent_orders=Count('id', filter=Q(created_at__gte=seven_days_ago)),
-                    today_revenue=Sum('total_amount', filter=Q(created_at__date=today)),
+                    today_revenue=Sum('total_amount', filter=Q(created_at__date=today) & ~Q(status__in=NON_REVENUE_STATUSES)),
                     pending_orders=Count('id', filter=Q(status='pending')),
                 )
                 recent_orders = _stats['recent_orders'] or 0
@@ -994,8 +918,10 @@ def manage_orders(request):
     pending_orders   = base_orders.filter(status='pending').order_by('-created_at')
     confirmed_orders = base_orders.filter(status='confirmed').order_by('-created_at')
     preparing_orders = base_orders.filter(status='preparing').order_by('-created_at')
-    ready_orders     = base_orders.filter(status='ready').order_by('-created_at')
-    served_orders    = base_orders.filter(status='served').order_by('-created_at')
+    # Delivery orders: out_for_delivery is still in progress (Ready tab), delivered is
+    # completed (Served tab). Without this they were counted in the total but in no tab.
+    ready_orders     = base_orders.filter(status__in=['ready', 'out_for_delivery']).order_by('-created_at')
+    served_orders    = base_orders.filter(status__in=['served', 'delivered']).order_by('-created_at')
     cancelled_orders = base_orders.filter(status='cancelled').order_by('-created_at')
     
     # Counts — single GROUP BY query
@@ -1004,8 +930,8 @@ def manage_orders(request):
     pending_count   = _counts.get('pending', 0)
     confirmed_count = _counts.get('confirmed', 0)
     preparing_count = _counts.get('preparing', 0)
-    ready_count     = _counts.get('ready', 0)
-    served_count    = _counts.get('served', 0)
+    ready_count     = _counts.get('ready', 0) + _counts.get('out_for_delivery', 0)
+    served_count    = _counts.get('served', 0) + _counts.get('delivered', 0)
     cancelled_count = _counts.get('cancelled', 0)
     total_count     = sum(_counts.values())
 
@@ -1030,11 +956,11 @@ def manage_orders(request):
     preparing_page      = preparing_paginator.get_page(request.GET.get('preparing_page', 1))
 
     ready_paginator     = Paginator(ready_orders,     _per_page)
-    ready_paginator._count = _counts.get('ready', 0)
+    ready_paginator._count = ready_count
     ready_page          = ready_paginator.get_page(request.GET.get('ready_page',     1))
 
     served_paginator    = Paginator(served_orders,    _per_page)
-    served_paginator._count = _counts.get('served', 0)
+    served_paginator._count = served_count
     served_page         = served_paginator.get_page(request.GET.get('served_page',    1))
 
     cancelled_paginator = Paginator(cancelled_orders, _per_page)
@@ -1494,15 +1420,14 @@ def edit_main_category(request, category_id):
             except Restaurant.DoesNotExist:
                 return JsonResponse({'success': False, 'message': 'Selected restaurant does not exist'})
         else:
-            # Same restaurant or no change, check duplicates with current owner
-            if category.owner:
-                _mcq_same = (
-                    Q(owner=category.owner) |
-                    Q(restaurant__main_owner=category.owner) |
-                    Q(restaurant__branch_owner=category.owner)
-                )
-            else:
-                _mcq_same = Q(restaurant=category.restaurant)
+            # Same restaurant or no change: check duplicates in THIS category's restaurant
+            # (as add_main_category does), plus the legacy per-owner unique constraint.
+            # A name used only by a sister branch is fine.
+            _mcq_same = Q(pk__in=[])
+            if category.restaurant_id:
+                _mcq_same |= Q(restaurant_id=category.restaurant_id)
+            if category.owner_id:
+                _mcq_same |= Q(owner_id=category.owner_id)
             if MainCategory.objects.filter(_mcq_same, name__iexact=name).exclude(id=category_id).exists():
                 return JsonResponse({'success': False, 'message': 'Category with this name already exists in this restaurant'})
 
@@ -2156,6 +2081,29 @@ def bulk_delete_subcategories(request):
         return JsonResponse({'success': False, 'message': f'Failed to delete subcategories: {str(e)}'})
 
 
+_MIN_PRICE = Decimal('0.01')
+_MAX_PRICE = Decimal('99999999.99')   # Product.price: max_digits=10, decimal_places=2
+
+
+def _parse_price(raw):
+    """Product price as a Decimal >= 0.01 (2 places), or None when invalid
+    (empty, not a number, nan/inf, zero, negative, too large)."""
+    try:
+        value = Decimal(str(raw).strip())
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    if not value.is_finite():
+        return None
+    value = value.quantize(Decimal('0.01'))
+    if value < _MIN_PRICE or value > _MAX_PRICE:
+        return None
+    return value
+
+
+def _valid_stations():
+    return {choice[0] for choice in Product._meta.get_field('station').choices}
+
+
 @login_required
 @require_http_methods(["POST"])
 @transaction.atomic
@@ -2208,9 +2156,9 @@ def add_product(request):
             main_category_id = int(main_category_id)
             sub_category_id = int(sub_category_id)
             prep_time = int(prep_time)
-            price = float(price)
-            if price < 0:
-                raise ValueError('Price cannot be negative')
+            price = _parse_price(price)
+            if price is None:
+                return JsonResponse({'success': False, 'message': 'Price must be a number of at least 0.01'})
             stock = int(stock)
             if stock < 0:
                 raise ValueError('Stock cannot be negative')
@@ -2247,9 +2195,11 @@ def add_product(request):
         else:
             return JsonResponse({'success': False, 'message': 'No restaurant context found'})
         
-        # Get station field
-        station = request.POST.get('station', 'kitchen')
-        
+        # Get station field (must be one of the real stations, or the item never shows on any screen)
+        station = request.POST.get('station', 'kitchen') or 'kitchen'
+        if station not in _valid_stations():
+            return JsonResponse({'success': False, 'message': 'Invalid station selected'})
+
         # Create product
         product = Product.objects.create(
             name=name,
@@ -2414,11 +2364,15 @@ def update_product(request, product_id):
             product.sub_category = get_object_or_404(SubCategory, id=request.POST.get('sub_category'), main_category=product.main_category)
         
         if request.POST.get('price'):
-            try:
-                product.price = float(request.POST.get('price'))
-            except (ValueError, TypeError):
-                pass  # Keep existing price if invalid
-        
+            _new_price = _parse_price(request.POST.get('price'))
+            if _new_price is None:
+                _msg = 'Price must be a number of at least 0.01'
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'success': False, 'message': _msg})
+                messages.error(request, _msg)
+                return redirect('admin_panel:manage_products')
+            product.price = _new_price
+
         if request.POST.get('available_in_stock'):
             try:
                 product.available_in_stock = int(request.POST.get('available_in_stock'))
@@ -2432,8 +2386,14 @@ def update_product(request, product_id):
                 pass  # Keep existing prep time if invalid
         
         if request.POST.get('station'):
+            if request.POST.get('station') not in _valid_stations():
+                _msg = 'Invalid station selected'
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'success': False, 'message': _msg})
+                messages.error(request, _msg)
+                return redirect('admin_panel:manage_products')
             product.station = request.POST.get('station')
-        
+
         product.is_available = request.POST.get('is_available') == 'on'
         
         product.save()
@@ -2547,6 +2507,30 @@ def delete_product(request, product_id):
 # USER MANAGEMENT CRUD OPERATIONS
 # ============================================================================
 
+_STAFF_ROLES = frozenset({'manager', 'customer_care', 'kitchen', 'bar', 'buffet', 'service',
+                          'cashier', 'delivery_rider'})
+
+
+def _assignable_roles(requesting_user):
+    """Roles a non-administrator may give from the Users page (allow-list)."""
+    if requesting_user.is_manager():
+        return _STAFF_ROLES - {'manager'}          # managers cannot create peer managers
+    roles = set(_STAFF_ROLES) | {'customer'}       # owners create walk-in customer accounts (add_order)
+    if requesting_user.is_main_owner():
+        roles.add('branch_owner')
+    return frozenset(roles)
+
+
+def _password_error(password, user):
+    """Django's password validators (includes the minimum length). '' when valid."""
+    from django.contrib.auth.password_validation import validate_password
+    try:
+        validate_password(password, user=user)
+    except ValidationError as e:
+        return ' '.join(e.messages)
+    return ''
+
+
 def _can_manage_target_user(requesting_user, target_user):
     """Check if requesting_user has permission to manage target_user based on restaurant affiliation."""
     if requesting_user.is_administrator():
@@ -2557,7 +2541,10 @@ def _can_manage_target_user(requesting_user, target_user):
         from restaurant.models_restaurant import Restaurant as _Restaurant
         return (
             target_user.owner_id == requesting_user.id or
-            _Restaurant.objects.filter(main_owner=requesting_user, branch_owner=target_user).exists()
+            _Restaurant.objects.filter(main_owner=requesting_user, branch_owner=target_user).exists() or
+            # staff of one of this main owner's branch owners (the Users page lists them)
+            (target_user.owner_id is not None and
+             _Restaurant.objects.filter(main_owner=requesting_user, branch_owner_id=target_user.owner_id).exists())
         )
     elif requesting_user.is_branch_owner():
         return target_user.owner_id == requesting_user.id
@@ -2600,39 +2587,18 @@ def add_user(request):
         if not all([first_name, last_name, username, email, password, role_name]):
             return JsonResponse({'success': False, 'message': 'All required fields must be filled'})
         
-        # Check role restrictions based on user hierarchy
+        # Role allow-list (never a deny-list: unknown/system roles such as admin_staff
+        # or administrator must never be creatable from the restaurant panel)
         if not request.user.is_administrator():
-            # Branch owners can ONLY create staff roles (not other branch_owner or main_owner)
-            if request.user.is_branch_owner():
-                if role_name in ['main_owner', 'branch_owner', 'owner', 'administrator']:
-                    return JsonResponse({
-                        'success': False, 
-                        'message': 'Branch owners can only create staff members (kitchen, bar, cashier, etc.), not owner roles.'
-                    })
-            
-            # Main owners can create branch_owner but NOT another main_owner or legacy owner
-            elif request.user.is_main_owner():
-                if role_name in ['main_owner', 'owner']:
-                    return JsonResponse({
-                        'success': False, 
-                        'message': 'Cannot create main owner or legacy owner roles. You can only create branch owners and staff.'
-                    })
-                if role_name == 'administrator':
-                    return JsonResponse({'success': False, 'message': 'Only administrators can create administrator accounts'})
-            
-            # Legacy owners can create any role except administrator and main_owner
-            elif request.user.is_owner():
-                if role_name in ['administrator', 'main_owner']:
-                    return JsonResponse({'success': False, 'message': 'You cannot create administrator or main owner accounts'})
-            
-            # Managers can ONLY create regular staff roles (not owners, managers, or customers)
-            elif request.user.is_manager():
-                if role_name in ['administrator', 'main_owner', 'branch_owner', 'owner', 'manager', 'customer']:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Managers can only create staff roles (kitchen, bar, cashier, customer_care, service, buffet).'
-                    })
-        
+            if role_name not in _assignable_roles(request.user):
+                return JsonResponse({'success': False,
+                                     'message': 'You can only create staff accounts (manager, customer care, kitchen, bar, buffet, service, cashier, delivery rider).'})
+
+        _pw_error = _password_error(password, User(username=username, email=email,
+                                                   first_name=first_name, last_name=last_name))
+        if _pw_error:
+            return JsonResponse({'success': False, 'message': _pw_error})
+
         # Check if username or email already exists
         if User.objects.filter(username=username).exists():
             return JsonResponse({'success': False, 'message': 'Username already exists'})
@@ -2677,6 +2643,18 @@ def add_user(request):
                     'message': 'Only system administrators can create main owner accounts.'
                 })
         
+        if role_name == 'branch_owner' and not request.user.is_administrator():
+            # A branch owner needs a branch: never create an orphan owner account (it would
+            # get its own subscription and a full admin panel). New branches with their owner
+            # are created through Add Branch.
+            if (not target_restaurant or target_restaurant.is_main_restaurant or
+                    target_restaurant.main_owner_id != request.user.id):
+                return JsonResponse({'success': False,
+                                     'message': 'A branch owner must be assigned to a branch. Select the branch, or create the branch with Add Branch.'})
+            if target_restaurant.branch_owner_id and target_restaurant.branch_owner_id != target_restaurant.main_owner_id:
+                return JsonResponse({'success': False,
+                                     'message': 'This branch already has a branch owner.'})
+
         if role_name in ['branch_owner', 'owner']:
             # Check if target restaurant has SINGLE plan - no branch owners allowed
             if not target_restaurant:
@@ -2829,39 +2807,32 @@ def update_user(request, user_id):
         except Role.DoesNotExist:
             return JsonResponse({'success': False, 'message': 'Invalid role selected'})
         
-        # Check role restrictions based on user hierarchy (same as add_user)
+        # Check role restrictions (allow-list, same as add_user)
         if not request.user.is_administrator():
-            # Branch owners can ONLY assign staff roles (not other branch_owner or main_owner)
-            if request.user.is_branch_owner():
-                if role_name in ['main_owner', 'branch_owner', 'owner', 'administrator']:
-                    return JsonResponse({
-                        'success': False, 
-                        'message': 'Branch owners can only assign staff roles (kitchen, bar, cashier, etc.), not owner roles.'
-                    })
-            
-            # Main owners can assign branch_owner but NOT another main_owner or legacy owner
-            elif request.user.is_main_owner():
-                if role_name in ['main_owner', 'owner']:
-                    return JsonResponse({
-                        'success': False, 
-                        'message': 'Cannot assign main owner or legacy owner roles. You can only assign branch owners and staff.'
-                    })
-                if role_name == 'administrator':
-                    return JsonResponse({'success': False, 'message': 'Only administrators can assign administrator role'})
-            
-            # Legacy owners can assign any role except administrator and main_owner
-            elif request.user.is_owner():
-                if role_name in ['administrator', 'main_owner']:
-                    return JsonResponse({'success': False, 'message': 'You cannot assign administrator or main owner roles'})
-            
-            # Managers can ONLY assign regular staff roles (not owners, managers, or customers)
-            elif request.user.is_manager():
-                if role_name in ['administrator', 'main_owner', 'branch_owner', 'owner', 'manager', 'customer']:
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Managers can only assign staff roles (kitchen, bar, cashier, customer_care, service, buffet).'
-                    })
-        
+            current_role = user.role.name if user.role else ''
+            if user.id == request.user.id:
+                # Nobody changes their own role from the Users page
+                if role_name != current_role:
+                    return JsonResponse({'success': False, 'message': 'You cannot change your own role.'})
+            elif role_name != current_role:
+                allowed = _assignable_roles(request.user)
+                if role_name == 'branch_owner':
+                    # A branch owner only exists together with a branch (Add Branch);
+                    # promoting staff here would create an owner without a branch.
+                    allowed = allowed - {'branch_owner'}
+                if role_name not in allowed:
+                    return JsonResponse({'success': False,
+                                         'message': 'You can only assign staff roles (manager, customer care, kitchen, bar, buffet, service, cashier, delivery rider).'})
+            elif role_name not in _assignable_roles(request.user):
+                # Unchanged role the requester could never grant (e.g. a system account)
+                return JsonResponse({'success': False, 'message': 'You do not have permission to manage this role.'})
+
+        if password:
+            _pw_error = _password_error(password, User(username=username, email=email,
+                                                       first_name=first_name, last_name=last_name))
+            if _pw_error:
+                return JsonResponse({'success': False, 'message': _pw_error})
+
         from restaurant.models_restaurant import Restaurant
         target_restaurant = None
 
@@ -3357,15 +3328,28 @@ def add_table(request):
         if TableInfo.objects.filter(tbl_no=table_number, restaurant=target_restaurant).exists():
             return JsonResponse({'success': False, 'message': f'Table number already exists in {target_restaurant.name}'})
         
+        # The legacy (owner, tbl_no) unique constraint is shared by a main restaurant and
+        # any branch the main owner runs himself (both store owner=main owner).
+        _table_owner = target_restaurant.branch_owner or target_restaurant.main_owner
+        _used_msg = (f'This table number is already used: table {table_number} exists in another of your '
+                     f'restaurants run by the same owner account. Please choose a different number.')
+        if TableInfo.objects.filter(tbl_no=table_number, owner=_table_owner).exists():
+            return JsonResponse({'success': False, 'message': _used_msg})
+
         # Create new table assigned to target restaurant
-        table = TableInfo.objects.create(
-            tbl_no=table_number,
-            capacity=int(capacity),
-            is_available=is_available,
-            restaurant=target_restaurant,  # Use restaurant field for new system
-            owner=target_restaurant.branch_owner or target_restaurant.main_owner  # Backward compatibility
-        )
-        
+        from django.db import IntegrityError
+        try:
+            with transaction.atomic():
+                table = TableInfo.objects.create(
+                    tbl_no=table_number,
+                    capacity=int(capacity),
+                    is_available=is_available,
+                    restaurant=target_restaurant,  # Use restaurant field for new system
+                    owner=_table_owner  # Backward compatibility
+                )
+        except IntegrityError:
+            return JsonResponse({'success': False, 'message': _used_msg})
+
         success_message = f'Table {table_number} added successfully to {target_restaurant.name}'
         
         return JsonResponse({
@@ -3564,8 +3548,16 @@ def update_table(request):
             except Restaurant.DoesNotExist:
                 return JsonResponse({'success': False, 'message': 'Selected restaurant does not exist'})
         else:
-            # Same restaurant or no change, just check duplicates with current owner
-            if owner_filter:
+            # Same restaurant or no change: check duplicates in THIS table's restaurant only
+            # (same rule as add_table: per restaurant, plus the legacy per-owner constraint).
+            # A number used only by a sister branch is fine.
+            if table.restaurant_id:
+                _dup_q = Q(restaurant_id=table.restaurant_id)
+                if table.owner_id:
+                    _dup_q |= Q(owner_id=table.owner_id)
+                if TableInfo.objects.filter(_dup_q, tbl_no=table_number).exclude(id=table_id).exists():
+                    return JsonResponse({'success': False, 'message': 'Table number already exists in your restaurant'})
+            elif owner_filter:
                 _tiq_dup = (
                     Q(owner=owner_filter) |
                     Q(restaurant__main_owner=owner_filter) |
@@ -3695,6 +3687,14 @@ def delete_table(request):
             return JsonResponse({'success': False, 'message': 'Table not found'})
         
         table_number = table.tbl_no
+        # Never delete a table while it still has an open (not cancelled, not paid) order:
+        # detaching it would make that unpaid order vanish from the Orders page and sales.
+        _open_orders = Order.objects.filter(table_info=table).exclude(
+            status__in=NON_REVENUE_STATUSES).exclude(payment_status='paid').count()
+        if _open_orders:
+            return JsonResponse({'success': False,
+                                 'message': f'Table {table_number} has {_open_orders} open order(s) that are not paid or '
+                                            f'cancelled. Complete or cancel them before deleting the table.'})
         # Detach orders that reference this table — table_info is now nullable (SET_NULL)
         Order.objects.filter(table_info=table).update(table_info=None)
         table.delete()
@@ -3748,6 +3748,71 @@ def view_order(request, order_id):
         return JsonResponse({'success': False, 'message': 'Error viewing order. Please try again.'})
 
 
+# Order statuses in which the dish has not been handed over yet, so cancelling puts the
+# ingredients back on the shelf. Served / out_for_delivery / delivered food (and food
+# already written off as wasted, refused, ...) is gone: its stock is never restored.
+_STOCK_RESTORABLE_STATUSES = ('pending', 'confirmed', 'preparing', 'ready')
+_ACTIVE_TABLE_STATUSES = ('pending', 'confirmed', 'preparing', 'ready', 'served')
+ADMIN_PAID_CANCEL_MESSAGE = 'This order has a payment. Void the payment at the cashier first, then cancel.'
+
+
+def _order_has_payment(order):
+    """A paid order is never cancelled from the panel: the money must be voided first."""
+    if order.payment_status == 'paid':
+        return True
+    return order.payments.filter(is_voided=False).exists()
+
+
+def _admin_cancel_order(request, order, reason=None):
+    """
+    Cancel an order from the owner/manager panel the same way orders.views.cancel_order
+    does: permission check, refuse paid orders, lock the order, restore stock, release
+    the table. Returns (success, message).
+    """
+    if not request.user.has_feature('cancel_orders'):
+        return False, "You don't have permission to cancel orders."
+    if reason is not None and not str(reason).strip():
+        return False, 'Cancellation reason is required.'
+    with transaction.atomic():
+        # `order` was already fetched through the caller's per-restaurant filter; lock it by pk
+        order = Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
+        if order.status == 'cancelled':
+            return False, 'This order is already cancelled.'
+        if _order_has_payment(order):
+            return False, ADMIN_PAID_CANCEL_MESSAGE
+        if order.status in _STOCK_RESTORABLE_STATUSES:
+            for item in order.order_items.select_related('product').all():
+                if item.product_id is None:
+                    continue
+                product = Product.objects.select_for_update(of=('self',)).get(pk=item.product_id)
+                if product.available_in_stock is not None:
+                    product.available_in_stock += item.quantity
+                    product.save(update_fields=['available_in_stock'])
+        old_status = order.status
+        order.status = 'cancelled'
+        order.reason_if_cancelled = (str(reason).strip() if reason
+                                     else f'Cancelled from the admin panel by {request.user.username}')
+        order.save(update_fields=['status', 'reason_if_cancelled', 'updated_at'])
+        order.release_table()
+    return True, f'Order #{order.order_number} status updated from {old_status} to cancelled'
+
+
+def _release_table_if_free(table):
+    """Mark a table free unless another active, unpaid order still sits on it
+    (same rule as Order.release_table)."""
+    if table is None:
+        return
+    with transaction.atomic():
+        table = TableInfo.objects.select_for_update(of=('self',)).get(pk=table.pk)
+        busy = Order.objects.filter(
+            table_info=table, status__in=_ACTIVE_TABLE_STATUSES,
+            payment_status__in=['unpaid', 'partial'],
+        ).exists()
+        if not busy and not table.is_available:
+            table.is_available = True
+            table.save(update_fields=['is_available'])
+
+
 @login_required
 @require_http_methods(["POST"])
 def update_order_status(request):
@@ -3774,15 +3839,22 @@ def update_order_status(request):
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
             )
-            order = get_object_or_404(Order.objects.filter(_oq_uos), id=order_id)
+            _order_scope = Order.objects.filter(_oq_uos)
         else:
-            order = get_object_or_404(Order, id=order_id)
-        
+            _order_scope = Order.objects.all()
+        order = get_object_or_404(_order_scope, id=order_id)
+
         # Validate status
         valid_statuses = [choice[0] for choice in Order.STATUS_CHOICES]
         if new_status not in valid_statuses:
             return JsonResponse({'success': False, 'message': 'Invalid status'})
-        
+
+        if new_status == 'cancelled':
+            # Same rules as the cashier / customer-care cancel (permission, payments,
+            # stock, table). A reason is required only when the UI sends the field.
+            ok, msg = _admin_cancel_order(request, order, request.POST.get('reason'))
+            return JsonResponse({'success': ok, 'message': msg})
+
         old_status = order.status
         order.status = new_status
         
@@ -3906,14 +3978,24 @@ def edit_order(request, order_id):
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
         )
         order = get_object_or_404(_order_qs.filter(_oq_eo), id=order_id)
-    
+
     if request.method == 'POST':
         try:
             table_id = request.POST.get('table_id')
             customer_id = request.POST.get('customer_id')
             special_instructions = request.POST.get('special_instructions', '')
             status = request.POST.get('status')
-            
+            cancelling = status == 'cancelled' and order.status != 'cancelled'
+            if cancelling:
+                # Check before changing anything (same rules as update_order_status)
+                if not request.user.has_feature('cancel_orders'):
+                    return JsonResponse({'success': False, 'message': "You don't have permission to cancel orders."})
+                if _order_has_payment(order):
+                    return JsonResponse({'success': False, 'message': ADMIN_PAID_CANCEL_MESSAGE})
+                if 'reason' in request.POST and not request.POST.get('reason', '').strip():
+                    return JsonResponse({'success': False, 'message': 'Cancellation reason is required.'})
+            old_table = order.table_info
+
             if table_id:
                 # Filter table by owner for all non-admin users
                 if owner_filter:
@@ -3934,12 +4016,27 @@ def edit_order(request, order_id):
                     order.ordered_by = get_object_or_404(User, id=customer_id)
             
             order.special_instructions = special_instructions
-            
-            if status and status in [choice[0] for choice in Order.STATUS_CHOICES]:
+
+            if status and status in [choice[0] for choice in Order.STATUS_CHOICES] and not cancelling:
                 order.status = status
-            
-            order.save()
-            
+
+            with transaction.atomic():
+                order.save()
+
+                # Moved to another table: occupy the new one, free the old one unless
+                # another active order still sits there.
+                if old_table is not None and order.table_info_id != old_table.id:
+                    order.occupy_table()
+                    _release_table_if_free(old_table)
+                elif old_table is None and order.table_info_id:
+                    order.occupy_table()
+
+                if cancelling:
+                    ok, msg = _admin_cancel_order(request, order, request.POST.get('reason'))
+                    if not ok:
+                        transaction.set_rollback(True)
+                        return JsonResponse({'success': False, 'message': msg})
+
             return JsonResponse({
                 'success': True,
                 'message': f'Order #{order.order_number} updated successfully'
@@ -4050,6 +4147,36 @@ def delete_order(request, order_id):
         return JsonResponse({'success': False, 'message': 'Error deleting order. Please try again.'})
 
 
+def _deletable_orders_q(restaurant_context):
+    """
+    Orders an owner/manager may delete: the same filter single delete_order uses
+    (selected restaurant, or every accessible restaurant in "all locations" view),
+    including delivery/pickup orders. Returns None when nothing is accessible.
+    """
+    current_restaurant = restaurant_context['current_restaurant']
+    if current_restaurant and not restaurant_context['view_all_restaurants']:
+        _op = current_restaurant.main_owner if current_restaurant.is_main_restaurant else current_restaurant.branch_owner
+        return (
+            Q(table_info__restaurant=current_restaurant) |
+            Q(table_info__owner=_op, table_info__restaurant__isnull=True) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=_op) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=_op)) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=_op) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=_op))
+        )
+    accessible_restaurants = restaurant_context['accessible_restaurants']
+    if not accessible_restaurants.exists():
+        return None
+    order_query = Q()
+    for restaurant in accessible_restaurants:
+        order_query |= (
+            Q(table_info__restaurant=restaurant) |
+            Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
+            Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.main_owner)) |
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.main_owner))
+        )
+    return order_query
+
+
 @login_required
 @require_POST
 @transaction.atomic
@@ -4075,46 +4202,17 @@ def bulk_delete_orders(request):
         # Get restaurant context for proper filtering
         session_restaurant_id = request.session.get('selected_restaurant_id')
         restaurant_context = get_restaurant_context(request.user, session_restaurant_id, request)
-        current_restaurant = restaurant_context['current_restaurant']
-        view_all_restaurants = restaurant_context['view_all_restaurants']
-        
-        # Build query for orders to delete with proper restaurant filtering
-        if current_restaurant and not view_all_restaurants:
-            # Filter by specific selected restaurant
-            if current_restaurant.is_main_restaurant:
-                # Main restaurant: orders from tables assigned to it OR owned by main owner
-                orders_to_delete = Order.objects.filter(
-                    id__in=order_ids
-                ).filter(
-                    Q(table_info__restaurant=current_restaurant) |
-                    Q(table_info__owner=current_restaurant.main_owner, table_info__restaurant__isnull=True)
-                )
-            else:
-                # Branch restaurant: only orders from tables specifically assigned to this branch
-                orders_to_delete = Order.objects.filter(
-                    id__in=order_ids
-                ).filter(
-                    Q(table_info__restaurant=current_restaurant) |
-                    Q(table_info__owner=current_restaurant.branch_owner, table_info__restaurant__isnull=True)
-                )
-        elif request.user.is_administrator():
-            # Administrator sees all orders
+        # Same per-restaurant filter as single delete_order (includes pickup/delivery)
+        if request.user.is_administrator():
             orders_to_delete = Order.objects.filter(id__in=order_ids)
         else:
-            # Get orders from all accessible restaurants
-            accessible_restaurants = restaurant_context['accessible_restaurants']
-            
-            if accessible_restaurants.exists():
-                order_query = Q()
-                for restaurant in accessible_restaurants:
-                    order_query |= (
-                        Q(table_info__restaurant=restaurant) |
-                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True) |
-                        Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True)
-                    )
-                orders_to_delete = Order.objects.filter(id__in=order_ids).filter(order_query)
-            else:
+            _scope_q = _deletable_orders_q(restaurant_context)
+            if _scope_q is None:
                 orders_to_delete = Order.objects.none()
+            else:
+                # id subquery: the OR-joins can repeat a row, which would break the count
+                _ids = Order.objects.filter(id__in=order_ids).filter(_scope_q).values('id')
+                orders_to_delete = Order.objects.filter(id__in=_ids)
         
         # Check if all requested orders exist and are accessible
         found_count = orders_to_delete.count()
@@ -4227,10 +4325,13 @@ def profile(request):
         elif action == 'update_restaurant':
             # Update restaurant information (for owners and managers)
             try:
-                if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
-                    messages.error(request, "Only restaurant owners and managers can update restaurant information.")
+                if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+                    # Managers used to get "updated successfully" while nothing changed (the
+                    # restaurant lookup is by owner). Tax / remote-order settings are an owner
+                    # decision, so say so instead.
+                    messages.error(request, "Only the restaurant owner can change restaurant settings. Please ask your owner.")
                     return redirect('admin_panel:profile')
-                
+
                 restaurant_name = request.POST.get('restaurant_name', '').strip()
                 restaurant_description = request.POST.get('restaurant_description', '').strip()
                 tax_rate_percentage = request.POST.get('tax_rate_percentage', '').strip()
@@ -4243,23 +4344,26 @@ def profile(request):
                     return redirect('admin_panel:profile')
                 
                 # Validate tax rate
+                own_restaurant = _own_restaurant(request.user)
                 try:
                     if tax_rate_percentage != '':  # Check explicitly for empty string (allow "0")
                         tax_rate_float = float(tax_rate_percentage)
+                        if not math.isfinite(tax_rate_float):
+                            raise ValueError('not a finite number')  # "nan" passes a range check
                         if tax_rate_float < 0 or tax_rate_float > 99.99:
                             messages.error(request, "Tax rate must be between 0% and 99.99%.")
                             return redirect('admin_panel:profile')
-                        
+
                         # Convert percentage to decimal for storage (0% = 0.00, 15% = 0.15, etc.)
                         tax_rate_decimal = Decimal(str(tax_rate_float / 100))
                     else:
-                        # If field is empty, use default tax rate from User model default
-                        tax_rate_decimal = Decimal('0.0800')  # Same as User model default
-                        
+                        # Empty field: keep the current rate (never silently reset to 8%)
+                        tax_rate_decimal = own_restaurant.tax_rate if own_restaurant else request.user.tax_rate
+
                 except (ValueError, InvalidOperation):
                     messages.error(request, "Invalid tax rate. Please enter a valid number.")
                     return redirect('admin_panel:profile')
-                
+
                 # Update restaurant information
                 request.user.restaurant_name = restaurant_name
                 request.user.restaurant_description = restaurant_description
@@ -4267,11 +4371,13 @@ def profile(request):
                 
                 logger.info(f"UPDATE_RESTAURANT: Setting user.tax_rate to {tax_rate_decimal}")
                 
-                # ALSO update Restaurant model tax_rate if user has a restaurant
+                # ALSO update the Restaurant model. Only the restaurant this page shows and
+                # edits (a main owner's MAIN restaurant): tax rate, remote orders, Wi-Fi and
+                # logo are per-location settings that each branch sets itself (Edit Branch /
+                # branch owner's profile), so a main owner's save must not overwrite them.
                 from restaurant.models_restaurant import Restaurant
-                user_restaurants = Restaurant.objects.filter(
-                    models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
-                )
+                user_restaurants = Restaurant.objects.filter(pk=own_restaurant.pk) if own_restaurant \
+                    else Restaurant.objects.none()
                 logger.info(f"UPDATE_RESTAURANT: Found {user_restaurants.count()} restaurants for user")
                 allow_remote_orders = request.POST.get('allow_remote_orders') == 'on'
                 try:
@@ -4285,13 +4391,11 @@ def profile(request):
                 except ValueError as e:
                     messages.error(request, str(e))
                     return redirect('admin_panel:profile')
-                own_restaurant = _own_restaurant(request.user)
                 for restaurant in user_restaurants:
                     restaurant.tax_rate = tax_rate_decimal
                     restaurant.allow_remote_orders = allow_remote_orders
-                    # Only the restaurant shown on this page — branches keep their own delivery
-                    # and reservation settings. (field absent from the form → keep current settings)
-                    is_own = own_restaurant is not None and restaurant.pk == own_restaurant.pk
+                    # (field absent from the form → keep current delivery/reservation settings)
+                    is_own = True
                     if delivery_fee is not None and is_own:
                         restaurant.delivery_fee = delivery_fee
                         restaurant.free_delivery_minimum = free_delivery_minimum
@@ -4310,7 +4414,7 @@ def profile(request):
                 wifi_ssid = request.POST.get('wifi_ssid', '').strip()
                 wifi_password = request.POST.get('wifi_password', '').strip()
                 
-                # Update WiFi settings for all restaurants
+                # Update WiFi settings (this restaurant only)
                 for restaurant in user_restaurants:
                     restaurant.wifi_ssid = wifi_ssid if wifi_ssid else None
                     restaurant.wifi_password = wifi_password if wifi_password else None
@@ -4327,7 +4431,7 @@ def profile(request):
                         messages.error(request, str(e.message))
                         return redirect('admin_panel:profile')
                     
-                    # Update all restaurants for this user
+                    # Update this restaurant only
                     for restaurant in user_restaurants:
                         if restaurant.logo:
                             restaurant.logo.delete()  # Delete old logo
@@ -4349,10 +4453,10 @@ def profile(request):
         elif action == 'update_currency':
             # Update currency settings (for owners and managers)
             try:
-                if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
-                    messages.error(request, "Only restaurant owners and managers can update currency settings.")
+                if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+                    messages.error(request, "Only the restaurant owner can change the currency. Please ask your owner.")
                     return redirect('admin_panel:profile')
-                
+
                 currency_code = request.POST.get('currency_code', 'USD').strip().upper()
                 
                 # Validate currency code
@@ -4421,35 +4525,19 @@ def profile(request):
     
     return render(request, 'admin_panel/profile.html', context)
 
-@login_required
-def manage_qr_code(request):
-    """QR Code management for restaurant owners and branch owners"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
-        messages.error(request, "Access denied. Owner or Branch Owner privileges required.")
-        return redirect('restaurant:home')
-    
-    # Get current restaurant context
-    current_restaurant = None
-    selected_restaurant_id = request.session.get('selected_restaurant_id')
-    
-    if selected_restaurant_id:
-        # selected_restaurant_id stores the User (owner) ID, not Restaurant ID
-        try:
-            selected_user = User.objects.get(id=selected_restaurant_id)
-            
-            # Get the Restaurant object for this user
-            if selected_user.is_branch_owner():
-                current_restaurant = Restaurant.objects.filter(branch_owner=selected_user, is_main_restaurant=False).first()
-            else:
-                current_restaurant = Restaurant.objects.filter(main_owner=selected_user, is_main_restaurant=True).first()
-            
-            # Verify access
-            if current_restaurant and not current_restaurant.can_user_access(request.user):
-                current_restaurant = None
-        except User.DoesNotExist:
-            current_restaurant = None
-    
-    # If no restaurant selected, get user's default restaurant
+def _qr_restaurant(request):
+    """
+    The restaurant whose QR codes the QR page shows, regenerates and renders.
+    One resolution for manage_qr_code, regenerate_qr_code and generate_qr_image so they
+    can never act on different restaurants. The session's selected_restaurant_id is an
+    owner USER id; get_restaurant_context turns it into an accessible Restaurant.
+    """
+    current_restaurant = get_restaurant_context(
+        request.user, request.session.get('selected_restaurant_id'), request)['current_restaurant']
+    if current_restaurant and not current_restaurant.can_user_access(request.user):
+        current_restaurant = None
+
+    # If no restaurant selected (e.g. "all locations" view), get user's default restaurant
     if not current_restaurant:
         if request.user.is_branch_owner():
             current_restaurant = Restaurant.objects.filter(branch_owner=request.user).first()
@@ -4472,7 +4560,18 @@ def manage_qr_code(request):
                 models.Q(main_owner=request.user) | models.Q(branch_owner=request.user)
             )
             current_restaurant = user_restaurants.first()
-    
+    return current_restaurant
+
+
+@login_required
+def manage_qr_code(request):
+    """QR Code management for restaurant owners and branch owners"""
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
+        messages.error(request, "Access denied. Owner or Branch Owner privileges required.")
+        return redirect('restaurant:home')
+
+    current_restaurant = _qr_restaurant(request)
+
     if not current_restaurant:
         messages.error(request, "No restaurant found. Please contact administrator.")
         return redirect('admin_panel:admin_dashboard')
@@ -4514,36 +4613,15 @@ def regenerate_qr_code(request):
     if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Owner or Branch Owner privileges required.")
         return redirect('restaurant:home')
-    
-    # Get current restaurant context
-    current_restaurant = None
-    selected_restaurant_id = request.session.get('selected_restaurant_id')
-    
-    if selected_restaurant_id:
-        try:
-            current_restaurant = Restaurant.objects.get(id=selected_restaurant_id)
-            if not current_restaurant.can_user_access(request.user):
-                current_restaurant = None
-        except Restaurant.DoesNotExist:
-            current_restaurant = None
-    
-    if not current_restaurant:
-        if request.user.is_branch_owner():
-            current_restaurant = Restaurant.objects.filter(branch_owner=request.user).first()
-        elif request.user.is_main_owner():
-            current_restaurant = Restaurant.objects.filter(main_owner=request.user, is_main_restaurant=True).first()
-        elif request.user.is_manager() and request.user.owner:
-            # Managers access their owner's restaurant
-            if request.user.owner.is_branch_owner():
-                current_restaurant = Restaurant.objects.filter(branch_owner=request.user.owner).first()
-            elif request.user.owner.is_main_owner():
-                current_restaurant = Restaurant.objects.filter(main_owner=request.user.owner, is_main_restaurant=True).first()
-            else:
-                # Regular owner
-                current_restaurant = Restaurant.objects.filter(
-                    Q(main_owner=request.user.owner) | Q(branch_owner=request.user.owner)
-                ).first()
-    
+    if not request.user.has_feature('manage_tables'):
+        # Regenerating invalidates every printed table QR code
+        messages.error(request, "You don't have permission to regenerate the QR code.")
+        return redirect('admin_panel:manage_qr_code')
+
+    # Same restaurant the QR page shows (session stores an owner USER id, not a
+    # Restaurant id; see _qr_restaurant).
+    current_restaurant = _qr_restaurant(request)
+
     if not current_restaurant:
         messages.error(request, "No restaurant found for QR code regeneration.")
         return redirect('admin_panel:admin_dashboard')
@@ -4565,35 +4643,10 @@ def generate_qr_image(request):
     # Check if generating menu QR or ordering QR
     qr_type = request.GET.get('type', 'order')  # Default to ordering QR
     
-    # Get current restaurant context
-    current_restaurant = None
-    selected_restaurant_id = request.session.get('selected_restaurant_id')
-    
-    if selected_restaurant_id:
-        try:
-            current_restaurant = Restaurant.objects.get(id=selected_restaurant_id)
-            if not current_restaurant.can_user_access(request.user):
-                current_restaurant = None
-        except Restaurant.DoesNotExist:
-            current_restaurant = None
-    
-    if not current_restaurant:
-        if request.user.is_branch_owner():
-            current_restaurant = Restaurant.objects.filter(branch_owner=request.user).first()
-        elif request.user.is_main_owner():
-            current_restaurant = Restaurant.objects.filter(main_owner=request.user, is_main_restaurant=True).first()
-        elif request.user.is_manager() and request.user.owner:
-            # Managers access their owner's restaurant
-            if request.user.owner.is_branch_owner():
-                current_restaurant = Restaurant.objects.filter(branch_owner=request.user.owner).first()
-            elif request.user.owner.is_main_owner():
-                current_restaurant = Restaurant.objects.filter(main_owner=request.user.owner, is_main_restaurant=True).first()
-            else:
-                # Regular owner
-                current_restaurant = Restaurant.objects.filter(
-                    Q(main_owner=request.user.owner) | Q(branch_owner=request.user.owner)
-                ).first()
-    
+    # Same restaurant the QR page shows (session stores an owner USER id, not a
+    # Restaurant id; see _qr_restaurant).
+    current_restaurant = _qr_restaurant(request)
+
     if not current_restaurant:
         return HttpResponse("No restaurant found", status=404)
     
@@ -5705,32 +5758,11 @@ def save_printer_settings(request):
             auto_print_buffet = request.POST.get('auto_print_buffet') == 'on'
             auto_print_service = request.POST.get('auto_print_service') == 'on'
         
-        # Get the current restaurant based on session or user type
-        current_restaurant = None
+        # Resolve the restaurant exactly as printer_settings does. The session value
+        # 'selected_restaurant_id' is an owner USER id, never a Restaurant id, and the
+        # helper only returns a restaurant this user is allowed to access.
         session_restaurant_id = request.session.get('selected_restaurant_id')
-        
-        if session_restaurant_id:
-            try:
-                current_restaurant = Restaurant.objects.get(id=session_restaurant_id)
-            except Restaurant.DoesNotExist:
-                pass
-        
-        # If no session restaurant, get the user's primary restaurant
-        if not current_restaurant:
-            if user.is_main_owner():
-                current_restaurant = Restaurant.objects.filter(main_owner=user, is_main_restaurant=True).first()
-            elif user.is_branch_owner():
-                current_restaurant = Restaurant.objects.filter(branch_owner=user, is_main_restaurant=False).first()
-            elif user.is_manager() and user.owner:
-                # Managers: get their owner's restaurant
-                if user.owner.is_main_owner():
-                    current_restaurant = Restaurant.objects.filter(main_owner=user.owner, is_main_restaurant=True).first()
-                elif user.owner.is_branch_owner():
-                    current_restaurant = Restaurant.objects.filter(branch_owner=user.owner).first()
-                else:
-                    current_restaurant = Restaurant.objects.filter(main_owner=user.owner).first()
-            elif user.is_owner():
-                current_restaurant = Restaurant.objects.filter(main_owner=user).first()
+        current_restaurant = get_restaurant_context(user, session_restaurant_id, request)['current_restaurant']
         
         # ALWAYS save to User model first (ensures backup)
         user.kitchen_printer_name = kitchen_printer if kitchen_printer else None

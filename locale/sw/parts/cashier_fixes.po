@@ -1,0 +1,7 @@
+# Kiswahili: cashier receipt additions (amount paid / balance)
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Paid (%(method)s):"
+msgstr "Imelipwa (%(method)s):"

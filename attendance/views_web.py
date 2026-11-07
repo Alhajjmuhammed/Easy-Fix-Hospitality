@@ -21,13 +21,54 @@ from .models import AttendanceQRToken, AttendanceRecord, Shift, AttendancePolicy
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
 def _get_owner_and_restaurant(request):
-    """Return (owner, current_restaurant) for the logged-in user."""
+    """Return (owner, current_restaurant) for the logged-in user.
+
+    The restaurant picked in the session is used when the owner may access it; otherwise
+    the owner's own restaurant (Restaurant.for_owner: the main restaurant for a main
+    owner). The generic "first accessible restaurant" fallback would pick a branch,
+    because branches sort first."""
+    from restaurant.models_restaurant import Restaurant
     user = request.user
     owner = user.get_owner()
+    if owner is None:
+        return owner, None
     restaurant = None
-    if hasattr(owner, 'get_current_restaurant'):
-        restaurant = owner.get_current_restaurant(request)
+    session = getattr(request, 'session', None)
+    rid = session.get('selected_restaurant_id') if session is not None else None
+    if rid and (user.is_main_owner() or user.is_branch_owner() or user.is_owner() or user.is_manager()):
+        # selected_restaurant_id holds the selected location's OWNER user id (not a Restaurant
+        # id): resolve it exactly like the admin panel does (honours selected_restaurant_pk)
+        try:
+            from admin_panel.restaurant_utils import get_restaurant_context
+            selected = get_restaurant_context(user, rid, request).get('current_restaurant')
+        except Exception:
+            selected = None
+        if selected is not None and selected.can_user_access(owner):
+            restaurant = selected
+    if restaurant is None:
+        restaurant = Restaurant.for_owner(owner)
     return owner, restaurant
+
+
+def _team_owner_ids(owner, restaurant):
+    """Owner accounts whose staff records belong to this view. Staff records are saved
+    under the staff member's own owner, so a branch's records sit under its branch owner
+    (not under the main owner who may be viewing the branch)."""
+    owners = {owner.id}
+    if restaurant is not None:
+        from .views_mobile import restaurant_team_owner_id
+        team_owner_id = restaurant_team_owner_id(restaurant)
+        if team_owner_id:
+            owners.add(team_owner_id)
+    return owners
+
+
+def _records_for(owner, restaurant):
+    """Attendance records of the selected restaurant (all of the owner's when none)."""
+    qs = AttendanceRecord.objects.filter(owner_id__in=_team_owner_ids(owner, restaurant))
+    if restaurant is not None:
+        qs = qs.filter(restaurant=restaurant)
+    return qs
 
 
 def _require_can_manage(request):
@@ -51,11 +92,27 @@ def _hide_owner_records(user):
 
 
 def _get_or_create_qr(owner, restaurant):
+    """One QR per restaurant (the token's restaurant link is one-to-one). Look it up by
+    the restaurant, whoever created it, and create it under the restaurant's own team
+    owner (the branch owner for a branch) so the branch owner and branch staff can use it."""
     from django.db import IntegrityError
+    if restaurant is None:
+        try:
+            qr, _ = AttendanceQRToken.objects.get_or_create(owner=owner, restaurant=None)
+        except IntegrityError:
+            qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=None).first()
+        return qr
+    qr = AttendanceQRToken.objects.filter(restaurant=restaurant).first()
+    if qr is not None:
+        return qr
+    from .views_mobile import restaurant_team_owner_id
     try:
-        qr, _ = AttendanceQRToken.objects.get_or_create(owner=owner, restaurant=restaurant)
+        qr, _ = AttendanceQRToken.objects.get_or_create(
+            restaurant=restaurant,
+            defaults={'owner_id': restaurant_team_owner_id(restaurant) or owner.id},
+        )
     except IntegrityError:
-        qr = AttendanceQRToken.objects.filter(owner=owner, restaurant=restaurant).first()
+        qr = AttendanceQRToken.objects.filter(restaurant=restaurant).first()
     return qr
 
 
@@ -103,12 +160,9 @@ def attendance_dashboard(request):
     owner, restaurant = _get_owner_and_restaurant(request)
     today = timezone.localdate()
 
-    records_qs = AttendanceRecord.objects.filter(
-        owner=owner, date=today
+    records_qs = _records_for(owner, restaurant).filter(
+        date=today
     ).select_related('staff', 'staff__role', 'shift', 'restaurant').order_by('check_in')
-
-    if restaurant:
-        records_qs = records_qs.filter(restaurant=restaurant)
 
     # Non-owner viewers (managers, cashiers, etc.) cannot see owner-level records
     if _hide_owner_records(request.user):
@@ -119,7 +173,7 @@ def attendance_dashboard(request):
     # Staff who haven't checked in yet — use all today's records (not restaurant-filtered)
     # so staff who checked in at another branch don't appear as absent
     staff_ids_present = AttendanceRecord.objects.filter(
-        owner=owner, date=today, check_in__isnull=False
+        owner_id__in=_team_owner_ids(owner, restaurant), date=today, check_in__isnull=False
     ).values_list('staff_id', flat=True)
     # Build the absent query from the correct owner context
     if restaurant and restaurant.branch_owner:
@@ -253,11 +307,9 @@ def attendance_calendar(request):
     first_day = date(year, month, 1)
     last_day = date(year, month, days_in_month)
 
-    records_qs = AttendanceRecord.objects.filter(
-        owner=owner, date__range=(first_day, last_day)
+    records_qs = _records_for(owner, restaurant).filter(
+        date__range=(first_day, last_day)
     ).select_related('staff', 'staff__role', 'shift')
-    if restaurant:
-        records_qs = records_qs.filter(restaurant=restaurant)
     if _hide_owner_records(request.user):
         records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
 
@@ -315,11 +367,9 @@ def attendance_day_records(request):
     if not day_str:
         return JsonResponse({'error': 'date param required'}, status=400)
 
-    records_qs = AttendanceRecord.objects.filter(
-        owner=owner, date=day_str
+    records_qs = _records_for(owner, restaurant).filter(
+        date=day_str
     ).select_related('staff', 'staff__role', 'shift', 'restaurant')
-    if restaurant:
-        records_qs = records_qs.filter(restaurant=restaurant)
     if _hide_owner_records(request.user):
         records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
 
@@ -380,12 +430,8 @@ def attendance_web_checkin(request):
     user = request.user
     can_web_checkin = user.is_any_owner()
     today = timezone.localdate()
-    owner = user.get_owner()
-
-    # Try to determine restaurant from session
-    restaurant = None
-    if hasattr(owner, 'get_current_restaurant'):
-        restaurant = owner.get_current_restaurant(request)
+    # Restaurant from the session, else the owner's own (main) restaurant
+    owner, restaurant = _get_owner_and_restaurant(request)
 
     # Find appropriate shift
     from .views_mobile import _shift_for
@@ -417,6 +463,7 @@ def attendance_web_checkin(request):
                 record.check_in_via = 'web'
                 if not record.shift:
                     record.shift = shift
+                record.compute_lateness()  # known on arrival; check-out recomputes it
                 record.save()
                 messages.success(request, f"Checked in at {timezone.localtime(now).strftime('%H:%M')}.")
 
@@ -513,7 +560,8 @@ def attendance_qr_web_scan(request):
 
     user = request.user
     owner = user.get_owner()
-    if qr.owner != owner:
+    from .views_mobile import qr_allowed_for
+    if not qr_allowed_for(user, owner, qr):
         return JsonResponse({'error': 'This QR code does not belong to your restaurant.'}, status=403)
 
     today = timezone.localdate()
@@ -536,6 +584,7 @@ def attendance_qr_web_scan(request):
         record.check_in_via = 'web'
         if not record.shift:
             record.shift = shift
+        record.compute_lateness()  # known on arrival; check-out recomputes it
         record.save()
         return JsonResponse({
             'success': True,
@@ -581,12 +630,9 @@ def attendance_day_detail(request):
     except ValueError:
         day = today
 
-    records_qs = AttendanceRecord.objects.filter(
-        owner=owner, date=day
+    records_qs = _records_for(owner, restaurant).filter(
+        date=day
     ).select_related('staff', 'staff__role', 'shift', 'restaurant').order_by('check_in')
-
-    if restaurant:
-        records_qs = records_qs.filter(restaurant=restaurant)
     if _hide_owner_records(request.user):
         records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
 
@@ -599,7 +645,7 @@ def attendance_day_detail(request):
     absent_staff = []
     if not day > today:
         staff_ids_present = AttendanceRecord.objects.filter(
-            owner=owner, date=day, check_in__isnull=False
+            owner_id__in=_team_owner_ids(owner, restaurant), date=day, check_in__isnull=False
         ).values_list('staff_id', flat=True)
         # Build the absent query from the correct owner context
         if restaurant and restaurant.branch_owner:
@@ -635,6 +681,53 @@ def attendance_day_detail(request):
     return render(request, 'admin_panel/attendance_day_detail.html', context)
 
 
+def _attendance_rate(owner, restaurant, records, date_from, date_to, today):
+    """(rate %, days counted) for the report.
+
+    - When a published roster has shifts in the range: shifts attended / shifts rostered.
+      That is the only fair measure when people work different days (weekends included).
+    - Otherwise: staff-days present / (team's active staff x every day in the range).
+      All days count, because weekend attendance counts in the numerator too, and staff
+      who never checked in are part of the team, so they lower the rate.
+    Days after today are not counted (nobody can be present yet). Capped at 100%.
+    Owner accounts are not staff and are left out.
+    """
+    from .models import RosterEntry
+    from .roster import NOT_ROSTERED_ROLES
+    end = min(date_to, today)
+    if end < date_from:
+        return 0, 0
+    days = (end - date_from).days + 1
+    if restaurant is not None:
+        from .views_mobile import restaurant_team_owner_id
+        team_owner_id = restaurant_team_owner_id(restaurant) or owner.id
+    else:
+        team_owner_id = owner.id
+
+    present = {
+        (r.staff_id, r.date) for r in records
+        if r.check_in and r.date <= end
+        and not (r.staff.role and r.staff.role.name in NOT_ROSTERED_ROLES)
+    }
+    rostered = set(
+        RosterEntry.objects.filter(
+            week__owner_id=team_owner_id, week__status='published', kind='shift',
+            date__range=(date_from, end),
+        ).values_list('staff_id', 'date')
+    )
+    if rostered:
+        rate = len(present & rostered) / len(rostered) * 100
+    else:
+        staff_ids = set(
+            User.objects.filter(owner_id=team_owner_id, is_active=True, is_active_staff=True)
+            .exclude(role__name__in=NOT_ROSTERED_ROLES).exclude(pk=team_owner_id)
+            .values_list('id', flat=True)
+        )
+        staff_ids |= {staff_id for staff_id, _ in present}
+        rate = len(present) / (len(staff_ids) * days) * 100 if staff_ids else 0
+    return round(min(rate, 100), 1), days
+
+
 @login_required
 def attendance_reports(request):
     """Attendance summary reports with date-range filtering."""
@@ -660,13 +753,9 @@ def attendance_reports(request):
     if date_from > date_to:
         date_from, date_to = date_to, date_from
 
-    records_qs = AttendanceRecord.objects.filter(
-        owner=owner,
+    records_qs = _records_for(owner, restaurant).filter(
         date__range=(date_from, date_to),
     ).select_related('staff', 'staff__role', 'shift')
-
-    if restaurant:
-        records_qs = records_qs.filter(restaurant=restaurant)
     if _hide_owner_records(request.user):
         records_qs = records_qs.exclude(staff__role__name__in=_OWNER_ROLES)
 
@@ -729,14 +818,8 @@ def attendance_reports(request):
     total_late = sum(1 for r in all_records if r.is_late)
     total_work_minutes = sum(r.work_minutes or 0 for r in all_records)
     th, tm = divmod(total_work_minutes, 60)
-    working_days = sum(
-        1 for i in range((date_to - date_from).days + 1)
-        if (date_from + timedelta(days=i)).weekday() < 5
-    )
     total_staff = len(staff_map)
-    attendance_rate = round(
-        total_records / (working_days * total_staff) * 100, 1
-    ) if total_staff and working_days else 0
+    attendance_rate, working_days = _attendance_rate(owner, restaurant, all_records, date_from, date_to, today)
 
     import csv
     if request.GET.get('export') == 'csv':

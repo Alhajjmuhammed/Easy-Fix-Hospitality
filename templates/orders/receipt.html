@@ -197,7 +197,7 @@
                         <div class="item-row">
                             <div class="item-name">{{ item.product.name }}</div>
                             <div class="item-qty">{{ item.quantity }}x</div>
-                            <div class="item-price">{% currency_symbol %}{{ item.get_total_price|floatformat:2 }}</div>
+                            <div class="item-price">{% currency_symbol %}{{ item.get_subtotal|floatformat:2 }}</div>
                         </div>
                         {% if item.special_notes %}
                             <div class="text-muted small ps-2">

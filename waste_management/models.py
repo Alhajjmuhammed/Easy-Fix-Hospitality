@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from orders.models import Order, OrderItem
 from restaurant.models import Product
 
@@ -69,8 +69,14 @@ class FoodWasteLog(models.Model):
             return self.product.owner
         return None
     
+    # Share of the menu price used when a product has no cost settings of its own
+    DEFAULT_INGREDIENT_PCT = 30
+    DEFAULT_LABOR_PCT = 25
+    DEFAULT_OVERHEAD_PCT = 15
+
     def calculate_costs(self):
         """Calculate costs based on product cost settings or default percentages"""
+        cent = Decimal('0.01')
         if not self.product:
             self.total_cost = self.ingredient_cost + self.labor_cost + self.overhead_cost
             return
@@ -81,12 +87,16 @@ class FoodWasteLog(models.Model):
             self.overhead_cost = cost_settings.overhead_cost_per_unit * self.quantity_wasted
         except ProductCostSettings.DoesNotExist:
             base_price = self.product.price
-            ingredient_pct = Decimal('30.0')
-            labor_pct = Decimal('25.0')
-            overhead_pct = Decimal('15.0')
+            ingredient_pct = Decimal(self.DEFAULT_INGREDIENT_PCT)
+            labor_pct = Decimal(self.DEFAULT_LABOR_PCT)
+            overhead_pct = Decimal(self.DEFAULT_OVERHEAD_PCT)
             self.ingredient_cost = (base_price * ingredient_pct / 100) * self.quantity_wasted
             self.labor_cost = (base_price * labor_pct / 100) * self.quantity_wasted
             self.overhead_cost = (base_price * overhead_pct / 100) * self.quantity_wasted
+        # Round each part to the cent as it is stored, and make the total their exact sum
+        self.ingredient_cost = Decimal(self.ingredient_cost).quantize(cent, ROUND_HALF_UP)
+        self.labor_cost = Decimal(self.labor_cost).quantize(cent, ROUND_HALF_UP)
+        self.overhead_cost = Decimal(self.overhead_cost).quantize(cent, ROUND_HALF_UP)
         self.total_cost = self.ingredient_cost + self.labor_cost + self.overhead_cost
     
     def save(self, *args, **kwargs):

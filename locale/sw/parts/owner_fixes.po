@@ -1,0 +1,10 @@
+# Kiswahili - owner/manager panel fixes (order tabs, profile settings note). Please have a native speaker review.
+
+msgid "On the way"
+msgstr "Iko njiani"
+
+msgid "Delivered to customer"
+msgstr "Imefikishwa kwa mteja"
+
+msgid "Restaurant settings and currency are managed by the restaurant owner."
+msgstr "Mipangilio ya mgahawa na sarafu inasimamiwa na mmiliki wa mgahawa."

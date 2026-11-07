@@ -64,10 +64,10 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',  # Enabled for production
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'restaurant_system.language_middleware.UserLanguageMiddleware',  # English unless the person chose Kiswahili
+    'django.contrib.messages.middleware.MessageMiddleware',  # before SessionTimeout/Subscription: they add messages
     'restaurant_system.session_timeout_middleware.SessionTimeoutMiddleware',  # Auto-logout after 15 min inactivity
     'restaurant_system.subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
     'attendance.middleware.AttendanceEnforcementMiddleware',  # Optional: block uncheck-in staff (default OFF)
-    'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',  # Django-axes for failed login tracking
 ]
@@ -415,6 +415,7 @@ AXES_IP_WHITELIST = []  # Can add trusted IPs (e.g., admin office, staff network
 # Rate Limiting Configuration
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = 'default'
+RATELIMIT_VIEW = 'restaurant_system.security_decorators.rate_limited_view'  # Custom rate limit exceeded view (429 page)
 # Use X-Real-IP header which nginx sets, fallback to X-Forwarded-For
 RATELIMIT_IP_META_KEY = 'HTTP_X_REAL_IP'
 

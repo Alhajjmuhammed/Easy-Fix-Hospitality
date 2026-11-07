@@ -159,7 +159,7 @@ def save_week(team_owner, start, cells, user):
         week.save(update_fields=['updated_at'])
     if week.is_published and notify_ids:
         _notify(notify_ids, 'Roster updated 📅',
-                f'Your shifts for the week of {start:%a %d %b} have changed. Tap to see them.', start)
+                'Your shifts for the week of {week} have changed. Tap to see them.', start)
     return changed, skipped
 
 
@@ -176,7 +176,7 @@ def publish_week(team_owner, start, user):
     upcoming = _upcoming_staff(week)
     if upcoming:  # nobody is told about a week that is already over
         _notify(upcoming, 'Your roster is ready 📅',
-                f'Your shifts for the week of {start:%a %d %b} are published. Tap to see them.', start)
+                'Your shifts for the week of {week} are published. Tap to see them.', start)
     return week
 
 
@@ -195,7 +195,7 @@ def unpublish_week(team_owner, start):
     upcoming = _upcoming_staff(week)
     if upcoming:
         _notify(upcoming, 'Roster withdrawn',
-                f'Your shifts for the week of {start:%a %d %b} are being changed. You will be notified again.', start)
+                'Your shifts for the week of {week} are being changed. You will be notified again.', start)
 
 
 @transaction.atomic
@@ -221,7 +221,7 @@ def copy_previous_week(team_owner, start, user):
     notify_ids = {e.staff_id for e in created if e.date >= today}
     if week.is_published and notify_ids:
         _notify(notify_ids, 'Roster updated 📅',
-                f'Your shifts for the week of {start:%a %d %b} have changed. Tap to see them.', start)
+                'Your shifts for the week of {week} have changed. Tap to see them.', start)
     return len(created)
 
 

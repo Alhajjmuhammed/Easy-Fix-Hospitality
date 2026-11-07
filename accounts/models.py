@@ -239,7 +239,9 @@ class User(AbstractUser):
             if feat_owner:
                 from django.db import transaction as _tx
                 with _tx.atomic():
-                    disabled = set(feat_owner.subscription.disabled_features.values_list('slug', flat=True))
+                    # Branches inherit the MAIN restaurant's module restrictions.
+                    sub_owner = self._subscription_owner() or feat_owner
+                    disabled = set(sub_owner.subscription.disabled_features.values_list('slug', flat=True))
                 slugs -= disabled
         except Exception:
             pass
@@ -296,6 +298,25 @@ class User(AbstractUser):
         if self.is_any_owner():
             return self
         return self.owner
+
+    def _subscription_owner(self):
+        """
+        The owner account whose RestaurantSubscription governs this user: the user's
+        owner, except that a branch owner (and branch staff) answer to the MAIN owner of
+        the branch. Cached on the instance (request.user is rebuilt every request).
+        """
+        if hasattr(self, '_sub_owner_cache'):
+            return self._sub_owner_cache
+        owner = self.get_owner()
+        result = owner
+        if owner is not None and owner.is_branch_owner():
+            from restaurant.models_restaurant import Restaurant
+            branch = (Restaurant.objects.filter(branch_owner=owner, is_main_restaurant=False)
+                      .select_related('main_owner').first())
+            if branch is not None and branch.main_owner_id and branch.main_owner_id != owner.pk:
+                result = branch.main_owner
+        self._sub_owner_cache = result
+        return result
     
     def get_accessible_restaurants(self):
         """Get restaurants this user can access"""
@@ -516,7 +537,9 @@ class User(AbstractUser):
             try:
                 from django.db import transaction as _tx
                 with _tx.atomic():
-                    if owner.subscription.disabled_features.filter(slug=slug).exists():
+                    # Branches inherit the MAIN restaurant's module restrictions.
+                    sub_owner = self._subscription_owner()
+                    if sub_owner and sub_owner.subscription.disabled_features.filter(slug=slug).exists():
                         return False
             except Exception:
                 pass  # No subscription record, or table not yet migrated — no restriction
@@ -820,18 +843,10 @@ class RestaurantSubscription(models.Model):
             self.block_reason = reason
             self.subscription_status = 'blocked'
 
-            # Block all related users — use locked to avoid stale FK traversal
-            owner_user = locked.restaurant_owner
-            owner_user.is_active = False
-            owner_user.save(update_fields=['is_active'])
-
-            # Block all staff under this owner
-            locked.restaurant_owner.owned_users.all().update(is_active=False)
-
-            # Also deactivate customer accounts linked to this owner
-            from django.contrib.auth import get_user_model as _get_user_model
-            _User = _get_user_model()
-            _User.objects.filter(owner=locked.restaurant_owner, role__name='customer').update(is_active=False)
+            # Block the owner, all staff and linked customer accounts under this owner —
+            # use locked to avoid stale FK traversal. Whom we switch off is remembered so
+            # unblocking/renewing restores exactly them (not staff disabled on purpose).
+            locked._suspend_users('blocked')
 
             self.save(update_fields=['is_blocked_by_admin', 'block_reason', 'subscription_status'])
 
@@ -863,13 +878,12 @@ class RestaurantSubscription(models.Model):
             if locked.subscription_start_date <= today <= grace_end:
                 self.subscription_status = 'active'
 
-            # Always reactivate users when admin unblocks (admin override)
+            # Always reactivate users when admin unblocks (admin override): the accounts
+            # the block/expiry switched off — staff the owner disabled stay disabled.
+            locked.reactivate_suspended_users()
             # Unblock owner
             self.restaurant_owner.is_active = True
             self.restaurant_owner.save(update_fields=['is_active'])
-
-            # Unblock all staff under this owner
-            locked.restaurant_owner.owned_users.all().update(is_active=True)
 
             self.save(update_fields=['is_blocked_by_admin', 'block_reason', 'subscription_status'])
 
@@ -883,6 +897,62 @@ class RestaurantSubscription(models.Model):
                 performed_by=unblocked_by
             )
     
+    # Which accounts an expiry/block switched off is remembered without a migration, in
+    # an AuditLog row (existing JSON field) per suspension. Restoring flips target_model
+    # so each record is used once.
+    SUSPENSION_TARGET = 'RestaurantSubscription.suspension'
+    SUSPENSION_RESTORED = 'RestaurantSubscription.suspension.restored'
+
+    def _suspended_scope(self):
+        """Accounts an expiry/block switches off: the owner and every account under it."""
+        owner_id = self.restaurant_owner_id
+        return User.objects.filter(models.Q(pk=owner_id) | models.Q(owner_id=owner_id))
+
+    def _suspend_users(self, reason):
+        """Deactivate the still-active accounts in scope and record exactly whom."""
+        ids = list(self._suspended_scope().filter(is_active=True).values_list('pk', flat=True))
+        if ids:
+            User.objects.filter(pk__in=ids).update(is_active=False)
+            AuditLog.objects.create(
+                event_type='staff_deactivated',
+                username='system',
+                description=f"Accounts deactivated: subscription {reason}",
+                extra_data={'user_ids': ids, 'reason': reason},
+                target_model=self.SUSPENSION_TARGET,
+                target_id=str(self.pk),
+            )
+        if self.restaurant_owner_id in ids:
+            self.restaurant_owner.is_active = False
+        return ids
+
+    def reactivate_suspended_users(self):
+        """
+        Switch back on the accounts that an expiry/block switched off (as recorded).
+        Branch owners/branch staff are never switched off by it (the subscription
+        middleware blocks them via the main owner), so they need nothing here.
+        Accounts that were already inactive at that moment (e.g. staff the owner disabled on purpose) stay off.
+        Suspensions from before the ids were recorded fall back to the owner and all the
+        accounts under it (the old behaviour).
+        """
+        logs = AuditLog.objects.filter(target_model=self.SUSPENSION_TARGET, target_id=str(self.pk))
+        ids = set()
+        for extra in logs.values_list('extra_data', flat=True):
+            for pk in (extra or {}).get('user_ids', []) if isinstance(extra, dict) else []:
+                try:
+                    ids.add(int(pk))
+                except (TypeError, ValueError):
+                    pass
+        if ids:
+            User.objects.filter(pk__in=ids).update(is_active=True)
+            logs.update(target_model=self.SUSPENSION_RESTORED)
+        elif not User.objects.filter(pk=self.restaurant_owner_id, is_active=True).exists():
+            # Legacy suspension (no record): owner + everyone under it.
+            ids = set(self._suspended_scope().filter(is_active=False).values_list('pk', flat=True))
+            self._suspended_scope().update(is_active=True)
+        if self.restaurant_owner_id in ids:
+            self.restaurant_owner.is_active = True
+        return ids
+
     def is_subscription_period_valid(self):
         """Check if subscription period is valid (ignoring block status)"""
         today = date.today()
@@ -919,13 +989,10 @@ class RestaurantSubscription(models.Model):
                 grace_end_date = locked.subscription_end_date + timedelta(days=locked.grace_period_days)
 
                 if today > grace_end_date:
-                    # Fully expired, block access
+                    # Fully expired, block access: owner and all staff (remembered, so a
+                    # renewal can switch exactly these accounts back on)
                     self.subscription_status = 'expired'
-                    locked.restaurant_owner.is_active = False
-                    locked.restaurant_owner.save(update_fields=['is_active'])
-
-                    # Block all staff
-                    locked.restaurant_owner.owned_users.all().update(is_active=False)
+                    locked._suspend_users('expired')
 
                     self.save(update_fields=['subscription_status'])
 

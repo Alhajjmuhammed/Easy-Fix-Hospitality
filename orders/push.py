@@ -94,6 +94,19 @@ def _run_and_close_db(fn, *args):
         connection.close()
 
 
+def _send_localized(recipients, make, data):
+    """Send one push per language: `recipients` is [(token, language)], `make(lang)` returns
+    (title, body) in that language. Always calls send_push at least once (possibly with no
+    tokens), exactly like the single English send it replaces."""
+    groups = {}
+    for token, language in recipients:
+        lang = language if language in ('en', 'sw') else 'en'  # same rule as i18n.language_of
+        groups.setdefault(lang, []).append(token)
+    for lang, tokens in (groups or {'en': []}).items():
+        title, body = make(lang)
+        send_push(tokens, title, body, data)
+
+
 def _restaurant_owner(order):
     """The owner account whose staff serve this order (works for legacy and branch tables)."""
     table = order.table_info
@@ -136,14 +149,21 @@ def notify_new_order(order):
         roles += list(REMOTE_ORDER_ROLES)
     if not roles:
         return
-    tokens = list(
+    recipients = list(
         User.objects.filter(owner=owner, is_active=True, role__name__in=roles, expo_push_token__isnull=False)
         .exclude(pk=order.ordered_by_id)
-        .values_list('expo_push_token', flat=True)
+        .values_list('expo_push_token', 'language')
     )
-    where = f'Table {order.table_info.tbl_no}' if order.table_info_id else order.get_order_type_display()
-    send_push(tokens, f'New Order #{order.order_number}', f'{where} • {order.order_items.count()} item(s)',
-              {'kind': 'new_order', 'orderId': order.id})
+    from .i18n import tr
+    count = order.order_items.count()
+    table_no = order.table_info.tbl_no if order.table_info_id else None
+    type_display = order.get_order_type_display()
+
+    def make(lang):
+        where = tr(lang, 'Table {table}', table=table_no) if table_no is not None else tr(lang, type_display)
+        return (tr(lang, 'New Order #{number}', number=order.order_number),
+                tr(lang, '{where} • {count} item(s)', where=where, count=count))
+    _send_localized(recipients, make, {'kind': 'new_order', 'orderId': order.id})
 
 
 RESERVATION_ROLES = ('cashier', 'customer_care', 'manager')
@@ -155,13 +175,9 @@ RESERVATION_STATUS_MESSAGES = {
 }
 
 
-def _reservation_when(res):
-    from django.utils import timezone as _tz
-    return _tz.localtime(res.start).strftime('%a %d %b, %H:%M')
-
-
-def _reservation_staff_tokens(res, exclude_user_id=None):
-    """Front-of-house staff of the restaurant who can see reservations (role set / custom role)."""
+def _reservation_staff(res, exclude_user_id=None):
+    """[(token, language)] of the front-of-house staff of the restaurant who can see
+    reservations (role set / custom role)."""
     from accounts.models import User
     owner = res.restaurant.branch_owner or res.restaurant.main_owner
     if owner is None:
@@ -170,23 +186,32 @@ def _reservation_staff_tokens(res, exclude_user_id=None):
                                  expo_push_token__isnull=False)
              .exclude(expo_push_token='').exclude(pk=exclude_user_id)
              .select_related('role', 'custom_role'))
-    return [u.expo_push_token for u in staff if u.has_feature('view_reservations')]
+    return [(u.expo_push_token, u.language) for u in staff if u.has_feature('view_reservations')]
 
 
 def notify_new_reservation(res):
     """Never notifies the person who created the booking."""
     status = 'awaiting confirmation' if res.status == 'pending' else 'confirmed'
-    send_push(_reservation_staff_tokens(res, exclude_user_id=res.created_by_id),
-              f'New Reservation • {res.party_size} people',
-              f'{res.name} — {_reservation_when(res)} ({status})',
-              {'kind': 'reservation', 'reservationId': res.id})
+    from django.utils import timezone as _tz
+    from .i18n import tr, when_text
+
+    def make(lang):
+        return (tr(lang, 'New Reservation • {party} people', party=res.party_size),
+                tr(lang, '{name} — {when} ({status})', name=res.name,
+                   when=when_text(lang, _tz.localtime(res.start)), status=tr(lang, status)))
+    _send_localized(_reservation_staff(res, exclude_user_id=res.created_by_id), make,
+                    {'kind': 'reservation', 'reservationId': res.id})
 
 
 def notify_reservation_cancelled_by_customer(res):
-    send_push(_reservation_staff_tokens(res),
-              'Reservation Cancelled',
-              f'{res.name} cancelled the table for {res.party_size} on {_reservation_when(res)}.',
-              {'kind': 'reservation', 'reservationId': res.id})
+    from django.utils import timezone as _tz
+    from .i18n import tr, when_text
+
+    def make(lang):
+        return (tr(lang, 'Reservation Cancelled'),
+                tr(lang, '{name} cancelled the table for {party} on {when}.', name=res.name,
+                   party=res.party_size, when=when_text(lang, _tz.localtime(res.start))))
+    _send_localized(_reservation_staff(res), make, {'kind': 'reservation', 'reservationId': res.id})
 
 
 def notify_reservation_status(res):
@@ -213,11 +238,15 @@ def notify_low_rating(rating):
     people = (User.objects.filter(Q(pk=owner.pk) | Q(owner=owner, role__name__in=FEEDBACK_ROLES),
                                   is_active=True, expo_push_token__isnull=False)
               .exclude(expo_push_token='').select_related('role', 'custom_role'))
-    tokens = [u.expo_push_token for u in people if u.has_feature('view_feedback')]
-    stars = f'{rating.food_stars}★ food' + (f', {rating.delivery_stars}★ delivery' if rating.delivery_stars else '')
-    send_push(tokens, f'Low rating on order #{rating.order.order_number}',
-              f'{stars}' + (f' — "{rating.comment[:80]}"' if rating.comment else ''),
-              {'kind': 'low_rating', 'orderId': rating.order_id})
+    recipients = [(u.expo_push_token, u.language) for u in people if u.has_feature('view_feedback')]
+    from .i18n import tr
+
+    def make(lang):
+        stars = tr(lang, '{n}★ food', n=rating.food_stars) + (
+            tr(lang, ', {n}★ delivery', n=rating.delivery_stars) if rating.delivery_stars else '')
+        return (tr(lang, 'Low rating on order #{number}', number=rating.order.order_number),
+                f'{stars}' + (f' — "{rating.comment[:80]}"' if rating.comment else ''))
+    _send_localized(recipients, make, {'kind': 'low_rating', 'orderId': rating.order_id})
 
 
 def notify_rating_reply(rating):
@@ -230,15 +259,24 @@ def notify_rating_reply(rating):
 
 
 def notify_roster(staff_ids, title, body, week_start):
+    """`title` / `body` are English texts (orders/i18n.py keys); `{week}` in them is filled in
+    with the week's first day, in each person's own language."""
     from accounts.models import User
-    tokens = User.objects.filter(pk__in=staff_ids, is_active=True, expo_push_token__isnull=False) \
-        .exclude(expo_push_token='').values_list('expo_push_token', flat=True)
-    send_push(list(tokens), title, body, {'kind': 'roster', 'week': week_start.isoformat()})
+    from .i18n import tr, when_text
+    recipients = User.objects.filter(pk__in=staff_ids, is_active=True, expo_push_token__isnull=False) \
+        .exclude(expo_push_token='').values_list('expo_push_token', 'language')
+
+    def make(lang):
+        week = when_text(lang, week_start, '%a %d %b')
+        return tr(lang, title, week=week), tr(lang, body, week=week)
+    _send_localized(list(recipients), make, {'kind': 'roster', 'week': week_start.isoformat()})
 
 
 def notify_rider_assigned(order, rider_user):
     if not rider_user or not rider_user.expo_push_token:
         return
-    send_push([rider_user.expo_push_token], 'New Delivery 🛵',
-              f'Order #{order.order_number} has been assigned to you.',
+    from .i18n import language_of, tr
+    lang = language_of(rider_user)
+    send_push([rider_user.expo_push_token], tr(lang, 'New Delivery 🛵'),
+              tr(lang, 'Order #{number} has been assigned to you.', number=order.order_number),
               {'kind': 'delivery_assigned', 'orderId': order.id})

@@ -205,7 +205,7 @@ def assign_rider(request):
             _Q(restaurant_owner=owner) |
             _Q(restaurant_owner__managed_restaurant__main_owner=owner)
         )
-        order = get_object_or_404(Order, order_scope, id=order_id, order_type='delivery')
+        order = get_object_or_404(Order.objects.filter(order_scope).distinct(), id=order_id, order_type='delivery')
     else:
         owner = None
         order = get_object_or_404(Order, id=order_id, order_type='delivery')
@@ -283,7 +283,7 @@ def auto_assign_rider(request):
             _Q(restaurant_owner=owner) |
             _Q(restaurant_owner__managed_restaurant__main_owner=owner)
         )
-        order = get_object_or_404(Order, order_scope, id=order_id, order_type='delivery')
+        order = get_object_or_404(Order.objects.filter(order_scope).distinct(), id=order_id, order_type='delivery')
     else:
         order = get_object_or_404(Order, id=order_id, order_type='delivery')
 

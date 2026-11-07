@@ -294,10 +294,18 @@ def edit_branch(request, restaurant_id):
             restaurant.name = sanitize_input(request.POST.get('name', ''), max_length=200)
             restaurant.description = sanitize_input(request.POST.get('description', ''), max_length=1000)
             restaurant.address = sanitize_input(request.POST.get('address', ''), max_length=500)
-            try:
-                restaurant.tax_rate = float(request.POST.get('tax_rate', 8.0)) / 100
-            except (ValueError, TypeError):
-                restaurant.tax_rate = 0.08  # Default to 8%
+            # Tax: an empty or missing field keeps the current rate (never a silent 8%);
+            # anything that is not a finite number between 0 and 99.99 is rejected.
+            _tax_raw = (request.POST.get('tax_rate') or '').strip()
+            if _tax_raw:
+                try:
+                    _tax_pct = Decimal(_tax_raw)
+                    if not _tax_pct.is_finite() or _tax_pct < 0 or _tax_pct > Decimal('99.99'):
+                        raise ValueError
+                except (ArithmeticError, ValueError):
+                    messages.error(request, 'Tax rate must be a number between 0 and 99.99.')
+                    return render(request, 'admin_panel/edit_branch.html', {'restaurant': restaurant})
+                restaurant.tax_rate = (_tax_pct / 100).quantize(Decimal('0.0001'))
             restaurant.auto_print_kot = request.POST.get('auto_print_kot') == 'on'
             restaurant.auto_print_bot = request.POST.get('auto_print_bot') == 'on'
             restaurant.kitchen_printer_name = request.POST.get('kitchen_printer_name', '').strip()
@@ -427,110 +435,71 @@ def delete_branch(request, restaurant_id):
             branch_owner.role.name == 'branch_owner'
         )
         
-        # Check for dependent data that might prevent deletion
-        from restaurant.models import TableInfo, Product, MainCategory
-        from orders.models import Order
-        
-        dependent_tables = TableInfo.objects.filter(
-            Q(restaurant_id=restaurant_id) | Q(owner=branch_owner)
-        ).count()
-        dependent_categories = MainCategory.objects.filter(
-            Q(restaurant_id=restaurant_id) | Q(owner=branch_owner)
-        ).count()
-        dependent_orders = Order.objects.filter(
-            Q(table_info__restaurant_id=restaurant_id) | Q(table_info__owner=branch_owner) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=branch_owner)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=branch_owner))
-        ).count()
-        
-        # Warning if there is dependent data
-        if dependent_tables > 0 or dependent_categories > 0 or dependent_orders > 0:
-            warning_parts = []
-            if dependent_tables > 0:
-                warning_parts.append(f"{dependent_tables} tables")
-            if dependent_categories > 0:
-                warning_parts.append(f"{dependent_categories} categories")
-            if dependent_orders > 0:
-                warning_parts.append(f"{dependent_orders} orders")
-            
-            warning_msg = f"This branch has {', '.join(warning_parts)}. Deleting it will also delete all related data. Are you sure?"
-        
-        # Delete all related data explicitly
-        from waste_management.models import FoodWasteLog
-        from reports.models import SalesReport
+        from restaurant.models import TableInfo, Product, MainCategory, SubCategory
         from orders.models import Order, BillRequest
         from orders.models_printjob import PrintJob
+        from waste_management.models import FoodWasteLog
+        from reports.models import SalesReport
         from accounts.models import User
-        
-        
-        
-        # 1. Delete waste logs related to products from this restaurant
-        waste_logs = FoodWasteLog.objects.filter(
-            Q(product__main_category__restaurant_id=restaurant_id) |
-            Q(product__main_category__owner=branch_owner)
-        )
-        waste_count = waste_logs.count()
-        waste_logs.delete()
-        
-        
-        # 2. Delete reports related to this branch owner (will cascade to ProductSalesDetail, etc.)
-        sales_reports = SalesReport.objects.filter(owner=branch_owner)
-        report_count = sales_reports.count()
-        sales_reports.delete()
-        
-        
-        # 3. Delete print jobs
-        print_jobs = PrintJob.objects.filter(restaurant_id=restaurant_id)
-        print_count = print_jobs.count()
-        print_jobs.delete()
-        
-        
-        # 4. Delete bill requests
-        bill_requests = BillRequest.objects.filter(
-            Q(table_info__restaurant_id=restaurant_id) |
-            Q(table_info__owner=branch_owner) |
-            (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=branch_owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=branch_owner)) |
-            (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=branch_owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=branch_owner))
-        )
-        bill_count = bill_requests.count()
-        bill_requests.delete()
-        
-        
-        # 5. Delete orders (this will cascade to order items)
-        orders = Order.objects.filter(
-            Q(table_info__restaurant_id=restaurant_id) |
-            Q(table_info__owner=branch_owner) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=branch_owner)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=branch_owner))
-        )
-        order_count = orders.count()
-        orders.delete()
-        
-        
-        # 6. Delete products (through categories - will cascade to products, subcategories, etc.)
-        categories = MainCategory.objects.filter(
-            Q(restaurant_id=restaurant_id) | Q(owner=branch_owner)
-        )
-        category_count = categories.count()
-        categories.delete()
-        
-        
-        # 7. Delete tables
-        tables = TableInfo.objects.filter(
-            Q(restaurant_id=restaurant_id) | Q(owner=branch_owner)
-        )
-        table_count = tables.count()
+        from .views import _cleanup_product_dependencies
+
+        # Every deletion below is scoped to THIS restaurant by its id. Legacy rows that
+        # only carry an owner (restaurant is NULL) are included only when the branch has
+        # its own dedicated branch owner. A branch the main owner runs himself has
+        # branch_owner == main_owner, so an owner filter would hit the MAIN restaurant.
+        if is_dedicated_branch_owner:
+            legacy_tables_q = Q(owner=branch_owner, restaurant__isnull=True)
+            legacy_orders_q = (
+                Q(table_info__owner=branch_owner, table_info__restaurant__isnull=True) |
+                Q(order_type__in=['delivery', 'pickup'], table_info__isnull=True, restaurant_owner=branch_owner) |
+                Q(order_type__in=['delivery', 'pickup'], table_info__isnull=True,
+                  restaurant_owner__isnull=True, ordered_by__owner=branch_owner)
+            )
+        else:
+            legacy_tables_q = Q(pk__in=[])
+            legacy_orders_q = Q(pk__in=[])
+
+        # Refuse to delete a branch that has order (and so sales/payment) history:
+        # deleting it would destroy financial records. The branch can be deactivated.
+        branch_orders = Order.objects.filter(Q(table_info__restaurant_id=restaurant_id) | legacy_orders_q)
+        order_count = branch_orders.count()
+        if order_count:
+            error_msg = (f'Cannot delete "{restaurant_name}": it has {order_count} order(s) on record. '
+                         f'Sales and payment history must be kept. Deactivate the branch instead.')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg})
+            messages.error(request, error_msg)
+            return redirect('admin_panel:main_owner_dashboard')
+
+        categories = MainCategory.objects.filter(Q(restaurant_id=restaurant_id) | legacy_tables_q)
+        category_ids = list(categories.values_list('id', flat=True))
+        product_ids = list(Product.objects.filter(main_category_id__in=category_ids).values_list('id', flat=True))
+        tables = TableInfo.objects.filter(Q(restaurant_id=restaurant_id) | legacy_tables_q)
+
+        # 1. Waste logs of this restaurant's products
+        FoodWasteLog.objects.filter(product_id__in=product_ids).delete()
+
+        # 2. Reports, print jobs: these are keyed by the owner USER, so only for a dedicated
+        #    branch owner (PrintJob.restaurant is a User FK, not a Restaurant id).
+        if is_dedicated_branch_owner:
+            SalesReport.objects.filter(owner=branch_owner).delete()
+            PrintJob.objects.filter(restaurant=branch_owner).delete()
+
+        # 3. Bill requests of this restaurant's tables
+        BillRequest.objects.filter(table_info__in=tables).delete()
+
+        # 4. Menu: products, then subcategories, then categories (PROTECT order)
+        _cleanup_product_dependencies(product_ids)
+        Product.objects.filter(id__in=product_ids).delete()
+        SubCategory.objects.filter(main_category_id__in=category_ids).delete()
+        MainCategory.objects.filter(id__in=category_ids).delete()
+
+        # 5. Tables
         tables.delete()
         
-        
-        # 8. Delete all users (staff) that belong to this branch owner (if dedicated branch owner)
+        # 6. Delete all users (staff) that belong to this branch owner (if dedicated branch owner)
         if is_dedicated_branch_owner and branch_owner:
-            branch_staff = User.objects.filter(owner=branch_owner)
-            staff_count = branch_staff.count()
-            if staff_count > 0:
-                staff_names = [f"{u.username} ({u.get_full_name()})" for u in branch_staff[:5]]  # Log first 5
-                
-                branch_staff.delete()
+            User.objects.filter(owner=branch_owner).delete()
         
         # 9. Clear NULLABLE foreign key references before deleting (to bypass PROTECT)
         
@@ -594,6 +563,10 @@ def switch_restaurant(request):
                 owner_user = restaurant.branch_owner if not restaurant.is_main_restaurant and restaurant.branch_owner else restaurant.main_owner
                 
                 request.session['selected_restaurant_id'] = owner_user.id  # Store User.id
+                # Also remember the exact Restaurant. A branch the main owner runs himself
+                # has the same owner user as the main restaurant, so the user id alone
+                # cannot tell them apart (read back in get_restaurant_context).
+                request.session['selected_restaurant_pk'] = restaurant.id
                 request.session['selected_restaurant_name'] = restaurant.name
                 
                 # Ensure view_all_restaurants flag is cleared when selecting specific restaurant
@@ -709,9 +682,10 @@ def set_view_all_restaurants(request):
         del request.session['selected_restaurant_id']
     if 'selected_restaurant_name' in request.session:
         del request.session['selected_restaurant_name']
-    
+    request.session.pop('selected_restaurant_pk', None)
+
     request.session['view_all_restaurants'] = True
-    
+
     return JsonResponse({
         'success': True, 
         'message': 'Now viewing all restaurants',

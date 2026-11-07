@@ -1329,7 +1329,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% blocktranslate with name="{name}" asvar t_menu_of %}{{ name }} Menu{% endblocktranslate %}{% blocktranslate with pct="{pct}" asvar t_off %}{{ pct }}% OFF{% endblocktranslate %}{% blocktranslate with n="{n}" asvar t_stock %}Stock: {{ n }}{% endblocktranslate %}{% translate "Add to Cart" as t_add_to_cart %}{% translate "No products available in this subcategory." as t_no_products %}{% blocktranslate with name="{name}" asvar t_demo_added %}{{ name }} added to cart! (Demo mode){% endblocktranslate %}{% translate "Error adding item to cart" as t_add_error %}{% translate "View Cart" as t_view_cart %}{% translate "Available" as t_available %}{% blocktranslate with name="{name}" asvar t_items_of %}{{ name }} Items{% endblocktranslate %}{% translate "No items available in this category at the moment." as t_no_items_now %}{% translate "Category" as t_category %}{% blocktranslate with name="{name}" asvar t_in_category %}in {{ name }}{% endblocktranslate %}{% translate "In stock" as t_in_stock %}{% blocktranslate with n="{n}" asvar t_showing_first %}Showing first 10 of {{ n }} results{% endblocktranslate %}{% blocktranslate with query="{query}" asvar t_no_results %}No results found for "{{ query }}"{% endblocktranslate %}{% translate "Try searching for different items" as t_try_other %}
+{% blocktranslate with name="{name}" asvar t_menu_of %}{{ name }} Menu{% endblocktranslate %}{% blocktranslate with pct="{pct}" asvar t_off %}{{ pct }}% OFF{% endblocktranslate %}{% blocktranslate with n="{n}" asvar t_stock %}Stock: {{ n }}{% endblocktranslate %}{% translate "Add to Cart" as t_add_to_cart %}{% translate "No products available in this subcategory." as t_no_products %}{% blocktranslate with name="{name}" asvar t_demo_added %}{{ name }} added to cart! (Demo mode){% endblocktranslate %}{% translate "Error adding item to cart" as t_add_error %}{% translate "View Cart" as t_view_cart %}{% translate "Available" as t_available %}{% blocktranslate with name="{name}" asvar t_items_of %}{{ name }} Items{% endblocktranslate %}{% translate "No items available in this category at the moment." as t_no_items_now %}{% translate "Category" as t_category %}{% blocktranslate with name="{name}" asvar t_in_category %}in {{ name }}{% endblocktranslate %}{% translate "In stock" as t_in_stock %}{% blocktranslate with n="{n}" asvar t_showing_first %}Showing first 10 of {{ n }} results{% endblocktranslate %}{% blocktranslate with query="{query}" asvar t_no_results %}No results found for "{{ query }}"{% endblocktranslate %}{% translate "Try searching for different items" as t_try_other %}{% translate "Other items" as t_other_items %}
 <script>
 // Translated text (Kiswahili or English, chosen by the server). {placeholders} are filled by fmt().
 const T = {
@@ -1381,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {% if categories %}
             {% for category in categories %}
             {% with subcat_list=category.subcategories.all %}
-            {% if subcat_list %}
+            {% if subcat_list or category.loose_products %}
             categoriesData['{{ category.name|escapejs }}'] = {
                 'id': {{ category.id }},
                 'subcategories': {}
@@ -1410,6 +1410,26 @@ document.addEventListener('DOMContentLoaded', function() {
             {% endif %}
             {% endwith %}
             {% endfor %}
+            {% if category.loose_products %}
+            categoriesData['{{ category.name|escapejs }}'].subcategories['{{ t_other_items|escapejs }}'] = {
+                'id': 0,
+                'products': [
+                    {% for product in category.loose_products %}
+                    {
+                        'id': {{ product.id }},
+                        'name': '{{ product.name|escapejs }}',
+                        'description': '{{ product.description|escapejs|truncatechars:100 }}',
+                        'price': '{{ product.get_current_price }}',
+                        'original_price': '{{ product.price }}',
+                        'stock': {{ product.available_in_stock }},
+                        'is_available': {{ product.is_available|yesno:"true,false" }},
+                        'has_promotion': {{ product.has_active_promotion|yesno:"true,false" }},
+                        'discount_percentage': {{ product.get_active_promotion.discount_percentage|default:0 }}
+                    }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ]
+            };
+            {% endif %}
             {% endif %}
             {% endwith %}
             {% endfor %}
@@ -1772,9 +1792,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     {% endif %}
                 {% endfor %}
             {% endfor %}
+            // Products without a sub-category
+            {% for product in category.loose_products %}
+                    searchIndex.push({
+                        type: 'product',
+                        id: {{ product.id }},
+                        name: '{{ product.name|escapejs }}',
+                        price: '{{ product.price }}',
+                        categoryId: {{ category.id }},
+                        categoryName: '{{ category.name|escapejs }}',
+                        subcategoryName: '{{ t_other_items|escapejs }}',
+                        stock: {{ product.available_in_stock }}
+                    });
+            {% endfor %}
         {% endfor %}
         {% endif %}
-        
+
         console.log('🔍 Search index built:', searchIndex.length, 'items');
     }
     

@@ -198,10 +198,10 @@
                             <td class="font-weight-bold">
                                 {% if record.unit_price is not None %}
                                     {% if record.record_type == 'returned' %}
-                                        <span class="text-success">+ {{ currency_symbol }}{{ record.unit_price|floatformat:"2" }}</span>
+                                        <span class="text-success">+ {{ currency_symbol }}{{ record.transaction_cost|floatformat:"2" }}</span>
                                         <span class="badge bg-success ms-1" style="font-size:.7em;">{% translate "Refund" %}</span>
                                     {% else %}
-                                        <span class="text-danger">- {{ currency_symbol }}{{ record.unit_price|floatformat:"2" }}</span>
+                                        <span class="text-danger">- {{ currency_symbol }}{{ record.transaction_cost|floatformat:"2" }}</span>
                                     {% endif %}
                                 {% else %}
                                     <span class="text-muted">—</span>

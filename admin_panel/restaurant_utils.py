@@ -135,9 +135,22 @@ def get_restaurant_context(user, session_restaurant_id=None, request=None):
         try:
             from accounts.models import User
             selected_user = User.objects.get(id=session_restaurant_id)
-            
+
+            # Exact restaurant chosen in switch_restaurant (needed for a branch the main
+            # owner runs himself). Only trusted while it still belongs to the owner user
+            # stored in selected_restaurant_id, so older sessions behave as before.
+            selected_pk = request.session.get('selected_restaurant_pk') if request and hasattr(request, 'session') else None
+            if selected_pk:
+                exact = accessible_restaurants.filter(id=selected_pk).first()
+                if exact:
+                    exact_owner = exact.branch_owner if (not exact.is_main_restaurant and exact.branch_owner) else exact.main_owner
+                    if exact_owner and exact_owner.id == selected_user.id:
+                        current_restaurant = exact
+
             # Find the Restaurant object for this user
-            if selected_user.is_branch_owner():
+            if current_restaurant:
+                pass
+            elif selected_user.is_branch_owner():
                 current_restaurant = accessible_restaurants.filter(branch_owner=selected_user, is_main_restaurant=False).first()
             else:
                 current_restaurant = accessible_restaurants.filter(main_owner=selected_user, is_main_restaurant=True).first()
@@ -208,3 +221,51 @@ def get_restaurant_context(user, session_restaurant_id=None, request=None):
         'can_manage_branches': user.can_access_branch_features(),
         'can_switch_restaurants': len(accessible_restaurants) > 1 or user.is_main_owner(),
     }
+
+# Order statuses that are not a sale: never count them as revenue.
+NON_REVENUE_STATUSES = ('cancelled', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted')
+
+
+def restaurant_orders_q(restaurant):
+    """
+    Q() matching the orders of exactly ONE restaurant (main or branch), never its
+    sister branches.
+
+    - dine-in orders on this restaurant's tables;
+    - legacy tables that carry only an owner (restaurant is NULL) of this restaurant's
+      operator (skipped for a branch the main owner runs himself, where that owner is
+      the MAIN restaurant's owner);
+    - delivery/pickup orders (no table) placed with this restaurant's operator.
+    """
+    if restaurant.is_main_restaurant:
+        operator = restaurant.main_owner
+        self_managed_branch = False
+    else:
+        operator = restaurant.branch_owner or restaurant.main_owner
+        self_managed_branch = operator == restaurant.main_owner
+    q = Q(table_info__restaurant=restaurant)
+    if not self_managed_branch:
+        q |= Q(table_info__owner=operator, table_info__restaurant__isnull=True)
+    if not self_managed_branch:
+        # A branch the main owner runs himself can't be told apart for delivery/pickup orders
+        # (they carry the main owner): they belong to the main restaurant, so count them once
+        remote = Q(order_type__in=['delivery', 'pickup'], table_info__isnull=True)
+        q |= remote & (Q(restaurant_owner=operator) |
+                       Q(restaurant_owner__isnull=True, ordered_by__owner=operator))
+    return q
+
+
+def restaurant_tables_products_q(restaurant):
+    """(tables_q, products_q) for exactly one restaurant, same rules as restaurant_orders_q."""
+    if restaurant.is_main_restaurant:
+        operator = restaurant.main_owner
+    else:
+        operator = restaurant.branch_owner or restaurant.main_owner
+        if operator == restaurant.main_owner:
+            operator = None  # self-managed branch: owner rows belong to the main restaurant
+    tables_q = Q(restaurant=restaurant)
+    products_q = Q(main_category__restaurant=restaurant)
+    if operator is not None:
+        tables_q |= Q(owner=operator, restaurant__isnull=True)
+        products_q |= Q(main_category__owner=operator, main_category__restaurant__isnull=True)
+    return tables_q, products_q

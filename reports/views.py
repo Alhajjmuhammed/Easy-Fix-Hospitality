@@ -10,6 +10,7 @@ def _safe_csv(value):
     return s
 from django.http import HttpResponse
 from django.core.paginator import Paginator
+from reports.forecast import NOT_SOLD
 from orders.models import Order, OrderItem
 from cashier.models import Payment
 from restaurant.models import MainCategory, SubCategory
@@ -18,6 +19,43 @@ from django.db.models import Sum, Count, F, ExpressionWrapper, DecimalField
 from datetime import datetime, timedelta
 from django.utils import timezone
 import csv
+
+def _restaurant_order_q(restaurant):
+    """Orders that belong to one location: its tables, legacy tables of its owner, and its own
+    delivery/pickup orders. A branch only claims delivery/pickup orders of its branch owner, so
+    the main restaurant's remote orders do not show up in every branch."""
+    from django.db.models import Q
+    if restaurant.is_main_restaurant:
+        remote_owners = [o for o in [restaurant.main_owner, restaurant.branch_owner] if o]
+        legacy_owner = restaurant.main_owner
+    else:
+        remote_owners = [o for o in [restaurant.branch_owner] if o]
+        legacy_owner = restaurant.branch_owner
+    return (Q(table_info__restaurant=restaurant) |
+            Q(table_info__owner=legacy_owner, table_info__restaurant__isnull=True) |
+            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=remote_owners) |
+            Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=remote_owners))
+
+
+def _location_breakdown(orders, restaurants, stats_items=None):
+    """{restaurant id: (order ids, order count, revenue)} for the per-location tables of the
+    exports. Same rules as the headline: same location filter, revenue without tax (or only the
+    filtered items when an item filter is on), and every order counted once (main restaurant
+    first), so the locations add up to the totals."""
+    from decimal import Decimal as _Dec
+    ordered = sorted(restaurants, key=lambda r: (not r.is_main_restaurant, r.name, r.id))
+    assigned, result = set(), {}
+    for restaurant in ordered:
+        ids = set(orders.filter(_restaurant_order_q(restaurant)).values_list('id', flat=True)) - assigned
+        assigned |= ids
+        if stats_items is not None:
+            revenue = sum((i.quantity * i.unit_price for i in stats_items.filter(order_id__in=ids)), _Dec('0'))
+        else:
+            revenue = sum((o.total_amount - o.get_tax_amount()
+                           for o in Order.objects.filter(id__in=ids).prefetch_related('order_items')), _Dec('0'))
+        result[restaurant.id] = (ids, len(ids), revenue)
+    return result
+
 
 # PDF export libraries
 from reportlab.pdfgen import canvas
@@ -83,7 +121,7 @@ def dashboard(request):
                 accessible_ids = set(restaurant_context['accessible_restaurants'].values_list('id', flat=True))
                 if target_restaurant.id not in accessible_ids:
                     target_restaurant = current_restaurant  # fall back silently
-        except Restaurant.DoesNotExist:
+        except (Restaurant.DoesNotExist, ValueError, TypeError):
             target_restaurant = None
     elif current_restaurant and not view_all_restaurants:
         target_restaurant = current_restaurant
@@ -107,7 +145,7 @@ def dashboard(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.branch_owner] if o]))
                 )
     elif request.user.is_administrator():
         # Administrator sees all orders
@@ -137,6 +175,9 @@ def dashboard(request):
                                                   request.user.is_main_owner() or 
                                                   request.user.is_branch_owner()):
         orders = orders.filter(ordered_by=request.user)
+
+    # Cancelled / refused / spoilt orders are not sales
+    orders = orders.exclude(status__in=NOT_SOLD)
     
     # Apply period filter using timezone-aware datetime boundaries.
     # PostgreSQL extracts __date in UTC; orders placed between midnight-3am local (UTC+3)
@@ -659,7 +700,7 @@ def export_csv(request):
                 accessible_ids = set(restaurant_context['accessible_restaurants'].values_list('id', flat=True))
                 if target_restaurant.id not in accessible_ids:
                     target_restaurant = current_restaurant  # fall back silently
-        except Restaurant.DoesNotExist:
+        except (Restaurant.DoesNotExist, ValueError, TypeError):
             target_restaurant = None
     elif current_restaurant and not view_all_restaurants:
         target_restaurant = current_restaurant
@@ -682,7 +723,7 @@ def export_csv(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.branch_owner] if o]))
                 )
     elif request.user.is_administrator():
         orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
@@ -711,6 +752,9 @@ def export_csv(request):
                                                   request.user.is_main_owner() or
                                                   request.user.is_branch_owner()):
         orders = orders.filter(ordered_by=request.user)
+
+    # Cancelled / refused / spoilt orders are not sales
+    orders = orders.exclude(status__in=NOT_SOLD)
     
     # Apply period filter using timezone-aware datetime boundaries.
     # PostgreSQL extracts __date in UTC; orders placed between midnight-3am local (UTC+3)
@@ -989,21 +1033,12 @@ def export_csv(request):
             writer.writerow([])  # Empty row
             writer.writerow(['BRANCH/LOCATION PERFORMANCE ANALYSIS'])
             writer.writerow(['Location', 'Orders', '% of Total Orders', 'Revenue', '% of Total Revenue', 'Avg Order Value'])
-            
+            _locations = _location_breakdown(orders, list(accessible_restaurants),
+                                             _stats_items if _item_filter_active else None)
+
             for restaurant in accessible_restaurants.order_by('name'):
-                # Get orders for this specific location
-                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
-                if restaurant.is_main_restaurant:
-                    restaurant_orders = orders.filter(
-                        Q(table_info__restaurant=restaurant) |
-                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
-                    )
-                else:
-                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
-                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
-                
-                location_order_count = restaurant_orders.count()
-                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                # Same location rules and revenue basis as the headline, each order counted once
+                _loc_ids, location_order_count, location_revenue = _locations[restaurant.id]
                 location_avg = (location_revenue / location_order_count) if location_order_count > 0 else 0
                 
                 order_percentage = (location_order_count / total_orders * 100) if total_orders > 0 else 0
@@ -1029,18 +1064,9 @@ def export_csv(request):
             writer.writerow(['Location', 'Product', 'Quantity Sold', 'Revenue', '% of Location Revenue'])
             
             for restaurant in accessible_restaurants.order_by('name'):
-                # Get orders for this location
-                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
-                if restaurant.is_main_restaurant:
-                    restaurant_orders = orders.filter(
-                        Q(table_info__restaurant=restaurant) |
-                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
-                    )
-                else:
-                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
-                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
-                
-                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                # Orders for this location: same split as the table above
+                _loc_ids, _loc_count, location_revenue = _locations[restaurant.id]
+                restaurant_orders = Order.objects.filter(id__in=_loc_ids)
                 
                 if restaurant_orders.exists():
                     # Get top 5 products for this location
@@ -1180,7 +1206,7 @@ def export_csv(request):
             categories_list,
             subcategories_list,
             stations_list,
-            f"{currency_symbol}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
+            f"{currency_symbol}{(sum(item.quantity * item.unit_price for item in filtered_items) if _item_filter_active else order.total_amount):.2f}",
             order.payment_status,
             ', '.join(sorted(set(p.payment_method.title() for p in order.payments.all() if not p.is_voided))) or '-',
             order.status,
@@ -1244,7 +1270,7 @@ def export_pdf(request):
                 accessible_ids = set(restaurant_context['accessible_restaurants'].values_list('id', flat=True))
                 if target_restaurant.id not in accessible_ids:
                     target_restaurant = current_restaurant  # fall back silently
-        except Restaurant.DoesNotExist:
+        except (Restaurant.DoesNotExist, ValueError, TypeError):
             target_restaurant = None
     elif current_restaurant and not view_all_restaurants:
         target_restaurant = current_restaurant
@@ -1267,7 +1293,7 @@ def export_pdf(request):
                 .filter(
                     Q(table_info__restaurant=target_restaurant) |
                     Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.branch_owner] if o]))
                 )
     elif request.user.is_administrator():
         orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
@@ -1296,6 +1322,9 @@ def export_pdf(request):
                                                   request.user.is_main_owner() or
                                                   request.user.is_branch_owner()):
         orders = orders.filter(ordered_by=request.user)
+
+    # Cancelled / refused / spoilt orders are not sales
+    orders = orders.exclude(status__in=NOT_SOLD)
     
     # Apply period filter using timezone-aware datetime boundaries.
     # PostgreSQL extracts __date in UTC; orders placed between midnight-3am local (UTC+3)
@@ -1642,21 +1671,12 @@ def export_pdf(request):
             
             # Branch performance data
             branch_data = [['Location', 'Orders', '% of Total', 'Revenue', '% of Total', 'Avg Order']]
-            
+            _locations = _location_breakdown(orders, list(accessible_restaurants),
+                                             _stats_items if _item_filter_active else None)
+
             for restaurant in accessible_restaurants.order_by('name'):
-                # Get orders for this location
-                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
-                if restaurant.is_main_restaurant:
-                    restaurant_orders = orders.filter(
-                        Q(table_info__restaurant=restaurant) |
-                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
-                    )
-                else:
-                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
-                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
-                
-                location_orders = restaurant_orders.count()
-                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                # Same location rules and revenue basis as the headline, each order counted once
+                _loc_ids, location_orders, location_revenue = _locations[restaurant.id]
                 location_avg = (location_revenue / location_orders) if location_orders > 0 else 0
                 
                 order_percentage = (location_orders / total_orders * 100) if total_orders > 0 else 0
@@ -1700,18 +1720,9 @@ def export_pdf(request):
             products_data = [['Location', 'Product', 'Qty', 'Revenue', '% of Loc']]
             
             for restaurant in accessible_restaurants.order_by('name'):
-                # Get orders for this location
-                # CRITICAL FIX: Legacy orders (no restaurant) should ONLY count for MAIN restaurant
-                if restaurant.is_main_restaurant:
-                    restaurant_orders = orders.filter(
-                        Q(table_info__restaurant=restaurant) |
-                        Q(table_info__owner=restaurant.main_owner, table_info__restaurant__isnull=True)
-                    )
-                else:
-                    # Branches: ONLY direct orders assigned to this branch, NO legacy orders
-                    restaurant_orders = orders.filter(table_info__restaurant=restaurant)
-                
-                location_revenue = restaurant_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+                # Orders for this location: same split as the table above
+                _loc_ids, _loc_count, location_revenue = _locations[restaurant.id]
+                restaurant_orders = Order.objects.filter(id__in=_loc_ids)
                 
                 if restaurant_orders.exists():
                     # Get top 5 products for this location
@@ -1829,7 +1840,7 @@ def export_pdf(request):
             customer_name[:12],  # Limit length
             order_restaurant[:12],  # Limit length
             items_list[:15],  # Limit length
-            f"{currency_symbol}{sum(item.quantity * item.unit_price for item in filtered_items):.2f}",
+            f"{currency_symbol}{(sum(item.quantity * item.unit_price for item in filtered_items) if _item_filter_active else order.total_amount):.2f}",
             order.payment_status.title(),
             ', '.join(sorted(set(p.payment_method.title() for p in order.payments.all() if not p.is_voided))) or '-',
             order.status.title(),
@@ -1915,29 +1926,57 @@ def money_flow(request):
     else:
         date_from = date_to = today
 
+    from admin_panel.restaurant_utils import get_restaurant_context as _get_rc
+    _restaurant_context = _get_rc(request.user, request.session.get('selected_restaurant_id'), request)
+    # A location picked in the restaurant switcher limits the page to it; otherwise the page
+    # covers everything the user owns (main restaurant and branches).
+    scope_restaurant = None
+    if (request.session.get('selected_restaurant_id') and not _restaurant_context['view_all_restaurants']
+            and _restaurant_context['current_restaurant']):
+        scope_restaurant = _restaurant_context['current_restaurant']
+
     # ── Orders / Sales ───────────────────────────────────────────────────────
-    if owner:
-        from django.db.models import Q as DQ
-        orders_qs = Order.objects.filter(
+    from django.db.models import Q as DQ
+    if scope_restaurant is not None:
+        _scope_q = _restaurant_order_q(scope_restaurant)
+    elif owner:
+        _scope_q = (
             DQ(table_info__owner=owner) |
             DQ(table_info__restaurant__main_owner=owner) |
             (DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | DQ(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
             (DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | DQ(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
         )
     elif request.user.is_administrator():
-        orders_qs = Order.objects.all()
+        _scope_q = DQ()
     else:
+        _scope_q = None
+    if _scope_q is None:
         orders_qs = Order.objects.none()
+    else:
+        # Pick the order ids first: the joins above can match one order twice (e.g. the main
+        # owner also runs a branch himself), which would double every sum.
+        orders_qs = Order.objects.filter(id__in=Order.objects.filter(_scope_q).values('id'))
 
     _mf_start = timezone.make_aware(datetime.combine(date_from, datetime.min.time()))
     _mf_end   = timezone.make_aware(datetime.combine(date_to + timedelta(days=1), datetime.min.time()))
     orders_qs = orders_qs.filter(created_at__gte=_mf_start, created_at__lt=_mf_end)
+    sold_qs = orders_qs.exclude(status__in=NOT_SOLD)   # cancelled / refused / spoilt are not sales
 
-    sales_revenue      = orders_qs.filter(payment_status='paid').aggregate(t=Sum('total_amount'))['t'] or 0
-    sales_unpaid       = orders_qs.filter(payment_status='unpaid').aggregate(t=Sum('total_amount'))['t'] or 0
-    sales_partial      = orders_qs.filter(payment_status='partial').aggregate(t=Sum('total_amount'))['t'] or 0
-    sales_total_orders = orders_qs.count()
-    sales_paid_orders  = orders_qs.filter(payment_status='paid').count()
+    sales_revenue      = sold_qs.filter(payment_status='paid').aggregate(t=Sum('total_amount'))['t'] or 0
+    sales_unpaid       = sold_qs.filter(payment_status='unpaid').aggregate(t=Sum('total_amount'))['t'] or 0
+    sales_partial      = sold_qs.filter(payment_status='partial').aggregate(t=Sum('total_amount'))['t'] or 0
+    sales_total_orders = sold_qs.count()
+    sales_paid_orders  = sold_qs.filter(payment_status='paid').count()
+
+    # Money actually received: every payment that was not voided, on the orders of the period
+    _live_payments = Payment.objects.filter(order__in=orders_qs, is_voided=False)
+    sales_collected = _live_payments.aggregate(t=Sum('amount'))['t'] or 0
+    # Still to collect: what each sold order costs minus what was paid on it
+    from decimal import Decimal as _MD
+    _paid_by_order = {row['order_id']: row['t'] for row in
+                      _live_payments.values('order_id').annotate(t=Sum('amount'))}
+    sales_outstanding = sum((max(_MD('0'), total - (_paid_by_order.get(oid) or _MD('0')))
+                             for oid, total in sold_qs.values_list('id', 'total_amount')), _MD('0'))
 
     # ── Events ───────────────────────────────────────────────────────────────
     try:
@@ -1961,8 +2000,16 @@ def money_flow(request):
         event_count = 0
 
     # ── Inventory costs ──────────────────────────────────────────────────────
-    if owner:
-        inv_qs = InventoryRecord.objects.filter(item__owner=owner)
+    if scope_restaurant is not None:
+        _inv_owner = (scope_restaurant.main_owner if scope_restaurant.is_main_restaurant
+                      else scope_restaurant.branch_owner) or owner
+        inv_qs = InventoryRecord.objects.filter(item__owner=_inv_owner)
+    elif owner:
+        # All locations: the owner's stock and the stock of the branches they run through others
+        from restaurant.models_restaurant import Restaurant as _R
+        _inv_owner_ids = {owner.id} | set(_R.objects.filter(main_owner=owner).exclude(branch_owner__isnull=True)
+                                          .values_list('branch_owner_id', flat=True))
+        inv_qs = InventoryRecord.objects.filter(item__owner_id__in=_inv_owner_ids)
     elif request.user.is_administrator():
         inv_qs = InventoryRecord.objects.all()
     else:
@@ -1978,9 +2025,9 @@ def money_flow(request):
     inv_net     = inv_spent - inv_refunds
 
     # ── Totals ───────────────────────────────────────────────────────────────
-    total_in         = sales_revenue + event_collected
+    total_in         = sales_collected + event_collected
     total_out        = inv_net          # net inventory spend (after refunds)
-    total_outstanding = sales_unpaid + sales_partial + event_outstanding
+    total_outstanding = sales_outstanding + event_outstanding
     net_position     = total_in - total_out
 
     # ── Daily chart data (money in vs out per day in range) ──────────────────
@@ -1996,10 +2043,10 @@ def money_flow(request):
     daily_sales_map = {
         row['day']: float(row['revenue'] or 0)
         for row in (
-            orders_qs.filter(payment_status='paid')
-            .annotate(day=TruncDate('created_at'))
+            _live_payments
+            .annotate(day=TruncDate('order__created_at'))
             .values('day')
-            .annotate(revenue=Sum('total_amount'))
+            .annotate(revenue=Sum('amount'))
             .order_by('day')
         )
     }
@@ -2047,9 +2094,6 @@ def money_flow(request):
         chart_in.append(float(day_orders_revenue + day_event_collected))
         chart_out.append(float(max(0, day_inv_spent - day_inv_refunds)))
 
-    from admin_panel.restaurant_utils import get_restaurant_context as _get_rc
-    _restaurant_context = _get_rc(request.user, request.session.get('selected_restaurant_id'), request)
-
     import json
     context = {
         'currency_symbol': currency_symbol,
@@ -2064,6 +2108,8 @@ def money_flow(request):
         'sales_partial': sales_partial,
         'sales_total_orders': sales_total_orders,
         'sales_paid_orders': sales_paid_orders,
+        'sales_collected': sales_collected,
+        'sales_outstanding': sales_outstanding,
         # Events
         'event_collected': event_collected,
         'event_outstanding': event_outstanding,

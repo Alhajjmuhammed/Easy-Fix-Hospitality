@@ -18,6 +18,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import logging
 
+from restaurant_system.db_utils import locked_get  # lock one row found through OR'd access filters
 logger = logging.getLogger(__name__)
 
 from accounts.models import get_owner_filter
@@ -32,7 +33,16 @@ from restaurant.models import TableInfo, Product
 from waste_management.models import FoodWasteLog
 from .models import Payment, OrderItemPayment, VoidTransaction
 from orders.printing import auto_print_receipt, auto_print_bill  # Auto-print receipt and bill
+from .mobile_money import NOT_PAYABLE_STATUSES  # cancelled / wasted orders: never paid, not revenue
 
+
+
+def _safe_date(parse, value):
+    """True when `value` is a real YYYY-MM-DD date."""
+    try:
+        return bool(value) and parse(value) is not None
+    except ValueError:
+        return False
 
 @login_required
 def cashier_dashboard(request):
@@ -236,9 +246,13 @@ def process_payment(request, order_id):
     # Use select_for_update() on POST to prevent concurrent payment race conditions.
     # GET uses a plain queryset (no lock needed for read-only data).
     if request.method == 'POST':
-        order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_pp), id=order_id)
+        order = locked_get(Order.objects.filter(_oq_pp), id=order_id)
     else:
         order = get_object_or_404(Order.objects.filter(_oq_pp), id=order_id)
+
+    # Customer care handles only the orders they placed (same rule as their payments page and the app)
+    if request.user.is_customer_care() and order.ordered_by_id != request.user.id:
+        return JsonResponse({'error': 'You can only take payments for orders you placed.'}, status=403)
 
     if request.method == 'GET':
         # Return order details for payment form
@@ -282,7 +296,11 @@ def process_payment(request, order_id):
     # POST - Process payment
     try:
         data = json.loads(request.body)
-        
+
+        # Never take money for an order that was cancelled (same rule as mobile money and loyalty)
+        if order.status in NOT_PAYABLE_STATUSES:
+            return JsonResponse({'error': 'This order is cancelled and cannot be paid.'}, status=400)
+
         # Better amount handling and validation
         amount_input = data.get('amount', '0')
         try:
@@ -290,6 +308,9 @@ def process_payment(request, order_id):
             if isinstance(amount_input, str):
                 amount_input = amount_input.strip().replace(',', '')  # Remove commas
             amount = Decimal(str(amount_input))
+            if not amount.is_finite():
+                raise InvalidOperation
+            amount = amount.quantize(Decimal('0.01'))      # money is stored to the cent
         except (ValueError, TypeError, InvalidOperation):
             return JsonResponse({'error': 'Invalid payment amount format'}, status=400)
         
@@ -363,15 +384,25 @@ def process_payment(request, order_id):
                 oi.id: oi for oi in OrderItem.objects.filter(id__in=item_ids, order=order)
             }
 
+            # Quantities already paid per item (other payments): an item can't be paid twice
+            already_paid = {r['order_item_id']: r['total'] or 0 for r in OrderItemPayment.objects.filter(
+                order_item__order=order, payment__is_voided=False).exclude(payment=payment)
+                .values('order_item_id').annotate(total=Sum('quantity_paid'))}
+            wanted = {}
+            for item_data in selected_items:
+                wanted[item_data['id']] = wanted.get(item_data['id'], 0) + int(item_data['quantity'])
+
             # Compute total and cache resolved items without writing yet
             total_item_amount = Decimal('0.00')
             item_details = []
-            for item_data in selected_items:
-                order_item = items_by_id.get(item_data['id'])
+            for item_id, quantity_paid in wanted.items():
+                order_item = items_by_id.get(item_id)
                 if order_item is None:
                     payment.delete()
                     return JsonResponse({'error': 'Invalid item selected'}, status=400)
-                quantity_paid = int(item_data['quantity'])
+                if quantity_paid > order_item.quantity - already_paid.get(order_item.id, 0):
+                    payment.delete()
+                    return JsonResponse({'error': 'More of an item selected than is still unpaid'}, status=400)
                 item_amount = order_item.unit_price * quantity_paid
                 total_item_amount += item_amount
                 item_details.append((order_item, quantity_paid, item_amount))
@@ -482,7 +513,7 @@ def void_payment(request, payment_id):
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
     # select_for_update prevents concurrent void of the same payment
-    payment = get_object_or_404(Payment.objects.select_for_update(of=('self',)).filter(_pq_vp), id=payment_id)
+    payment = locked_get(Payment.objects.filter(_pq_vp), id=payment_id)
     
     if payment.is_voided:
         return JsonResponse({'error': 'Payment already voided'}, status=400)
@@ -585,7 +616,7 @@ def transfer_table(request, order_id):
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
     )
-    order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_tt), id=order_id)
+    order = locked_get(Order.objects.filter(_oq_tt), id=order_id)
 
     if order.status == 'cancelled':
         return JsonResponse({'error': 'Cannot transfer a cancelled order'}, status=400)
@@ -606,7 +637,7 @@ def transfer_table(request, order_id):
         Q(restaurant__main_owner=owner) |
         Q(restaurant__branch_owner=owner)
     )
-    target_table = get_object_or_404(TableInfo.objects.select_for_update(of=('self',)).filter(_ttq).distinct(), id=target_table_id)
+    target_table = locked_get(TableInfo.objects.filter(_ttq), id=target_table_id)
 
     if order.table_info is None:
         return JsonResponse({'error': 'Delivery and pickup orders cannot be transferred to a table'}, status=400)
@@ -664,7 +695,7 @@ def cancel_order(request, order_id):
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
     )
-    order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_co), id=order_id)
+    order = locked_get(Order.objects.filter(_oq_co), id=order_id)
 
     # Check if order status allows cancellation (mirrors mobile API and kitchen staff logic)
     if order.status in ['served', 'cancelled']:
@@ -773,7 +804,8 @@ def generate_receipt(request, payment_id):
     payment = get_object_or_404(
         Payment.objects.select_related('order')
             .prefetch_related('order__order_items__product')
-            .filter(_pq_gr),
+            .filter(_pq_gr)
+            .filter(**({'order__ordered_by': request.user} if request.user.is_customer_care() else {})),
         id=payment_id,
     )
     order = payment.order
@@ -817,7 +849,8 @@ def reprint_receipt(request, payment_id):
     payment = get_object_or_404(
         Payment.objects.select_related('order')
             .prefetch_related('order__order_items__product')
-            .filter(_pq_rr),
+            .filter(_pq_rr)
+            .filter(**({'order__ordered_by': request.user} if request.user.is_customer_care() else {})),
         id=payment_id,
     )
 
@@ -859,8 +892,12 @@ def receipt_management(request):
     
     # Get search parameters
     search_query = request.GET.get('search', '')
+    from django.utils.dateparse import parse_date as _parse_date
+    # A malformed date in the address is ignored instead of crashing the page
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
+    date_from = date_from if _safe_date(_parse_date, date_from) else ''
+    date_to = date_to if _safe_date(_parse_date, date_to) else ''
     
     # Base queryset for payments
     _pq_rm = (
@@ -989,6 +1026,9 @@ def cashier_reports(request):
     payment_status = request.GET.get('payment_status', 'all')
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
+    # Anything but a number means "all" (a malformed address must not crash the report)
+    category_id = category_id if str(category_id).isdigit() else 'all'
+    subcategory_id = subcategory_id if str(subcategory_id).isdigit() else 'all'
     station_filter = request.GET.get('station_filter', 'all')
     staff_filter = request.GET.get('staff', 'all')  # Changed from customer_care_filter
     staff_role = request.GET.get('staff_role', 'all')  # New: filter by role
@@ -1064,7 +1104,7 @@ def cashier_reports(request):
     
     # Calculate statistics via DB aggregation (no Python iteration over orders)
     from django.db.models import Case, When, Value, DecimalField
-    revenue_qs = Order.objects.filter(id__in=order_ids).exclude(status='cancelled')
+    revenue_qs = Order.objects.filter(id__in=order_ids).exclude(status__in=NOT_PAYABLE_STATUSES)  # no cancelled / wasted orders
     agg = revenue_qs.aggregate(
         total_revenue=Sum('total_amount'),
         total_orders_count=Count('id'),

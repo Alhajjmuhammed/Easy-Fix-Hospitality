@@ -48,12 +48,52 @@ def validate_session_restaurant_id(session):
             role__name__in=['owner', 'main_owner', 'branch_owner'],
             is_active=True
         )
-        return restaurant
     except User.DoesNotExist:
         logger.warning(f"Restaurant owner not found for id: {restaurant_id}")
         if 'selected_restaurant_id' in session:
             del session['selected_restaurant_id']
         return None
+
+    # Customers may only use a restaurant that is open right now: not deactivated,
+    # and its (main) subscription not expired or blocked. Same rule as the mobile API.
+    if not restaurant_open_for_customers(restaurant):
+        logger.info(f"Restaurant {restaurant_id} in session is not open for customers")
+        if 'selected_restaurant_id' in session:
+            del session['selected_restaurant_id']
+        return None
+    return restaurant
+
+
+def restaurant_open_for_customers(owner):
+    """
+    True if customers may order from this owner account's restaurant right now
+    (Restaurant.open_owner(): restaurant active, owner active, subscription not
+    expired/blocked). Legacy owners without a Restaurant row: subscription check only.
+    """
+    from restaurant.models_restaurant import Restaurant
+    from accounts.models import RestaurantSubscription
+    restaurant_obj = Restaurant.for_owner(owner)
+    if restaurant_obj is not None:
+        return restaurant_obj.open_owner() is not None
+    sub = RestaurantSubscription.objects.filter(restaurant_owner=owner).first()
+    return not (sub is not None and not sub.is_active)
+
+
+# Session keys that belong to one restaurant: the cart and anything tied to it.
+RESTAURANT_BOUND_SESSION_KEYS = ('cart', 'selected_table', 'selected_table_id',
+                                 'add_to_order_id', 'order_mode')
+
+
+def set_session_restaurant(session, owner_id):
+    """
+    Select the restaurant (owner account id) for this session. Switching to a DIFFERENT
+    restaurant empties the cart and table, so items from two restaurants never mix.
+    """
+    previous = session.get('selected_restaurant_id')
+    if previous is not None and str(previous) != str(owner_id):
+        for key in RESTAURANT_BOUND_SESSION_KEYS:
+            session.pop(key, None)
+    session['selected_restaurant_id'] = owner_id
 
 
 def validate_session_table(session, restaurant=None):

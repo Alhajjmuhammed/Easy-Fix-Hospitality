@@ -11,10 +11,12 @@ from django.db.models import Sum, Count, Q, Subquery, OuterRef, Value
 from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator
+from django.core.exceptions import ValidationError
 from accounts.models import User
 from restaurant.models_restaurant import Restaurant
 from restaurant.models import Product, MainCategory, SubCategory, TableInfo
 from orders.models import Order, OrderItem
+from .restaurant_utils import get_restaurant_context, restaurant_orders_q, NON_REVENUE_STATUSES
 
 
 @login_required
@@ -38,17 +40,13 @@ def main_owner_dashboard(request):
     base_restaurants = Restaurant.objects.filter(main_owner=request.user)
     
     if selected_restaurant_id and not view_all_restaurants:
-        # Viewing a specific restaurant — session stores User (owner) ID, not Restaurant ID
+        # Viewing a specific restaurant — resolved like every other admin-panel page
+        # (session stores the owner USER id; see get_restaurant_context).
         try:
-            selected_user = User.objects.get(id=selected_restaurant_id)
-            if selected_user.is_branch_owner():
-                current_restaurant = base_restaurants.filter(
-                    branch_owner=selected_user, is_main_restaurant=False
-                ).first()
-            else:
-                current_restaurant = base_restaurants.filter(
-                    main_owner=selected_user, is_main_restaurant=True
-                ).first()
+            current_restaurant = get_restaurant_context(
+                request.user, selected_restaurant_id, request)['current_restaurant']
+            if current_restaurant and current_restaurant.main_owner_id != request.user.id:
+                current_restaurant = None
             if not current_restaurant:
                 raise Restaurant.DoesNotExist
             restaurants = [current_restaurant]  # Only show selected restaurant
@@ -71,25 +69,24 @@ def main_owner_dashboard(request):
 
     # Annotate directly on the restaurants queryset
     restaurant_ids = [r.id for r in restaurants]
+    # Distinct counts are safe in one multi-join query; SUMs are not (each order would be
+    # repeated once per joined product/staff row), so order figures are computed below
+    # with one separate aggregate per restaurant.
     annotated = Restaurant.objects.filter(id__in=restaurant_ids).annotate(
-        orders_count=Count(
-            'tables__orders',
-            filter=Q(tables__orders__isnull=False),
-            distinct=True,
-        ),
-        today_revenue=Sum(
-            'tables__orders__total_amount',
-            filter=Q(tables__orders__created_at__date=today),
-        ),
         tables_count=Count('tables', distinct=True),
         products_count=Count('main_categories__products', distinct=True),
-        pending_orders=Count(
-            'tables__orders',
-            filter=Q(tables__orders__status='pending'),
-            distinct=True,
-        ),
         staff_count=Count('branch_owner__owned_users', distinct=True),
     ).in_bulk()  # dict keyed by pk for O(1) lookup
+
+    order_stats = {}
+    for restaurant in restaurants:
+        # Dine-in + this restaurant's pickup/delivery orders; revenue excludes
+        # cancelled/refused/wasted orders.
+        order_stats[restaurant.id] = Order.objects.filter(restaurant_orders_q(restaurant)).aggregate(
+            orders_count=Count('id'),
+            today_revenue=Sum('total_amount', filter=Q(created_at__date=today) & ~Q(status__in=NON_REVENUE_STATUSES)),
+            pending_orders=Count('id', filter=Q(status='pending')),
+        )
 
     # Aggregate statistics
     total_orders = 0
@@ -101,12 +98,13 @@ def main_owner_dashboard(request):
 
     for restaurant in restaurants:
         ann = annotated.get(restaurant.id, restaurant)
-        orders_count   = ann.orders_count   or 0
-        today_rev      = ann.today_revenue  or 0
-        staff_count    = ann.staff_count    or 0
-        tables_count   = ann.tables_count   or 0
-        products_count = ann.products_count or 0
-        pending_count  = ann.pending_orders or 0
+        _os = order_stats.get(restaurant.id, {})
+        orders_count   = _os.get('orders_count')   or 0
+        today_rev      = _os.get('today_revenue')  or 0
+        staff_count    = getattr(ann, 'staff_count', 0)    or 0
+        tables_count   = getattr(ann, 'tables_count', 0)   or 0
+        products_count = getattr(ann, 'products_count', 0) or 0
+        pending_count  = _os.get('pending_orders') or 0
 
         branch_stat = {
             'restaurant': restaurant,
@@ -207,13 +205,14 @@ def branch_reports(request):
     # Apply date filters
     if date_from:
         try:
-            orders = orders.filter(created_at__gte=date_from)
-        except (ValueError, TypeError):
+            orders = orders.filter(created_at__date__gte=date_from)
+        except (ValueError, TypeError, ValidationError):
             pass
     if date_to:
         try:
-            orders = orders.filter(created_at__lte=date_to)
-        except (ValueError, TypeError):
+            # __date: a bare date would mean midnight and exclude the whole last day
+            orders = orders.filter(created_at__date__lte=date_to)
+        except (ValueError, TypeError, ValidationError):
             pass
     
     # Calculate metrics

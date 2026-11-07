@@ -1,6 +1,6 @@
 """Suppliers & purchase orders: shared rules (ordering, receiving into stock, payments, sending)."""
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from io import BytesIO
 
 from django.conf import settings
@@ -9,7 +9,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Max
 from django.utils import timezone
 
-from .models import InventoryItem, InventoryRecord, PurchaseOrder, PurchaseOrderLine, Supplier, SupplierPayment
+from .models import _money, InventoryItem, InventoryRecord, PurchaseOrder, PurchaseOrderLine, Supplier, SupplierPayment
 
 MAX_LINES = 100
 
@@ -21,7 +21,7 @@ def to_decimal(value, field, minimum=Decimal('0'), allow_zero=True):
         raise ValidationError(f'Enter a valid {field}.')
     if not d.is_finite() or d >= Decimal('100000000'):
         raise ValidationError(f'Enter a valid {field}.')
-    d = d.quantize(Decimal('0.01'))   # round first, so 0.001 counts as zero
+    d = d.quantize(Decimal('0.01'), ROUND_HALF_UP)   # round first, so 0.001 counts as zero
     if d < minimum or (d == 0 and not allow_zero):
         raise ValidationError(f'Enter a valid {field}.')
     return d
@@ -131,7 +131,8 @@ def save_order(owner, user, data, item_ids, quantities, prices, order=None):
     order.order_date = order_date
     order.expected_date = expected
     order.notes = (data.get('notes') or '').strip()[:2000]
-    new_total = sum((qty * price for _, qty, price in lines), Decimal('0')).quantize(Decimal('0.01'))
+    # Same rounding as PurchaseOrder.ordered_total (each line rounded, then added up)
+    new_total = _money(sum((_money(qty * price) for _, qty, price in lines), Decimal('0')))
     if order.paid_total > new_total:
         raise ValidationError(f'{order.paid_total} has already been paid on this order, so the total '
                               f'cannot go below that. Remove or change the payment first.')

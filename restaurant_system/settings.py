@@ -69,9 +69,9 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',  # Re-enabled for security
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'restaurant_system.language_middleware.UserLanguageMiddleware',  # English unless the person chose Kiswahili
+    'django.contrib.messages.middleware.MessageMiddleware',  # before SessionTimeout/Subscription: they add messages
     'restaurant_system.session_timeout_middleware.SessionTimeoutMiddleware',  # ✅ Auto-logout after 15 min inactivity - RE-ENABLED
     'restaurant_system.subscription_middleware.SubscriptionAccessMiddleware',  # SaaS subscription control
-    'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',  # Django-axes for failed login tracking
 ]
@@ -306,7 +306,7 @@ AXES_IPWARE_META_PRECEDENCE_ORDER = [  # Get real IP behind proxy/load balancer
 # Default rate limits for the entire application
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = 'default'  # Use default cache backend
-RATELIMIT_VIEW = 'restaurant_system.views.rate_limited'  # Custom rate limit exceeded view
+RATELIMIT_VIEW = 'restaurant_system.security_decorators.rate_limited_view'  # Custom rate limit exceeded view (429 page)
 
 # Cache Configuration for Rate Limiting
 CACHES = {

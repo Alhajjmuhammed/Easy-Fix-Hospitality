@@ -96,7 +96,8 @@ class SessionTimeoutMiddleware(MiddlewareMixin):
                     request,
                     'Your session has expired due to inactivity. '
                     'Please log in again to continue. '
-                    f'(Auto-logout after {timeout_seconds // 60} minutes of inactivity)'
+                    f'(Auto-logout after {timeout_seconds // 60} minutes of inactivity)',
+                    fail_silently=True,  # never turn a logout into a 500
                 )
                 
                 # Redirect to login page

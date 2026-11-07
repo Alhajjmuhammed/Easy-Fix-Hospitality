@@ -498,6 +498,11 @@ def manage_all_users(request):
     # Get search and filter parameters
     search_query = request.GET.get('search', '').strip()
     restaurant_filter = request.GET.get('restaurant')
+    if restaurant_filter:
+        try:
+            restaurant_filter = int(restaurant_filter)
+        except (ValueError, TypeError):
+            restaurant_filter = None
     role_filter = request.GET.get('role')
     status_filter = request.GET.get('status')
     
@@ -586,6 +591,8 @@ def view_all_orders(request):
     # Filter options
     status_filter = request.GET.get('status', 'all')
     restaurant_filter = request.GET.get('restaurant', 'all')
+    if restaurant_filter != 'all' and not str(restaurant_filter).isdigit():
+        restaurant_filter = 'all'  # ignore a malformed filter instead of a 500
     
     orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items').order_by('-created_at')
     
@@ -1385,15 +1392,24 @@ def unblock_restaurant(request, restaurant_id):
                 subscription = restaurant_owner.subscription
                 old_status = subscription.subscription_status
                 
-                # Determine new status based on dates
+                # Determine new status based on dates (the grace period still counts)
                 current_date = timezone.now().date()
-                if current_date <= subscription.subscription_end_date:
+                grace_end = subscription.subscription_end_date + timedelta(days=subscription.grace_period_days)
+                if current_date <= grace_end:
                     new_status = 'active'
                 else:
                     new_status = 'expired'
                 
-                subscription.subscription_status = new_status
-                subscription.save()
+                with transaction.atomic():
+                    subscription.subscription_status = new_status
+                    # Clear a model-level admin block too, so "Unblock" really unblocks
+                    subscription.is_blocked_by_admin = False
+                    subscription.block_reason = ''
+                    subscription.save()
+                    # Unblocked into an active state: switch back on the owner and the
+                    # staff the block/expiry switched off (not staff disabled on purpose)
+                    if subscription.is_active:
+                        subscription.reactivate_suspended_users()
                 
                 # Log the unblocking action
                 SubscriptionLog.objects.create(
@@ -1432,6 +1448,7 @@ def extend_subscription(request, restaurant_id):
                 days_to_extend = int(request.POST.get('days', 30))
             except (ValueError, TypeError):
                 days_to_extend = 30
+            days_to_extend = max(1, min(days_to_extend, 3650))  # 1 day .. 10 years
             
             if hasattr(restaurant_owner, 'subscription'):
                 subscription = restaurant_owner.subscription
@@ -1449,7 +1466,12 @@ def extend_subscription(request, restaurant_id):
                 else:
                     old_status = subscription.subscription_status
                 
-                subscription.save()
+                with transaction.atomic():
+                    subscription.save()
+                    # Renewed into an active state: switch back on the owner and the staff
+                    # the expiry/block switched off (not staff disabled on purpose)
+                    if subscription.is_active:
+                        subscription.reactivate_suspended_users()
                 
                 # Log the extension
                 SubscriptionLog.objects.create(
@@ -1856,6 +1878,11 @@ def manage_products(request):
     # Get search and filter parameters
     search_query = request.GET.get('search', '').strip()
     restaurant_filter = request.GET.get('restaurant')
+    if restaurant_filter:
+        try:
+            restaurant_filter = int(restaurant_filter)
+        except (ValueError, TypeError):
+            restaurant_filter = None
     category_filter = request.GET.get('category')
     availability_filter = request.GET.get('availability')
     

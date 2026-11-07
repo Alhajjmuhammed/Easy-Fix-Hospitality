@@ -41,10 +41,63 @@ from accounts.security_utils import (
 )
 from .printing import auto_print_order, auto_print_new_items  # Server-side printing
 
+from restaurant_system.db_utils import locked_get  # lock one row found through OR'd access filters
 logger = logging.getLogger(__name__)
 
 # Initialize channel layer for WebSocket communication
 channel_layer = get_channel_layer()
+
+
+def _customer_product_q(session, owner):
+    """Products a customer may order in this session: only the ONE restaurant they are ordering
+    from (the table's restaurant for dine-in, otherwise the owner's own restaurant). A main owner
+    is also main_owner of every branch, so owner-based filters alone would mix branch menus in."""
+    from restaurant.models_restaurant import Restaurant
+    rid = None
+    table_id = session.get('selected_table_id') if session.get('order_type', 'dine-in') == 'dine-in' else None
+    if table_id:
+        rid = TableInfo.objects.filter(pk=table_id).values_list('restaurant_id', flat=True).first()
+    if rid is None:
+        r = Restaurant.for_owner(owner)
+        rid = r.pk if r else None
+    if rid is None:
+        return (Q(main_category__owner=owner) | Q(main_category__restaurant__main_owner=owner) |
+                Q(main_category__restaurant__branch_owner=owner))
+    return Q(main_category__restaurant_id=rid) | Q(main_category__restaurant__isnull=True, main_category__owner=owner)
+
+def _checkout_key(request, cart):
+    import hashlib
+    digest = hashlib.sha256(json.dumps(cart, sort_keys=True, default=str).encode()).hexdigest()[:24]
+    session = request.session.session_key or ''        # per browser: two devices never block each other
+    return f'checkout:{request.user.pk}:{session}:{digest}'
+
+
+def _duplicate_checkout(request, cart):
+    """True when this user just submitted exactly this cart (a double tap on "Place order").
+    A different cart, or the same one a little later, goes through. If the cache is down,
+    django-redis (IGNORE_EXCEPTIONS) returns None: then nothing is blocked."""
+    from django.core.cache import cache
+    return cache.add(_checkout_key(request, cart), 1, 8) is False
+
+
+def _checkout_failed(request, cart):
+    """Placing the order did not succeed: allow an immediate retry of the same cart."""
+    from django.core.cache import cache
+    try:
+        cache.delete(_checkout_key(request, cart))
+    except Exception:
+        pass
+
+
+PAID_CANCEL_MESSAGE = 'This order has a payment. Void the payment at the cashier first, then cancel.'
+HANDED_OVER_STATUSES = ('served', 'out_for_delivery', 'delivered')
+NOT_PREPARED_STATUSES = ('cancelled', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted')
+CUSTOMER_PAID_CANCEL_MESSAGE = 'This order is already paid. Please contact the restaurant to cancel it.'
+
+
+def _has_live_payment(order):
+    """A paid order is never cancelled directly: the money must be voided (and recorded) first."""
+    return order.payments.filter(is_voided=False).exists()
 
 
 def _remote_restaurant_for(owner):
@@ -348,9 +401,7 @@ def add_to_cart(request):
         
         # Get product and verify it belongs to this restaurant
         product = Product.objects.filter(
-            Q(main_category__owner=restaurant) |
-            Q(main_category__restaurant__main_owner=restaurant) |
-            Q(main_category__restaurant__branch_owner=restaurant),
+            _customer_product_q(request.session, restaurant),
             id=product_id,
             is_available=True,
         ).distinct().first()
@@ -488,9 +539,7 @@ def update_cart_quantity(request):
         
         # Get product and verify it belongs to this restaurant
         product = Product.objects.filter(
-            Q(main_category__owner=restaurant) |
-            Q(main_category__restaurant__main_owner=restaurant) |
-            Q(main_category__restaurant__branch_owner=restaurant),
+            _customer_product_q(request.session, restaurant),
             id=product_id,
         ).distinct().first()
         
@@ -622,6 +671,10 @@ def place_order(request):
 
     if request.method == 'POST':
         form = OrderForm(request.POST)
+        if form.is_valid() and request.user.is_customer() and _duplicate_checkout(request, cart):
+            # Same cart submitted twice within seconds (double tap): place it once
+            messages.info(request, 'Your order is already being placed. Please wait a moment.')
+            return redirect('orders:my_orders' if request.user.is_customer() else 'orders:select_table')
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -671,9 +724,11 @@ def place_order(request):
                         rest_obj = _remote_restaurant_for(current_restaurant)
                         if request.user.is_customer():
                             if not rest_obj or not rest_obj.allow_remote_orders or not rest_obj.is_active:
+                                _checkout_failed(request, cart)
                                 messages.error(request, 'This restaurant is not accepting delivery or pickup orders right now.')
                                 return redirect('restaurant:browse_restaurants')
                             if order_type_session == 'delivery' and not (delivery_address.strip() and delivery_phone.strip()):
+                                _checkout_failed(request, cart)
                                 messages.error(request, 'Please enter your delivery address and phone number.')
                                 return redirect('restaurant:delivery_info', restaurant_id=rest_obj.id)
                         remote_tax_rate = Decimal(str(rest_obj.tax_rate)) if rest_obj else Decimal(str(getattr(current_restaurant, 'tax_rate', None) or Decimal('0.08')))
@@ -716,12 +771,10 @@ def place_order(request):
                         )
 
                     # Create order items - verify each product belongs to restaurant
-                    total_amount = 0
+                    total_amount = Decimal('0')
                     for product_id, item in cart.items():
                         product = Product.objects.select_for_update(of=('self',)).filter(
-                            Q(main_category__owner=current_restaurant) |
-                            Q(main_category__restaurant__main_owner=current_restaurant) |
-                            Q(main_category__restaurant__branch_owner=current_restaurant),
+                            _customer_product_q(request.session, current_restaurant),
                             id=product_id,
                         ).first()
 
@@ -745,10 +798,10 @@ def place_order(request):
                                 available_in_stock=F('available_in_stock') - item['quantity']
                             )
 
-                        total_amount += float(unit_price_paid) * item['quantity']
+                        total_amount += unit_price_paid * item['quantity']   # exact money, no floats
 
                     # Update order total — include tax and (for delivery) the restaurant's delivery fee
-                    food_subtotal = Decimal(str(total_amount))
+                    food_subtotal = total_amount
                     if is_remote_order:
                         tax_rate = remote_tax_rate
                         if order_type_session == 'delivery' and rest_obj is not None:
@@ -872,6 +925,7 @@ def place_order(request):
                     
             except Exception as e:
                 logger.error(f'Error placing order: {str(e)} | type={type(e).__name__}', exc_info=True)
+                _checkout_failed(request, cart)
                 messages.error(request, 'Error placing order. Please try again.')
                 return redirect('orders:view_cart')
     else:
@@ -1530,6 +1584,8 @@ def kitchen_reports(request):
     items_by_product = {}
     
     for order in orders_with_kitchen_items:
+        if order.status in NOT_PREPARED_STATUSES:
+            continue                     # cancelled orders: nothing was prepared/sold
         for item in order.order_items.all():
             if item.product and item.product.station == 'kitchen':
                 total_items += item.quantity
@@ -1645,6 +1701,8 @@ def bar_reports(request):
     items_by_product = {}
     
     for order in orders_with_bar_items:
+        if order.status in NOT_PREPARED_STATUSES:
+            continue                     # cancelled orders: nothing was prepared/sold
         for item in order.order_items.all():
             if item.product and item.product.station == 'bar':
                 total_items += item.quantity
@@ -1758,6 +1816,8 @@ def buffet_reports(request):
     items_by_product = {}
 
     for order in orders_with_buffet_items:
+        if order.status in NOT_PREPARED_STATUSES:
+            continue                     # cancelled orders: nothing was prepared/sold
         for item in order.order_items.all():
             if item.product and item.product.station == 'buffet':
                 total_items += item.quantity
@@ -1869,6 +1929,8 @@ def service_reports(request):
     items_by_product = {}
 
     for order in orders_with_service_items:
+        if order.status in NOT_PREPARED_STATUSES:
+            continue                     # cancelled orders: nothing was prepared/sold
         for item in order.order_items.all():
             if item.product and item.product.station == 'service':
                 total_items += item.quantity
@@ -2035,7 +2097,7 @@ def update_order_status(request, order_id):
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
             )
-            order = get_object_or_404(Order.objects.select_for_update(of=('self',)).filter(_oq_uos3), id=order_id)
+            order = locked_get(Order.objects.filter(_oq_uos3), id=order_id)
         else:
             order = get_object_or_404(Order.objects.select_for_update(of=('self',)), id=order_id)
         
@@ -2092,9 +2154,12 @@ def update_order_status(request, order_id):
         
         # Handle cancellation reason
         if new_status == 'cancelled':
+            if _has_live_payment(order):
+                return JsonResponse({'success': False, 'message': PAID_CANCEL_MESSAGE})
             cancel_reason = request.POST.get('cancel_reason', '') if request.content_type != 'application/json' else data.get('cancel_reason', '')
             order.reason_if_cancelled = cancel_reason
 
+        previous_status = order.status
         order.status = new_status
         if new_status == 'confirmed' and not order.confirmed_by:
             order.confirmed_by = request.user
@@ -2112,10 +2177,12 @@ def update_order_status(request, order_id):
 
         # Release table and restore stock if order is cancelled through status change
         if new_status == 'cancelled':
-            for item in order.order_items.select_related('product').select_for_update(of=('self',)):
-                if item.product:
-                    item.product.available_in_stock = F('available_in_stock') + item.quantity
-                    item.product.save(update_fields=['available_in_stock'])
+            # Food already handed over is gone: only put stock back for orders not yet served
+            if previous_status not in HANDED_OVER_STATUSES:
+                for item in order.order_items.select_related('product').select_for_update(of=('self',)):
+                    if item.product:
+                        item.product.available_in_stock = F('available_in_stock') + item.quantity
+                        item.product.save(update_fields=['available_in_stock'])
             order.release_table()
 
         fields_to_update = ['status', 'reason_if_cancelled', 'confirmed_at', 'preparing_at', 'ready_at', 'served_at']
@@ -2280,10 +2347,7 @@ def cancel_order(request, order_id):
                 with transaction.atomic():
                     # Re-fetch with row lock to prevent concurrent cancellation race
                     if owner_filter:
-                        order = get_object_or_404(
-                            Order.objects.select_for_update(of=('self',)).filter(_oq_cobk),
-                            id=order_id
-                        )
+                        order = locked_get(Order.objects.filter(_oq_cobk), id=order_id)
                     else:
                         order = get_object_or_404(
                             Order.objects.select_for_update(of=('self',)),
@@ -2291,8 +2355,11 @@ def cancel_order(request, order_id):
                         )
                     if order.status in ['served', 'cancelled']:
                         return JsonResponse({'success': False, 'message': 'Cannot cancel this order.'})
-                    # Restore product stock
-                    for item in order.order_items.select_related('product').all():
+                    if _has_live_payment(order):
+                        return JsonResponse({'success': False, 'message': PAID_CANCEL_MESSAGE})
+                    # Restore product stock (not for food already handed over)
+                    for item in (order.order_items.select_related('product').all()
+                                 if order.status not in HANDED_OVER_STATUSES else []):
                         product = item.product
                         if product and product.available_in_stock is not None:
                             product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
@@ -2322,10 +2389,7 @@ def cancel_order(request, order_id):
             with transaction.atomic():
                 # Re-fetch with row lock to prevent concurrent cancellation race
                 if owner_filter:
-                    order = get_object_or_404(
-                        Order.objects.select_for_update(of=('self',)).filter(_oq_cobk),
-                        id=order_id
-                    )
+                    order = locked_get(Order.objects.filter(_oq_cobk), id=order_id)
                 else:
                     order = get_object_or_404(
                         Order.objects.select_for_update(of=('self',)),
@@ -2334,8 +2398,12 @@ def cancel_order(request, order_id):
                 if order.status in ['served', 'cancelled']:
                     messages.error(request, 'Cannot cancel this order.')
                     return redirect('orders:kitchen_dashboard')
-                # Restore product stock
-                for item in order.order_items.select_related('product').all():
+                if _has_live_payment(order):
+                    messages.error(request, PAID_CANCEL_MESSAGE)
+                    return redirect('orders:kitchen_dashboard')
+                # Restore product stock (not for food already handed over)
+                for item in (order.order_items.select_related('product').all()
+                             if order.status not in HANDED_OVER_STATUSES else []):
                     product = item.product
                     if product and product.available_in_stock is not None:
                         product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
@@ -2381,7 +2449,10 @@ def customer_cancel_order(request, order_id):
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
                 )
-                order = get_object_or_404(_order_qs.filter(_oq_cco), id=order_id)
+                _cco_qs = _order_qs.filter(_oq_cco)
+                if request.user.is_customer_care():
+                    _cco_qs = _cco_qs.filter(ordered_by=request.user)       # own orders only (as in the app)
+                order = get_object_or_404(_cco_qs, id=order_id)
             else:
                 order = get_object_or_404(_order_qs, id=order_id)
         except PermissionDenied:
@@ -2403,7 +2474,7 @@ def customer_cancel_order(request, order_id):
         if request.headers.get('Content-Type') == 'application/json':
             try:
                 data = json.loads(request.body)
-                reason = data.get('reason', 'Cancelled by customer').strip()
+                reason = (data.get('reason') or '').strip() or 'Cancelled by customer'
                 
                 with transaction.atomic():
                     # Re-fetch with row lock to prevent concurrent cancellation race
@@ -2413,10 +2484,7 @@ def customer_cancel_order(request, order_id):
                             id=order_id, ordered_by=request.user
                         )
                     elif owner_filter:
-                        order = get_object_or_404(
-                            Order.objects.select_for_update(of=('self',)).filter(_oq_cco),
-                            id=order_id
-                        )
+                        order = locked_get(Order.objects.filter(_oq_cco), id=order_id)
                     else:
                         order = get_object_or_404(
                             Order.objects.select_for_update(of=('self',)),
@@ -2427,6 +2495,8 @@ def customer_cancel_order(request, order_id):
                             'success': False,
                             'message': 'Order cannot be cancelled. It has already been confirmed by the kitchen.'
                         })
+                    if _has_live_payment(order):
+                        return JsonResponse({'success': False, 'message': CUSTOMER_PAID_CANCEL_MESSAGE})
                     # Restore product stock
                     for item in order.order_items.select_related('product').all():
                         product = item.product
@@ -2464,10 +2534,7 @@ def customer_cancel_order(request, order_id):
                         id=order_id, ordered_by=request.user
                     )
                 elif owner_filter:
-                    order = get_object_or_404(
-                        Order.objects.select_for_update(of=('self',)).filter(_oq_cco),
-                        id=order_id
-                    )
+                    order = locked_get(Order.objects.filter(_oq_cco), id=order_id)
                 else:
                     order = get_object_or_404(
                         Order.objects.select_for_update(of=('self',)),
@@ -2475,6 +2542,9 @@ def customer_cancel_order(request, order_id):
                     )
                 if order.status != 'pending':
                     messages.error(request, 'Order cannot be cancelled. It has already been confirmed by the kitchen.')
+                    return redirect('orders:my_orders' if request.user.is_customer() else 'orders:customer_care_dashboard')
+                if _has_live_payment(order):
+                    messages.error(request, CUSTOMER_PAID_CANCEL_MESSAGE)
                     return redirect('orders:my_orders' if request.user.is_customer() else 'orders:customer_care_dashboard')
                 # Restore product stock
                 for item in order.order_items.select_related('product').all():
@@ -2762,7 +2832,10 @@ def customer_care_receipt(request, payment_id):
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
-    payment = get_object_or_404(Payment.objects.filter(_pq_ccr), id=payment_id)
+    _receipts = Payment.objects.filter(_pq_ccr)
+    if request.user.is_customer_care():
+        _receipts = _receipts.filter(order__ordered_by=request.user)   # own orders only (as in the app)
+    payment = get_object_or_404(_receipts, id=payment_id)
     
     # Fetch order with prefetch to avoid repeated order_items queries when calling get_total()
     order = Order.objects.prefetch_related('order_items__product').get(pk=payment.order_id)
@@ -2807,7 +2880,10 @@ def customer_care_reprint_receipt(request, payment_id):
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
-    payment = get_object_or_404(Payment.objects.filter(_pq_ccrr), id=payment_id)
+    _receipts = Payment.objects.filter(_pq_ccrr)
+    if request.user.is_customer_care():
+        _receipts = _receipts.filter(order__ordered_by=request.user)   # own orders only (as in the app)
+    payment = get_object_or_404(_receipts, id=payment_id)
     
     # Add a message indicating this is a reprint
     messages.info(request, f"Reprinting receipt #{payment.id:06d}")
@@ -2867,7 +2943,10 @@ def customer_care_receipt_management(request):
     payments = Payment.objects.filter(
         _pq_ccpm,
         is_voided=False
-    ).select_related(
+    )
+    if request.user.is_customer_care():
+        payments = payments.filter(order__ordered_by=request.user)   # own orders only (as in the app)
+    payments = payments.select_related(
         'order', 'order__table_info', 'processed_by'
     ).order_by('-created_at')
     
@@ -2922,7 +3001,10 @@ def view_receipt(request, order_id):
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
                 )
-                order = get_object_or_404(_order_qs.filter(_oq_ccod), id=order_id)
+                _ccod_qs = _order_qs.filter(_oq_ccod)
+                if request.user.is_customer_care():
+                    _ccod_qs = _ccod_qs.filter(ordered_by=request.user)     # own orders only
+                order = get_object_or_404(_ccod_qs, id=order_id)
             else:
                 order = get_object_or_404(_order_qs, id=order_id)
         except PermissionDenied:
@@ -2943,7 +3025,9 @@ def view_receipt(request, order_id):
     # Calculate totals
     subtotal = order.get_subtotal()
     tax_amount = order.get_tax_amount()
-    discount_amount = order.get_total_discount()
+    # Happy-hour prices are already in each line's unit price: a separate discount line
+    # worked out from today's promotion would count it twice
+    discount_amount = Decimal('0')
     total_amount = order.total_amount
 
     # Get restaurant name - use main restaurant name for branch staff
@@ -3016,7 +3100,8 @@ def print_kot(request, order_id):
                         return redirect('orders:kitchen_dashboard')
                 elif order.order_type in ('delivery', 'pickup'):
                     ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
-                    if ordered_by_owner != owner_filter:
+                    # Self-registered customers have no owner: their order carries restaurant_owner
+                    if ordered_by_owner != owner_filter and order.restaurant_owner_id != owner_filter.id:
                         messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                         return redirect('orders:kitchen_dashboard')
                 else:
@@ -3150,7 +3235,8 @@ def print_bot(request, order_id):
                         return redirect('orders:bar_dashboard')
                 elif order.order_type in ('delivery', 'pickup'):
                     ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
-                    if ordered_by_owner != owner_filter:
+                    # Self-registered customers have no owner: their order carries restaurant_owner
+                    if ordered_by_owner != owner_filter and order.restaurant_owner_id != owner_filter.id:
                         messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                         return redirect('orders:bar_dashboard')
                 else:
@@ -3283,7 +3369,8 @@ def print_buffet(request, order_id):
                         return redirect('orders:buffet_dashboard')
                 elif order.order_type in ('delivery', 'pickup'):
                     ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
-                    if ordered_by_owner != owner_filter:
+                    # Self-registered customers have no owner: their order carries restaurant_owner
+                    if ordered_by_owner != owner_filter and order.restaurant_owner_id != owner_filter.id:
                         messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                         return redirect('orders:buffet_dashboard')
                 else:
@@ -3416,7 +3503,8 @@ def print_service(request, order_id):
                         return redirect('orders:service_dashboard')
                 elif order.order_type in ('delivery', 'pickup'):
                     ordered_by_owner = getattr(order.ordered_by, 'owner', None) if order.ordered_by else None
-                    if ordered_by_owner != owner_filter:
+                    # Self-registered customers have no owner: their order carries restaurant_owner
+                    if ordered_by_owner != owner_filter and order.restaurant_owner_id != owner_filter.id:
                         messages.error(request, 'Access denied. This order belongs to a different restaurant.')
                         return redirect('orders:service_dashboard')
                 else:
@@ -3849,11 +3937,15 @@ def handle_add_to_existing_order(request, order_id, cart):
 
             # Add new items to order
             total_added = Decimal('0.00')
+            # Only the order's own restaurant's products (a main owner's filter also covers branches)
+            if order.table_info_id and order.table_info.restaurant_id:
+                _menu_q = (Q(main_category__restaurant_id=order.table_info.restaurant_id) |
+                           Q(main_category__restaurant__isnull=True, main_category__owner=owner_filter))
+            else:
+                _menu_q = _customer_product_q(request.session, owner_filter)
             for product_id, item in cart.items():
                 product = Product.objects.select_for_update(of=('self',)).filter(
-                    Q(main_category__owner=owner_filter) |
-                    Q(main_category__restaurant__main_owner=owner_filter) |
-                    Q(main_category__restaurant__branch_owner=owner_filter),
+                    _menu_q,
                     id=product_id,
                 ).first()
                 
@@ -4352,19 +4444,28 @@ def cancel_order_item(request, item_id):
                     product.save(update_fields=['available_in_stock'])
                     logger.info(f"Restored {item.quantity} units of {product.name} to stock")
 
-            # Compute tax_rate BEFORE deleting the item so we can back-calculate it for delivery/pickup
-            if order.table_info:
-                tax_rate = order.table_info.get_tax_rate()
-            else:
-                tax_rate = order.charged_tax_rate()
+            # The rate this order was actually charged (not today's rate, which may have changed),
+            # worked out BEFORE the item is removed
+            tax_rate = order.charged_tax_rate()
+
+            # Recalculate order total (tax + delivery fee as charged) after item cancellation
+            subtotal = sum(oi.get_subtotal() for oi in order.order_items.select_related('product').all()
+                           if oi.pk != item.pk)
+            new_total = order.total_for_subtotal(subtotal, tax_rate)
+            paid = order.payments.filter(is_voided=False).aggregate(t=Sum('amount'))['t'] or Decimal('0')
+            if new_total < paid:
+                # Removing it would leave the customer owed money: void/refund at the cashier first
+                transaction.set_rollback(True)
+                return JsonResponse({'error': 'This item is already paid for. Void the payment at the cashier '
+                                              'first, then remove it.'}, status=400)
 
             # Delete the item
             item.delete()
-
-            # Recalculate order total (tax + delivery fee as charged) after item cancellation
-            subtotal = sum(oi.get_subtotal() for oi in order.order_items.select_related('product').all())
-            order.total_amount = order.total_for_subtotal(subtotal, tax_rate)
-            order.save(update_fields=['total_amount'])
+            order.total_amount = new_total
+            order.payment_status = ('paid' if paid >= new_total else 'partial') if paid > 0 else 'unpaid'
+            if order.payment_status == 'paid':
+                order.release_table()                  # fully paid now: the table is free (as the app does)
+            order.save(update_fields=['total_amount', 'payment_status'])
 
         logger.info(
             f"Item cancelled: {item_name} x{item_quantity} (${item_total}) "

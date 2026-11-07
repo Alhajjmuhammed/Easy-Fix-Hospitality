@@ -4,6 +4,9 @@ Stock follows the order status (reconciled, never double-counted):
   preparing / ready / served / out for delivery / delivered → ingredients used
   kitchen error / quality issue / food wasted              → ingredients used, shown as waste
   pending / confirmed / cancelled / customer refused       → nothing used (put back if already taken)
+  cancelled after served / out for delivery / delivered   → kept: the food was handed over
+What was already taken is kept when only the status label changes or other lines change, so a
+recipe edit only applies to servings added or changed after it.
 Selling never stops because of stock: counts may go below zero and show as out of stock.
 """
 import logging
@@ -18,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 USED_STATUSES = frozenset({'preparing', 'ready', 'served', 'out_for_delivery', 'delivered'})
 WASTE_STATUSES = frozenset({'kitchen_error', 'quality_issue', 'wasted'})
+# Food has left the kitchen: cancelling now does not bring the ingredients back
+# (same rule the order views use for product stock).
+HANDED_OVER_STATUSES = frozenset({'served', 'out_for_delivery', 'delivered'})
+_UNKNOWN = object()
 
 
 def stock_group(status):
@@ -126,8 +133,12 @@ def sync_order_stock(order):
     """Bring the stock taken for this order in line with its status and items. Safe to call
     any number of times. Never raises: a stock problem must not stop an order."""
     from orders.models import Order
-    from .models import InventoryRecord
+    from .models import InventoryRecord, RecipeIngredient
     try:
+        # Set by _order_pre_save when this instance's status was just saved (a status change);
+        # unknown when the sync comes from an item change.
+        prev_status = getattr(order, '_stock_prev_status', _UNKNOWN)
+        changed_products = _pop_changed_products(order.pk)   # popped either way: a status change starts afresh
         with transaction.atomic():
             # Lock the order so two simultaneous changes can't both take the stock
             order = Order.objects.select_for_update().filter(pk=order.pk).first()
@@ -138,6 +149,20 @@ def sync_order_stock(order):
             if not wanted and not records.exists():
                 return
             taken = {r['item_id']: -r['total'] for r in records.values('item_id').annotate(total=Sum('quantity_change'))}
+            if not stock_group(order.status):
+                if order.status == 'cancelled' and _was_handed_over(prev_status, order):
+                    return  # the customer already had the food: what was taken stays used
+            elif any(taken.values()):
+                # Something was already taken: keep it for what did not change, so a recipe
+                # edited since then is not applied to servings already cooked.
+                if prev_status is not _UNKNOWN:
+                    if stock_group(prev_status):
+                        wanted = dict(taken)   # only the label changes (e.g. served -> wasted)
+                elif changed_products is not None:
+                    touched = set(RecipeIngredient.objects.filter(product_id__in=changed_products)
+                                  .values_list('item_id', flat=True))
+                    wanted = {i: (wanted.get(i, Decimal('0')) if i in touched else taken.get(i, Decimal('0')))
+                              for i in set(wanted) | set(taken)}
             kind = 'waste' if order.status in WASTE_STATUSES else 'used'
             if stock_group(order.status):
                 # Food that was cooked and then lost counts as waste (and back to "used" if corrected)
@@ -157,3 +182,71 @@ def sync_order_stock(order):
                         source_order=order)
     except Exception:
         logger.warning('Recipe stock update failed for order %s', getattr(order, 'pk', None), exc_info=True)
+
+
+def _was_handed_over(prev_status, order):
+    if prev_status is not _UNKNOWN:
+        return prev_status in HANDED_OVER_STATUSES
+    return order.served_at is not None
+
+
+# ---------------------------------------------------------------------------
+# Signal hooks (connected in InventoryConfig.ready): remember the status an order had
+# before a save, and which dishes' lines changed in an order, so sync_order_stock only
+# reconciles what changed. Marks live on the thread's DB connection; a mark left behind by a
+# rolled-back change only makes the next sync reconcile a little more (the old behaviour).
+# ---------------------------------------------------------------------------
+
+def _changed_marks():
+    from django.db import connection
+    marks = getattr(connection, '_inventory_changed_products', None)
+    if marks is None:
+        marks = connection._inventory_changed_products = {}
+    return marks
+
+
+def _pop_changed_products(order_id):
+    return _changed_marks().pop(order_id, None)
+
+
+def _mark_changed(order_id, *product_ids):
+    if order_id is None:
+        return
+    marks = _changed_marks()
+    if len(marks) > 500 and order_id not in marks:
+        marks.clear()   # e.g. many orders edited before cooking: losing marks only means a full reconcile
+    marks.setdefault(order_id, set()).update(p for p in product_ids if p is not None)
+
+
+def _order_pre_save(sender, instance, **kwargs):
+    # _loaded_status is kept by orders.signals: the status last loaded or saved
+    instance._stock_prev_status = getattr(instance, '_loaded_status', None)
+
+
+def _item_post_init(sender, instance, **kwargs):
+    instance._stock_loaded_product = instance.__dict__.get('product_id')
+
+
+def _item_pre_save(sender, instance, **kwargs):
+    _mark_changed(instance.order_id, instance.product_id, getattr(instance, '_stock_loaded_product', None))
+
+
+def _item_post_save(sender, instance, **kwargs):
+    instance._stock_loaded_product = instance.product_id
+
+
+def _item_pre_delete(sender, instance, origin=None, **kwargs):
+    from orders.models import Order
+    if isinstance(origin, Order):
+        return  # the whole order is being deleted
+    _mark_changed(instance.order_id, instance.product_id)
+
+
+def connect_signals():
+    from django.db.models.signals import post_init, post_save, pre_delete, pre_save
+    from orders.models import Order, OrderItem
+    pre_save.connect(_order_pre_save, sender=Order, dispatch_uid='inventory_order_pre_save')
+    post_init.connect(_item_post_init, sender=OrderItem, dispatch_uid='inventory_item_post_init')
+    pre_save.connect(_item_pre_save, sender=OrderItem, dispatch_uid='inventory_item_pre_save')
+    post_save.connect(_item_post_save, sender=OrderItem, dispatch_uid='inventory_item_post_save')
+    pre_delete.connect(_item_pre_delete, sender=OrderItem, dispatch_uid='inventory_item_pre_delete')

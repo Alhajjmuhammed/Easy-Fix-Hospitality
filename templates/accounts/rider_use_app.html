@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Delivery Rider" %}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-motorcycle text-primary mb-3" style="font-size: 64px;"></i>
+                    <h4 class="mb-3">{% translate "Please use the mobile app" %}</h4>
+                    <p class="lead">
+                        {% translate "Delivery riders receive and complete their deliveries in the mobile app. Sign in to the app with the same username and password." %}
+                    </p>
+                    <form method="post" action="{% url 'accounts:logout' %}" class="mt-4">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-secondary">
+                            <i class="fas fa-sign-out-alt"></i> {% translate "Log out" %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

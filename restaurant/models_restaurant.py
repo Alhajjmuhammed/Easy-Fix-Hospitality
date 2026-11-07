@@ -322,7 +322,9 @@ class Restaurant(models.Model):
         if owner is None:
             return None
         return (
-            cls.objects.filter(branch_owner=owner, is_main_restaurant=False).first()
+            # A branch the main owner runs himself has branch_owner == main_owner: it is not
+            # "his" restaurant — his main restaurant is (checked next)
+            cls.objects.filter(branch_owner=owner, is_main_restaurant=False).exclude(main_owner=owner).first()
             or cls.objects.filter(main_owner=owner, is_main_restaurant=True).first()
             or cls.objects.filter(models.Q(main_owner=owner) | models.Q(branch_owner=owner)).first()
         )

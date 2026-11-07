@@ -121,7 +121,10 @@ class Order(models.Model):
         food = Decimal(str(food_subtotal))
         fee = Decimal(str(delivery_fee or 0))
         taxable = food + (fee if fee_taxed else Decimal('0'))
-        return food + fee + taxable * Decimal(str(tax_rate))
+        from decimal import ROUND_HALF_UP
+        # Rounded to the cent here (half up, as PostgreSQL stores it), so the total shown at
+        # checkout and the total stored are always the same number on every database
+        return (food + fee + taxable * Decimal(str(tax_rate))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     def get_tax_amount(self):
         """Calculate tax from stored order total — historically accurate regardless of current tax rate."""

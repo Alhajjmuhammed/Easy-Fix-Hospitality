@@ -119,6 +119,20 @@ class AttendanceRecord(models.Model):
     def __str__(self):
         return f"{self.staff.username} — {self.date}"
 
+    def _aware(self, t):
+        return timezone.make_aware(datetime.combine(self.date, t), timezone.get_current_timezone())
+
+    def compute_lateness(self):
+        """Set is_late / late_minutes from check_in and the shift. Called at check-in (so
+        'late today' is known when the person arrives) and again by compute_metrics."""
+        if not self.check_in or not self.shift:
+            return
+        expected_in = self._aware(self.shift.start_time)
+        late_threshold = expected_in + timedelta(minutes=self.shift.grace_minutes)
+        if self.check_in > late_threshold:
+            self.is_late = True
+            self.late_minutes = int((self.check_in - late_threshold).total_seconds() / 60)
+
     def compute_metrics(self):
         """Recalculate work_minutes, is_late, is_overtime after check-out."""
         if not self.check_in or not self.check_out:
@@ -128,17 +142,11 @@ class AttendanceRecord(models.Model):
 
         if self.shift:
             record_date = self.date
-            tz = timezone.get_current_timezone()
 
             def aware(d, t):
-                return timezone.make_aware(datetime.combine(d, t), tz)
+                return timezone.make_aware(datetime.combine(d, t), timezone.get_current_timezone())
 
-            expected_in = aware(record_date, self.shift.start_time)
-            late_threshold = expected_in + timedelta(minutes=self.shift.grace_minutes)
-
-            if self.check_in > late_threshold:
-                self.is_late = True
-                self.late_minutes = int((self.check_in - late_threshold).total_seconds() / 60)
+            self.compute_lateness()
 
             expected_out = aware(record_date, self.shift.end_time)
             if self.shift.end_time < self.shift.start_time:

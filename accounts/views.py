@@ -58,8 +58,17 @@ def login_view(request):
         if form.is_valid():
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
+
+            # Right password, but the account was switched off because the restaurant's
+            # subscription expired or was blocked: say so (instead of "Invalid username or
+            # password", which also counted towards the lockout).
+            blocked_reason = _subscription_blocked_login_reason(request, username, password)
+            if blocked_reason:
+                from urllib.parse import urlencode
+                return redirect(f"{reverse('accounts:access_blocked')}?{urlencode({'reason': blocked_reason})}")
+
             user = authenticate(request, username=username, password=password)
-            
+
             if user is not None:
                 login(request, user)
                 
@@ -97,6 +106,8 @@ def login_view(request):
                     return redirect('orders:buffet_dashboard')
                 elif user.is_service_staff():
                     return redirect('orders:service_dashboard')
+                elif user.is_delivery_rider():
+                    return redirect('accounts:rider_home')  # riders work in the mobile app
                 else:
                     return redirect('restaurant:menu')
             else:
@@ -119,6 +130,64 @@ def login_view(request):
         form = UserLoginForm()
     
     return render(request, 'accounts/login.html', {'form': form})
+
+def _subscription_blocked_login_reason(request, username, password):
+    """
+    The access-blocked reason if this login is for an INACTIVE account whose password
+    is correct and whose restaurant subscription is expired/blocked; otherwise None.
+
+    Security: nothing is revealed for a wrong password (normal flow, counted by axes),
+    and a username+IP that axes has locked out always takes the normal (locked) flow.
+    """
+    try:
+        candidate = User.objects.select_related('role', 'owner').get(
+            **{User.USERNAME_FIELD: username}, is_active=False)
+    except (User.DoesNotExist, User.MultipleObjectsReturned):
+        return None
+    if candidate.is_administrator() or candidate.is_customer() or not candidate.role:
+        return None
+    try:
+        from axes.handlers.proxy import AxesProxyHandler
+        from axes.helpers import get_credentials
+        if not AxesProxyHandler.is_allowed(request, get_credentials(username=username)):
+            return None
+    except Exception:
+        return None
+    if not candidate.check_password(password):
+        return None
+    sub_owner = candidate._subscription_owner()
+    if sub_owner is None:
+        return None
+    from .models import RestaurantSubscription
+    subscription = RestaurantSubscription.objects.filter(restaurant_owner=sub_owner).first()
+    if subscription is None or subscription.is_active:
+        return None  # inactive for another reason (e.g. disabled by the owner)
+    if subscription.is_blocked_by_admin:
+        reason = f"Restaurant access blocked: {subscription.block_reason}" if subscription.block_reason \
+            else "Restaurant access blocked by the administrator"
+    else:
+        reason = "Your restaurant subscription has expired or is inactive"
+    try:
+        from .security_utils import log_security_event, get_client_ip
+        log_security_event(
+            event_type='login_failed',
+            user=None,
+            description=f"Login refused for '{username}': restaurant subscription inactive",
+            ip_address=get_client_ip(request),
+            extra_data={'attempted_username': username, 'subscription_inactive': True},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log blocked login: {e}")
+    return reason
+
+
+@login_required
+def rider_home(request):
+    """Delivery riders work in the mobile app; the website has no rider screens."""
+    if not request.user.is_delivery_rider():
+        return redirect('restaurant:home')
+    return render(request, 'accounts/rider_use_app.html')
+
 
 @login_required
 @require_POST
@@ -289,10 +358,12 @@ def qr_code_access(request, qr_code):
         except Restaurant.DoesNotExist:
             # Fallback: try to find in User model (legacy system)
             try:
+                # No is_active filter here: an owner switched off by an expired/blocked
+                # subscription must get the "unavailable" page, not "Invalid QR code".
+                # A deactivated owner with a good subscription is still refused below.
                 user_restaurant = User.objects.get(
-                    restaurant_qr_code=qr_code, 
-                    role__name__in=['owner', 'main_owner', 'branch_owner'], 
-                    is_active=True
+                    restaurant_qr_code=qr_code,
+                    role__name__in=['owner', 'main_owner', 'branch_owner'],
                 )
                 # Try to get the corresponding Restaurant object
                 # Check if branch owner first, then main owner
@@ -307,10 +378,11 @@ def qr_code_access(request, qr_code):
             except User.DoesNotExist:
                 raise User.DoesNotExist("QR code not found in either system")
         
-        # Ensure we have a valid user
-        if not user_restaurant or not user_restaurant.is_active:
-            raise User.DoesNotExist("Restaurant owner not found or inactive")
-        
+        # Ensure we have a valid user (whether it is active is checked after the
+        # subscription, so expired/blocked restaurants show "unavailable")
+        if not user_restaurant:
+            raise User.DoesNotExist("Restaurant owner not found")
+
         # For compatibility, set restaurant variable to user_restaurant for legacy code
         restaurant = user_restaurant
         
@@ -366,11 +438,21 @@ def qr_code_access(request, qr_code):
                 'current_time': timezone.now(),
                 'display_name': display_name
             })
-        
+
+        # Restaurant / branch switched off by the owner or the system admin
+        if restaurant_obj is not None and not restaurant_obj.is_active:
+            return _restaurant_unavailable(request, restaurant, restaurant_obj, qr_code)
+
+        # Owner account deactivated by hand (subscription fine): treated as invalid, as before
+        if not restaurant.is_active:
+            raise User.DoesNotExist("Restaurant owner inactive")
+
         # Store restaurant in session - ALWAYS use User ID (owner)
         # select_table expects User.objects.get(id=selected_restaurant_id)
         # restaurant = user_restaurant (always a User object)
-        request.session['selected_restaurant_id'] = restaurant.id  # User ID
+        # Scanning a different restaurant empties the cart (items never mix restaurants)
+        from .security_utils import set_session_restaurant
+        set_session_restaurant(request.session, restaurant.id)  # User ID
         request.session['selected_restaurant_name'] = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
         request.session['access_method'] = 'qr_code'
         # A table QR scan always starts a dine-in flow
@@ -417,6 +499,25 @@ def qr_code_access(request, qr_code):
         logger.warning(f"QR Code Access Failed: '{qr_code}'")
         messages.error(request, f'Invalid QR code. Restaurant not found. (Code: {qr_code})')
         return redirect('accounts:login')
+
+
+def _restaurant_unavailable(request, restaurant, restaurant_obj, qr_code,
+                            reason="This restaurant is temporarily unavailable.",
+                            subscription_status='inactive'):
+    """The customer-facing "restaurant unavailable" page."""
+    from django.utils import timezone
+    display_name = restaurant_obj.name if restaurant_obj else restaurant.restaurant_name
+    if restaurant_obj and not restaurant_obj.is_main_restaurant and restaurant_obj.parent_restaurant:
+        display_name = restaurant_obj.parent_restaurant.name
+    return render(request, 'accounts/restaurant_unavailable.html', {
+        'restaurant': restaurant,
+        'restaurant_obj': restaurant_obj,
+        'qr_code': qr_code,
+        'reason': reason,
+        'subscription_status': subscription_status,
+        'current_time': timezone.now(),
+        'display_name': display_name,
+    })
 
 
 @rate_limit_registration
@@ -577,9 +678,11 @@ def customer_register_view(request, qr_code):
 @require_POST
 def update_tax_rate(request):
     """Update restaurant owner's tax rate"""
-    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
-        return JsonResponse({'success': False, 'message': 'Only restaurant owners and managers can update tax rates.'})
-    
+    if not (request.user.is_owner() or request.user.is_main_owner() or request.user.is_branch_owner()):
+        # Managers included: the tax rate is the owner's setting (only the owner profile
+        # page offers it); a manager's own tax_rate was saved but never used for orders.
+        return JsonResponse({'success': False, 'message': 'Only the restaurant owner can update the tax rate.'})
+
     try:
         data = json.loads(request.body)
         tax_rate = Decimal(str(data.get('tax_rate', 0)))
@@ -593,11 +696,12 @@ def update_tax_rate(request):
         with transaction.atomic():
             request.user.tax_rate = tax_rate
             request.user.save()
-            if not request.user.is_manager():
-                from restaurant.models_restaurant import Restaurant
-                Restaurant.objects.filter(
-                    Q(main_owner=request.user) | Q(branch_owner=request.user)
-                ).update(tax_rate=tax_rate)
+            # Tax is per location: only the owner's own restaurant (branches keep their own rate,
+            # set through Edit Branch) — the same rule as the admin-panel profile form
+            from restaurant.models_restaurant import Restaurant
+            own = Restaurant.for_owner(request.user)
+            if own is not None:
+                Restaurant.objects.filter(pk=own.pk).update(tax_rate=tax_rate)
 
         return JsonResponse({'success': True, 'message': 'Tax rate updated successfully',
                             'tax_rate_percentage': float(tax_rate * 100)})
@@ -652,12 +756,12 @@ def menu_qr_access(request, menu_qr_code):
         # Get the associated user (main_owner or branch_owner)
         user_restaurant = restaurant_obj.main_owner if restaurant_obj.is_main_restaurant else restaurant_obj.branch_owner
         
-        # Check if restaurant is active
-        if not user_restaurant or not user_restaurant.is_active:
+        if not user_restaurant:
             messages.error(request, 'This restaurant is currently unavailable.')
             return redirect('accounts:login')
-        
-        # Check subscription status
+
+        # Check subscription status (before the owner's is_active: an expired/blocked
+        # subscription switches the owner off, and must show "unavailable")
         from accounts.models import RestaurantSubscription
         subscription_owner = user_restaurant
         if not restaurant_obj.is_main_restaurant:
@@ -683,8 +787,17 @@ def menu_qr_access(request, menu_qr_code):
         except RestaurantSubscription.DoesNotExist:
             messages.error(request, 'This restaurant is temporarily unavailable.')
             return redirect('accounts:login')
-        
-        # Get active categories and products for this restaurant
+
+        # Restaurant / branch switched off by the owner or the system admin
+        if not restaurant_obj.is_active:
+            return _restaurant_unavailable(request, user_restaurant, restaurant_obj, menu_qr_code)
+
+        # Owner account deactivated by hand (subscription fine): as before
+        if not user_restaurant.is_active:
+            messages.error(request, 'This restaurant is currently unavailable.')
+            return redirect('accounts:login')
+
+        # Get active categoriesand products for this restaurant
         categories = MainCategory.objects.filter(
             is_active=True,
             restaurant=restaurant_obj

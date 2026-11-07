@@ -18,6 +18,21 @@ from ..serializers import UserSerializer
 logger = logging.getLogger(__name__)
 
 
+def _is_locked_out(request, username):
+    try:
+        from axes.handlers.proxy import AxesProxyHandler
+        return not AxesProxyHandler.is_allowed(request, {'username': username})
+    except Exception:
+        return False
+
+
+def _locked_out_response():
+    return Response(
+        {'error': 'Too many failed attempts. Account temporarily locked. Please try again later.'},
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
@@ -31,16 +46,24 @@ def login(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # django-axes: a locked-out account must be told so, not "invalid password".
+    # Axes' backend raises PermissionDenied inside authenticate(), which Django
+    # swallows (returning None), so check the lockout explicitly first.
+    if _is_locked_out(request, username):
+        logger.warning('Mobile login locked out for username: %s', username)
+        return _locked_out_response()
+
     try:
         user = authenticate(request, username=username, password=password)
     except Exception:
         # django-axes raises PermissionDenied when account is locked out
         logger.warning('Mobile login locked out for username: %s', username)
-        return Response(
-            {'error': 'Too many failed login attempts. Account temporarily locked.'},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+        return _locked_out_response()
     if not user:
+        if getattr(request, 'axes_locked_out', False) or _is_locked_out(request, username):
+            # This failed attempt was the one that triggered the lockout.
+            logger.warning('Mobile login locked out for username: %s', username)
+            return _locked_out_response()
         logger.warning('Failed mobile login for username: %s', username)
         return Response(
             {'error': 'Invalid username or password.'},
@@ -56,21 +79,26 @@ def login(request):
     # Resolve the owning restaurant for subscription check and response
     owner = user.get_owner() if hasattr(user, 'get_owner') else getattr(user, 'owner', None)
 
-    # Check subscription for non-customer users
+    # Check subscription for non-customer users. Branch owners and branch staff have
+    # no subscription of their own: resolve the governing owner exactly as the
+    # IsSubscriptionActive permission does (the parent restaurant's main owner).
     if not user.is_customer():
-        if owner:
-            try:
-                sub = owner.subscription
-                # Only 'active' is allowed; suspended/expired/blocked/cancelled all deny access
-                if sub.subscription_status not in ('active',):
-                    return Response(
-                        {'error': 'Your restaurant subscription is not active. Please contact support.'},
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-            except Exception:
+        from ..permissions import resolve_subscription_owner
+        sub_owner = resolve_subscription_owner(user) if owner else None
+        if sub_owner:
+            from accounts.models import RestaurantSubscription
+            sub = RestaurantSubscription.objects.filter(restaurant_owner=sub_owner).first()
+            if sub is None:
                 # No subscription record — deny access rather than silently allowing
                 return Response(
                     {'error': 'No subscription found for this restaurant. Please contact support.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            # is_active covers blocked, non-active status, not yet started, and past
+            # the end date (+ grace period) even when the status still says 'active'.
+            if not sub.is_active:
+                return Response(
+                    {'error': 'Your restaurant subscription is not active. Please contact support.'},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 

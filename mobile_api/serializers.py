@@ -401,10 +401,9 @@ class OrderSerializer(serializers.ModelSerializer):
             return float(obj.total_amount)
 
     def get_discount_amount(self, obj):
-        try:
-            return float(obj.get_total_discount())
-        except Exception:
-            return 0.0
+        # Happy-hour prices are already in each line's unit price (and the subtotal): reporting
+        # a discount from today's promotion would count it twice. Kept for older app builds.
+        return 0.0
 
     def get_confirmed_by_name(self, obj):
         try:

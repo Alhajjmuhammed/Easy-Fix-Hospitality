@@ -8,8 +8,58 @@ def _safe_csv(value):
     if s and s[0] in ('=', '+', '-', '@', '|', '%'):
         return '\t' + s
     return s
+
+
+def _valid_date_str(value):
+    """The value if it is a YYYY-MM-DD date, else None (a bad date in the URL is ignored)."""
+    if not value:
+        return None
+    try:
+        datetime.strptime(value, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        return None
+    return value
+
+
+def _reason_label(reason):
+    return dict(FoodWasteLog.WASTE_REASON_CHOICES).get(reason, reason)
+
+
+def _currency_symbol(request):
+    try:
+        from accounts.templatetags.restaurant_tags import get_user_currency_info
+        return get_user_currency_info(request.user, request)[1] or '$'
+    except Exception:
+        return '$'
+
+
+def _excel_money_format(symbol):
+    return '"' + symbol.replace('"', '') + '"#,##0.00'
+
+
+def _whole_quantity(value):
+    """A whole number of portions (1, 2, "3"), or None for 2.5, "abc", True, ..."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, str) and value.strip().lstrip('-').isdigit():
+        return int(value.strip())
+    return None
+
+
+def _filter_product(waste_logs, product_filter):
+    """The reports' product dropdown sends the product id; older links may send a name."""
+    product_filter = (product_filter or '').strip()
+    if not product_filter:
+        return waste_logs
+    if product_filter.isdigit():
+        return waste_logs.filter(product_id=int(product_filter))
+    return waste_logs.filter(product__name__icontains=product_filter)
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse
+from django.http import Http404, JsonResponse, HttpResponse
 from django.db import models, transaction
 from django.db.models import Q, Sum, Count, Avg
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, TruncYear
@@ -42,30 +92,39 @@ logger = logging.getLogger(__name__)
 from admin_panel.restaurant_utils import get_restaurant_context
 
 
-def detect_automatic_waste():
-    """Automatically detect potential waste scenarios"""
-    from django.contrib.auth import get_user_model
-    
-    User = get_user_model()
-    
+def _auto_detect_owner_ids(user):
+    """Restaurant owners whose orders this user may auto-detect: their own restaurant and, for a
+    main owner (or their staff), its branches. None means every restaurant (administrator)."""
+    owner = get_owner_filter(user)
+    if owner is None:
+        return None
+    from restaurant.models_restaurant import Restaurant
+    ids = {owner.id}
+    ids.update(Restaurant.objects.filter(main_owner=owner).exclude(branch_owner__isnull=True)
+               .values_list('branch_owner_id', flat=True))
+    return ids
+
+
+def detect_automatic_waste(user):
+    """Log waste for pickup/delivery orders nobody came for: still confirmed after 2 hours and not
+    paid. Only for the restaurant(s) of the user who asked; run on an explicit request only."""
     # Scenario 1: Orders that were never picked up (older than 2 hours)
     pickup_timeout = timezone.now() - timedelta(hours=2)
     abandoned_orders = Order.objects.filter(
         status='confirmed',
         created_at__lt=pickup_timeout,
+        order_type__in=('pickup', 'delivery'),
+        payment_status='unpaid',          # paid / part-paid orders are not abandoned food
     ).exclude(
         waste_logs__waste_reason='customer_left'  # Don't duplicate
-    ).prefetch_related('order_items__product')
+    )
+    owner_ids = _auto_detect_owner_ids(user)
+    if owner_ids is not None:
+        abandoned_orders = abandoned_orders.filter(restaurant_owner_id__in=owner_ids)
+    abandoned_orders = abandoned_orders.prefetch_related('order_items__product')
 
     auto_waste_count = 0
-
-    # Look up system user once — not inside the loop
-    system_user = User.objects.filter(role__name='administrator').first()
-    if not system_user:
-        system_user = User.objects.filter(role__name='owner').first()
-
-    if not system_user:
-        return auto_waste_count
+    system_user = user   # the person who ran the detection is recorded on the logs
 
     # Pre-load existing customer_left waste log keys to avoid per-item EXISTS queries
     existing_keys = set(
@@ -115,19 +174,16 @@ def waste_dashboard(request):
         messages.error(request, "You don't have permission to access waste management.")
         return redirect('restaurant:home')
     
-    # Run automatic waste detection
-    auto_detected = detect_automatic_waste()
-    if auto_detected > 0:
-        messages.info(request, f"🤖 Automatically detected {auto_detected} waste incidents from abandoned orders.")
-    
+    # Automatic waste detection only runs on an explicit POST (auto_detect_waste), never on a page view.
+
     # Get filter parameters (similar to reports)
     period = request.GET.get('period', 'today')
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     waste_reason = request.GET.get('waste_reason', 'all')
     restaurant_filter = request.GET.get('restaurant_filter', '').strip()
-    from_date = request.GET.get('from_date')
-    to_date = request.GET.get('to_date')
+    from_date = _valid_date_str(request.GET.get('from_date'))
+    to_date = _valid_date_str(request.GET.get('to_date'))
     per_page = request.GET.get('per_page', '20')
     search_query = request.GET.get('search', '').strip()
     
@@ -411,8 +467,8 @@ def export_waste_csv(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     waste_reason = request.GET.get('waste_reason', 'all')
-    from_date = request.GET.get('from_date')
-    to_date = request.GET.get('to_date')
+    from_date = _valid_date_str(request.GET.get('from_date'))
+    to_date = _valid_date_str(request.GET.get('to_date'))
     restaurant_filter = request.GET.get('restaurant_filter', '').strip()
     
     # Get restaurant context
@@ -510,6 +566,8 @@ def export_waste_csv(request):
     total_items = _csv_agg['total_items'] or 0
     total_cost = _csv_agg['total_cost'] or Decimal('0.00')
 
+    sym = _currency_symbol(request)
+
     # Create CSV response
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="waste_report_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
@@ -521,7 +579,7 @@ def export_waste_csv(request):
     writer.writerow(['Generated:', timezone.now().strftime('%Y-%m-%d %H:%M:%S')])
     writer.writerow(['Period:', period.title()])
     writer.writerow(['Total Items Wasted:', total_items])
-    writer.writerow(['Total Waste Cost:', f'${total_cost:.2f}'])
+    writer.writerow(['Total Waste Cost:', f'{sym}{total_cost:.2f}'])
     writer.writerow([])  # Empty row
     
     # Write headers
@@ -542,10 +600,10 @@ def export_waste_csv(request):
             _safe_csv(log.product.sub_category.name) if log.product and log.product.sub_category else '',
             log.quantity_wasted,
             log.get_waste_reason_display(),
-            f'${log.total_cost:.2f}',
-            f'${log.ingredient_cost:.2f}',
-            f'${log.labor_cost:.2f}',
-            f'${log.overhead_cost:.2f}',
+            f'{sym}{log.total_cost:.2f}',
+            f'{sym}{log.ingredient_cost:.2f}',
+            f'{sym}{log.labor_cost:.2f}',
+            f'{sym}{log.overhead_cost:.2f}',
             _safe_csv(log.recorded_by.get_full_name()) if log.recorded_by else '',
             _safe_csv(log.notes or '')
         ])
@@ -622,9 +680,9 @@ def export_waste_csv(request):
                 data['restaurant'].name,
                 data['total_items'],
                 f"{items_percentage:.1f}%",
-                f"${data['total_cost']:.2f}",
+                f"{sym}{data['total_cost']:.2f}",
                 f"{cost_percentage:.1f}%",
-                f"${avg_cost:.2f}"
+                f"{sym}{avg_cost:.2f}"
             ])
     
     return response
@@ -645,8 +703,8 @@ def export_waste_pdf(request):
     category_id = request.GET.get('category_id', 'all')
     subcategory_id = request.GET.get('subcategory_id', 'all')
     waste_reason = request.GET.get('waste_reason', 'all')
-    from_date = request.GET.get('from_date')
-    to_date = request.GET.get('to_date')
+    from_date = _valid_date_str(request.GET.get('from_date'))
+    to_date = _valid_date_str(request.GET.get('to_date'))
     restaurant_filter = request.GET.get('restaurant_filter', '').strip()
     
     # Get restaurant context
@@ -741,6 +799,8 @@ def export_waste_pdf(request):
     total_items = _pdf_agg['total_items'] or 0
     total_cost = _pdf_agg['total_cost'] or Decimal('0.00')
 
+    sym = _currency_symbol(request)
+
     # Create PDF
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -762,7 +822,7 @@ def export_waste_pdf(request):
         ['Report Generated:', timezone.now().strftime('%Y-%m-%d %H:%M:%S')],
         ['Period:', period.title()],
         ['Total Items Wasted:', str(total_items)],
-        ['Total Waste Cost:', f'${total_cost:.2f}'],
+        ['Total Waste Cost:', f'{sym}{total_cost:.2f}'],
     ]
     
     summary_table = Table(summary_data)
@@ -786,13 +846,15 @@ def export_waste_pdf(request):
         
         # Add waste data
         for log in waste_logs.select_related('product', 'product__main_category', 'product__sub_category', 'recorded_by').order_by('-created_at'):
+            product_name = log.product.name if log.product else '[deleted product]'
+            category_name = log.product.main_category.name if log.product and log.product.main_category else ''
             data.append([
                 log.created_at.strftime('%Y-%m-%d'),
-                log.product.name[:20] + '...' if len(log.product.name) > 20 else log.product.name,
-                log.product.main_category.name[:15] + '...' if len(log.product.main_category.name) > 15 else log.product.main_category.name,
+                product_name[:20] + '...' if len(product_name) > 20 else product_name,
+                category_name[:15] + '...' if len(category_name) > 15 else category_name,
                 str(log.quantity_wasted),
                 log.get_waste_reason_display()[:10] + '...' if len(log.get_waste_reason_display()) > 10 else log.get_waste_reason_display(),
-                f'${log.total_cost:.2f}',
+                f'{sym}{log.total_cost:.2f}',
                 (log.recorded_by.get_full_name()[:15] + '...' if len(log.recorded_by.get_full_name()) > 15 else log.recorded_by.get_full_name()) if log.recorded_by else ''
             ])
         
@@ -887,9 +949,9 @@ def export_waste_pdf(request):
                 data['restaurant'].name,
                 str(data['total_items']),
                 f"{items_percentage:.1f}%",
-                f"${data['total_cost']:.2f}",
+                f"{sym}{data['total_cost']:.2f}",
                 f"{cost_percentage:.1f}%",
-                f"${avg_cost:.2f}"
+                f"{sym}{avg_cost:.2f}"
             ])
         
         perf_table = Table(perf_data, colWidths=[2*inch, 1*inch, 1*inch, 1*inch, 1*inch, 1*inch])
@@ -928,7 +990,7 @@ def auto_detect_waste(request):
         return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
 
     try:
-        detected_count = detect_automatic_waste()
+        detected_count = detect_automatic_waste(request.user)
         return JsonResponse({
             'success': True,
             'detected_count': detected_count,
@@ -953,13 +1015,19 @@ def record_food_waste(request):
 
         # Get required data
         product_id = data.get('product_id')
-        quantity_wasted = int(data.get('quantity_wasted', 0))
+        quantity_wasted = _whole_quantity(data.get('quantity_wasted', 0))
         waste_reason = data.get('waste_reason')
         disposal_method = data.get('disposal_method', 'waste_bin')
         notes = data.get('notes', '')
-        
+
+        if quantity_wasted is None:
+            return JsonResponse({'error': 'Quantity must be a whole number'}, status=400)
         if not product_id or quantity_wasted <= 0 or not waste_reason:
             return JsonResponse({'error': 'Missing required fields'}, status=400)
+        if waste_reason not in dict(FoodWasteLog.WASTE_REASON_CHOICES):
+            return JsonResponse({'error': 'Invalid waste reason'}, status=400)
+        if disposal_method not in dict(FoodWasteLog.DISPOSAL_METHOD_CHOICES):
+            return JsonResponse({'error': 'Invalid disposal method'}, status=400)
         
         # Get product — scope to owner so staff cannot record waste against another tenant's products
         owner_filter = get_owner_filter(request.user)
@@ -1004,6 +1072,8 @@ def record_food_waste(request):
         
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    except Http404:
+        raise   # another restaurant's product (or none): a 404, not a server error
     except Exception as e:
         logger.error(f"Error in record_food_waste: {str(e)}", exc_info=True)
         return JsonResponse({'error': 'An error occurred while recording waste.'}, status=500)
@@ -1038,13 +1108,19 @@ def edit_waste_log(request, log_id):
     try:
         data = json.loads(request.body)
 
-        quantity_wasted = int(data.get('quantity_wasted', waste_log.quantity_wasted))
+        quantity_wasted = _whole_quantity(data.get('quantity_wasted', waste_log.quantity_wasted))
         waste_reason = data.get('waste_reason', waste_log.waste_reason)
         disposal_method = data.get('disposal_method', waste_log.disposal_method)
         notes = data.get('notes', waste_log.notes)
 
+        if quantity_wasted is None:
+            return JsonResponse({'error': 'Quantity must be a whole number'}, status=400)
         if quantity_wasted <= 0:
             return JsonResponse({'error': 'Quantity must be greater than zero'}, status=400)
+        if waste_reason not in dict(FoodWasteLog.WASTE_REASON_CHOICES):
+            return JsonResponse({'error': 'Invalid waste reason'}, status=400)
+        if disposal_method not in dict(FoodWasteLog.DISPOSAL_METHOD_CHOICES):
+            return JsonResponse({'error': 'Invalid disposal method'}, status=400)
 
         old_quantity = waste_log.quantity_wasted
         waste_log.quantity_wasted = quantity_wasted
@@ -1157,31 +1233,24 @@ def waste_reports(request):
         except (Restaurant.DoesNotExist, ValueError):
             target_restaurant = None
     
-    # Set default dates based on period
+    # Set default dates based on period (a bad or missing date falls back to the period)
     from django.utils.timezone import localtime
+    date_from = _valid_date_str(date_from)
+    date_to = _valid_date_str(date_to)
     if not date_from or not date_to:
         today = localtime(timezone.now()).date()
-        if period_type == 'daily':
-            date_from = today
-            date_to = today
-        elif period_type == 'weekly':
+        date_to = today
+        if period_type == 'weekly':
             date_from = today - timedelta(days=7)
-            date_to = today
         elif period_type == 'monthly':
             date_from = today.replace(day=1)
-            date_to = today
         elif period_type == 'yearly':
             date_from = today.replace(month=1, day=1)
-            date_to = today
+        else:  # daily, or an unknown period
+            date_from = today
     else:
-        try:
-            date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
-        except (ValueError, TypeError):
-            date_from = None
-        try:
-            date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
-        except (ValueError, TypeError):
-            date_to = None
+        date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+        date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
 
     # Build queryset with restaurant context
     if request.user.is_administrator():
@@ -1230,8 +1299,7 @@ def waste_reports(request):
     if waste_reason:
         waste_logs = waste_logs.filter(waste_reason=waste_reason)
     
-    if product_filter:
-        waste_logs = waste_logs.filter(product__name__icontains=product_filter)
+    waste_logs = _filter_product(waste_logs, product_filter)
     
     # Generate report data
     report_data = generate_waste_report_data(waste_logs, period_type, date_from, date_to)
@@ -1503,24 +1571,24 @@ def export_waste_report(request):
     if waste_reason:
         waste_logs = waste_logs.filter(waste_reason=waste_reason)
     
-    if product_filter:
-        waste_logs = waste_logs.filter(product__name__icontains=product_filter)
+    waste_logs = _filter_product(waste_logs, product_filter)
     
     # Generate report data
     report_data = generate_waste_report_data(waste_logs, period_type, date_from, date_to)
     
     # Export based on format
+    sym = _currency_symbol(request)
     if export_format == 'csv':
-        return export_csv(report_data, date_from, date_to)
+        return export_csv(report_data, date_from, date_to, sym)
     elif export_format == 'excel':
-        return export_excel(report_data, date_from, date_to)
+        return export_excel(report_data, date_from, date_to, sym)
     elif export_format == 'pdf':
-        return export_pdf(report_data, date_from, date_to)
+        return export_pdf(report_data, date_from, date_to, sym)
     else:
         return JsonResponse({'error': 'Invalid format'}, status=400)
 
 
-def export_csv(report_data, date_from, date_to):
+def export_csv(report_data, date_from, date_to, sym='$'):
     """Export waste report as CSV"""
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="waste_report_{date_from}_to_{date_to}.csv"'
@@ -1531,8 +1599,8 @@ def export_csv(report_data, date_from, date_to):
     writer.writerow(['WASTE REPORT SUMMARY'])
     writer.writerow(['Period', f'{date_from} to {date_to}'])
     writer.writerow(['Total Items Wasted', report_data['summary']['total_items']])
-    writer.writerow(['Total Cost', f"${report_data['summary']['total_cost']:.2f}"])
-    writer.writerow(['Average Cost per Item', f"${report_data['summary']['average_cost_per_item']:.2f}"])
+    writer.writerow(['Total Cost', f"{sym}{report_data['summary']['total_cost']:.2f}"])
+    writer.writerow(['Average Cost per Item', f"{sym}{report_data['summary']['average_cost_per_item']:.2f}"])
     writer.writerow([])
     
     # Detailed logs
@@ -1550,10 +1618,10 @@ def export_csv(report_data, date_from, date_to):
             log.quantity_wasted,
             log.get_waste_reason_display(),
             log.get_disposal_method_display(),
-            f"${log.ingredient_cost:.2f}",
-            f"${log.labor_cost:.2f}",
-            f"${log.overhead_cost:.2f}",
-            f"${log.total_cost:.2f}",
+            f"{sym}{log.ingredient_cost:.2f}",
+            f"{sym}{log.labor_cost:.2f}",
+            f"{sym}{log.overhead_cost:.2f}",
+            f"{sym}{log.total_cost:.2f}",
             log.order.order_number if log.order else '',
             _safe_csv(log.recorded_by.username if log.recorded_by else ''),
             _safe_csv(log.notes),
@@ -1566,10 +1634,10 @@ def export_csv(report_data, date_from, date_to):
     writer.writerow(['Reason', 'Count', 'Quantity', 'Total Cost'])
     for item in report_data['reason_breakdown']:
         writer.writerow([
-            dict(FoodWasteLog.WASTE_REASON_CHOICES)[item['waste_reason']],
+            _reason_label(item['waste_reason']),
             item['count'],
             item['quantity'],
-            f"${item['cost']:.2f}"
+            f"{sym}{item['cost']:.2f}"
         ])
     
     writer.writerow([])
@@ -1582,13 +1650,13 @@ def export_csv(report_data, date_from, date_to):
             _safe_csv(item['product__name']),
             item['count'],
             item['quantity'],
-            f"${item['cost']:.2f}"
+            f"{sym}{item['cost']:.2f}"
         ])
     
     return response
 
 
-def export_excel(report_data, date_from, date_to):
+def export_excel(report_data, date_from, date_to, sym='$'):
     """Export waste report as Excel"""
     output = io.BytesIO()
     workbook = openpyxl.Workbook()
@@ -1615,8 +1683,8 @@ def export_excel(report_data, date_from, date_to):
     summary_sheet['B6'] = float(report_data['summary']['average_cost_per_item'])
     
     # Format currency cells
-    summary_sheet['B5'].number_format = '$#,##0.00'
-    summary_sheet['B6'].number_format = '$#,##0.00'
+    summary_sheet['B5'].number_format = _excel_money_format(sym)
+    summary_sheet['B6'].number_format = _excel_money_format(sym)
     
     # Detailed logs sheet
     logs_sheet = workbook.create_sheet("Detailed Logs")
@@ -1647,7 +1715,7 @@ def export_excel(report_data, date_from, date_to):
         
         # Format currency columns
         for col in [6, 7, 8, 9]:
-            logs_sheet.cell(row=row, column=col).number_format = '$#,##0.00'
+            logs_sheet.cell(row=row, column=col).number_format = _excel_money_format(sym)
     
     # Auto-adjust column widths
     for sheet in [summary_sheet, logs_sheet]:
@@ -1673,11 +1741,11 @@ def export_excel(report_data, date_from, date_to):
         cell.fill = header_fill
     
     for row, item in enumerate(report_data['reason_breakdown'], 2):
-        reason_sheet.cell(row=row, column=1, value=dict(FoodWasteLog.WASTE_REASON_CHOICES)[item['waste_reason']])
+        reason_sheet.cell(row=row, column=1, value=_reason_label(item['waste_reason']))
         reason_sheet.cell(row=row, column=2, value=item['count'])
         reason_sheet.cell(row=row, column=3, value=item['quantity'])
         reason_sheet.cell(row=row, column=4, value=float(item['cost']))
-        reason_sheet.cell(row=row, column=4).number_format = '$#,##0.00'
+        reason_sheet.cell(row=row, column=4).number_format = _excel_money_format(sym)
     
     workbook.save(output)
     output.seek(0)
@@ -1691,7 +1759,7 @@ def export_excel(report_data, date_from, date_to):
     return response
 
 
-def export_pdf(report_data, date_from, date_to):
+def export_pdf(report_data, date_from, date_to, sym='$'):
     """Export waste report as PDF"""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -1713,8 +1781,8 @@ def export_pdf(report_data, date_from, date_to):
     summary_data = [
         ['Period:', f'{date_from} to {date_to}'],
         ['Total Items Wasted:', str(report_data['summary']['total_items'])],
-        ['Total Cost:', f"${report_data['summary']['total_cost']:.2f}"],
-        ['Average Cost per Item:', f"${report_data['summary']['average_cost_per_item']:.2f}"],
+        ['Total Cost:', f"{sym}{report_data['summary']['total_cost']:.2f}"],
+        ['Average Cost per Item:', f"{sym}{report_data['summary']['average_cost_per_item']:.2f}"],
     ]
     
     summary_table = Table(summary_data, colWidths=[2*inch, 3*inch])
@@ -1738,10 +1806,10 @@ def export_pdf(report_data, date_from, date_to):
     
     for item in report_data['reason_breakdown'][:10]:  # Top 10
         reason_data.append([
-            dict(FoodWasteLog.WASTE_REASON_CHOICES)[item['waste_reason']],
+            _reason_label(item['waste_reason']),
             str(item['count']),
             str(item['quantity']),
-            f"${item['cost']:.2f}"
+            f"{sym}{item['cost']:.2f}"
         ])
     
     reason_table = Table(reason_data, colWidths=[2*inch, 1*inch, 1*inch, 1.5*inch])
@@ -1768,7 +1836,7 @@ def export_pdf(report_data, date_from, date_to):
             item['product__name'],
             str(item['count']),
             str(item['quantity']),
-            f"${item['cost']:.2f}"
+            f"{sym}{item['cost']:.2f}"
         ])
     
     product_table = Table(product_data, colWidths=[2*inch, 1*inch, 1*inch, 1.5*inch])
@@ -1815,29 +1883,18 @@ def cost_settings(request):
             Q(main_category__restaurant__branch_owner=owner_filter)
         ).distinct()
     
-    # Get or create cost settings efficiently — avoid N+1 get_or_create per product
+    # Viewing the page never writes: products without their own cost settings are costed with
+    # the default percentages below (FoodWasteLog.calculate_costs uses the same numbers).
     products_list = list(products)
     existing = {s.product_id: s for s in ProductCostSettings.objects.filter(product__in=products_list)}
-    missing = [p for p in products_list if p.id not in existing]
-    if missing:
-        ProductCostSettings.objects.bulk_create([
-            ProductCostSettings(
-                product=p,
-                ingredient_cost_per_unit=p.price * Decimal('0.18'),
-                labor_cost_per_unit=p.price * Decimal('0.08'),
-                overhead_cost_per_unit=p.price * Decimal('0.04'),
-            ) for p in missing
-        ])
-        # Re-fetch to include newly created records
-        existing = {s.product_id: s for s in ProductCostSettings.objects.filter(product__in=products_list)}
     cost_settings = [existing[p.id] for p in products_list if p.id in existing]
-    
-    # Default global percentage settings (displayed in summary cards)
+
+    # Default percentages actually used for waste costs (displayed in summary cards)
     from types import SimpleNamespace
     current_settings = SimpleNamespace(
-        ingredient_cost_percentage=30,
-        labor_cost_percentage=25,
-        overhead_cost_percentage=10,
+        ingredient_cost_percentage=FoodWasteLog.DEFAULT_INGREDIENT_PCT,
+        labor_cost_percentage=FoodWasteLog.DEFAULT_LABOR_PCT,
+        overhead_cost_percentage=FoodWasteLog.DEFAULT_OVERHEAD_PCT,
     )
 
     context = {
@@ -1846,6 +1903,18 @@ def cost_settings(request):
     }
     
     return render(request, 'waste_management/cost_settings.html', context)
+
+
+def _cost_value(value):
+    """A per-unit cost: a number of zero or more, rounded to the cent (ValueError otherwise)."""
+    from decimal import InvalidOperation, ROUND_HALF_UP
+    try:
+        d = Decimal(str(value if value not in (None, '') else 0).strip())
+    except (InvalidOperation, ValueError, TypeError):
+        raise ValueError('bad cost')
+    if not d.is_finite() or d < 0 or d >= Decimal('100000000'):
+        raise ValueError('bad cost')
+    return d.quantize(Decimal('0.01'), ROUND_HALF_UP)
 
 
 @login_required
@@ -1860,26 +1929,39 @@ def update_cost_settings(request):
     try:
         data = json.loads(request.body)
         setting_id = data.get('setting_id')
-        
+
         owner_filter = get_owner_filter(request.user)
         if owner_filter:
-            setting = get_object_or_404(
-                ProductCostSettings.objects.filter(
-                    Q(product__main_category__owner=owner_filter) |
-                    Q(product__main_category__restaurant__main_owner=owner_filter) |
-                    Q(product__main_category__restaurant__branch_owner=owner_filter)
-                ),
-                id=setting_id
+            own = Q(main_category__owner=owner_filter) | Q(main_category__restaurant__main_owner=owner_filter) | \
+                Q(main_category__restaurant__branch_owner=owner_filter)
+            own_settings = ProductCostSettings.objects.filter(
+                Q(product__main_category__owner=owner_filter) |
+                Q(product__main_category__restaurant__main_owner=owner_filter) |
+                Q(product__main_category__restaurant__branch_owner=owner_filter)
             )
+            own_products = Product.objects.filter(own)
         else:
-            setting = get_object_or_404(ProductCostSettings, id=setting_id)
-        
+            own_settings = ProductCostSettings.objects.all()
+            own_products = Product.objects.all()
+        if setting_id:
+            setting = get_object_or_404(own_settings, id=setting_id)
+        else:
+            # No settings yet for this product (the page no longer creates them just by viewing)
+            product = get_object_or_404(own_products.distinct(), id=data.get('product_id'))
+            setting = ProductCostSettings.objects.filter(product=product).first() or ProductCostSettings(product=product)
+
+        try:
+            costs = [_cost_value(data.get(k, 0)) for k in ('ingredient_cost', 'labor_cost', 'overhead_cost')]
+            prep_time, cook_time = (_whole_quantity(data.get(k, 0)) for k in ('prep_time', 'cook_time'))
+        except ValueError:
+            return JsonResponse({'error': 'Enter costs of zero or more.'}, status=400)
+        if prep_time is None or cook_time is None or prep_time < 0 or cook_time < 0:
+            return JsonResponse({'error': 'Enter times of zero or more whole minutes.'}, status=400)
+
         # Update costs
-        setting.ingredient_cost_per_unit = Decimal(str(data.get('ingredient_cost', 0)))
-        setting.labor_cost_per_unit = Decimal(str(data.get('labor_cost', 0)))
-        setting.overhead_cost_per_unit = Decimal(str(data.get('overhead_cost', 0)))
-        setting.preparation_time_minutes = int(data.get('prep_time', 0))
-        setting.cooking_time_minutes = int(data.get('cook_time', 0))
+        setting.ingredient_cost_per_unit, setting.labor_cost_per_unit, setting.overhead_cost_per_unit = costs
+        setting.preparation_time_minutes = prep_time
+        setting.cooking_time_minutes = cook_time
         setting.save()
         
         return JsonResponse({
@@ -1887,7 +1969,9 @@ def update_cost_settings(request):
             'message': f'Cost settings updated for {setting.product.name}',
             'total_cost': float(setting.total_cost_per_unit)
         })
-        
+
+    except Http404:
+        raise
     except Exception as e:
         logger.error(f"Error updating cost setting: {str(e)}", exc_info=True)
         return JsonResponse({'error': 'An error occurred while updating cost settings.'}, status=400)

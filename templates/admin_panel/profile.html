@@ -145,7 +145,10 @@
     </div>
 </div>
 
-{% if user.is_owner or user.is_manager %}
+{% if user.is_manager and not user.is_owner %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>{% translate "Restaurant settings and currency are managed by the restaurant owner." %}</div>
+{% endif %}
+{% if user.is_owner %}
 <!-- Restaurant Settings Card -->
 <div class="row">
     <div class="col-lg-8 col-md-12">
@@ -641,7 +644,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-{% if user.is_owner or user.is_manager %}
+{% if user.is_owner %}
 // Currency symbols mapping
 const currencySymbols = {
     'USD': '$',

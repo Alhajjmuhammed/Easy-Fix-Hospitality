@@ -116,7 +116,8 @@ class UserRegistrationForm(forms.ModelForm):
     
     def clean_email(self):
         email = self.cleaned_data['email']
-        if User.objects.filter(email=email).exists():
+        # Email is optional: a blank email is never a duplicate
+        if email and User.objects.filter(email=email).exists():
             raise forms.ValidationError("A user with this email already exists.")
         return email
 
@@ -228,6 +229,10 @@ class OwnerRegistrationForm(forms.ModelForm):
         password = cleaned_data.get('password')
         confirm_password = cleaned_data.get('confirm_password')
         
+        # Honeypot check - if filled, it's a bot
+        if cleaned_data.get('website'):
+            raise forms.ValidationError("Bot detected.")
+        
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords don't match.")
         
@@ -239,6 +244,13 @@ class OwnerRegistrationForm(forms.ModelForm):
                 self.add_error('password', e.messages)
         
         return cleaned_data
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        # Same rule as the customer form: an email already in use is refused
+        if email and User.objects.filter(email=email).exists():
+            raise forms.ValidationError("A user with this email already exists.")
+        return email
 
 
 class CustomerRegistrationForm(forms.ModelForm):

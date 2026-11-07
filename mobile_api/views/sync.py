@@ -60,11 +60,15 @@ def sync_push(request):
     # double-print when the app is also printing via Bluetooth.
     _header_local_print = request.META.get('HTTP_X_LOCAL_PRINT') == 'true'
     _fee_supported = client_supports_delivery_fee(request)
+    # The restaurant a customer selected (X-Restaurant-ID), used to keep their offline
+    # orders inside that one restaurant — same as customer_restaurant_q online.
+    _customer_rid = _request_restaurant_id(request) if request.user.is_customer() else None
 
     for item in data.get('orders', []):
         if _header_local_print:
             item['local_print'] = True
         item['_fee_supported'] = _fee_supported  # server-set; never trust a client value
+        item['_customer_rid'] = _customer_rid    # server-set; never trust a client value
         offline_id = item.get('offline_id', '')
         try:
             result = _sync_order(request.user, owner, item)
@@ -92,6 +96,19 @@ def sync_push(request):
             results['bill_requests'].append({'offline_id': offline_id, 'status': 'error', 'error': 'Bill request sync failed. Please retry.'})
 
     return Response({'results': results, 'synced_at': timezone.now().isoformat()})
+
+
+def _request_restaurant_id(request):
+    """Restaurant.id the request is scoped to (same lookup as customer_restaurant_q)."""
+    rid = (
+        request.headers.get('X-Restaurant-ID')
+        or request.GET.get('restaurant_id')
+        or (request.data.get('restaurant_id') if hasattr(request, 'data') else None)
+    )
+    try:
+        return int(rid)
+    except (TypeError, ValueError):
+        return None
 
 
 def _sync_order(user, owner, data):
@@ -150,13 +167,34 @@ def _sync_order_atomic(user, owner, data, offline_id):
     order_type = data.get('order_type', 'dine-in')
     is_remote = order_type in ('delivery', 'pickup')
 
+    # Customers are limited to the one restaurant they selected (a main owner is also
+    # main_owner of every branch, so owner filters alone would mix branch menus in).
+    # Mirrors customer_restaurant_q in the online _place_order.
+    _table_q = Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner)
+    _product_q = (
+        Q(main_category__owner=owner) |
+        Q(main_category__restaurant__main_owner=owner) |
+        Q(main_category__restaurant__branch_owner=owner)
+    )
+    _cust_rid = None
+    if user.is_customer():
+        _cust_rid = data.get('_customer_rid')
+        if not _cust_rid:
+            try:
+                _cust_rid = int(data.get('restaurant_id') or 0) or None
+            except (TypeError, ValueError):
+                _cust_rid = None
+        if _cust_rid:
+            _table_q &= Q(restaurant_id=_cust_rid) | Q(restaurant__isnull=True, owner=owner)
+            _product_q &= (
+                Q(main_category__restaurant_id=_cust_rid) |
+                Q(main_category__restaurant__isnull=True, main_category__owner=owner)
+            )
+
     table_id = data.get('table_id')
     table = None
     if table_id:
-        table = TableInfo.objects.filter(
-            Q(owner=owner) | Q(restaurant__main_owner=owner) | Q(restaurant__branch_owner=owner),
-            id=table_id,
-        ).first()
+        table = TableInfo.objects.filter(_table_q, id=table_id).first()
 
     if table is None and not is_remote:
         return {'status': 'error', 'error': f'Table {table_id} not found.'}
@@ -186,11 +224,19 @@ def _sync_order_atomic(user, owner, data, offline_id):
         from restaurant.models_restaurant import Restaurant as _Restaurant
         _rq = Q(main_owner=owner) | Q(branch_owner=owner)
         try:
-            _rid = int(data.get('restaurant_id') or 0)
+            _rid = int(_cust_rid or data.get('restaurant_id') or 0)
         except (TypeError, ValueError):
             _rid = 0
         _r = (_Restaurant.objects.filter(_rq, id=_rid).first() if _rid else None) or _Restaurant.for_owner(owner)
         tax_rate = Decimal(str(_r.tax_rate)) if _r and _r.tax_rate else Decimal('0')
+
+    # Same customer checks as the online _place_order, before anything is written.
+    if user.is_customer() and is_remote:
+        _remote_rest = _r or (table.restaurant if table is not None else None)
+        if not _remote_rest or not _remote_rest.allow_remote_orders:
+            return {'status': 'error', 'error': 'This restaurant is not accepting delivery or pickup orders.'}
+        if order_type == 'delivery' and not (data.get('delivery_phone') or '').strip():
+            return {'status': 'error', 'error': 'A phone number is required for delivery orders.'}
 
     _dlat = data.get('delivery_lat')
     _dlng = data.get('delivery_lng')
@@ -227,13 +273,9 @@ def _sync_order_atomic(user, owner, data, offline_id):
         if not pid:
             dropped_items.append(None)
             continue
-        product = Product.objects.select_for_update(of=('self',)).filter(
-            Q(main_category__owner=owner) |
-            Q(main_category__restaurant__main_owner=owner) |
-            Q(main_category__restaurant__branch_owner=owner)
-        ).filter(id=pid).first()
+        product = Product.objects.select_for_update(of=('self',)).filter(_product_q).filter(id=pid).first()
         if product is None:
-            dropped_items.append(pid)  # Unknown product — skip, note drop
+            dropped_items.append(pid)  # Unknown / other restaurant's product — skip, note drop
         elif not product.is_available:
             dropped_items.append(pid)  # Product unavailable — skip, note drop
         elif False:  # stock gate removed — negative stock allowed
@@ -285,6 +327,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
         order.status = 'cancelled'
         order.reason_if_cancelled = data.get('cancel_reason', 'Cancelled offline')
         order.save(update_fields=['status', 'reason_if_cancelled'])
+        order.release_table()  # the table was occupied above; a cancelled order frees it
 
     result = {'status': 'created', 'order_id': order.id, 'order_number': order.order_number}
     if dropped_items:

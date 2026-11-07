@@ -17,8 +17,10 @@ def rate_limit_login(func):
     - Rate limiting is per IP address
     """
     @wraps(func)
-    @ratelimit(key='ip', rate='20/m', block=True, method='POST')  # 20 attempts per minute - BLOCKS if exceeded
-    @ratelimit(key='ip', rate='60/h', block=True, method='POST')  # 60 attempts per hour - BLOCKS if exceeded
+    # block=False: the wrapper below answers with the friendly 429 page (block=True raised
+    # a bare 403 before this code could run)
+    @ratelimit(key='ip', rate='20/m', block=False, method='POST')  # 20 attempts per minute
+    @ratelimit(key='ip', rate='60/h', block=False, method='POST')  # 60 attempts per hour
     def wrapper(request, *args, **kwargs):
         # Check if rate limited
         was_limited = getattr(request, 'limited', False)
@@ -87,9 +89,14 @@ def rate_limit_registration(func):
     - 10 registrations per day per IP
     """
     @wraps(func)
-    @ratelimit(key='ip', rate='3/h', block=True, method='POST')
-    @ratelimit(key='ip', rate='10/d', block=True, method='POST')
+    @ratelimit(key='ip', rate='3/h', block=False, method='POST')
+    @ratelimit(key='ip', rate='10/d', block=False, method='POST')
     def wrapper(request, *args, **kwargs):
+        if getattr(request, 'limited', False):
+            # Friendly page instead of a bare 403
+            return render(request, 'accounts/rate_limited.html', {
+                'retry_after': 3600,
+            }, status=429)
         return func(request, *args, **kwargs)
     return wrapper
 

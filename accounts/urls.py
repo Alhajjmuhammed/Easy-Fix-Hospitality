@@ -12,4 +12,5 @@ urlpatterns = [
     path('profile/', views.profile_view, name='profile'),
     path('update-tax-rate/', views.update_tax_rate, name='update_tax_rate'),
     path('access-blocked/', views.access_blocked_view, name='access_blocked'),
+    path('rider/', views.rider_home, name='rider_home'),
 ]

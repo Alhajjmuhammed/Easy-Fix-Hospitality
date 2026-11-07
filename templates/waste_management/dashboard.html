@@ -53,7 +53,7 @@
                             <div class="text-xs font-weight-bold text-uppercase mb-1 text-muted">{% translate "Avg Cost Per Item" %}</div>
                             <div class="h4 mb-0 font-weight-bold text-gray-800">
                                 {% if total_items_wasted > 0 %}
-                                    {% currency_symbol %}{{ total_waste_cost|floatformat:2|floatformat:0 }}
+                                    {% currency_symbol %}{{ avg_cost_per_item|floatformat:0 }}
                                 {% else %}
                                     {% currency_symbol %}0
                                 {% endif %}

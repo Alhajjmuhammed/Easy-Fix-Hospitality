@@ -133,6 +133,15 @@ class OrderConsumer(AsyncWebsocketConsumer):
             if order.ordered_by == user:
                 return True
 
+            # Everything below grants access to restaurant staff via user.owner. A
+            # (legacy) customer account can carry an owner too — it must only ever
+            # see its own orders (checked above), never other customers' orders.
+            if user.is_customer():
+                logger.warning(
+                    f"Customer {user.username} denied access to order {order_id} WebSocket"
+                )
+                return False
+
             # Get the restaurant this table belongs to
             table = order.table_info
             if not table:

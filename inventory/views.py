@@ -1,6 +1,8 @@
 import csv
+from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import ProtectedError, RestrictedError
@@ -20,6 +22,7 @@ from accounts.models import get_owner_filter
 from admin_panel.restaurant_utils import get_restaurant_context
 
 from .models import InventoryCategory, InventoryItem, InventoryRecord, InventoryUnit
+from .purchasing import to_decimal
 
 
 def _get_currency_symbol(owner, user):
@@ -144,7 +147,7 @@ def manage_items(request):
         if action == 'add':
             if not _require_inventory_access(request.user, level='add'):
                 return JsonResponse({'success': False, 'error': 'You do not have permission to add inventory items.'})
-        elif action in ('edit', 'delete', 'toggle'):
+        elif action in ('edit', 'delete', 'toggle', 'deactivate', 'reactivate'):
             if not _require_inventory_access(request.user, level='manage'):
                 return JsonResponse({'success': False, 'error': 'You do not have permission to edit or delete inventory items.'})
 
@@ -152,27 +155,25 @@ def manage_items(request):
             name = request.POST.get('name', '').strip()
             category = request.POST.get('category', '').strip()
             unit = request.POST.get('unit', '').strip()
-            low_stock_threshold = request.POST.get('low_stock_threshold') or 5
             notes = request.POST.get('notes', '').strip()
             initial_stock_str = request.POST.get('initial_stock', '').strip()
 
             if not name:
                 return JsonResponse({'success': False, 'error': 'Name is required.'})
 
+            try:
+                low_stock_threshold = _parse_threshold(request.POST.get('low_stock_threshold'), Decimal('5'))
+                unit_price = _parse_item_price(request.POST.get('unit_price', ''))
+                initial_stock = None
+                if initial_stock_str:
+                    initial_stock = to_decimal(initial_stock_str, 'initial stock')
+            except ValidationError as e:
+                return JsonResponse({'success': False, 'error': e.messages[0]})
+
             # Determine the item owner
             item_owner = owner if owner else request.user
             if InventoryItem.objects.filter(owner=item_owner, name__iexact=name).exists():
                 return JsonResponse({'success': False, 'error': f'An item named "{name}" already exists.'})
-
-            unit_price_str = request.POST.get('unit_price', '').strip()
-            unit_price = None
-            if unit_price_str:
-                try:
-                    unit_price = float(unit_price_str)
-                    if unit_price < 0:
-                        unit_price = None
-                except (ValueError, TypeError):
-                    pass
 
             item = InventoryItem.objects.create(
                 owner=item_owner,
@@ -185,19 +186,14 @@ def manage_items(request):
             )
 
             # Save initial stock as an Opening Stock record if provided
-            if initial_stock_str:
-                try:
-                    initial_stock = float(initial_stock_str)
-                    if initial_stock != 0:
-                        InventoryRecord.objects.create(
-                            item=item,
-                            record_type='opening',
-                            quantity_change=initial_stock,
-                            notes='Initial stock',
-                            recorded_by=request.user,
-                        )
-                except (ValueError, TypeError):
-                    pass
+            if initial_stock:
+                InventoryRecord.objects.create(
+                    item=item,
+                    record_type='opening',
+                    quantity_change=initial_stock,
+                    notes='Initial stock',
+                    recorded_by=request.user,
+                )
 
             return JsonResponse({'success': True, 'item_id': item.id, 'name': item.name})
 
@@ -211,20 +207,20 @@ def manage_items(request):
             if not name:
                 return JsonResponse({'success': False, 'error': 'Name is required.'})
 
+            if InventoryItem.objects.filter(owner=item.owner, name__iexact=name).exclude(pk=item.pk).exists():
+                return JsonResponse({'success': False, 'error': f'An item named "{name}" already exists.'})
+            try:
+                threshold = _parse_threshold(request.POST.get('low_stock_threshold'), item.low_stock_threshold)
+                unit_price = _parse_item_price(request.POST.get('unit_price', ''))
+            except ValidationError as e:
+                return JsonResponse({'success': False, 'error': e.messages[0]})
+
             item.name = name
             item.category = request.POST.get('category', item.category)
             item.unit = request.POST.get('unit', item.unit)
-            item.low_stock_threshold = request.POST.get('low_stock_threshold') or item.low_stock_threshold
+            item.low_stock_threshold = threshold
             item.notes = request.POST.get('notes', '').strip()
-            unit_price_str = request.POST.get('unit_price', '').strip()
-            if unit_price_str:
-                try:
-                    up = float(unit_price_str)
-                    item.unit_price = up if up >= 0 else None
-                except (ValueError, TypeError):
-                    pass
-            else:
-                item.unit_price = None
+            item.unit_price = unit_price
             item.save()
             return JsonResponse({'success': True})
 
@@ -347,34 +343,42 @@ def add_record(request):
         quantity_str = request.POST.get('quantity', '').strip()
         notes = request.POST.get('notes', '').strip()
 
-        # Optional cost tracking
+        errors = []
+
+        # Optional cost tracking. The form asks for the TOTAL paid (or refunded) for this
+        # movement; it is turned into a per-unit price below so |qty| × unit_price ≈ the total.
         unit_price_str = request.POST.get('unit_price', '').strip()
-        record_unit_price = None
+        total_paid = None
         if unit_price_str:
             try:
-                p = float(unit_price_str)
-                if p >= 0:
-                    record_unit_price = p
-            except (ValueError, TypeError):
-                pass
-
-        errors = []
+                total_paid = to_decimal(unit_price_str, 'amount')
+            except ValidationError:
+                errors.append('Enter a valid amount.')
 
         item = _get_item_for_user(item_id, owner, request.user)
         if item is None:
             errors.append('Invalid item selected.')
 
-        try:
-            quantity = float(quantity_str)
-            if quantity == 0:
-                errors.append('Quantity cannot be zero.')
-        except (ValueError, TypeError):
-            errors.append('Enter a valid quantity.')
-            quantity = None
-
         valid_types = [k for k, _ in InventoryRecord.RECORD_TYPE_CHOICES]
         if record_type not in valid_types:
             errors.append('Invalid record type.')
+
+        quantity = None
+        try:
+            quantity = to_decimal(quantity_str, 'quantity', minimum=-MAX_QUANTITY)
+        except ValidationError:
+            errors.append('Enter a valid quantity.')
+        if quantity is not None:
+            if record_type == 'adjustment':
+                if quantity == 0:
+                    errors.append('Quantity cannot be zero.')
+            elif record_type == 'closing':
+                if quantity < 0:
+                    errors.append('A closing count cannot be negative.')
+            elif quantity <= 0:
+                errors.append('Quantity must be more than zero.')
+            elif total_paid is not None and _unit_price_from_total(total_paid, quantity) is None:
+                errors.append('The amount is too large for this quantity.')
 
         if errors:
             _rc = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
@@ -383,6 +387,7 @@ def add_record(request):
                 'record_type_choices': InventoryRecord.RECORD_TYPE_CHOICES,
                 'errors': errors,
                 'form_data': request.POST,
+                'currency_symbol': _get_currency_symbol(owner, request.user),
                 **_rc,
             }
             return render(request, 'inventory/record.html', context)
@@ -392,14 +397,30 @@ def add_record(request):
         if record_type in stock_out_types and quantity > 0:
             quantity = -quantity
 
-        InventoryRecord.objects.create(
-            item=item,
-            record_type=record_type,
-            quantity_change=quantity,
-            unit_price=record_unit_price,
-            notes=notes,
-            recorded_by=request.user,
-        )
+        with transaction.atomic():
+            if record_type == 'closing':
+                # A closing count is the level counted on the shelf: record the difference
+                # from the current stock, so the stock becomes exactly the counted number.
+                # Lock the item so a sale taking stock at the same moment is not lost.
+                InventoryItem.objects.select_for_update().filter(pk=item.pk).first()
+                counted = quantity
+                current = Decimal(item.current_stock or 0)
+                quantity = (counted - current).quantize(CENT, ROUND_HALF_UP)
+                count_note = f'Counted {counted} (was {current})'
+                notes = f'{count_note} — {notes}' if notes else count_note
+
+            record_unit_price = None
+            if total_paid is not None and quantity != 0:
+                record_unit_price = _unit_price_from_total(total_paid, quantity)
+
+            InventoryRecord.objects.create(
+                item=item,
+                record_type=record_type,
+                quantity_change=quantity,
+                unit_price=record_unit_price,
+                notes=notes,
+                recorded_by=request.user,
+            )
         return redirect('inventory:history')
 
     _rc = get_restaurant_context(request.user, request.session.get('current_restaurant_id'), request)
@@ -524,6 +545,8 @@ def history(request):
 @login_required
 def item_detail_ajax(request, item_id):
     """Return JSON with item info and current stock for quick lookup."""
+    if not _require_inventory_access(request.user, 'view'):
+        return JsonResponse({'error': 'Forbidden'}, status=403)
     owner = get_owner_filter(request.user)
     item = _get_item_for_user(item_id, owner, request.user)
     if item is None:
@@ -541,6 +564,34 @@ def item_detail_ajax(request, item_id):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+MAX_QUANTITY = Decimal('99999999.99')   # quantity_change / unit_price: max_digits=10, decimal_places=2
+CENT = Decimal('0.01')
+
+
+def _unit_price_from_total(total, quantity):
+    """Per-unit price for a record whose form gave the TOTAL amount. unit_price has 2 decimal
+    places, so it is rounded half-up to the cent: |qty| × unit_price is within |qty| × half a
+    cent of the total. None if the price does not fit the field."""
+    price = (total / abs(quantity)).quantize(CENT, ROUND_HALF_UP)
+    return price if price <= MAX_QUANTITY else None
+
+
+def _record_cost(record):
+    """What a history row costs: |qty| × the record's own unit price, rounded to the cent."""
+    return (abs(Decimal(record.quantity_change)) * Decimal(record.unit_price)).quantize(CENT, ROUND_HALF_UP)
+
+
+def _parse_threshold(value, default):
+    if value is None or str(value).strip() == '':
+        return default
+    return to_decimal(value, 'low stock threshold')
+
+
+def _parse_item_price(value):
+    value = (value or '').strip()
+    return to_decimal(value, 'unit price') if value else None
+
 
 def _get_item_for_user(item_id, owner, user):
     """Fetch an InventoryItem enforcing owner scope."""
@@ -570,10 +621,11 @@ def _export_csv(records_qs, currency_symbol='$', total_spent=0, total_refunds=0,
     writer.writerow(['Date', 'Item', 'Type', 'Qty Change', 'Unit', 'Cost / Refund', 'Notes', 'Recorded By'])
     for r in records_qs:
         if r.unit_price is not None:
+            cost = _record_cost(r)
             if r.record_type == 'returned':
-                cost_str = f"+{currency_symbol}{float(r.unit_price):.2f} (Refund)"
+                cost_str = f"+{currency_symbol}{cost:.2f} (Refund)"
             else:
-                cost_str = f"-{currency_symbol}{float(r.unit_price):.2f}"
+                cost_str = f"-{currency_symbol}{cost:.2f}"
         else:
             cost_str = ''
         writer.writerow([
@@ -696,10 +748,11 @@ def _export_pdf(records_qs, currency_symbol='$', total_spent=0, total_refunds=0,
     records_list = list(records_qs)
     for r in records_list:
         if r.unit_price is not None:
+            cost = _record_cost(r)
             if r.record_type == 'returned':
-                cost_p = Paragraph(f"+{currency_symbol}{float(r.unit_price):.2f} (Refund)", cell_green)
+                cost_p = Paragraph(f"+{currency_symbol}{cost:.2f} (Refund)", cell_green)
             else:
-                cost_p = Paragraph(f"-{currency_symbol}{float(r.unit_price):.2f}", cell_red)
+                cost_p = Paragraph(f"-{currency_symbol}{cost:.2f}", cell_red)
         else:
             cost_p = Paragraph('—', cell_muted)
 
@@ -784,7 +837,7 @@ def manage_settings(request):
                 return JsonResponse({'success': False, 'error': 'Name is required.'})
             try:
                 obj = Model.objects.get(id=obj_id, owner=item_owner)
-            except Model.DoesNotExist:
+            except (Model.DoesNotExist, ValueError, TypeError):
                 return JsonResponse({'success': False, 'error': 'Not found.'})
             if Model.objects.filter(owner=item_owner, name__iexact=name).exclude(id=obj_id).exists():
                 return JsonResponse({'success': False, 'error': f'"{name}" already exists.'})
@@ -802,7 +855,7 @@ def manage_settings(request):
             obj_id = request.POST.get('id')
             try:
                 obj = Model.objects.get(id=obj_id, owner=item_owner)
-            except Model.DoesNotExist:
+            except (Model.DoesNotExist, ValueError, TypeError):
                 return JsonResponse({'success': False, 'error': 'Not found.'})
             # Count items still using this value
             if kind == 'category':

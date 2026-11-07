@@ -645,6 +645,28 @@ def update_order_status(request, order_id):
             {'error': f'Station staff can only set status to: {", ".join(STATION_ALLOWED_STATUSES)}'},
             status=403,
         )
+    # Station staff may only touch orders that contain items for their own station
+    # (mirrors the web kitchen/bar/buffet/service update_order_status check).
+    if _is_station_staff:
+        _station = user.role.name
+        if not any(oi.product and oi.product.station == _station for oi in order.order_items.all()):
+            return Response(
+                {'error': f'Access denied. This order contains no {_station} items.'},
+                status=403,
+            )
+
+    # Cancelling through the status endpoint must enforce the same rules as the
+    # cancel endpoint: cancel_orders permission and a mandatory reason
+    # (the "void payments first" check is done under the row lock below).
+    cancel_reason = ''
+    if new_status == 'cancelled':
+        if not user.is_customer() and not user.has_feature('cancel_orders'):
+            return Response({'error': 'Access denied.'}, status=403)
+        cancel_reason = (
+            request.data.get('reason') or request.data.get('cancel_reason') or ''
+        ).strip()
+        if not cancel_reason:
+            return Response({'error': 'Cancellation reason is required.'}, status=400)
 
     # Enforce directed status transition rules — mirrors web's update_order_status.
     valid_transitions = {
@@ -668,6 +690,11 @@ def update_order_status(request, order_id):
             'out_for_delivery': ['ready', 'delivered', 'cancelled'],
             'delivered':        ['out_for_delivery', 'cancelled'],
         })
+    # The station app's "Start preparing" button is shown for pending orders too;
+    # web kitchen staff can confirm, so let station staff start a pending order
+    # directly (it is confirmed implicitly — see the stamps below).
+    if _is_station_staff:
+        valid_transitions['pending'] = valid_transitions['pending'] + ['preparing']
 
     with transaction.atomic():
         # Re-fetch under lock so two concurrent status transitions cannot both pass
@@ -682,22 +709,49 @@ def update_order_status(request, order_id):
                 {'error': f'Cannot transition order from "{order.status}" to "{new_status}".'},
                 status=400,
             )
+        if new_status == 'cancelled' and order.payments.filter(is_voided=False).exists():
+            return Response(
+                {'error': 'Cannot cancel order with payments. Void all payments first.'},
+                status=400,
+            )
+        previous_status = order.status
         order.status = new_status
-        if new_status == 'confirmed' and not order.confirmed_by:
+        update_fields = ['status', 'updated_at']
+        # A pending order started directly by a station is confirmed implicitly.
+        _confirming = new_status == 'confirmed' or (
+            new_status == 'preparing' and previous_status == 'pending'
+        )
+        if _confirming and not order.confirmed_by:
             order.confirmed_by = user
-            order.save(update_fields=['status', 'confirmed_by', 'updated_at'])
-        elif new_status == 'cancelled':
-            from restaurant.models import Product as _Product
-            from django.db.models import F as _F
-            for item in order.order_items.select_related('product').all():
-                if item.product_id and item.product and item.product.available_in_stock is not None:
-                    _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
-                        available_in_stock=_F('available_in_stock') + item.quantity
-                    )
+            update_fields.append('confirmed_by')
+        # Stamp the transition time so kitchen timers work (mirrors the web view).
+        _now = timezone.now()
+        if _confirming and not order.confirmed_at:
+            order.confirmed_at = _now
+            update_fields.append('confirmed_at')
+        if new_status == 'preparing' and not order.preparing_at:
+            order.preparing_at = _now
+            update_fields.append('preparing_at')
+        elif new_status == 'ready' and not order.ready_at:
+            order.ready_at = _now
+            update_fields.append('ready_at')
+        elif new_status == 'served' and not order.served_at:
+            order.served_at = _now
+            update_fields.append('served_at')
+        if new_status == 'cancelled':
+            # Food already handed over is gone: only put stock back for orders not yet served.
+            if previous_status not in ('served', 'out_for_delivery', 'delivered'):
+                from restaurant.models import Product as _Product
+                from django.db.models import F as _F
+                for item in order.order_items.select_related('product').all():
+                    if item.product_id and item.product and item.product.available_in_stock is not None:
+                        _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
+                            available_in_stock=_F('available_in_stock') + item.quantity
+                        )
+            order.reason_if_cancelled = cancel_reason
+            update_fields.append('reason_if_cancelled')
             order.release_table()
-            order.save(update_fields=['status', 'updated_at'])
-        else:
-            order.save(update_fields=['status', 'updated_at'])
+        order.save(update_fields=update_fields)
         # --- transaction commits here ---
 
     # Customer push notification is sent by the Order status-change signal (orders/signals.py).
@@ -993,7 +1047,9 @@ def cancel_order(request, order_id):
                 {'error': 'Cannot cancel order with payments. Void all payments first.'},
                 status=400,
             )
-        for item in order.order_items.select_related('product').all():
+        # Food already handed over is gone: only put stock back for orders not yet served
+        for item in (order.order_items.select_related('product').all()
+                     if order.status not in ('served', 'out_for_delivery', 'delivered') else []):
             if item.product_id and item.product and item.product.available_in_stock is not None:
                 _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
                     available_in_stock=_F('available_in_stock') + item.quantity
@@ -1354,10 +1410,22 @@ def cancel_order_item(request, item_id):
         # Recover effective tax rate BEFORE deleting the item.
         # For delivery/pickup orders (table_info=None) reverse-calculate from
         # the stored total so the original tax rate is preserved.
-        if order.table_info:
-            tax_rate = order.table_info.get_tax_rate()
-        else:
-            tax_rate = order.charged_tax_rate()  # excludes the delivery fee
+        # The rate the order was actually charged (today's rate may have changed since)
+        tax_rate = order.charged_tax_rate()  # excludes the delivery fee
+        # Work out the new total BEFORE touching anything: removing an item must not
+        # push the total below what the customer has already paid (mirrors web).
+        subtotal = sum(
+            oi.get_subtotal() for oi in order.order_items.select_related('product').all()
+            if oi.pk != item.pk
+        )
+        new_total = order.total_for_subtotal(subtotal, tax_rate)
+        from django.db.models import Sum as _Sum
+        paid = order.payments.filter(is_voided=False).aggregate(t=_Sum('amount'))['t'] or _Dec('0')
+        if new_total < paid:
+            return Response(
+                {'error': 'This item is already paid for. Void the payment at the cashier first, then remove it.'},
+                status=400,
+            )
         if item.product_id and item.product and item.product.available_in_stock is not None:
             from restaurant.models import Product as _Prod
             from django.db.models import F as _F2
@@ -1365,11 +1433,12 @@ def cancel_order_item(request, item_id):
                 available_in_stock=_F2('available_in_stock') + item.quantity
             )
         item.delete()
-        subtotal = sum(
-            oi.get_subtotal() for oi in order.order_items.select_related('product').all()
-        )
-        order.total_amount = order.total_for_subtotal(subtotal, tax_rate)
-        order.save(update_fields=['total_amount', 'updated_at'])
+        order.total_amount = new_total
+        _was_paid = order.payment_status == 'paid'
+        order.payment_status = ('paid' if paid >= new_total else 'partial') if paid > 0 else 'unpaid'
+        if order.payment_status == 'paid' and not _was_paid:
+            order.release_table()  # same as a completing payment
+        order.save(update_fields=['total_amount', 'payment_status', 'updated_at'])
         # --- transaction commits here ---
 
     logger.info('Mobile: Item "%s" cancelled from Order %s by %s. Reason: %s',

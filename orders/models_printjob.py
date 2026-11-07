@@ -93,7 +93,8 @@ class PrintJob(models.Model):
         """Mark job as being printed"""
         self.status = 'printing'
         self.printed_by_client = client_id
-        self.save(update_fields=['status', 'printed_by_client'])
+        self.printed_at = timezone.now()        # when printing started (overwritten when completed)
+        self.save(update_fields=['status', 'printed_by_client', 'printed_at'])
     
     def mark_completed(self):
         """Mark job as successfully printed"""

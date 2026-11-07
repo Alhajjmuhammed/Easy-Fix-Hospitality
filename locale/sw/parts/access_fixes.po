@@ -1,0 +1,19 @@
+# Kiswahili: rider web page and menu items without a sub-category (access fixes).
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Delivery Rider"
+msgstr "Msambazaji"
+
+msgid "Please use the mobile app"
+msgstr "Tafadhali tumia programu ya simu"
+
+msgid "Delivery riders receive and complete their deliveries in the mobile app. Sign in to the app with the same username and password."
+msgstr "Wasambazaji hupokea na kukamilisha safari zao za kusambaza kupitia programu ya simu. Ingia kwenye programu kwa jina la mtumiaji na nenosiri lile lile."
+
+msgid "Log out"
+msgstr "Toka"
+
+msgid "Other items"
+msgstr "Bidhaa nyingine"

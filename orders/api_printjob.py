@@ -72,10 +72,11 @@ class PrintJobSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
-class PrintJobViewSet(viewsets.ModelViewSet):
+class PrintJobViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API ViewSet for Print Jobs
-    Used by print clients to fetch and update print jobs
+    Used by print clients to fetch and update print jobs. Read-only apart from the status actions
+    below: nobody can rewrite a queued receipt's content or delete jobs through the API.
     """
     serializer_class = PrintJobSerializer
     permission_classes = [IsAuthenticated, IsRestaurantOwnerOrStaff]
@@ -114,11 +115,12 @@ class PrintJobViewSet(viewsets.ModelViewSet):
         from django.utils import timezone
         from datetime import timedelta
 
-        # Reset stale 'printing' jobs that got stuck (client crashed mid-job)
+        # Reset stale 'printing' jobs that got stuck (client crashed mid-job). Measured from when
+        # printing started, so a job queued long ago and just picked up is not handed out twice.
+        from django.db.models import Q
         stale_threshold = timezone.now() - timedelta(minutes=10)
-        stale_jobs = self.get_queryset().filter(
-            status='printing',
-            created_at__lt=stale_threshold
+        stale_jobs = self.get_queryset().filter(status='printing').filter(
+            Q(printed_at__lt=stale_threshold) | Q(printed_at__isnull=True, created_at__lt=stale_threshold)
         )
         if stale_jobs.exists():
             count = stale_jobs.count()
@@ -140,15 +142,16 @@ class PrintJobViewSet(viewsets.ModelViewSet):
         Endpoint: /api/print-jobs/{id}/start_printing/
         """
         job = self.get_object()
-        
-        if job.status != 'pending':
+        client_id = str(request.data.get('client_id', 'unknown'))[:255]
+        from django.utils import timezone
+        # Claim it atomically: two print clients polling at once must not both print it
+        if not PrintJob.objects.filter(pk=job.pk, status='pending').update(
+                status='printing', printed_by_client=client_id, printed_at=timezone.now()):
             return Response(
                 {'error': 'Job is not pending'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        client_id = request.data.get('client_id', 'unknown')
-        job.mark_printing(client_id)
+        job.refresh_from_db()
         
         return Response({
             'message': 'Job marked as printing',
@@ -178,7 +181,8 @@ class PrintJobViewSet(viewsets.ModelViewSet):
         Endpoint: /api/print-jobs/{id}/mark_failed/
         """
         job = self.get_object()
-        error_msg = request.data.get('error', 'Unknown error')
+        # The print client sends 'error_message'; older clients may send 'error'
+        error_msg = request.data.get('error_message') or request.data.get('error') or 'Unknown error'
         job.mark_failed(error_msg)
         
         return Response({

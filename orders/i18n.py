@@ -33,6 +33,36 @@ SW = {
     '{n} people': 'watu {n}',
     # Push: rating reply (customer)
     'The restaurant replied 💬': 'Mgahawa umejibu 💬',
+    # Push: new order (staff)
+    'New Order #{number}': 'Oda Mpya #{number}',
+    '{where} • {count} item(s)': '{where} • bidhaa {count}',
+    'Table {table}': 'Meza {table}',
+    'Dine In': 'Kula Hapa',
+    'Delivery': 'Usafirishaji',
+    'Pickup': 'Kuchukua',
+    # Push: rider assignment (rider)
+    'New Delivery 🛵': 'Usafirishaji Mpya 🛵',
+    'Order #{number} has been assigned to you.': 'Oda #{number} imekabidhiwa kwako.',
+    # Push: reservations (staff)
+    'New Reservation • {party} people': 'Nafasi Mpya • watu {party}',
+    '{name} — {when} ({status})': '{name} — {when} ({status})',
+    'awaiting confirmation': 'inasubiri uthibitisho',
+    'confirmed': 'imethibitishwa',
+    '{name} cancelled the table for {party} on {when}.': '{name} ameghairi meza ya watu {party} tarehe {when}.',
+    # Push: low rating (owner / staff)
+    'Low rating on order #{number}': 'Tathmini ya chini kwa oda #{number}',
+    '{n}★ food': 'chakula {n}★',
+    ', {n}★ delivery': ', usafirishaji {n}★',
+    # Push: weekly roster (staff)
+    'Roster updated 📅': 'Ratiba imebadilishwa 📅',
+    'Your shifts for the week of {week} have changed. Tap to see them.':
+        'Zamu zako za wiki ya {week} zimebadilika. Gusa kuziona.',
+    'Your roster is ready 📅': 'Ratiba yako iko tayari 📅',
+    'Your shifts for the week of {week} are published. Tap to see them.':
+        'Zamu zako za wiki ya {week} zimetolewa. Gusa kuziona.',
+    'Roster withdrawn': 'Ratiba imeondolewa',
+    'Your shifts for the week of {week} are being changed. You will be notified again.':
+        'Zamu zako za wiki ya {week} zinabadilishwa. Utajulishwa tena.',
     # SMS (customer) — kept short and plain (one SMS part)
     '{name}: order #{number} confirmed.': '{name}: oda #{number} imethibitishwa.',
     '{name}: order #{number} is ready for pickup.': '{name}: oda #{number} iko tayari kuchukuliwa.',

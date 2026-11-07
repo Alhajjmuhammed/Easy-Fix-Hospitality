@@ -294,6 +294,15 @@ class Product(models.Model):
         return self.main_category.image
     
     def get_current_price(self):
+        """Current price with any active Happy Hour promotion, rounded to the cent (it is stored
+        on order lines and added up into totals, so it must be a real money amount)."""
+        from decimal import ROUND_HALF_UP
+        price = self._current_price_unrounded()
+        if price is None:
+            return price
+        return Decimal(str(price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    def _current_price_unrounded(self):
         """Get current price considering active Happy Hour promotions"""
         # Use pre-computed cache set by the menu view (avoids N+1)
         if hasattr(self, '_calculated_price_cache'):

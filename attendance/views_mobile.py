@@ -52,6 +52,35 @@ def _shift_for(user, owner, restaurant, now_time):
     return rostered_shift(user, timezone.localdate()) or _best_shift(owner, restaurant, now_time)
 
 
+def restaurant_team_owner_id(restaurant):
+    """Id of the owner account a restaurant's staff belong to (and their records are
+    saved under): a branch's branch owner, otherwise the main owner."""
+    if not restaurant.is_main_restaurant and restaurant.branch_owner_id:
+        return restaurant.branch_owner_id
+    return restaurant.main_owner_id
+
+
+def qr_allowed_for(user, owner, qr):
+    """
+    May this user check in with this QR? Yes when it is their owner's QR, or when the QR's
+    restaurant is the user's own restaurant — e.g. a branch QR a main owner created (saved
+    under the main owner) scanned by that branch's staff. Owners may also use the QR of any
+    restaurant they can access. Staff of a main restaurant are NOT accepted at a branch.
+    """
+    if owner is None:
+        return False
+    if qr.owner_id == owner.id:
+        return True
+    rest = qr.restaurant
+    if rest is None:
+        return False
+    if restaurant_team_owner_id(rest) == owner.id:
+        return True
+    if user.is_any_owner():
+        return user.get_accessible_restaurants().filter(pk=rest.pk).exists()
+    return False
+
+
 def _record_to_dict(rec):
     def fmt(dt):
         return dt.isoformat() if dt else None
@@ -100,7 +129,7 @@ def attendance_scan(request):
     user = request.user
     owner = user.get_owner()
 
-    if qr.owner != owner:
+    if not qr_allowed_for(user, owner, qr):
         return Response({'error': 'This QR code does not belong to your restaurant'}, status=403)
 
     today = timezone.localdate()
@@ -153,7 +182,7 @@ def attendance_confirm(request):
 
     user = request.user
     owner = user.get_owner()
-    if qr.owner != owner:
+    if not qr_allowed_for(user, owner, qr):
         return Response({'error': 'QR code does not belong to your restaurant'}, status=403)
 
     today = timezone.localdate()
@@ -184,6 +213,7 @@ def attendance_confirm(request):
             record.check_in_via = 'mobile'
             if not record.shift:
                 record.shift = shift
+            record.compute_lateness()  # known on arrival; check-out recomputes it
             record.save()
             return Response({
                 'success': True,

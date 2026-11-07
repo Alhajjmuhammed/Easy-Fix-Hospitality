@@ -134,11 +134,11 @@ def _process_payment(request):
         # Acquire the row lock FIRST so that the dedup check runs with a fully
         # serialized view — two concurrent identical offline POSTs cannot both pass
         # the filter before either has committed (TOCTOU fix).
-        # No distinct() — FOR UPDATE + DISTINCT is forbidden in PostgreSQL.
-        order = get_object_or_404(
-            Order.objects.select_for_update(of=('self',)).filter(_tq),
-            id=data['order_id'],
-        )
+        # No distinct() — FOR UPDATE + DISTINCT is forbidden in PostgreSQL. The OR'd
+        # joins in _tq can return the same order more than once (e.g. a main owner who
+        # also runs a second restaurant as its branch owner), so the access check is
+        # done above (with distinct) and the row is locked by primary key only.
+        order = Order.objects.select_for_update(of=('self',)).get(pk=order_check.pk)
         # Dedup check AFTER the lock so the second duplicate request sees the
         # Payment row the first already created.
         if offline_id:
@@ -146,7 +146,8 @@ def _process_payment(request):
             if _existing:
                 return Response({'payment': PaymentSerializer(_existing).data, 'already_synced': True})
 
-        if order.status == 'cancelled':
+        from cashier.mobile_money import NOT_PAYABLE_STATUSES
+        if order.status in NOT_PAYABLE_STATUSES:     # cancelled / wasted / refused: same rule as the web
             return Response({'error': 'Cannot process payment for a cancelled order.'}, status=400)
 
         # Re-read total_paid inside the lock so the overpayment check is race-free
@@ -238,11 +239,17 @@ def void_payment(request, payment_id):
     if not reason:
         return Response({'error': 'Void reason is required.'}, status=400)
 
+    # Scope check first (the OR'd joins can repeat a row, and FOR UPDATE cannot be
+    # combined with DISTINCT), then lock the single payment row by primary key.
+    _payment_ids = list(
+        Payment.objects.filter(_otq3, id=payment_id).values_list('id', flat=True)[:1]
+    )
+    if not _payment_ids:
+        from django.http import Http404
+        raise Http404('No Payment matches the given query.')
+
     with transaction.atomic():
-        payment = get_object_or_404(
-            Payment.objects.select_for_update(of=('self',)).filter(_otq3),
-            id=payment_id,
-        )
+        payment = Payment.objects.select_for_update(of=('self',)).get(pk=_payment_ids[0])
 
         if request.user.is_customer_care() and payment.order.ordered_by != request.user:
             return Response({'error': 'Access denied.'}, status=403)

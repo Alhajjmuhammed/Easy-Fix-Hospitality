@@ -38,7 +38,7 @@ export const useLanguageStore = create((set, get) => ({
         const { useAuthStore } = require('./useAuthStore');
         if (!useAuthStore.getState().token) return;
         const client = require('../api/client').default;
-        await client.post('/api/v1/auth/language/', { language: pending });
+        await client.post('/auth/language/', { language: pending });
         // Only clear it if no newer choice was made while this one was being saved
         if ((await AsyncStorage.getItem(PENDING_KEY)) === pending) await AsyncStorage.removeItem(PENDING_KEY);
       } catch { /* offline or older server: try again next time */ }

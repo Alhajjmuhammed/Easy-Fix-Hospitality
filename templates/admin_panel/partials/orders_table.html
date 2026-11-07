@@ -31,6 +31,7 @@
                     </td>
                     <td>
                         <span class="badge bg-secondary" style="font-size: 0.7rem;">{% if order.table_info %}{{ order.table_info.tbl_no }}{% else %}{% translate order.get_order_type_display %}{% endif %}</span>
+                        {% if order.status == 'out_for_delivery' %}<br><span class="badge bg-info text-dark" style="font-size: 0.65rem;">{% translate "On the way" %}</span>{% elif order.status == 'delivered' %}<br><span class="badge bg-success" style="font-size: 0.65rem;">{% translate "Delivered to customer" %}</span>{% endif %}
                     </td>
                     <td>
                         <small style="font-size: 0.75rem;">{{ order.created_at|date:"M d, H:i" }}</small>

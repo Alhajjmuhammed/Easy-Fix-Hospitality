@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -169,7 +169,7 @@ class InventoryRecord(models.Model):
 # ---------------------------------------------------------------------------
 
 def _money(value):
-    return (value or Decimal('0')).quantize(Decimal('0.01'))
+    return (value or Decimal('0')).quantize(Decimal('0.01'), ROUND_HALF_UP)
 
 
 class Supplier(models.Model):
