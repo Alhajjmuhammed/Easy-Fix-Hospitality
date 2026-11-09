@@ -221,7 +221,7 @@ def branch_reports(request):
     average_order = total_revenue / total_orders if total_orders > 0 else 0
     
     # Orders by status
-    status_breakdown = orders.values('status').annotate(count=Count('id'))
+    status_breakdown = orders.order_by().values('status').annotate(count=Count('id'))  # no default ordering in GROUP BY
     
     # Revenue by restaurant
     # Correlated subquery annotations — 1 SQL statement instead of N round-trips
@@ -229,13 +229,13 @@ def branch_reports(request):
         orders.filter(
             Q(table_info__restaurant=OuterRef('pk')) |
             Q(table_info__owner=OuterRef('branch_owner'))
-        ).annotate(_g=Value(1)).values('_g').annotate(s=Sum('total_amount')).values('s')[:1]
+        ).order_by().annotate(_g=Value(1)).values('_g').annotate(s=Sum('total_amount')).values('s')[:1]
     )
     _cnt_sq = Subquery(
         orders.filter(
             Q(table_info__restaurant=OuterRef('pk')) |
             Q(table_info__owner=OuterRef('branch_owner'))
-        ).annotate(_g=Value(1)).values('_g').annotate(s=Count('id')).values('s')[:1]
+        ).order_by().annotate(_g=Value(1)).values('_g').annotate(s=Count('id')).values('s')[:1]
     )
 
     restaurant_revenue = []

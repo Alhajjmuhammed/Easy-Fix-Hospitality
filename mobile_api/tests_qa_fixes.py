@@ -381,7 +381,10 @@ class AttendanceTests(Base):
         self.client.force_login(user)
         if restaurant is not None:
             s = self.client.session
-            s['selected_restaurant_id'] = restaurant.id
+            # What switch_restaurant stores: the location's OWNER user id, plus the exact restaurant
+            s['selected_restaurant_id'] = (restaurant.branch_owner_id if not restaurant.is_main_restaurant
+                                           and restaurant.branch_owner_id else restaurant.main_owner_id)
+            s['selected_restaurant_pk'] = restaurant.id
             s.save()
         with mock.patch('attendance.views_web.render',
                         lambda r, t, c=None, *a, **k: HttpResponse(c['qr_token'])):
@@ -416,7 +419,10 @@ class AttendanceTests(Base):
         self.client.force_login(user)
         if restaurant is not None:
             s = self.client.session
-            s['selected_restaurant_id'] = restaurant.id
+            # What switch_restaurant stores: the location's OWNER user id, plus the exact restaurant
+            s['selected_restaurant_id'] = (restaurant.branch_owner_id if not restaurant.is_main_restaurant
+                                           and restaurant.branch_owner_id else restaurant.main_owner_id)
+            s['selected_restaurant_pk'] = restaurant.id
             s.save()
         with mock.patch('attendance.views_web.render',
                         lambda r, t, c=None, *a, **k: captured.update(c or {}) or HttpResponse('ok')):
