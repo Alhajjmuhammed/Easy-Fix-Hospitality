@@ -235,10 +235,20 @@ class OrderItem(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     special_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+    # Units of dish stock this line really took (stock never goes below 0, see orders/stock.py).
+    # None = line from before that rule: it took its full quantity.
+    stock_taken = models.IntegerField(null=True, blank=True)
+
     def __str__(self):
         product_name = self.product.name if self.product else '[deleted product]'
         return f"{self.quantity}x {product_name} for Order {self.order.order_number}"
+
+    @property
+    def stock_short(self):
+        """How many of this line were ordered beyond the stock that was left (0 = all in stock)."""
+        if self.stock_taken is None:
+            return 0
+        return max(0, self.quantity - self.stock_taken)
     
     def get_subtotal(self):
         return self.quantity * self.unit_price

@@ -2694,15 +2694,24 @@ def cancel_order(request, order_id):
             if not reason:
                 return JsonResponse({'success': False, 'message': 'Cancellation reason is required'})
             
-            order = get_object_or_404(Order, id=order_id)
-            
-            # Check if order can be cancelled
-            if order.status in ['served', 'cancelled']:
-                return JsonResponse({'success': False, 'message': 'Order cannot be cancelled in current status'})
-            
-            order.status = 'cancelled'
-            order.reason_if_cancelled = reason
-            order.save()
+            from django.db import transaction
+            from orders.stock import give_back_order
+            get_object_or_404(Order, id=order_id)
+            with transaction.atomic():
+                order = Order.objects.select_for_update(of=('self',)).get(pk=order_id)
+
+                # Check if order can be cancelled
+                if order.status in ['served', 'cancelled']:
+                    return JsonResponse({'success': False, 'message': 'Order cannot be cancelled in current status'})
+                # Money already taken must be voided (and recorded) at the cashier first
+                if order.payments.filter(is_voided=False).exists():
+                    return JsonResponse({'success': False, 'message': 'This order has a payment. Void the payment at the cashier first, then cancel.'})
+
+                give_back_order(order)           # stock the kitchen had not used yet
+                order.status = 'cancelled'
+                order.reason_if_cancelled = reason
+                order.release_table()
+                order.save()
             
             return JsonResponse({
                 'success': True,

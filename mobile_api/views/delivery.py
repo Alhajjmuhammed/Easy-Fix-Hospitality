@@ -51,6 +51,29 @@ def _push_rider(order, rider_user):
 
 # ── Rider profile helpers ──────────────────────────────────────────────────────
 
+def _can_assign_riders(user):
+    """Who may give a delivery order to a rider: the "Assign riders" permission (managers and
+    cashiers by default), or "Manage delivery" for staff who are not riders themselves (kept for
+    restaurants that configured roles before "Assign riders" existed)."""
+    if user.is_administrator():
+        return True
+    if not user.has_feature('manage_delivery') and not user.has_feature('view_delivery')             and _delivery_switched_off(user):
+        return False                       # the administrator switched delivery off for this restaurant
+    if user.has_feature('assign_riders'):
+        return True
+    return user.has_feature('manage_delivery') and not user.is_delivery_rider()
+
+
+def _delivery_switched_off(user):
+    """True when the administrator disabled the delivery module for this user's restaurant."""
+    try:
+        owner = user._subscription_owner() if hasattr(user, '_subscription_owner') else user.get_owner()
+        return bool(owner) and owner.subscription.disabled_features.filter(
+            slug__in=['manage_delivery', 'view_delivery']).exists()
+    except Exception:
+        return False
+
+
 def _rider_data(rider, owner_id=None):
     if rider.owner_id:
         restaurant = rider.owner.restaurant_name or rider.owner.username
@@ -121,7 +144,7 @@ def riders_list(request):
             user.is_cashier() or user.is_customer_care() or user.is_manager() or
             user.is_administrator()):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
-    if not user.is_administrator() and not (user.has_feature('view_delivery') or user.has_feature('manage_delivery')):
+    if not user.is_administrator() and not (user.has_feature('view_delivery') or _can_assign_riders(user)):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     owner = get_restaurant_owner(request)
@@ -137,8 +160,8 @@ def riders_list(request):
 
     owner_id = owner.id if owner else None
 
-    if user.is_administrator() or scope == 'global':
-        # Global pool: all restaurants + global riders, local riders sorted first
+    if user.is_administrator():
+        # Administrator: every rider, the selected restaurant's own first
         if owner_id:
             qs = qs.annotate(
                 _priority=Case(
@@ -151,7 +174,9 @@ def riders_list(request):
         else:
             qs = qs.order_by(F('last_location_at').desc(nulls_last=True))
     else:
-        # Local only: this restaurant's riders + global riders (no owner)
+        # This restaurant's riders + shared riders that belong to no restaurant. Never another
+        # restaurant's riders: assigning one would hand them this restaurant's customer details.
+        # ('scope=global' from older app builds gets the same list.)
         if owner:
             from django.db.models import Q as _Q
             qs = qs.filter(_Q(owner=owner) | _Q(owner__isnull=True))
@@ -175,7 +200,7 @@ def assign_rider(request):
             user.is_cashier() or user.is_customer_care() or user.is_manager() or
             user.is_administrator()):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
-    if not user.is_administrator() and not user.has_feature('manage_delivery'):
+    if not _can_assign_riders(user):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     order_id = request.data.get('order_id')
@@ -261,7 +286,7 @@ def auto_assign_rider(request):
             user.is_cashier() or user.is_customer_care() or user.is_manager() or
             user.is_administrator()):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
-    if not user.is_administrator() and not user.has_feature('manage_delivery'):
+    if not _can_assign_riders(user):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     order_id = request.data.get('order_id')
@@ -300,19 +325,16 @@ def auto_assign_rider(request):
     rider = local_qs.first()
     source = 'local'
 
-    # Step 2: fall back to global riders (null owner), then any restaurant
+    # Step 2: fall back to shared riders that belong to no restaurant. Never another
+    # restaurant's own riders: that would hand them this restaurant's customer details.
     if not rider and owner and not user.is_administrator():
         rider = available_qs.filter(owner__isnull=True).first()
         if rider:
             source = 'global'
-        else:
-            rider = available_qs.exclude(owner=owner).first()
-            if rider:
-                source = 'global'
 
     if not rider:
         return Response(
-            {'error': 'No available riders at this time. All riders are currently on deliveries.'},
+            {'error': 'No free rider of this restaurant right now. All your riders are on deliveries.'},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 

@@ -716,11 +716,9 @@ def cancel_order(request, order_id):
         # Restore stock for each item — atomic per-product update
         from restaurant.models import Product as _Product
         from django.db.models import F as _F
+        from orders.stock import give_back
         for item in order.order_items.select_related('product').all():
-            if item.product_id and item.product and item.product.available_in_stock is not None:
-                _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
-                    available_in_stock=_F('available_in_stock') + item.quantity
-                )
+            give_back(item)                    # exactly what this line took (stock never below 0)
         # Release the table when order is cancelled
         order.release_table()
         order.save(update_fields=['status', 'payment_status', 'reason_if_cancelled'])
@@ -1120,6 +1118,17 @@ def cashier_reports(request):
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
     unpaid_amount = total_revenue - paid_amount
 
+    # The same payments as "Paid Amount", split by method (their totals add up to it)
+    _method_names = dict(Payment.PAYMENT_METHOD_CHOICES)
+    _method_names.setdefault('mobile', 'Mobile money')     # older Customer Care payments
+    payment_method_totals = [
+        {'method': r['payment_method'], 'label': _method_names.get(r['payment_method'], r['payment_method']),
+         'count': r['count'], 'total': r['total'] or Decimal('0.00')}
+        for r in Payment.objects.filter(
+            order_id__in=order_ids, is_voided=False, order__payment_status__in=['paid', 'partial'],
+        ).values('payment_method').annotate(count=Count('id'), total=Sum('amount')).order_by('-total')
+    ]
+
     total_items = OrderItem.objects.filter(order_id__in=order_ids).count()
     
     # Handle CSV export
@@ -1164,7 +1173,14 @@ def cashier_reports(request):
                 f'{currency_symbol}{order.total_amount:.2f}',
                 order.get_payment_status_display()
             ])
-        
+
+        # Totals by payment method (voided payments excluded)
+        writer.writerow([])
+        writer.writerow(['Payment Method', 'Payments', 'Amount'])
+        for m in payment_method_totals:
+            writer.writerow([m['label'], m['count'], f"{currency_symbol}{m['total']:.2f}"])
+        writer.writerow(['Total paid', sum(m['count'] for m in payment_method_totals), f'{currency_symbol}{paid_amount:.2f}'])
+
         return response
     
     # Handle PDF export
@@ -1203,6 +1219,11 @@ def cashier_reports(request):
             ['Total Orders', 'Items Sold', ''],
             [str(total_orders), str(total_items), '']
         ]
+        # Totals by payment method, as extra rows of the summary
+        if payment_method_totals:
+            summary_data.append(['Payment Method', 'Payments', 'Amount'])
+            for m in payment_method_totals:
+                summary_data.append([m['label'], str(m['count']), f"{currency_symbol}{m['total']:.2f}"])
         summary_table = Table(summary_data, colWidths=[2.5*inch, 2.5*inch, 2.5*inch])
         summary_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c5282')),
@@ -1328,6 +1349,7 @@ def cashier_reports(request):
         'total_revenue': total_revenue,
         'paid_amount': paid_amount,
         'unpaid_amount': unpaid_amount,
+        'payment_method_totals': payment_method_totals,
         'total_orders': total_orders,
         'total_items': total_items,
         'categories': categories,

@@ -9,11 +9,14 @@ import {
   Snackbar,
   Banner,
   Divider,
+  Dialog,
+  Portal,
+  TextInput,
   useTheme,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
-import { apiOrders, apiUpdateOrderStatus, apiPrintStationTicket } from '../../api/orders';
+import { apiOrders, apiUpdateOrderStatus, apiPrintStationTicket, apiCancelOrder } from '../../api/orders';
 import { getOrders, getOfflinePendingOrders, updateCachedOrderStatus, saveOfflineStatusChange } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -47,6 +50,9 @@ const STATUS_LABELS = {
 
 const ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing', 'ready'];
 
+// Quick reasons for a station cancelling an order (the text is what gets saved)
+const CANCEL_REASONS = ['Out of ingredients', 'Kitchen mistake', 'Customer left'];
+
 function filterForStation(orders, stationName) {
   return orders
     .filter((o) =>
@@ -75,7 +81,7 @@ function StatusChip({ status }) {
   );
 }
 
-const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMarkReady, onPrint, updatingId, printingId }) {
+const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMarkReady, onPrint, onCancel, updatingId, printingId }) {
   const { format } = useCurrency();
   const t = useT();
   const isUpdating = updatingId === order.id;
@@ -83,6 +89,10 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
   const status = order.status;
   const canPrepare = status === 'pending' || status === 'confirmed';
   const canReady   = status === 'preparing';
+  // Paid / part-paid orders are cancelled by the cashier (the payment must be voided first);
+  // orders still waiting to sync from this phone exist only here
+  const canCancel  = !String(order.id).startsWith('offline_')
+    && !['paid', 'partial'].includes(order.payment_status);
 
   const tableLabel = order.table_number
     ? t('Table {n}', { n: order.table_number })
@@ -117,6 +127,11 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
             <Text variant="bodyMedium" style={styles.itemName} numberOfLines={2}>
               {item.product_name || item.name || t('Item')}
             </Text>
+            {Number(item.stock_short) > 0 ? (
+              <Text variant="bodySmall" style={styles.stockShort}>
+                {t('⚠ Only {n} in stock', { n: Math.max(0, Number(item.quantity) - Number(item.stock_short)) })}
+              </Text>
+            ) : null}
             {(item.special_notes || item.notes) ? (
               <Text variant="bodySmall" style={styles.itemNotes}>
                 {t('Note:')} {item.special_notes || item.notes}
@@ -139,6 +154,17 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
         >
           {t('Print')}
         </Button>
+        {canCancel && (
+          <Button
+            mode="text"
+            onPress={() => onCancel(order)}
+            disabled={isUpdating || isPrinting}
+            textColor="#C62828"
+            compact
+          >
+            {t('Cancel')}
+          </Button>
+        )}
         {canPrepare && (
           <Button
             mode="contained"
@@ -191,6 +217,9 @@ export default function StationDashboardScreen() {
   const [updatingId,  setUpdatingId]  = useState(null);
   const [printingId,  setPrintingId]  = useState(null);
   const [snack,       setSnack]       = useState('');
+  const [cancelOrder, setCancelOrder] = useState(null);   // order shown in the cancel dialog
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling,  setCancelling]  = useState(false);
 
   // ── Network monitoring ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -297,6 +326,35 @@ export default function StationDashboardScreen() {
   }, [stationName]);
 
   const handleMarkPreparing = useCallback((id) => updateStatus(id, 'preparing'), [updateStatus]);
+
+  // ── Cancel (always with a reason; needs the server: it refuses paid orders) ──
+  const openCancel = useCallback((order) => {
+    if (isOffline) { setSnack('Cancelling an order needs an internet connection.'); return; }
+    setCancelReason('');
+    setCancelOrder(order);
+  }, [isOffline]);
+
+  const confirmCancel = async () => {
+    const reason = cancelReason.trim();
+    if (!cancelOrder || cancelling) return;
+    if (!reason) { setSnack('Please give a reason for cancelling.'); return; }
+    setCancelling(true);
+    try {
+      await apiCancelOrder(cancelOrder.id, reason);
+      // keep the offline cache in step, so it never shows this order as active again
+      try { await updateCachedOrderStatus(cancelOrder.id, 'cancelled'); } catch { /* best-effort */ }
+      if (!mountedRef.current) return;
+      setOrders((prev) => prev.filter((o) => o.id !== cancelOrder.id));
+      setCancelOrder(null);
+      setSnack('Order cancelled');
+    } catch (err) {
+      if (mountedRef.current) {
+        setSnack(err?.response?.data?.error || (err?.response ? 'Could not cancel the order.' : 'Cancelling an order needs an internet connection.'));
+      }
+    } finally {
+      if (mountedRef.current) setCancelling(false);
+    }
+  };
   const handleMarkReady     = useCallback((id) => updateStatus(id, 'ready'),     [updateStatus]);
 
   // ── Print ticket ─────────────────────────────────────────────────────────
@@ -334,11 +392,12 @@ export default function StationDashboardScreen() {
         onMarkPreparing={handleMarkPreparing}
         onMarkReady={handleMarkReady}
         onPrint={handlePrint}
+        onCancel={openCancel}
         updatingId={updatingId}
         printingId={printingId}
       />
     ),
-    [handleMarkPreparing, handleMarkReady, handlePrint, updatingId, printingId]
+    [handleMarkPreparing, handleMarkReady, handlePrint, openCancel, updatingId, printingId]
   );
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -417,6 +476,42 @@ export default function StationDashboardScreen() {
         }
       />
 
+      <Portal>
+        <Dialog visible={!!cancelOrder} onDismiss={() => !cancelling && setCancelOrder(null)}>
+          <Dialog.Title>
+            {cancelOrder ? t('Cancel order #{number}?', { number: cancelOrder.order_number || cancelOrder.id }) : ''}
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodySmall" style={styles.cancelHint}>
+              {t('The front desk and the owner will see this reason.')}
+            </Text>
+            <View style={styles.reasonChips}>
+              {CANCEL_REASONS.map((r) => (
+                <Chip key={r} compact selected={cancelReason === r} onPress={() => setCancelReason(r)}
+                      style={styles.reasonChip}>
+                  {t(r)}
+                </Chip>
+              ))}
+            </View>
+            <TextInput
+              mode="outlined"
+              dense
+              label={t('Reason')}
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              maxLength={200}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setCancelOrder(null)} disabled={cancelling}>{t('Keep order')}</Button>
+            <Button onPress={confirmCancel} loading={cancelling} disabled={cancelling || !cancelReason.trim()}
+                    textColor="#C62828">
+              {t('Cancel Order')}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
       <Snackbar
         visible={!!snack}
         onDismiss={() => setSnack('')}
@@ -444,6 +539,24 @@ const styles = StyleSheet.create({
   },
   banner: {
     backgroundColor: '#FFEBEE',
+  },
+  stockShort: {
+    color: '#C62828',
+    fontFamily: 'Poppins_600SemiBold',
+    marginLeft: 6,
+  },
+  cancelHint: {
+    color: '#757575',
+    marginBottom: 8,
+  },
+  reasonChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  reasonChip: {
+    marginBottom: 4,
   },
   stationHeader: {
     flexDirection: 'row',

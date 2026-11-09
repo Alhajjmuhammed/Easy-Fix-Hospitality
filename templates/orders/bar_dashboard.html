@@ -447,7 +447,7 @@
                                     <td>
                                         {% for item in order.order_items.all %}
                                             {% if item.product.station == 'bar' %}
-                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}</div>
                                             {% endif %}
                                         {% endfor %}
                                     </td>
@@ -511,7 +511,7 @@
                                     <td>
                                         {% for item in order.order_items.all %}
                                             {% if item.product.station == 'bar' %}
-                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}</div>
                                             {% endif %}
                                         {% endfor %}
                                     </td>
@@ -575,7 +575,7 @@
                                     <td>
                                         {% for item in order.order_items.all %}
                                             {% if item.product.station == 'bar' %}
-                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}</div>
                                             {% endif %}
                                         {% endfor %}
                                     </td>
@@ -639,7 +639,7 @@
                                     <td>
                                         {% for item in order.order_items.all %}
                                             {% if item.product.station == 'bar' %}
-                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}</div>
                                             {% endif %}
                                         {% endfor %}
                                     </td>
@@ -697,7 +697,7 @@
                                     <td>
                                         {% for item in order.order_items.all %}
                                             {% if item.product.station == 'bar' %}
-                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span></div>
+                                                <div>{{ item.product.name }} <span class="badge bg-secondary">x{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}</div>
                                             {% endif %}
                                         {% endfor %}
                                     </td>

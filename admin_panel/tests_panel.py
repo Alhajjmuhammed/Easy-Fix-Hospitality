@@ -391,12 +391,16 @@ class TableTests(PanelBase):
         self.login(self.bo_a)
         self.assertTrue(self.client.post('/admin-panel/tables/delete/', {'table_id': self.t['a'].id}).json()['success'])
 
-    def test_add_table_number_clash_gives_clear_message(self):
+    def test_self_managed_branch_may_reuse_main_table_number_but_not_its_own(self):
+        # Owner decision 2026-11-09: table numbers are unique per restaurant
         br = self.self_managed_branch()
         self.login(self.main)
-        res = self.client.post('/admin-panel/tables/add/', {'tbl_no': 'MAIN1', 'capacity': '4', 'restaurant_id': br.id}).json()
+        add = lambda: self.client.post('/admin-panel/tables/add/',
+                                       {'tbl_no': 'MAIN1', 'capacity': '4', 'restaurant_id': br.id}).json()
+        self.assertTrue(add()['success'])                                  # same number as the main restaurant
+        res = add()                                                        # twice in the same branch
         self.assertFalse(res['success'])
-        self.assertIn('already used', res['message'])
+        self.assertIn('already exists', res['message'])
 
     def test_main_can_rename_table_to_number_used_only_in_branch(self):
         self.login(self.main)

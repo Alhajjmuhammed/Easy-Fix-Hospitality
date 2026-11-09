@@ -286,13 +286,15 @@ class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
     station = serializers.SerializerMethodField()
+    # Units ordered beyond the stock that was left (0 = all in stock) — shown to the kitchen
+    stock_short = serializers.ReadOnlyField()
 
     class Meta:
         model = OrderItem
         fields = [
             'id', 'product_id', 'product_name',
             'quantity', 'unit_price', 'total_price',
-            'special_notes', 'station',
+            'special_notes', 'station', 'stock_short',
         ]
 
     def get_product_id(self, obj):

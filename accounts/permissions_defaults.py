@@ -10,7 +10,7 @@ DEFAULT_ROLE_FEATURES = {
         'view_orders', 'place_orders', 'manage_orders', 'cancel_orders', 'transfer_orders',
         'request_bill',
         # Delivery
-        'view_delivery', 'manage_delivery',
+        'view_delivery', 'manage_delivery', 'assign_riders',
         # Reservations
         'view_reservations', 'manage_reservations',
         # Payments
@@ -49,6 +49,7 @@ DEFAULT_ROLE_FEATURES = {
         'request_bill', 'process_payments', 'void_payments', 'view_receipts',
         'view_waste', 'log_waste', 'view_reports', 'export_reports',
         'view_inventory',
+        'assign_riders',
         'view_reservations', 'manage_reservations',
     ],
     'delivery_rider': ['view_delivery', 'manage_delivery'],
@@ -67,6 +68,7 @@ ALL_FEATURES = [
     # Delivery
     ('view_delivery',     'View Delivery',            'View delivery orders and rider assignments', 'orders'),
     ('manage_delivery',   'Manage Delivery',          'Assign riders and manage delivery order lifecycle', 'orders'),
+    ('assign_riders',     'Assign Riders',            'Give delivery orders to a rider (own restaurant riders only)', 'orders'),
     # Reservations
     ('view_reservations',   'View Reservations',      'View table reservations (read-only)', 'orders'),
     ('manage_reservations', 'Manage Reservations',    'Create, confirm, decline, assign tables and update reservations (includes view)', 'orders'),

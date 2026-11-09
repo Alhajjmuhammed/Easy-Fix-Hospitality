@@ -5,3 +5,9 @@ msgstr ""
 
 msgid "Paid (%(method)s):"
 msgstr "Imelipwa (%(method)s):"
+
+msgid "By payment method"
+msgstr "Kwa njia ya malipo"
+
+msgid "Total paid"
+msgstr "Jumla iliyolipwa"

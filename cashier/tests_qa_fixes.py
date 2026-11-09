@@ -116,7 +116,8 @@ class CashierStationFixTests(Base):
 
     def test_unpaid_order_still_cancels_and_served_food_is_not_restocked(self):
         o = self.order([(self.pk_, 2)], status='preparing')
-        self.assertTrue(self.status(o, 'cancelled')['success'])
+        self.assertFalse(self.status(o, 'cancelled')['success'])          # station staff must give a reason
+        self.assertTrue(self.status(o, 'cancelled', cancel_reason='Out of ingredients')['success'])
         self.pk_.refresh_from_db()
         self.assertEqual(self.pk_.available_in_stock, 52)                  # not served yet: back in stock
         s = self.order([(self.pb, 1)], status='served')

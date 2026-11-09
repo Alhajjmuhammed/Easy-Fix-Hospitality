@@ -1,0 +1,10 @@
+# Kiswahili: dish stock never below 0 — kitchen warning
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Only %(n)s in stock"
+msgstr "Zilikuwepo %(n)s tu"
+
+msgid "Ordered more than was left in stock"
+msgstr "Imeagizwa zaidi ya kilichobaki stoo"

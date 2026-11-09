@@ -3328,13 +3328,10 @@ def add_table(request):
         if TableInfo.objects.filter(tbl_no=table_number, restaurant=target_restaurant).exists():
             return JsonResponse({'success': False, 'message': f'Table number already exists in {target_restaurant.name}'})
         
-        # The legacy (owner, tbl_no) unique constraint is shared by a main restaurant and
-        # any branch the main owner runs himself (both store owner=main owner).
+        # Table numbers are unique per restaurant: a main restaurant and a branch (also one the
+        # main owner runs himself) can each have their own T1, T2 …
         _table_owner = target_restaurant.branch_owner or target_restaurant.main_owner
-        _used_msg = (f'This table number is already used: table {table_number} exists in another of your '
-                     f'restaurants run by the same owner account. Please choose a different number.')
-        if TableInfo.objects.filter(tbl_no=table_number, owner=_table_owner).exists():
-            return JsonResponse({'success': False, 'message': _used_msg})
+        _used_msg = f'Table number already exists in {target_restaurant.name}'
 
         # Create new table assigned to target restaurant
         from django.db import IntegrityError
@@ -3536,8 +3533,9 @@ def update_table(request):
                     new_owner = target_restaurant.branch_owner or target_restaurant.main_owner
                 
                 # Check for duplicates in target restaurant
+                # (unique per restaurant; legacy unlinked tables of the same owner count too)
                 if TableInfo.objects.filter(
-                    Q(restaurant=target_restaurant) | Q(owner=new_owner),
+                    Q(restaurant=target_restaurant) | Q(owner=new_owner, restaurant__isnull=True),
                     tbl_no=table_number
                 ).exclude(id=table_id).exists():
                     return JsonResponse({'success': False, 'message': f'Table {table_number} already exists in {target_restaurant.name}'})
@@ -3552,9 +3550,8 @@ def update_table(request):
             # (same rule as add_table: per restaurant, plus the legacy per-owner constraint).
             # A number used only by a sister branch is fine.
             if table.restaurant_id:
+                # Unique within this table's restaurant only (sister restaurants may reuse it)
                 _dup_q = Q(restaurant_id=table.restaurant_id)
-                if table.owner_id:
-                    _dup_q |= Q(owner_id=table.owner_id)
                 if TableInfo.objects.filter(_dup_q, tbl_no=table_number).exclude(id=table_id).exists():
                     return JsonResponse({'success': False, 'message': 'Table number already exists in your restaurant'})
             elif owner_filter:
@@ -3781,13 +3778,9 @@ def _admin_cancel_order(request, order, reason=None):
         if _order_has_payment(order):
             return False, ADMIN_PAID_CANCEL_MESSAGE
         if order.status in _STOCK_RESTORABLE_STATUSES:
+            from orders.stock import give_back
             for item in order.order_items.select_related('product').all():
-                if item.product_id is None:
-                    continue
-                product = Product.objects.select_for_update(of=('self',)).get(pk=item.product_id)
-                if product.available_in_stock is not None:
-                    product.available_in_stock += item.quantity
-                    product.save(update_fields=['available_in_stock'])
+                give_back(item)                # exactly what this line took (stock never below 0)
         old_status = order.status
         order.status = 'cancelled'
         order.reason_if_cancelled = (str(reason).strip() if reason
@@ -4135,6 +4128,9 @@ def delete_order(request, order_id):
 
         order_number = order.order_number
         _cleanup_order_dependencies([order.id])
+        from orders.stock import give_back_order
+        give_back_order(order)                    # an order deleted while still in the kitchen
+        order.release_table()
         order.delete()
 
         return JsonResponse({
@@ -4230,6 +4226,10 @@ def bulk_delete_orders(request):
         _cleanup_order_dependencies(order_ids)
 
         # Perform bulk deletion
+        from orders.stock import give_back_order
+        for _o in orders_to_delete.prefetch_related('order_items'):
+            give_back_order(_o)                   # orders deleted while still in the kitchen
+            _o.release_table()
         deleted_count, deleted_details = orders_to_delete.delete()
         
         # Log the deletion

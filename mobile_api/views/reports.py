@@ -439,8 +439,9 @@ def cashier_reports(request):
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
     )
+    # id__in: the OR'd joins above can repeat a payment row, which would inflate the sums
     my_payments = Payment.objects.filter(
-        _ptq,
+        id__in=Payment.objects.filter(_ptq).values('id'),
         processed_by=user,
         is_voided=False,
         created_at__gte=_start_dt,

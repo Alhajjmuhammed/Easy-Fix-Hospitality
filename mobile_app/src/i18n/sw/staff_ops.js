@@ -182,4 +182,18 @@ export default {
   'My Deliveries': 'Safari zangu',
   'Active Delivery': 'Safari inayoendelea',
   'Your account role is not recognized. Please contact your administrator.': 'Nafasi ya akaunti yako haitambuliki. Tafadhali wasiliana na msimamizi wako.',
+  // Station: cancel an unpaid order with a reason
+  'Cancel order #{number}?': 'Ghairi oda #{number}?',
+  'The front desk and the owner will see this reason.': 'Mapokezi na mmiliki wataona sababu hii.',
+  'Out of ingredients': 'Viungo vimeisha',
+  'Kitchen mistake': 'Kosa la jikoni',
+  'Customer left': 'Mteja ameondoka',
+  'Keep order': 'Usighairi',
+  'Please give a reason for cancelling.': 'Tafadhali andika sababu ya kughairi.',
+  'Could not cancel the order.': 'Imeshindikana kughairi oda.',
+  'Cancelling an order needs an internet connection.': 'Kughairi oda kunahitaji mtandao.',
+  // Station: an order line got less stock than it ordered (stock never goes below 0)
+  '⚠ Only {n} in stock': '⚠ Zilikuwepo {n} tu',
+  // Cashier report: payment method names
+  'Mobile money': 'Pesa kwa simu',
 };

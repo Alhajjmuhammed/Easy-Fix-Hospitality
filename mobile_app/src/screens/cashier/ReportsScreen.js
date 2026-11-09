@@ -32,7 +32,10 @@ const PERIODS = [
   { value: 'monthly', label: 'This Month' },
 ];
 
-const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
+const METHOD_LABELS = {
+  cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher',
+  loyalty: 'Loyalty points', mobile: 'Mobile money',
+};
 
 export default function CashierReportsScreen() {
   const { format }                      = useCurrency();

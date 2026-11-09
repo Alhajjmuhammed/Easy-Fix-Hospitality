@@ -513,18 +513,15 @@ def _place_order(request):
             delivery_lng=round(data['delivery_lng'], 7) if data.get('delivery_lng') is not None else None,
         )
 
+        from orders.stock import take_for_item
         for item in validated_items:
-            OrderItem.objects.create(
+            _line = OrderItem.objects.create(
                 order=order,
                 product=item['product'],
                 quantity=item['quantity'],
                 unit_price=item['unit_price'],
             )
-            p = item['product']
-            if p.available_in_stock is not None:
-                Product.objects.filter(pk=p.pk).update(
-                    available_in_stock=F('available_in_stock') - item['quantity']
-                )
+            take_for_item(_line)               # stock never below 0; the line records what it took
         # Mark table unavailable only for dine-in orders
         if table is not None:
             table.is_available = False
@@ -743,11 +740,9 @@ def update_order_status(request, order_id):
             if previous_status not in ('served', 'out_for_delivery', 'delivered'):
                 from restaurant.models import Product as _Product
                 from django.db.models import F as _F
+                from orders.stock import give_back
                 for item in order.order_items.select_related('product').all():
-                    if item.product_id and item.product and item.product.available_in_stock is not None:
-                        _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
-                            available_in_stock=_F('available_in_stock') + item.quantity
-                        )
+                    give_back(item)            # exactly what this line took (stock never below 0)
             order.reason_if_cancelled = cancel_reason
             update_fields.append('reason_if_cancelled')
             order.release_table()
@@ -981,9 +976,12 @@ def cancel_order(request, order_id):
     user = request.user
     is_privileged = (user.is_owner() or user.is_main_owner() or
                      user.is_branch_owner() or user.is_manager() or user.is_cashier())
-    if not (user.is_customer() or user.is_customer_care() or is_privileged):
+    # Kitchen/bar/buffet/service: unpaid, still-active orders with items for their station only
+    from orders.views import _user_station
+    station = _user_station(user)
+    if not (user.is_customer() or user.is_customer_care() or is_privileged or station):
         return Response({'error': 'Access denied.'}, status=403)
-    if not user.is_customer() and not user.has_feature('cancel_orders'):
+    if not user.is_customer() and not station and not user.has_feature('cancel_orders'):
         return Response({'error': 'Access denied.'}, status=403)
 
     if user.is_customer():
@@ -1012,6 +1010,13 @@ def cancel_order(request, order_id):
     if user.is_customer_care() and order.ordered_by != user:
         return Response({'error': 'Access denied.'}, status=403)
 
+    # Station staff: the order must have items for their station and still be in the kitchen
+    if station:
+        if order.status not in ('pending', 'confirmed', 'preparing', 'ready'):
+            return Response({'error': 'Only orders that are still being prepared can be cancelled.'}, status=400)
+        if not order.order_items.filter(product__station=station).exists():
+            return Response({'error': 'This order has no items for your station.'}, status=403)
+
     # Status guard: customers/CC → pending only; privileged staff → anything not served/cancelled.
     if user.is_customer() or user.is_customer_care():
         if order.status != 'pending':
@@ -1025,8 +1030,8 @@ def cancel_order(request, order_id):
 
     reason = (request.data.get('reason', '') or '').strip()
     if not reason:
-        # Require a reason from privileged staff so the audit trail is meaningful.
-        if is_privileged:
+        # Require a reason from staff so the audit trail is meaningful.
+        if is_privileged or station:
             return Response({'error': 'Cancellation reason is required.'}, status=400)
         reason = 'Cancelled by customer'
 
@@ -1050,10 +1055,8 @@ def cancel_order(request, order_id):
         # Food already handed over is gone: only put stock back for orders not yet served
         for item in (order.order_items.select_related('product').all()
                      if order.status not in ('served', 'out_for_delivery', 'delivered') else []):
-            if item.product_id and item.product and item.product.available_in_stock is not None:
-                _Product.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
-                    available_in_stock=_F('available_in_stock') + item.quantity
-                )
+            from orders.stock import give_back
+            give_back(item)                    # exactly what this line took (stock never below 0)
         order.status = 'cancelled'
         order.reason_if_cancelled = reason
         order.release_table()
@@ -1194,10 +1197,7 @@ def add_items_to_order(request, order_id):
     from decimal import Decimal as _Dec
     # Capture effective tax rate BEFORE the transaction mutates order_items.
     # For delivery/pickup (table_info=None) reverse-calculate from the stored total.
-    if order.table_info:
-        _add_tax_rate = order.table_info.get_tax_rate()
-    else:
-        _add_tax_rate = order.charged_tax_rate()  # excludes the delivery fee
+    _add_tax_rate = order.charged_tax_rate()  # the rate this order was charged; excludes the fee
 
     class _StockConflict(Exception):
         def __init__(self, msg): self.msg = msg
@@ -1218,10 +1218,8 @@ def add_items_to_order(request, order_id):
                 unit_price=item['unit_price'],
             )
             new_items.append(oi)
-            if p.available_in_stock is not None:
-                Product.objects.filter(pk=p.pk).update(
-                    available_in_stock=F('available_in_stock') - item['quantity']
-                )
+            from orders.stock import take_for_item
+            take_for_item(oi)                  # stock never below 0; the line records what it took
         added = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated)
         order.total_amount = _Dec(str(order.total_amount)) + added * (_Dec('1') + _add_tax_rate)
         extra_notes = sanitize_special_instructions(
@@ -1426,12 +1424,8 @@ def cancel_order_item(request, item_id):
                 {'error': 'This item is already paid for. Void the payment at the cashier first, then remove it.'},
                 status=400,
             )
-        if item.product_id and item.product and item.product.available_in_stock is not None:
-            from restaurant.models import Product as _Prod
-            from django.db.models import F as _F2
-            _Prod.objects.filter(pk=item.product_id, available_in_stock__isnull=False).update(
-                available_in_stock=_F2('available_in_stock') + item.quantity
-            )
+        from orders.stock import give_back
+        give_back(item)                        # exactly what this line took (stock never below 0)
         item.delete()
         order.total_amount = new_total
         _was_paid = order.payment_status == 'paid'

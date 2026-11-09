@@ -70,6 +70,36 @@
         </div>
     </div>
 
+    {% if payment_method_totals %}
+    <!-- Paid amount split by payment method (voided payments excluded) -->
+    <div class="card mb-4" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 0;">
+        <div class="card-header" style="background-color: #2c5282; color: white;">
+            <h5 class="mb-0"><i class="bi bi-wallet2"></i> {% translate "By payment method" %}</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr><th class="ps-3">{% translate "Method" %}</th><th class="text-end">{% translate "Payments" %}</th><th class="text-end pe-3">{% translate "Amount" %}</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for m in payment_method_totals %}
+                        <tr>
+                            <td class="ps-3">{% translate m.label %}</td>
+                            <td class="text-end">{{ m.count }}</td>
+                            <td class="text-end pe-3">{% currency_symbol %}{{ m.total|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold"><td class="ps-3">{% translate "Total paid" %}</td><td></td><td class="text-end pe-3">{% currency_symbol %}{{ paid_amount|floatformat:2 }}</td></tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Filters Section -->
     <div class="card mb-4" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 0;">
         <div class="card-header" style="background-color: #2c5282; color: white;">

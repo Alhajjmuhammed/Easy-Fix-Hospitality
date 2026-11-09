@@ -469,7 +469,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                 {% if item.product.station == 'kitchen' %}
                                 <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}
                                 </div>
                                 {% if item.special_notes %}
                                 <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>
@@ -530,7 +530,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                 {% if item.product.station == 'kitchen' %}
                                 <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}
                                 </div>
                                 {% if item.special_notes %}
                                 <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>
@@ -592,7 +592,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                 {% if item.product.station == 'kitchen' %}
                                 <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}
                                 </div>
                                 {% if item.special_notes %}
                                 <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>
@@ -654,7 +654,7 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
                                 {% if item.product.station == 'kitchen' %}
                                 <div class="kds-item">
                                     <span class="kds-item-name">{{ item.product.name }}</span>
-                                    <span class="kds-qty">×{{ item.quantity }}</span>
+                                    <span class="kds-qty">×{{ item.quantity }}</span>{% if item.stock_short %} <span class="badge bg-danger" title="{% translate "Ordered more than was left in stock" %}"><i class="fas fa-exclamation-triangle"></i> {% blocktranslate with n=item.stock_taken %}Only {{ n }} in stock{% endblocktranslate %}</span>{% endif %}
                                 </div>
                                 {% if item.special_notes %}
                                 <div class="kds-note"><i class="fas fa-exclamation-triangle"></i>{{ item.special_notes }}</div>

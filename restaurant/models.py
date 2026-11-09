@@ -138,10 +138,12 @@ class TableInfo(models.Model):
                 check=models.Q(owner__isnull=False) | models.Q(restaurant__isnull=False),
                 name='table_must_have_owner_or_restaurant'
             ),
-            # Unique table numbers per owner (legacy)
+            # Unique table numbers per owner — only for legacy tables not linked to a restaurant.
+            # Tables of a restaurant are unique per restaurant (below), so a main restaurant and a
+            # branch the main owner runs himself can both have their own T1.
             models.UniqueConstraint(
                 fields=['owner', 'tbl_no'],
-                condition=models.Q(owner__isnull=False),
+                condition=models.Q(owner__isnull=False, restaurant__isnull=True),
                 name='unique_table_per_owner'
             ),
             # Unique table numbers per restaurant (new system)

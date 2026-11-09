@@ -283,15 +283,14 @@ def _sync_order_atomic(user, owner, data, offline_id):
         else:
             fn = getattr(product, 'get_current_price', None)
             server_price = float(fn()) if fn else float(product.price)
-            OrderItem.objects.create(
+            _line = OrderItem.objects.create(
                 order=order,
                 product=product,
                 quantity=qty,
                 unit_price=server_price,
             )
-            if product.available_in_stock is not None:
-                from django.db.models import F as _F
-                Product.objects.filter(pk=product.pk).update(available_in_stock=_F('available_in_stock') - qty)
+            from orders.stock import take_for_item
+            take_for_item(_line)               # stock never below 0; the line records what it took
 
     # Reject order if no items were actually created (all product IDs were invalid).
     # Must release the table first — Order.save() called occupy_table() on creation,
@@ -319,11 +318,9 @@ def _sync_order_atomic(user, owner, data, offline_id):
     # If the order was cancelled offline before being synced, cancel it immediately
     order_status = data.get('status', 'pending')
     if order_status == 'cancelled':
+        from orders.stock import give_back
         for item in order.order_items.select_related('product'):
-            if item.product:
-                from django.db.models import F
-                item.product.available_in_stock = F('available_in_stock') + item.quantity
-                item.product.save(update_fields=['available_in_stock'])
+            give_back(item)                    # exactly what this line took (stock never below 0)
         order.status = 'cancelled'
         order.reason_if_cancelled = data.get('cancel_reason', 'Cancelled offline')
         order.save(update_fields=['status', 'reason_if_cancelled'])
@@ -394,9 +391,8 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
                 unit_price=unit_price,
             )
             new_items.append(oi)
-            if product.available_in_stock is not None:
-                from django.db.models import F as _F
-                Product.objects.filter(pk=product.pk).update(available_in_stock=_F('available_in_stock') - qty)
+            from orders.stock import take_for_item
+            take_for_item(oi)                  # stock never below 0; the line records what it took
 
     if not new_items:
         return {'status': 'error', 'error': 'No valid products found — items could not be added.'}

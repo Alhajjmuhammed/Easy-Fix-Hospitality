@@ -42,6 +42,7 @@ from accounts.security_utils import (
 from .printing import auto_print_order, auto_print_new_items  # Server-side printing
 
 from restaurant_system.db_utils import locked_get  # lock one row found through OR'd access filters
+from .stock import take_for_item, give_back  # dish stock never below 0 (orders/stock.py)
 logger = logging.getLogger(__name__)
 
 # Initialize channel layer for WebSocket communication
@@ -88,6 +89,24 @@ def _checkout_failed(request, cart):
     except Exception:
         pass
 
+
+
+def _user_station(user):
+    """'kitchen' / 'bar' / 'buffet' / 'service' for station staff, else None."""
+    for station, check in (('kitchen', user.is_kitchen_staff), ('bar', user.is_bar_staff),
+                           ('buffet', user.is_buffet_staff), ('service', user.is_service_staff)):
+        if check():
+            return station
+    return None
+
+
+def _station_may_cancel(user, order):
+    """Station staff may cancel an unpaid, still-active order that has items for their station
+    (e.g. out of an ingredient) — always with a reason. Paid orders need the cashier first."""
+    station = _user_station(user)
+    if station is None or order.status not in ('pending', 'confirmed', 'preparing', 'ready'):
+        return False
+    return order.order_items.filter(product__station=station).exists()
 
 PAID_CANCEL_MESSAGE = 'This order has a payment. Void the payment at the cashier first, then cancel.'
 HANDED_OVER_STATUSES = ('served', 'out_for_delivery', 'delivered')
@@ -785,18 +804,15 @@ def place_order(request):
                         unit_price_paid = product.get_current_price()
 
                         # Create order item with authoritative price
-                        OrderItem.objects.create(
+                        _line = OrderItem.objects.create(
                             order=order,
                             product=product,
                             quantity=item['quantity'],
                             unit_price=unit_price_paid
                         )
 
-                        # Update stock
-                        if product.available_in_stock is not None:
-                            type(product).objects.filter(pk=product.pk).update(
-                                available_in_stock=F('available_in_stock') - item['quantity']
-                            )
+                        # Stock: never below 0 — the line remembers what it really took
+                        take_for_item(_line)
 
                         total_amount += unit_price_paid * item['quantity']   # exact money, no floats
 
@@ -2157,6 +2173,12 @@ def update_order_status(request, order_id):
             if _has_live_payment(order):
                 return JsonResponse({'success': False, 'message': PAID_CANCEL_MESSAGE})
             cancel_reason = request.POST.get('cancel_reason', '') if request.content_type != 'application/json' else data.get('cancel_reason', '')
+            cancel_reason = (cancel_reason or '').strip()
+            if _user_station(request.user) is not None:
+                if not _station_may_cancel(request.user, order):
+                    return JsonResponse({'success': False, 'message': 'Only orders that are still being prepared can be cancelled here.'})
+                if not cancel_reason:
+                    return JsonResponse({'success': False, 'message': 'Please give a reason for cancelling.'})
             order.reason_if_cancelled = cancel_reason
 
         previous_status = order.status
@@ -2180,9 +2202,7 @@ def update_order_status(request, order_id):
             # Food already handed over is gone: only put stock back for orders not yet served
             if previous_status not in HANDED_OVER_STATUSES:
                 for item in order.order_items.select_related('product').select_for_update(of=('self',)):
-                    if item.product:
-                        item.product.available_in_stock = F('available_in_stock') + item.quantity
-                        item.product.save(update_fields=['available_in_stock'])
+                    give_back(item)            # exactly what this line took (stock never below 0)
             order.release_table()
 
         fields_to_update = ['status', 'reason_if_cancelled', 'confirmed_at', 'preparing_at', 'ready_at', 'served_at']
@@ -2295,7 +2315,8 @@ def update_order_status(request, order_id):
 @login_required
 def cancel_order(request, order_id):
     """Cancel an order with reason"""
-    if not request.user.has_feature('cancel_orders'):
+    has_cancel_permission = request.user.has_feature('cancel_orders')
+    if not has_cancel_permission and _user_station(request.user) is None:
         if request.headers.get('Content-Type') == 'application/json':
             return JsonResponse({'success': False, 'message': 'Access denied.'})
         messages.error(request, 'Access denied. You do not have permission to cancel orders.')
@@ -2333,6 +2354,13 @@ def cancel_order(request, order_id):
             return JsonResponse({'success': False, 'message': 'Cannot cancel this order.'})
         messages.error(request, 'Cannot cancel this order.')
         return redirect('orders:kitchen_dashboard')
+
+    # Kitchen/bar/buffet/service staff: only active orders with items for their own station
+    if not has_cancel_permission and not _station_may_cancel(request.user, order):
+        if request.headers.get('Content-Type') == 'application/json':
+            return JsonResponse({'success': False, 'message': 'Access denied.'})
+        messages.error(request, 'You can only cancel active orders that have items for your station.')
+        return redirect('orders:kitchen_dashboard')
     
     if request.method == 'POST':
         # Handle AJAX request
@@ -2357,14 +2385,12 @@ def cancel_order(request, order_id):
                         return JsonResponse({'success': False, 'message': 'Cannot cancel this order.'})
                     if _has_live_payment(order):
                         return JsonResponse({'success': False, 'message': PAID_CANCEL_MESSAGE})
+                    if not has_cancel_permission and not _station_may_cancel(request.user, order):
+                        return JsonResponse({'success': False, 'message': 'Cannot cancel this order.'})
                     # Restore product stock (not for food already handed over)
                     for item in (order.order_items.select_related('product').all()
                                  if order.status not in HANDED_OVER_STATUSES else []):
-                        product = item.product
-                        if product and product.available_in_stock is not None:
-                            product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
-                            product.available_in_stock += item.quantity
-                            product.save(update_fields=['available_in_stock'])
+                        give_back(item)        # exactly what this line took (stock never below 0)
 
                     # Update order
                     order.status = 'cancelled'
@@ -2401,14 +2427,13 @@ def cancel_order(request, order_id):
                 if _has_live_payment(order):
                     messages.error(request, PAID_CANCEL_MESSAGE)
                     return redirect('orders:kitchen_dashboard')
+                if not has_cancel_permission and not _station_may_cancel(request.user, order):
+                    messages.error(request, 'Cannot cancel this order.')
+                    return redirect('orders:kitchen_dashboard')
                 # Restore product stock (not for food already handed over)
                 for item in (order.order_items.select_related('product').all()
                              if order.status not in HANDED_OVER_STATUSES else []):
-                    product = item.product
-                    if product and product.available_in_stock is not None:
-                        product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
-                        product.available_in_stock += item.quantity
-                        product.save(update_fields=['available_in_stock'])
+                    give_back(item)            # exactly what this line took (stock never below 0)
 
                 # Update order
                 order.status = 'cancelled'
@@ -2499,11 +2524,7 @@ def customer_cancel_order(request, order_id):
                         return JsonResponse({'success': False, 'message': CUSTOMER_PAID_CANCEL_MESSAGE})
                     # Restore product stock
                     for item in order.order_items.select_related('product').all():
-                        product = item.product
-                        if product and product.available_in_stock is not None:
-                            product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
-                            product.available_in_stock += item.quantity
-                            product.save(update_fields=['available_in_stock'])
+                        give_back(item)        # exactly what this line took (stock never below 0)
 
                     # Update order
                     order.status = 'cancelled'
@@ -2548,11 +2569,7 @@ def customer_cancel_order(request, order_id):
                     return redirect('orders:my_orders' if request.user.is_customer() else 'orders:customer_care_dashboard')
                 # Restore product stock
                 for item in order.order_items.select_related('product').all():
-                    product = item.product
-                    if product and product.available_in_stock is not None:
-                        product = Product.objects.select_for_update(of=('self',)).get(pk=product.pk)
-                        product.available_in_stock += item.quantity
-                        product.save(update_fields=['available_in_stock'])
+                    give_back(item)            # exactly what this line took (stock never below 0)
 
                 # Update order
                 order.status = 'cancelled'
@@ -3966,20 +3983,15 @@ def handle_add_to_existing_order(request, order_id, cart):
                 
                 new_items.append(order_item)
 
-                # Update stock
-                if product.available_in_stock is not None:
-                    type(product).objects.filter(pk=product.pk).update(
-                        available_in_stock=F('available_in_stock') - item['quantity']
-                    )
+                # Stock: never below 0 — the line remembers what it really took
+                take_for_item(order_item)
 
                 total_added += unit_price_paid * item['quantity']
             
             # Update order total — total_amount is tax-inclusive, so gross the added subtotal
-            if order.table_info:
-                tax_rate = order.table_info.get_tax_rate()
-            else:
-                # Remote order: keep the rate it was charged at (items already include the new ones)
-                tax_rate = order.charged_tax_rate(order.get_subtotal() - total_added)
+            # Keep the rate the order was charged at, for every order type — today's rate may have
+            # changed since (items already include the new ones). Same rule as the app.
+            tax_rate = order.charged_tax_rate(order.get_subtotal() - total_added)
             order.total_amount += total_added * (1 + tax_rate)
             order.save(update_fields=['total_amount'])
 
@@ -4437,12 +4449,8 @@ def cancel_order_item(request, item_id):
         with transaction.atomic():
             # Restore stock if product stock tracking is enabled
             if item.product:
-                from restaurant.models import Product
-                product = Product.objects.select_for_update(of=('self',)).get(id=item.product.id)
-                if product.available_in_stock is not None:
-                    product.available_in_stock += item.quantity
-                    product.save(update_fields=['available_in_stock'])
-                    logger.info(f"Restored {item.quantity} units of {product.name} to stock")
+                restored = give_back(item)     # exactly what this line took (stock never below 0)
+                logger.info(f"Restored {restored} units of {item.product.name} to stock")
 
             # The rate this order was actually charged (not today's rate, which may have changed),
             # worked out BEFORE the item is removed
