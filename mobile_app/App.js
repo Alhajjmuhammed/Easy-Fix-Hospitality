@@ -31,6 +31,7 @@ import { usePushNotifications } from './src/hooks/usePushNotifications';
 import { useLockStore, IDLE_MS } from './src/store/useLockStore';
 import { useLanguageStore } from './src/store/useLanguageStore';
 import LockScreen from './src/screens/LockScreen';
+import { isOnlineState } from './src/utils/network';
 
 const fontConfig = {
   displayLarge:   { fontFamily: 'Poppins_300Light' },
@@ -102,10 +103,14 @@ function AppContent() {
   }, [hasPin, lock, refreshProfile]);
 
   // ── Refresh profile when device comes back online ────────────────────────────
+  // Then save a language chosen while offline to the account (it stays pending until
+  // a request to the server really succeeds).
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
-      if (state.isConnected && state.isInternetReachable) {
-        refreshProfile();
+      if (isOnlineState(state)) {
+        refreshProfile().then((ok) => {
+          if (ok) useLanguageStore.getState().syncToServer();
+        });
       }
     });
     return () => unsub();

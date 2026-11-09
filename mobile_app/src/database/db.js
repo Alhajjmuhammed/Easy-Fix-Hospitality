@@ -278,6 +278,25 @@ export const initDatabase = async () => {
     `);
   } catch (_) {}
 
+  // Migration: tag every queued row with the user + restaurant it was made under, so a
+  // logout (automatic on 401/403, or by hand) never has to delete unsent sales: rows stay
+  // on the phone and only sync when that same user is logged in to that same restaurant.
+  // Rows from older builds have NULL here and are claimed by whoever logs in next.
+  // Also: a permanent error message for queued station status changes.
+  for (const stmt of [
+    `ALTER TABLE offline_orders ADD COLUMN owner_user_id INTEGER`,
+    `ALTER TABLE offline_orders ADD COLUMN owner_restaurant_id INTEGER`,
+    `ALTER TABLE offline_payments ADD COLUMN owner_user_id INTEGER`,
+    `ALTER TABLE offline_payments ADD COLUMN owner_restaurant_id INTEGER`,
+    `ALTER TABLE offline_bill_requests ADD COLUMN owner_user_id INTEGER`,
+    `ALTER TABLE offline_bill_requests ADD COLUMN owner_restaurant_id INTEGER`,
+    `ALTER TABLE offline_status_changes ADD COLUMN owner_user_id INTEGER`,
+    `ALTER TABLE offline_status_changes ADD COLUMN owner_restaurant_id INTEGER`,
+    `ALTER TABLE offline_status_changes ADD COLUMN error_message TEXT`,
+  ]) {
+    try { await db.runAsync(stmt); } catch (_) {}
+  }
+
   // Migration: add orders cache table for existing installs that pre-date this feature.
   // CREATE TABLE IF NOT EXISTS in the block above already handles fresh installs;
   // this covers the case where initDatabase was already called once before orders existed.

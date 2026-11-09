@@ -8,9 +8,11 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiOrders, apiUpdateOrderStatus, apiCancelOrder, apiTransferTable } from '../../api/orders';
 import NetInfo from '@react-native-community/netinfo';
-import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, updateOfflineOrderStatus, getTables } from '../../database/operations';
+import { isOnline, isOnlineState, isNetworkError, newClientId } from '../../utils/network';
+import { getOrders, cacheOrders, getOfflinePendingOrders, saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, getTables } from '../../database/operations';
 import { resetErrors } from '../../utils/syncQueue';
 import { useSyncStore } from '../../store/useSyncStore';
+import SyncWarningsBanner from '../../components/SyncWarningsBanner';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { apiRidersList, apiAssignRider, apiAutoAssign } from '../../api/delivery';
 import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
@@ -106,7 +108,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
     try {
       const net = await NetInfo.fetch();
       if (!mountedRef.current) return;
-      if (!net.isConnected) {
+      if (!isOnlineState(net)) {
         const [offlinePending, cached] = await Promise.all([
           getOfflinePendingOrders(),
           getOrders(null),
@@ -170,14 +172,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
     const next = STATUS_NEXT[order.status];
     if (!next) return;
     if (order._is_offline_pending) {
-      await updateOfflineOrderStatus(order.offline_id, next).catch(() => {});
-      if (!mountedRef.current) return;
-      setOrders((prev) => prev.map((o) => o.offline_id === order.offline_id ? { ...o, status: next } : o));
+      // Not on the server yet: a status change here would never be sent. The buttons are
+      // hidden for these orders ("Waiting to sync"); this guards any other caller.
+      setSnack('Waiting to sync – the status can be changed once the order is sent');
       return;
     }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to update order status'); return; }
+    if (!isOnlineState(net)) { setSnack('No internet — connect to update order status'); return; }
     setUpdatingStatus(order.id);
     try {
       await apiUpdateOrderStatus(order.id, next);
@@ -191,8 +193,12 @@ export default function CashierMyOrdersScreen({ navigation }) {
   };
 
   // ── Payment ────────────────────────────────────────────────────────────────
+  // One id per pay dialog: sent with the online payment and reused for its offline-queue
+  // copy, so a payment the server already recorded is never recorded twice.
+  const payIdRef = useRef(null);
   const openPayment = (order) => {
     setPayDialog(order);
+    payIdRef.current = newClientId('pay');
     setAmount(String(order.balance_due > 0 ? order.balance_due : order.total ?? 0));
     setMethod('cash');
     setReference('');
@@ -204,13 +210,14 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (isNaN(parsed) || parsed <= 0) { setSnack('Enter a valid amount'); return; }
     if (method === 'loyalty') {
       // Points are checked and taken by the server, so they can't be used offline
-      const netNow = await NetInfo.fetch();
-      if (payDialog._is_offline_pending || !netNow.isConnected) { setSnack('Loyalty points need an internet connection'); return; }
+      const onlineNow = await isOnline();
+      if (payDialog._is_offline_pending || !onlineNow) { setSnack('Loyalty points need an internet connection'); return; }
     }
     setPaying(true);
     try {
       if (payDialog._is_offline_pending) {
         await saveOfflinePaymentForOfflineOrder({
+          offline_id:        payIdRef.current,
           offline_order_ref: payDialog.offline_id,
           order_number:      payDialog.order_number,
           amount:            parsed,
@@ -239,11 +246,13 @@ export default function CashierMyOrdersScreen({ navigation }) {
         }
         return;
       }
-      const net = await NetInfo.fetch();
+      const online = await isOnline();
       if (!mountedRef.current) return;
-      if (!net.isConnected) {
-        if (method === 'loyalty') { setSnack('Loyalty points need an internet connection'); return; }
+      // Save on this phone with the dialog's payment id — the same id the online attempt
+      // sends — so a payment the server already took is not recorded twice at sync.
+      const queuePayment = async (doneMessage) => {
         await saveOfflinePayment({
+          offline_id:       payIdRef.current,
           order_id:         payDialog.id,
           order_number:     payDialog.order_number,
           amount:           parsed,
@@ -266,13 +275,29 @@ export default function CashierMyOrdersScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
-        setSnack('No internet – payment saved and will sync automatically');
+        setSnack(doneMessage);
         if (usePrinterStore.getState().autoPrintAfterPayment) {
           printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
+      };
+      if (!online) {
+        if (method === 'loyalty') { setSnack('Loyalty points need an internet connection'); return; }
+        await queuePayment('No internet – payment saved and will sync automatically');
         return;
       }
-      const payRes = await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim(), ...(method === 'loyalty' ? { loyalty_code: loyaltyCode } : {}) });
+      let payRes;
+      try {
+        // Loyalty is redeemed online only (the server refuses it with an offline_id).
+        payRes = await apiProcessPayment({ order_id: payDialog.id, amount: parsed, payment_method: method, reference_number: reference.trim(), ...(method === 'loyalty' ? { loyalty_code: loyaltyCode } : { offline_id: payIdRef.current }) });
+      } catch (err) {
+        // Dropped request: it may have reached the server. Queue it with the same id —
+        // the server returns the earlier payment instead of taking the money twice.
+        if (isNetworkError(err) && method !== 'loyalty') {
+          await queuePayment('Connection lost – payment saved on this phone and will sync automatically');
+          return;
+        }
+        throw err;
+      }
       if (!mountedRef.current) return;
       const paidOrder   = payDialog;
       const payForPrint = { payment_method: method, amount: parsed, created_at: new Date().toISOString(), id: payRes?.payment?.id ?? null };
@@ -306,7 +331,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (!voidDialog) return;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to void a payment'); setVoidDialog(null); return; }
+    if (!isOnlineState(net)) { setSnack('No internet — connect to void a payment'); setVoidDialog(null); return; }
     setVoiding(true);
     try {
       await apiVoidPayment(voidDialog.paymentId, voidReason.trim());
@@ -329,7 +354,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (cancelReason.trim() === '') { setCancelError('A reason is required to cancel this order.'); return; }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
+    if (!isOnlineState(net)) { setSnack('No internet — connect to cancel an order'); setCancelDialog(null); return; }
     setCancelling(true);
     try {
       await apiCancelOrder(cancelDialog.id, cancelReason.trim());
@@ -376,7 +401,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (!transferDialog || !targetTable) return;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
+    if (!isOnlineState(net)) { setSnack('No internet — connect to transfer table'); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       await apiTransferTable(transferDialog.id, targetTable.id);
@@ -428,7 +453,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (!assignDialog) return;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to auto-assign a rider'); setAssignDialog(null); return; }
+    if (!isOnlineState(net)) { setSnack('No internet — connect to auto-assign a rider'); setAssignDialog(null); return; }
     setAutoAssigning(true);
     try {
       const res = await apiAutoAssign(assignDialog.id);
@@ -450,7 +475,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
     if (!assignDialog || !selectedRider) return;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack('No internet — connect to assign a rider'); setAssignDialog(null); return; }
+    if (!isOnlineState(net)) { setSnack('No internet — connect to assign a rider'); setAssignDialog(null); return; }
     setAssigning(true);
     try {
       await apiAssignRider(assignDialog.id, selectedRider);
@@ -479,6 +504,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
       >
         {t('Offline – showing cached orders. Connect to see your personal order history.')}
       </Banner>
+      <SyncWarningsBanner />
       <SegmentedButtons
         value={period}
         onValueChange={setPeriod}
@@ -581,9 +607,9 @@ export default function CashierMyOrdersScreen({ navigation }) {
                                 {
                                   text: t('Delete'),
                                   style: 'destructive',
-                                  onPress: () => deleteOfflineOrder(order.offline_id)
+                                  onPress: () => useSyncStore.getState().deleteQueuedOrder(order.offline_id)
                                     .then(() => fetchOrders(true))
-                                    .catch(() => setSnack('Could not delete queued order')),
+                                    .catch((e) => setSnack(e?.code === 'SYNC_IN_PROGRESS' ? 'Sync in progress – try again in a moment' : 'Could not delete queued order')),
                                 },
                               ],
                             );
@@ -663,11 +689,8 @@ export default function CashierMyOrdersScreen({ navigation }) {
               <Card.Actions>
                 {order._is_offline_pending ? (
                   <>
-                    {effectiveNext && (
-                      <Button mode="outlined" compact onPress={() => handleStatusAdvance(order)}>
-                        → {t(effectiveNext)}
-                      </Button>
-                    )}
+                    {/* Status can change only once the order is on the server */}
+                    <Text variant="bodySmall" style={{ color: '#E65100', paddingHorizontal: 8 }}>{t('Waiting to sync')}</Text>
                     {!isPaid && (
                       <Button mode="contained" compact onPress={() => openPayment(order)}>{t('Pay')}</Button>
                     )}

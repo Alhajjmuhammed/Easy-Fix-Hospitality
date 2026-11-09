@@ -4,6 +4,7 @@ import { Text, Menu as PaperMenu, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
+import { countUnsentItems } from '../database/operations';
 import { useT } from '../i18n';
 
 const PRIMARY = '#2c3e50';
@@ -31,9 +32,13 @@ export default function CustomerHeader({ onBack = null }) {
   const userInitials    = initials(fullName) || fullName.slice(0, 2).toUpperCase();
   const firstName       = fullName.split(' ')[0];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setMenuVisible(false);
-    Alert.alert(t('Logout'), t('Are you sure you want to logout?'), [
+    // Unsent orders/payments are kept on this phone (tagged with this user) — say so first.
+    const unsent = await countUnsentItems().catch(() => 0);
+    Alert.alert(t('Logout'), unsent > 0
+      ? t('You have {count} unsent items (orders, payments, requests). They stay on this phone, but only you can send them — log in again on this phone to send them.', { count: unsent })
+      : t('Are you sure you want to logout?'), [
       { text: t('Cancel'), style: 'cancel' },
       { text: t('Logout'), style: 'destructive', onPress: logout },
     ]);

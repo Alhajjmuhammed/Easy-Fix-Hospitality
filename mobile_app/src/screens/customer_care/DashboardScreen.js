@@ -22,6 +22,7 @@ import { apiTables } from '../../api/tables';
 import { apiBillRequests, apiCompleteBillRequest } from '../../api/billRequests';
 import { getOrders, cacheOrders, getOfflinePendingOrders, deleteOfflineOrder } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
+import SyncWarningsBanner from '../../components/SyncWarningsBanner';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -277,10 +278,10 @@ export default function CCDashboardScreen({ navigation }) {
 
   const handleDismissError = useCallback(async (offlineId) => {
     try {
-      await deleteOfflineOrder(offlineId);
+      await useSyncStore.getState().deleteQueuedOrder(offlineId);
       if (mountedRef.current) fetchAll(true);
-    } catch {
-      if (mountedRef.current) setSnack('Could not dismiss order');
+    } catch (e) {
+      if (mountedRef.current) setSnack(e?.code === 'SYNC_IN_PROGRESS' ? 'Sync in progress – try again in a moment' : 'Could not dismiss order');
     }
   }, [fetchAll]);
 
@@ -371,6 +372,7 @@ export default function CCDashboardScreen({ navigation }) {
             : t('Offline – showing cached orders. Connect to sync latest data.'))
           : t('{n} order(s) queued – will sync automatically when internet is available.', { n: pendingCount })}
       </Banner>
+      <SyncWarningsBanner />
 
       {/* Restaurant Banner */}
       <RestaurantBanner />

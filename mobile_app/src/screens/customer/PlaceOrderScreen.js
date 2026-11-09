@@ -12,14 +12,14 @@ import {
   Portal,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import NetInfo from '@react-native-community/netinfo';
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSyncStore } from '../../store/useSyncStore';
 import { apiPlaceOrder, apiAddItemsToOrder } from '../../api/orders';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { printOrderTicket } from '../../utils/printer';
-import { saveOfflineOrder, cacheOrders } from '../../database/operations';
+import { saveOfflineOrder, cacheOrders, markOfflineOrderLocallyPrinted } from '../../database/operations';
+import { isOnline, isNetworkError } from '../../utils/network';
 import { useCurrency } from '../../hooks/useCurrency';
 import { checkoutTotals } from '../../utils/checkoutTotals';
 import { useT } from '../../i18n';
@@ -43,6 +43,8 @@ export default function PlaceOrderScreen({ navigation }) {
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
   // One id per checkout: if a request times out after the server saved the order,
   // retrying with the same id returns that order instead of creating a duplicate.
+  // The same id is used for adding items (client_id) and for the offline-queue copy,
+  // so an online attempt that really went through is never applied twice at sync.
   const checkoutIdRef = useRef(`chk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
   const subtotal = getSubtotal();
@@ -59,8 +61,9 @@ export default function PlaceOrderScreen({ navigation }) {
     // fire-and-forget. Items with no station default to 'kitchen'.
     // alwaysFire=true bypasses the localKotBot guard (used for offline orders —
     // kitchen/bar always needs tickets regardless of the user's online preference)
+    // Resolves true only when every station ticket really printed.
     const fireTickets = (order, alwaysFire = false) => {
-      if (!localKotBot && !alwaysFire) return;
+      if (!localKotBot && !alwaysFire) return Promise.resolve(false);
       const rName = user?.restaurant_name || '';
       const userFullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
       const orderedBy = order.ordered_by_name || userFullName;
@@ -68,13 +71,17 @@ export default function PlaceOrderScreen({ navigation }) {
       // Default null/empty station to 'kitchen' so items always appear on a ticket
       const stations = [...new Set(allItems.map(i => i.station || 'kitchen'))];
       // One ticket per station (KOT / BOT / Buffet / Service)
-      stations.forEach(s => printOrderTicket(order, rName, s, orderedBy).catch(() => {}));
+      return Promise.all(stations.map((s) => printOrderTicket(order, rName, s, orderedBy)
+        .then((ok) => ok !== false)
+        .catch(() => false)))
+        .then((results) => results.length > 0 && results.every(Boolean));
     };
 
     if (!items.length) return;
     setLoading(true);
+    const clientId = checkoutIdRef.current;
     try {
-      const net = await NetInfo.fetch();
+      const online = await isOnline();
       const isRemote = orderType === 'delivery' || orderType === 'pickup';
       const orderData = {
         ...(isRemote ? {} : { table_id: tableId }),
@@ -92,13 +99,71 @@ export default function PlaceOrderScreen({ navigation }) {
         delivery_lng: deliveryLng != null ? parseFloat(Number(deliveryLng).toFixed(7)) : null,
       };
 
-      if (net.isConnected) {
+      // Save on this phone; synced later with the same id as any online attempt.
+      const queueOffline = async (afterNetworkError = false) => {
+        const offlineId = await saveOfflineOrder({
+          ...orderData,
+          offline_id: clientId,
+          user_id: user?.id,
+          total_amount: cartTotal,
+          tax_rate: taxRate,
+          delivery_fee: deliveryFee,
+          delivery_fee_taxed: deliveryFeeTaxed,
+          // Set once the local ticket really printed (below): the sync endpoint then
+          // skips its own print. If it did not print, the server prints it at sync.
+          local_print_fired: false,
+          // Link to the existing server order so the sync endpoint appends items
+          // instead of creating a duplicate standalone order.
+          ...(isAddingToExisting ? { existing_order_id: existingOrderId } : {}),
+        });
+        await refreshPendingCount();
+
+        // Print draft ticket from cart data (new items only).
+        // Station is included so tickets split by station (KOT/BOT) exactly
+        // like online orders. Always fired offline: the kitchen needs the ticket now.
+        const draftOrder = {
+          order_number: isAddingToExisting ? 'ADD-ITEMS' : 'OFFLINE',
+          table_number: tableName,
+          created_at:   new Date().toISOString(),
+          items:        items.map((i) => ({
+            product_name:  i.product.name,
+            quantity:      i.quantity,
+            special_notes: i.special_notes || '',
+            station:       i.product.station || 'kitchen',
+          })),
+          special_instructions: notes.trim(),
+        };
+        fireTickets(draftOrder, true).then((printed) => {
+          if (printed) markOfflineOrderLocallyPrinted(offlineId).catch(() => {});
+        });
+
+        clearCart();
+        if (isAddingToExisting) {
+          setSnack(afterNetworkError
+            ? t('Connection lost – items saved on this phone and will be added when online')
+            : t('Items saved – will be added to order when online'));
+          navTimer.current = setTimeout(() => navigation.goBack(), 1500);
+        } else {
+          setSnack(afterNetworkError
+            ? t('Connection lost – order saved on this phone and will sync automatically')
+            : t('Order saved – will sync when online'));
+          navTimer.current = setTimeout(() => {
+            const resetTarget = (orderType === 'delivery' || orderType === 'pickup')
+              ? 'RestaurantSelector'
+              : 'TableSelection';
+            navigation.reset({ index: 0, routes: [{ name: resetTarget }] });
+          }, 1500);
+        }
+      };
+
+      if (online) {
         try {
           if (isAddingToExisting) {
             // Add items to existing order
             const result = await apiAddItemsToOrder(existingOrderId, {
               items: orderData.items,
               special_instructions: orderData.special_instructions,
+              client_id: clientId,
             }, localKotBot);
             // Cache immediately so the updated order is available offline
             cacheOrders([result.order]).catch(() => {});
@@ -116,7 +181,7 @@ export default function PlaceOrderScreen({ navigation }) {
             fireTickets(newItemsOrder);
             navigation.replace('OrderConfirmation', { order: result.order });
           } else {
-            const result = await apiPlaceOrder({ ...orderData, offline_id: checkoutIdRef.current }, localKotBot);
+            const result = await apiPlaceOrder({ ...orderData, offline_id: clientId }, localKotBot);
             // Cache immediately so the order is available offline
             cacheOrders([result.order]).catch(() => {});
             clearCart();
@@ -125,6 +190,12 @@ export default function PlaceOrderScreen({ navigation }) {
           }
         } catch (err) {
           if (!mountedRef.current) return;
+          if (isNetworkError(err)) {
+            // Request dropped (no internet behind the Wi-Fi, timeout...). It may or may not
+            // have reached the server: queue it with the SAME id, the server de-duplicates.
+            await queueOffline(true);
+            return;
+          }
           if (err.response?.status === 409) {
             const { price_changes, unavailable_items } = err.response.data;
             if (unavailable_items?.length) {
@@ -141,57 +212,12 @@ export default function PlaceOrderScreen({ navigation }) {
             const friendlyMsg = err.response?.data?.detail
               || err.response?.data?.error
               || err.response?.data?.message
-              || (err.response ? t('Please check your order and try again.') : t('No internet connection. Please try again.'));
+              || t('Please check your order and try again.');
             setSnack(friendlyMsg);
           }
         }
       } else {
-        await saveOfflineOrder({
-          ...orderData,
-          user_id: user?.id,
-          total_amount: cartTotal,
-          tax_rate: taxRate,
-          delivery_fee: deliveryFee,
-          delivery_fee_taxed: deliveryFeeTaxed,
-          // Signal that the BT ticket was already fired locally so the sync
-          // endpoint skips auto_print_new_items and avoids a duplicate print.
-          local_print_fired: localKotBot,
-          // Link to the existing server order so the sync endpoint appends items
-          // instead of creating a duplicate standalone order.
-          ...(isAddingToExisting ? { existing_order_id: existingOrderId } : {}),
-        });
-        await refreshPendingCount();
-
-        // Print draft ticket from cart data (new items only) if localKotBot is enabled.
-        // Station is included so tickets split by station (KOT/BOT) exactly
-        // like online orders. fireTickets() is a no-op when localKotBot=false.
-        const draftOrder = {
-          order_number: isAddingToExisting ? 'ADD-ITEMS' : 'OFFLINE',
-          table_number: tableName,
-          created_at:   new Date().toISOString(),
-          items:        items.map((i) => ({
-            product_name:  i.product.name,
-            quantity:      i.quantity,
-            special_notes: i.special_notes || '',
-            station:       i.product.station || 'kitchen',
-          })),
-          special_instructions: notes.trim(),
-        };
-        fireTickets(draftOrder, true); // always fire KOT/BOT when offline
-
-        clearCart();
-        if (isAddingToExisting) {
-          setSnack(t('Items saved – will be added to order when online'));
-          navTimer.current = setTimeout(() => navigation.goBack(), 1500);
-        } else {
-          setSnack(t('Order saved – will sync when online'));
-          navTimer.current = setTimeout(() => {
-            const resetTarget = (orderType === 'delivery' || orderType === 'pickup')
-              ? 'RestaurantSelector'
-              : 'TableSelection';
-            navigation.reset({ index: 0, routes: [{ name: resetTarget }] });
-          }, 1500);
-        }
+        await queueOffline(false);
       }
     } catch (err) {
       if (mountedRef.current) setSnack(err.message || t('Something went wrong.'));

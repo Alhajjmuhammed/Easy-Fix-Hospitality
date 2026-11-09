@@ -18,6 +18,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { apiOrders, apiUpdateOrderStatus, apiPrintStationTicket, apiCancelOrder } from '../../api/orders';
 import { getOrders, getOfflinePendingOrders, updateCachedOrderStatus, saveOfflineStatusChange } from '../../database/operations';
+import { isOnlineState } from '../../utils/network';
+import SyncWarningsBanner from '../../components/SyncWarningsBanner';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
@@ -87,8 +89,11 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
   const isUpdating = updatingId === order.id;
   const isPrinting = printingId === order.id;
   const status = order.status;
-  const canPrepare = status === 'pending' || status === 'confirmed';
-  const canReady   = status === 'preparing';
+  // Orders still waiting to sync from this phone are not on the server yet: a status
+  // change would only be local and never sent, so the buttons are hidden for them.
+  const notSynced  = String(order.id).startsWith('offline_') || !!order._is_offline_pending;
+  const canPrepare = !notSynced && (status === 'pending' || status === 'confirmed');
+  const canReady   = !notSynced && status === 'preparing';
   // Paid / part-paid orders are cancelled by the cashier (the payment must be voided first);
   // orders still waiting to sync from this phone exist only here
   const canCancel  = !String(order.id).startsWith('offline_')
@@ -165,6 +170,9 @@ const OrderCard = React.memo(function OrderCard({ order, onMarkPreparing, onMark
             {t('Cancel')}
           </Button>
         )}
+        {notSynced && (
+          <Text variant="bodySmall" style={styles.waitingSync}>{t('Waiting to sync')}</Text>
+        )}
         {canPrepare && (
           <Button
             mode="contained"
@@ -224,7 +232,7 @@ export default function StationDashboardScreen() {
   // ── Network monitoring ──────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
-      const offline = !(state.isConnected && state.isInternetReachable);
+      const offline = !isOnlineState(state);
       if (mountedRef.current) setIsOffline(offline);
       if (!offline) fetchOrders(true); // re-fetch on reconnect
     });
@@ -293,11 +301,11 @@ export default function StationDashboardScreen() {
     };
 
     try {
-      // Offline-pending orders exist only locally — skip API entirely
+      // Offline-pending orders exist only locally: a change would never reach the server.
+      // Their buttons are hidden ("Waiting to sync"); this guards any other caller.
       const isOfflineOrder = String(orderId).startsWith('offline_');
       if (isOfflineOrder) {
-        applyLocalUpdate();
-        if (mountedRef.current) setSnack(`Order marked as ${newStatus}`);
+        if (mountedRef.current) setSnack('Waiting to sync – the status can be changed once the order is sent');
         return;
       }
 
@@ -413,6 +421,7 @@ export default function StationDashboardScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <RestaurantHeader />
+      <SyncWarningsBanner />
       {/* Offline banner */}
       {isOffline && (
         <Banner
@@ -632,6 +641,11 @@ const styles = StyleSheet.create({
     marginLeft: 32,
     color: '#E65100',
     fontStyle: 'italic',
+  },
+  waitingSync: {
+    color: '#E65100',
+    alignSelf: 'center',
+    marginHorizontal: 8,
   },
   cardActions: {
     paddingHorizontal: 12,

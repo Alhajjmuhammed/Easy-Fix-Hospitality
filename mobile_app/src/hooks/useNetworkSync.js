@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { useSyncStore } from '../store/useSyncStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { SYNC_INTERVAL_MS } from '../config';
+import { isOnline, isOnlineState } from '../utils/network';
 
 /**
  * Registers a NetInfo listener and a periodic timer so the app syncs whenever
@@ -20,8 +21,20 @@ export function useNetworkSync() {
   // Kick off sync when network becomes available
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      if (state.isConnected && isAuth()) {
+      if (isOnlineState(state) && isAuth()) {
         triggerSync();
+      }
+    });
+    return () => unsubscribe();
+  }, [triggerSync]);
+
+  // Kick off sync when a token appears (login, or the saved token finished loading):
+  // the first NetInfo event can arrive before the token, and a login while already
+  // online fires no NetInfo event at all — queued rows would wait for the timer.
+  useEffect(() => {
+    const unsubscribe = useAuthStore.subscribe((state, prev) => {
+      if (state.token && !prev.token) {
+        isOnline().then((online) => { if (online && isAuth()) triggerSync(); });
       }
     });
     return () => unsubscribe();

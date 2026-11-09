@@ -64,6 +64,8 @@ client.interceptors.response.use(
       }
       // Token expired or invalid — clear in-memory cache immediately so no
       // further requests go out with a bad token.
+      // This automatic logout never deletes the offline queue (unsent orders/payments):
+      // logout() keeps it, tagged with this user, until the same user logs in again.
       clearClientAuth();
       // Guard: two concurrent 401 responses must not both trigger logout(),
       // which would run concurrent SQLite transactions and risk deadlock.

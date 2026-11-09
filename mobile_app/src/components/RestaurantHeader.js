@@ -4,7 +4,9 @@ import { Text, Menu as PaperMenu, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
+import { countUnsentItems } from '../database/operations';
 import { useT } from '../i18n';
+import { OtherAccountsUnsentNote } from './SyncWarningsBanner';
 
 function stringToColor(str = '') {
   const PALETTE = ['#2c3e50', '#AD1457', '#6A1B9A', '#00838F', '#2E7D32', '#E65100', '#4527A0', '#37474F'];
@@ -33,9 +35,13 @@ export default function RestaurantHeader({ extraMenuItems = [], onBack = null })
   const staffInitials = initials(staffName) || staffName.slice(0, 2).toUpperCase();
   const roleName = (user?.role_name || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setMenuVisible(false);
-    Alert.alert(t('Logout'), t('Are you sure you want to logout?'), [
+    // Unsent orders/payments are kept on this phone (tagged with this user) — say so first.
+    const unsent = await countUnsentItems().catch(() => 0);
+    Alert.alert(t('Logout'), unsent > 0
+      ? t('You have {count} unsent items (orders, payments, requests). They stay on this phone, but only you can send them — log in again on this phone to send them.', { count: unsent })
+      : t('Are you sure you want to logout?'), [
       { text: t('Cancel'), style: 'cancel' },
       { text: t('Logout'), style: 'destructive', onPress: logout },
     ]);
@@ -113,6 +119,8 @@ export default function RestaurantHeader({ extraMenuItems = [], onBack = null })
       </View>
 
       <View style={styles.divider} />
+      {/* Owners/managers: unsent rows of other accounts on this phone (only they can send them) */}
+      {['manager', 'branch_owner', 'main_owner', 'owner'].includes(user?.role_name) && <OtherAccountsUnsentNote />}
 
       {/* Profile Modal */}
       <Modal

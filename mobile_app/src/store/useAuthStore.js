@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { apiLogin, apiLogout, apiMe, apiRegister } from '../api/auth';
 import { setClientAuth, clearClientAuth } from '../api/client';
-import { clearAllUserData } from '../database/operations';
+import { clearAllUserData, setQueueOwner } from '../database/operations';
 
 // Device must go online at least once every 15 days to continue working offline.
 // If the grace period lapses, the session is cleared and the user must log in
@@ -75,6 +75,8 @@ export const useAuthStore = create((set, get) => ({
         return;
       }
 
+      // Queued offline rows are this user's (and untagged rows from older builds)
+      setQueueOwner(parsedUser?.id, restaurantId);
       // Restore cached data immediately so the app can start
       set({
         token,
@@ -118,6 +120,7 @@ export const useAuthStore = create((set, get) => ({
       }
 
       setClientAuth(token, restaurantId);
+      setQueueOwner(user?.id, restaurantId);
       // Clear any stale cart from a previous session that may not have been
       // cleaned up if the app crashed before logout was called.
       const { useCartStore } = require('./useCartStore');
@@ -148,6 +151,7 @@ export const useAuthStore = create((set, get) => ({
       await SecureStore.setItemAsync('last_online_at', String(Date.now()));
       if (restaurantId) await SecureStore.setItemAsync('restaurant_id', String(restaurantId));
       setClientAuth(token, restaurantId);
+      setQueueOwner(user?.id, restaurantId);
       set({ token, user, restaurantId, isLoading: false });
       require('./useLanguageStore').useLanguageStore.getState().syncToServer();
       return { success: true };
@@ -159,6 +163,12 @@ export const useAuthStore = create((set, get) => ({
   },
 
   logout: async () => {
+    // Stop a running sync first: it must not send this user's rows once the token is gone
+    // or another user has logged in. It stops before its next request (no waiting: an
+    // automatic logout is itself called from inside a sync request's 401). The sync lock
+    // stays held until it has stopped, so the next user's sync runs after it, not alongside.
+    const { useSyncStore } = require('./useSyncStore');
+    useSyncStore.getState().reset();
     try { await apiLogout(); } catch (_) {}
     clearClientAuth();
     await SecureStore.deleteItemAsync('auth_token');
@@ -172,16 +182,18 @@ export const useAuthStore = create((set, get) => ({
     // on this device seeing previous user's cart (data breach fix)
     const { useCartStore } = require('./useCartStore');
     useCartStore.getState().clearCart();
-    // Reset sync pending count so next user sees 0, not previous user's count
-    const { useSyncStore } = require('./useSyncStore');
-    useSyncStore.getState().reset();
     // Reset printer settings to defaults — Bluetooth device paired by one staff
     // member should not carry over to the next user session.
     const { usePrinterStore } = require('./usePrinterStore');
     usePrinterStore.getState().resetSettings();
-    // Clear all SQLite cached/offline data — menu, tables, offline orders/payments
-    // belong to the previous user's restaurant and must not leak to next user
+    // Clear the SQLite cache (menu, tables, cached orders) of the previous user's
+    // restaurant. The offline queue is KEPT — this logout may be automatic (401/403) and
+    // the unsent sales must survive it. Queued rows are tagged with their user and
+    // restaurant and stay hidden until that user logs in again (see setQueueOwner).
     try { await clearAllUserData(); } catch (_) {}
+    // Dropped last: anything queued while the logout was running is still tagged with
+    // this user. After this, nothing can be queued until someone logs in.
+    setQueueOwner(null, null);
     set({ token: null, user: null, restaurantId: null });
   },
 
@@ -190,10 +202,12 @@ export const useAuthStore = create((set, get) => ({
     if (restaurantId === null || restaurantId === undefined) {
       try { await SecureStore.deleteItemAsync('restaurant_id'); } catch (_) {}
       setClientAuth(get().token, null);
+      setQueueOwner(get().user?.id, null);
       set({ restaurantId: null });
     } else {
       try { await SecureStore.setItemAsync('restaurant_id', String(restaurantId)); } catch (_) {}
       setClientAuth(get().token, restaurantId);
+      setQueueOwner(get().user?.id, restaurantId);
       set({ restaurantId });
       // Currency and tax rate in the profile are resolved per restaurant
       // (X-Restaurant-ID); refresh in the background so menu/cart show the
@@ -205,10 +219,11 @@ export const useAuthStore = create((set, get) => ({
   /** Silently re-fetch user profile from server — picks up restaurant name,
    *  logo, currency, tax rate changes without requiring a re-login.
    *  Goes through the axios client, so a 401 WILL trigger auto-logout via
-   *  the response interceptor in client.js. Other errors are silently ignored. */
+   *  the response interceptor in client.js. Other errors are silently ignored.
+   *  Returns true when the profile was refreshed (the device is really online). */
   refreshProfile: async () => {
     const token = get().token;
-    if (!token) return;
+    if (!token) return false;
     try {
       const res = await apiMe();
       const freshUser = res.data;
@@ -216,9 +231,11 @@ export const useAuthStore = create((set, get) => ({
       // Device is online — reset the 15-day offline grace period clock
       await SecureStore.setItemAsync('last_online_at', String(Date.now()));
       set({ user: freshUser });
+      return true;
     } catch (_) {
       // 401 is handled by the client.js response interceptor (triggers full logout).
       // All other errors (network down, 500, etc.) — ignore silently.
+      return false;
     }
   },
 

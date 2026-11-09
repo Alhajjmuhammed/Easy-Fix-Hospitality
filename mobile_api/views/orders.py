@@ -1045,6 +1045,17 @@ def cancel_order(request, order_id):
         # Re-check status inside the lock — a concurrent request may have changed it.
         if order.status == 'cancelled':
             return Response({'error': 'Order is already cancelled.'}, status=400)
+        # Station staff: re-check under the lock. The status may have moved on since the
+        # check above (e.g. the cashier assigned a rider → out_for_delivery).
+        if station:
+            from orders.views import _station_may_cancel
+            if not _station_may_cancel(user, order):
+                return Response({'error': 'Only orders that are still being prepared can be cancelled.'}, status=400)
+        # Same status rules as above, against the locked row.
+        if (user.is_customer() or user.is_customer_care()) and order.status != 'pending':
+            return Response({'error': 'Only pending orders can be cancelled.'}, status=400)
+        if order.status == 'served':
+            return Response({'error': f'Cannot cancel an order with status "{order.status}".'}, status=400)
         # Re-check payments inside the lock — a payment could have been created between
         # the outer status check and acquiring this lock.
         if order.payments.filter(is_voided=False).exists():
@@ -1067,6 +1078,27 @@ def cancel_order(request, order_id):
     _notify_ws(order, user)
     logger.info('Mobile: Order %s cancelled by %s. Reason: %s', order.order_number, user.username, reason)
     return Response({'success': True, 'message': f'Order {order.order_number} cancelled.'})
+
+
+def _append_tag(client_id):
+    """Dedup tag for one 'add items' action; same format as sync.py _sync_order_append."""
+    return f'[offline-append:{client_id}]' if client_id else ''
+
+
+def _add_items_response(request, order, already_applied=False):
+    """Response for an add-items replay whose items were already added: the current order."""
+    order = Order.objects.select_related(
+        'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
+    ).prefetch_related(
+        Prefetch('payments', queryset=Payment.objects.select_related('processed_by')),
+        'order_items__product',
+        'table_info__bill_requests',
+    ).get(pk=order.pk)
+    return Response({
+        'order': OrderSerializer(order, context={'request': request}).data,
+        'message': f'Items added to order {order.order_number}.',
+        'already_applied': already_applied,
+    })
 
 
 @api_view(['POST'])
@@ -1128,6 +1160,16 @@ def add_items_to_order(request, order_id):
     # CC staff can only add to their own orders.
     if user.is_customer_care() and order.ordered_by != user:
         return Response({'error': 'Access denied.'}, status=403)
+
+    # Idempotency: the app sends one client_id per "add items" action and reuses it for a
+    # retry and for the offline-queue copy (synced with the same id as offline_id). The tag
+    # is the one _sync_order_append in sync.py stamps, so a repeat on either path is a no-op.
+    # Checked before the paid/cancelled guards: a replay must return the earlier result.
+    # Older app builds send no client_id and keep the old behaviour.
+    client_id = str(request.data.get('client_id') or '').strip()[:64]
+    append_tag = _append_tag(client_id)
+    if append_tag and append_tag in (order.special_instructions or ''):
+        return _add_items_response(request, order, already_applied=True)
 
     # Block cancelled orders only.
     # 'served' is intentionally allowed for unpaid orders — the web's
@@ -1202,9 +1244,19 @@ def add_items_to_order(request, order_id):
     class _StockConflict(Exception):
         def __init__(self, msg): self.msg = msg
 
+    class _AlreadyApplied(Exception):
+        pass
+
     new_items = []  # collect created OrderItem instances for targeted KOT/BOT printing
     try:
       with transaction.atomic():
+        # Lock the order row: serialises two concurrent adds (same client_id → only one
+        # applies) and makes the total below build on the latest committed total.
+        _locked = Order.objects.select_for_update(of=('self',)).get(pk=order.pk)
+        if append_tag and append_tag in (_locked.special_instructions or ''):
+            raise _AlreadyApplied()
+        order.total_amount = _locked.total_amount
+        order.special_instructions = _locked.special_instructions or ''
         for item in validated:
             # Re-fetch product under SELECT FOR UPDATE so concurrent add-item
             # requests cannot both pass the stock check and together oversell.
@@ -1227,10 +1279,14 @@ def add_items_to_order(request, order_id):
         )
         if extra_notes:
             order.special_instructions = (order.special_instructions + '\n' + extra_notes).strip()
+        if append_tag:
+            order.special_instructions = (order.special_instructions.rstrip() + f' {append_tag}').strip()
         order.save(update_fields=['total_amount', 'special_instructions', 'updated_at'])
         # --- transaction commits here ---
     except _StockConflict as e:
         return Response({'error': e.msg}, status=status.HTTP_409_CONFLICT)
+    except _AlreadyApplied:
+        return _add_items_response(request, Order.objects.get(pk=order.pk), already_applied=True)
 
     # Re-fetch with full select_related + prefetch — the atomic block created new
     # OrderItems so the original instance's prefetch cache is stale, and

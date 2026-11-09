@@ -13,6 +13,7 @@ import {
 } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuthStore } from '../../store/useAuthStore';
+import { countUnsentItems } from '../../database/operations';
 import { apiMe } from '../../api/auth';
 import { useT } from '../../i18n';
 import LanguageSwitch from '../../components/LanguageSwitch';
@@ -54,6 +55,7 @@ export default function ProfileScreen() {
   const [user, setUser] = useState(cachedUser);
   const [refreshing, setRefreshing] = useState(false);
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [unsentCount, setUnsentCount] = useState(0);
   const [fetchError, setFetchError] = useState(false);
 
   const mountedRef = useRef(true);
@@ -180,7 +182,10 @@ export default function ProfileScreen() {
         textColor="#B71C1C"
         style={styles.logoutBtn}
         labelStyle={{ fontFamily: P600 }}
-        onPress={() => setLogoutVisible(true)}
+        onPress={async () => {
+          setUnsentCount(await countUnsentItems().catch(() => 0));
+          setLogoutVisible(true);
+        }}
       >
         {t('Log Out')}
       </Button>
@@ -191,7 +196,9 @@ export default function ProfileScreen() {
           <Dialog.Title style={{ fontFamily: P700 }}>{t('Log Out')}</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ fontFamily: P400 }}>
-              {t('Are you sure you want to log out?')}
+              {unsentCount > 0
+                ? t('You have {count} unsent items (orders, payments, requests). They stay on this phone, but only you can send them — log in again on this phone to send them.', { count: unsentCount })
+                : t('Are you sure you want to log out?')}
             </Text>
           </Dialog.Content>
           <Dialog.Actions>

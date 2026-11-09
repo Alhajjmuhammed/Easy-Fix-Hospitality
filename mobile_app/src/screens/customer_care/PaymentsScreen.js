@@ -26,12 +26,14 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
+import { isOnline, isOnlineState, isNetworkError, newClientId } from '../../utils/network';
 import { apiOrders, apiTransferTable } from '../../api/orders';
 import { apiProcessPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
 import { saveOfflinePayment, saveOfflinePaymentForOfflineOrder, deleteOfflineOrder, getOrders, cacheOrders, getOfflinePendingOrders, getTables } from '../../database/operations';
 import { useSyncStore } from '../../store/useSyncStore';
+import SyncWarningsBanner from '../../components/SyncWarningsBanner';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { printReceipt } from '../../utils/printer';
@@ -118,7 +120,7 @@ export default function CCPaymentsScreen({ navigation }) {
     try {
       const net = await NetInfo.fetch();
       if (!mountedRef.current) return;
-      if (!net.isConnected) {
+      if (!isOnlineState(net)) {
         const [offlinePending, cached] = await Promise.all([
           getOfflinePendingOrders(),
           getOrders(null),
@@ -186,8 +188,12 @@ export default function CCPaymentsScreen({ navigation }) {
   }, []);
 
   // â”€â”€ Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // One id per pay dialog: sent with the online payment and reused for its offline-queue
+  // copy, so a payment the server already recorded is never recorded twice.
+  const payIdRef = useRef(null);
   const openPayment = (order) => {
     setPayDialog(order);
+    payIdRef.current = newClientId('pay');
     const due = parseFloat(order.balance_due);
     const tot = parseFloat(order.total || 0);
     setAmount(String(due > 0 ? due.toFixed(2) : tot.toFixed(2)));
@@ -205,6 +211,7 @@ export default function CCPaymentsScreen({ navigation }) {
       // Offline-pending order: queue payment linked to the offline order
       if (payDialog._is_offline_pending) {
         await saveOfflinePaymentForOfflineOrder({
+          offline_id:        payIdRef.current,
           offline_order_ref: payDialog.offline_id,
           order_number:      payDialog.order_number,
           amount:            parsedAmount,
@@ -235,10 +242,13 @@ export default function CCPaymentsScreen({ navigation }) {
         return;
       }
 
-      const netState = await NetInfo.fetch();
+      const online = await isOnline();
       if (!mountedRef.current) return;
-      if (!netState.isConnected) {
+      // Save on this phone with the dialog's payment id — the same id the online attempt
+      // sends — so a payment the server already took is not recorded twice at sync.
+      const queuePayment = async (doneMessage) => {
         await saveOfflinePayment({
+          offline_id:       payIdRef.current,
           order_id:         payDialog.id,
           order_number:     payDialog.order_number,
           amount:           parsedAmount,
@@ -264,19 +274,34 @@ export default function CCPaymentsScreen({ navigation }) {
         const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: null };
         const staffName   = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || '';
         setPayDialog(null);
-        setSnack(t('No internet — payment saved offline and will sync automatically'));
+        setSnack(doneMessage);
         if (usePrinterStore.getState().autoPrintAfterPayment) {
           printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
+      };
+      if (!online) {
+        await queuePayment(t('No internet — payment saved offline and will sync automatically'));
         return;
       }
-      const payRes = await apiProcessPayment({
-        order_id:         payDialog.id,
-        amount:           parsedAmount,
-        payment_method:   method,
-        reference_number: reference.trim(),
-        notes:            notes.trim(),
-      });
+      let payRes;
+      try {
+        payRes = await apiProcessPayment({
+          order_id:         payDialog.id,
+          amount:           parsedAmount,
+          payment_method:   method,
+          reference_number: reference.trim(),
+          notes:            notes.trim(),
+          offline_id:       payIdRef.current,
+        });
+      } catch (err) {
+        // Dropped request: it may have reached the server. Queue it with the same id —
+        // the server returns the earlier payment instead of taking the money twice.
+        if (isNetworkError(err)) {
+          await queuePayment(t('Connection lost – payment saved on this phone and will sync automatically'));
+          return;
+        }
+        throw err;
+      }
       if (!mountedRef.current) return;
       const paidOrder   = payDialog;
       const payForPrint = { payment_method: method, amount: parsedAmount, created_at: new Date().toISOString(), id: payRes?.payment?.id ?? null };
@@ -336,7 +361,7 @@ export default function CCPaymentsScreen({ navigation }) {
     if (!selectedTableId) { setSnack(t('Please select a destination table')); return; }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
-    if (!net.isConnected) { setSnack(t('No internet — connect to transfer table')); setTransferDialog(null); return; }
+    if (!isOnlineState(net)) { setSnack(t('No internet — connect to transfer table')); setTransferDialog(null); return; }
     setTransferring(true);
     try {
       const res = await apiTransferTable(transferDialog.id, parseInt(selectedTableId));
@@ -374,6 +399,7 @@ export default function CCPaymentsScreen({ navigation }) {
       >
         {t('Offline – showing cached orders. Payments saved offline will sync when connected.')}
       </Banner>
+      <SyncWarningsBanner />
       {/* Filters */}
       <View style={styles.filterBox}>
         <Menu
@@ -525,7 +551,7 @@ export default function CCPaymentsScreen({ navigation }) {
                     )}
                     {order._is_offline_pending && (
                       <Menu.Item leadingIcon="delete-outline" title={t('Delete Queued Order')} titleStyle={{ color: '#E53935' }}
-                        onPress={() => { setMenuOpenId(null); deleteOfflineOrder(order.offline_id).then(() => fetchOrders(true)).catch(() => setSnack(t('Could not delete queued order'))); }} />
+                        onPress={() => { setMenuOpenId(null); useSyncStore.getState().deleteQueuedOrder(order.offline_id).then(() => fetchOrders(true)).catch((e) => setSnack(e?.code === 'SYNC_IN_PROGRESS' ? t('Sync in progress – try again in a moment') : t('Could not delete queued order'))); }} />
                     )}
                   </Menu>
                 </View>

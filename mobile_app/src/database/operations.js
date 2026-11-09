@@ -5,6 +5,85 @@ import { dbExec, dbQuery, getDb } from './db';
 const now = () => new Date().toISOString();
 const newOfflineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+// ── Queue ownership ─────────────────────────────────────────────────────────
+// Every queued row (offline_orders / offline_payments / offline_bill_requests /
+// offline_status_changes) is tagged with the user + restaurant it was made under.
+// A logout never deletes the queue; rows only show and sync for their own user and
+// restaurant. Rows from older builds (no tag) are given ONCE, after the upgrade, to the
+// first user known on this phone (see _ensureClaimed).
+const QUEUE_TABLES = ['offline_orders', 'offline_payments', 'offline_bill_requests', 'offline_status_changes'];
+const CLAIM_FLAG = 'queue_claim_done';
+let _queueOwner = { userId: null, restaurantId: null };
+let _claimDone = false;
+
+/** Key of the current queue owner ("user:restaurant"), also used to tag sync notices. */
+export const queueOwnerKey = () => `${_queueOwner.userId}:${_queueOwner.restaurantId ?? 0}`;
+
+/** Called by useAuthStore whenever the logged-in user or selected restaurant changes. */
+export const setQueueOwner = (userId, restaurantId) => {
+  const uid = userId == null || userId === '' ? null : Number(userId);
+  const rid = restaurantId == null || restaurantId === '' ? null : Number(restaurantId);
+  _queueOwner = {
+    userId: Number.isFinite(uid) ? uid : null,
+    restaurantId: Number.isFinite(rid) ? rid : null,
+  };
+  // Old untagged rows go to the first user known after the upgrade — start now, not at the
+  // first read, so a later user cannot get there first. (Retried at reads if the database
+  // is not ready yet.)
+  if (_queueOwner.userId != null) _ensureClaimed();
+};
+
+export const getQueueOwner = () => ({ ..._queueOwner });
+
+// SQL fragment + params selecting only the current owner's rows (nothing when logged out).
+const OWNER_SQL = 'owner_user_id = ? AND IFNULL(owner_restaurant_id, 0) = ?';
+const _ownerParams = () => [_queueOwner.userId ?? -1, _queueOwner.restaurantId ?? 0];
+// Tag for a new queued row. Nothing is queued while nobody is logged in (e.g. halfway
+// through a logout): an untagged row would be invisible to everyone afterwards.
+const _tag = () => {
+  if (_queueOwner.userId == null) {
+    const err = new Error('Not logged in — the action was not saved. Log in and try again.');
+    err.code = 'NO_QUEUE_OWNER';
+    throw err;
+  }
+  return [_queueOwner.userId, _queueOwner.restaurantId];
+};
+
+/** Rows made by an older build have no owner. They are given ONCE — to the first user known
+ *  after the upgrade (normally the one already logged in) — and never again, so a later
+ *  login by someone else cannot pick them up. A queued order keeps its own restaurant. */
+let _claiming = null;
+const _ensureClaimed = () => {
+  if (_claimDone) return Promise.resolve();
+  if (!_claiming) _claiming = _claim().finally(() => { _claiming = null; });
+  return _claiming;
+};
+const _claim = async () => {
+  try {
+    if (await getSyncMeta(CLAIM_FLAG)) { _claimDone = true; return; }
+    if (_queueOwner.userId == null) return;          // wait for the first user after the upgrade
+    const [uid, rid] = [_queueOwner.userId, _queueOwner.restaurantId];
+    for (const table of QUEUE_TABLES) {
+      // A queued order keeps its own restaurant; a payment for a queued order follows that
+      // order (via offline_order_ref). Bill requests / status changes have no such link.
+      const restaurantExpr = table === 'offline_orders'
+        ? 'COALESCE(restaurant_id, ?)'
+        : table === 'offline_payments'
+          ? `COALESCE((SELECT o.restaurant_id FROM offline_orders o
+                       WHERE o.offline_id = offline_payments.offline_order_ref), ?)`
+          : '?';
+      await dbExec(
+        `UPDATE ${table} SET owner_user_id = ?, owner_restaurant_id = ${restaurantExpr} WHERE owner_user_id IS NULL`,
+        [uid, rid],
+      );
+    }
+    await setSyncMeta(CLAIM_FLAG, now());
+    _claimDone = true;
+  } catch (_) {
+    // Database not initialised yet — try again on the next read.
+  }
+};
+
 // ── Sync Metadata ────────────────────────────────────────────────────────────
 
 export const getSyncMeta = async (key) => {
@@ -151,14 +230,16 @@ export const updateTableAvailability = (tableId, isAvailable) =>
 // ── Offline Orders ────────────────────────────────────────────────────────────
 
 export const saveOfflineOrder = async (orderData) => {
-  const offlineId = newOfflineId();
+  // Reuse the id of the online attempt when there was one (offline fallback after a
+  // dropped request): the server matches it and never creates the order twice.
+  const offlineId = orderData.offline_id || newOfflineId();
   const createdAt = now();
   await dbExec(
     `INSERT INTO offline_orders
       (offline_id, table_id, items_json, special_instructions, restaurant_id, total_amount, created_at, sync_status,
        order_type, delivery_address, delivery_phone, delivery_lat, delivery_lng, existing_order_id, tax_rate, local_print_fired,
-       delivery_fee, delivery_fee_taxed)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       delivery_fee, delivery_fee_taxed, owner_user_id, owner_restaurant_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       offlineId,
       orderData.table_id ?? null,
@@ -177,13 +258,26 @@ export const saveOfflineOrder = async (orderData) => {
       orderData.local_print_fired ? 1 : 0,
       orderData.delivery_fee ?? 0,
       orderData.delivery_fee_taxed ? 1 : 0,
+      ..._tag(),
     ],
   );
   return offlineId;
 };
 
-export const getPendingOrders = () =>
-  dbQuery("SELECT * FROM offline_orders WHERE sync_status = 'pending' ORDER BY created_at");
+/** The local ticket for a queued order really printed: tell the server not to print it again. */
+export const markOfflineOrderLocallyPrinted = (offlineId) =>
+  dbExec(
+    "UPDATE offline_orders SET local_print_fired = 1 WHERE offline_id = ? AND sync_status != 'synced'",
+    [offlineId],
+  );
+
+export const getPendingOrders = async () => {
+  await _ensureClaimed();
+  return dbQuery(
+    `SELECT * FROM offline_orders WHERE sync_status = 'pending' AND ${OWNER_SQL} ORDER BY id`,
+    _ownerParams(),
+  );
+};
 
 export const updateOfflineOrderStatus = (offlineId, status) =>
   dbExec('UPDATE offline_orders SET status = ? WHERE offline_id = ?', [status, offlineId]);
@@ -206,13 +300,16 @@ export const markOrderError = (offlineId, error) =>
 // ── Offline Payments ──────────────────────────────────────────────────────────
 
 export const saveOfflinePayment = async (paymentData) => {
-  const offlineId = newOfflineId();
+  // Same id as the online attempt (if any), so a payment the server already took
+  // is recognised at sync instead of being recorded twice.
+  const offlineId = paymentData.offline_id || newOfflineId();
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `INSERT INTO offline_payments
-        (offline_id, order_id, order_number, amount, payment_method, reference_number, notes, created_at, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        (offline_id, order_id, order_number, amount, payment_method, reference_number, notes, created_at, sync_status,
+         owner_user_id, owner_restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       [
         offlineId,
         paymentData.order_id || null,
@@ -222,6 +319,7 @@ export const saveOfflinePayment = async (paymentData) => {
         paymentData.reference_number || '',
         paymentData.notes || '',
         now(),
+        ..._tag(),
       ],
     );
     // Also update the cached server order so that if the app restarts while offline
@@ -260,13 +358,14 @@ export const saveOfflinePayment = async (paymentData) => {
 
 /** Save a payment for an offline-pending order (no server order ID yet). */
 export const saveOfflinePaymentForOfflineOrder = async (paymentData) => {
-  const offlineId = newOfflineId();
+  const offlineId = paymentData.offline_id || newOfflineId();
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `INSERT INTO offline_payments
-        (offline_id, offline_order_ref, order_id, order_number, amount, payment_method, reference_number, notes, created_at, sync_status)
-       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'pending')`,
+        (offline_id, offline_order_ref, order_id, order_number, amount, payment_method, reference_number, notes, created_at, sync_status,
+         owner_user_id, owner_restaurant_id)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       [
         offlineId,
         paymentData.offline_order_ref,
@@ -276,6 +375,7 @@ export const saveOfflinePaymentForOfflineOrder = async (paymentData) => {
         paymentData.reference_number || '',
         paymentData.notes || '',
         now(),
+        ..._tag(),
       ],
     );
     const orderRows = await db.getAllAsync(
@@ -296,17 +396,58 @@ export const saveOfflinePaymentForOfflineOrder = async (paymentData) => {
   return offlineId;
 };
 
-export const getPendingPayments = () =>
-  dbQuery("SELECT * FROM offline_payments WHERE sync_status = 'pending' ORDER BY created_at");
+export const getPendingPayments = async () => {
+  await _ensureClaimed();
+  return dbQuery(
+    `SELECT * FROM offline_payments WHERE sync_status = 'pending' AND ${OWNER_SQL} ORDER BY id`,
+    _ownerParams(),
+  );
+};
 
-export const getAllOfflinePayments = () =>
-  dbQuery("SELECT * FROM offline_payments WHERE sync_status != 'synced' ORDER BY created_at DESC LIMIT 100");
+export const getAllOfflinePayments = async () => {
+  await _ensureClaimed();
+  return dbQuery(
+    `SELECT * FROM offline_payments WHERE sync_status != 'synced' AND ${OWNER_SQL} ORDER BY created_at DESC LIMIT 100`,
+    _ownerParams(),
+  );
+};
 
 export const markPaymentSynced = (offlineId, serverPaymentId) =>
   dbExec(
     "UPDATE offline_payments SET sync_status = 'synced', server_payment_id = ? WHERE offline_id = ?",
     [serverPaymentId, offlineId],
   );
+
+/** The server could not record this offline payment (the order was already fully paid).
+ *  Finished: not retried. The cashier is told to settle/refund with the customer. */
+export const markPaymentNotRecorded = (offlineId, message) =>
+  dbExec(
+    "UPDATE offline_payments SET sync_status = 'not_recorded', error_message = ? WHERE offline_id = ?",
+    [message || 'Not recorded: the order was already fully paid', offlineId],
+  );
+
+/** Unsynced "add items" rows (this user's) for these server orders: { orderId: 'pending'|'error' }.
+ *  A payment for such an order waits until its added items are on the server. */
+export const getUnsyncedAppendStatuses = async (orderIds) => {
+  const ids = [...new Set((orderIds || []).filter((x) => x != null))];
+  if (!ids.length) return {};
+  await _ensureClaimed();
+  const out = {};
+  for (let i = 0; i < ids.length; i += 500) {
+    const batch = ids.slice(i, i + 500);
+    const rows = await dbQuery(
+      `SELECT existing_order_id, sync_status FROM offline_orders
+       WHERE existing_order_id IN (${batch.map(() => '?').join(',')})
+         AND sync_status IN ('pending', 'error') AND ${OWNER_SQL}`,
+      [...batch, ..._ownerParams()],
+    );
+    for (const r of rows) {
+      // 'pending' wins: it may still sync this run or the next
+      if (out[r.existing_order_id] !== 'pending') out[r.existing_order_id] = r.sync_status;
+    }
+  }
+  return out;
+};
 
 export const markPaymentError = (offlineId, error) =>
   dbExec(
@@ -319,14 +460,20 @@ export const markPaymentError = (offlineId, error) =>
 export const saveOfflineBillRequest = async (tableId) => {
   const offlineId = newOfflineId();
   await dbExec(
-    "INSERT INTO offline_bill_requests (offline_id, table_id, created_at, sync_status) VALUES (?, ?, ?, 'pending')",
-    [offlineId, tableId, now()],
+    `INSERT INTO offline_bill_requests (offline_id, table_id, created_at, sync_status, owner_user_id, owner_restaurant_id)
+     VALUES (?, ?, ?, 'pending', ?, ?)`,
+    [offlineId, tableId, now(), ..._tag()],
   );
   return offlineId;
 };
 
-export const getPendingBillRequests = () =>
-  dbQuery("SELECT * FROM offline_bill_requests WHERE sync_status = 'pending' ORDER BY created_at");
+export const getPendingBillRequests = async () => {
+  await _ensureClaimed();
+  return dbQuery(
+    `SELECT * FROM offline_bill_requests WHERE sync_status = 'pending' AND ${OWNER_SQL} ORDER BY id`,
+    _ownerParams(),
+  );
+};
 
 export const markBillRequestSynced = (offlineId, serverId) =>
   dbExec(
@@ -594,8 +741,10 @@ export const getOrderById = async (id) => {
  * ALL orders — both cached server orders and unsynced local ones.
  */
 export const getOfflinePendingOrders = async () => {
+  await _ensureClaimed();
   const rows = await dbQuery(
-    "SELECT * FROM offline_orders WHERE sync_status IN ('pending', 'error') ORDER BY created_at DESC"
+    `SELECT * FROM offline_orders WHERE sync_status IN ('pending', 'error') AND ${OWNER_SQL} ORDER BY created_at DESC`,
+    _ownerParams(),
   );
 
   if (!rows.length) return [];
@@ -634,7 +783,8 @@ export const getOfflinePendingOrders = async () => {
 
   // ── 4. Batch-load all pending payments for offline orders (one query) ─────
   const allPayments = await dbQuery(
-    "SELECT * FROM offline_payments WHERE sync_status = 'pending' ORDER BY created_at ASC", []
+    `SELECT * FROM offline_payments WHERE sync_status = 'pending' AND ${OWNER_SQL} ORDER BY created_at ASC`,
+    _ownerParams(),
   );
   const paymentsByRef = {};
   for (const p of allPayments) {
@@ -779,14 +929,18 @@ export const getLocalReportStats = async () => {
 
 export async function saveOfflineStatusChange(orderId, newStatus) {
   await dbExec(
-    "INSERT INTO offline_status_changes (order_id, new_status, sync_status) VALUES (?, ?, 'pending')",
-    [orderId, newStatus],
+    `INSERT INTO offline_status_changes (order_id, new_status, sync_status, owner_user_id, owner_restaurant_id)
+     VALUES (?, ?, 'pending', ?, ?)`,
+    [orderId, newStatus, ..._tag()],
   );
 }
 
+// Replayed in the order they were made: by row id (created_at has 1-second resolution).
 export async function getPendingStatusChanges() {
+  await _ensureClaimed();
   return dbQuery(
-    "SELECT * FROM offline_status_changes WHERE sync_status = 'pending' ORDER BY created_at ASC",
+    `SELECT * FROM offline_status_changes WHERE sync_status = 'pending' AND ${OWNER_SQL} ORDER BY id ASC`,
+    _ownerParams(),
   );
 }
 
@@ -797,12 +951,64 @@ export async function markStatusChangeSynced(id) {
   );
 }
 
-export async function markStatusChangeError(id) {
+/** The server refused this change for good (e.g. the order was cancelled meanwhile).
+ *  'failed' is never reset to pending, so it is not resent on every sync. */
+export async function markStatusChangeError(id, message = '') {
   await dbExec(
-    "UPDATE offline_status_changes SET sync_status = 'error' WHERE id = ?",
-    [id],
+    "UPDATE offline_status_changes SET sync_status = 'failed', error_message = ? WHERE id = ?",
+    [message || 'Rejected by the server', id],
   );
 }
+
+/** Everything still waiting to be sent for the logged-in user (same rows the sync sends). */
+export const countPendingQueue = async () => {
+  await _ensureClaimed();
+  const p = _ownerParams();
+  const counts = await Promise.all(QUEUE_TABLES.map((table) =>
+    dbQuery(`SELECT COUNT(*) AS cnt FROM ${table} WHERE sync_status = 'pending' AND ${OWNER_SQL}`, p),
+  ));
+  return counts.reduce((sum, rows) => sum + (rows[0]?.cnt || 0), 0);
+};
+
+/** Everything of the logged-in user not on the server yet — orders, payments, bill
+ *  requests and status changes, waiting or in error (for the logout warning). */
+export const countUnsentItems = async () => {
+  await _ensureClaimed();
+  const p = _ownerParams();
+  const counts = await Promise.all(QUEUE_TABLES.map((table) =>
+    dbQuery(`SELECT COUNT(*) AS cnt FROM ${table} WHERE sync_status IN ('pending', 'error') AND ${OWNER_SQL}`, p),
+  ));
+  return counts.reduce((sum, rows) => sum + (rows[0]?.cnt || 0), 0);
+};
+
+/** Unsent rows on this phone that belong to OTHER accounts or restaurants (or are not yet
+ *  claimed). Only their owner can send them; shown to owners/managers as a reminder. */
+export const countOtherAccountsUnsent = async () => {
+  await _ensureClaimed();
+  const p = _ownerParams();
+  const counts = await Promise.all(QUEUE_TABLES.map((table) =>
+    dbQuery(
+      `SELECT COUNT(*) AS cnt FROM ${table} WHERE sync_status IN ('pending', 'error')
+         AND NOT (IFNULL(owner_user_id, -2) = ? AND IFNULL(owner_restaurant_id, 0) = ?)`,
+      p,
+    ),
+  ));
+  return counts.reduce((sum, rows) => sum + (rows[0]?.cnt || 0), 0);
+};
+
+// ── Sync notices (kept until dismissed, across app restarts) ─────────────────
+const NOTICES_KEY = 'sync_notices';
+
+export const getSyncNotices = async () => {
+  try {
+    const list = JSON.parse((await getSyncMeta(NOTICES_KEY)) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveSyncNotices = (list) => setSyncMeta(NOTICES_KEY, JSON.stringify((list || []).slice(-200)));
 
 // ── Cached Delivery Assignments ───────────────────────────────────────────────
 
@@ -837,12 +1043,14 @@ export async function getCachedAssignments() {
 // ── Security: clear all user-specific local data on logout ───────────────────
 // Must be called every time a user logs out to prevent data leaking to the
 // next user who logs in on the same device (different user, different restaurant).
+// The offline queue (offline_orders / offline_payments / offline_bill_requests /
+// offline_status_changes) is deliberately KEPT: a logout can be automatic (401 after
+// the token was replaced by another login or expired), and deleting the queue would
+// lose unsent sales. Queued rows are tagged with their user + restaurant and are only
+// shown to and synced by that same user (see setQueueOwner).
 export const clearAllUserData = async () => {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM offline_orders');
-    await db.runAsync('DELETE FROM offline_payments');
-    await db.runAsync('DELETE FROM offline_bill_requests');
     await db.runAsync(
       "DELETE FROM sync_meta WHERE key IN ('menu_json', 'menu_last_synced', 'tables_last_synced', 'last_sync', 'cashier_report_cache', 'cashier_report_cache_ts', 'cashier_report_cache_period', 'cc_report_cache', 'cc_report_cache_ts')"
     );
@@ -850,7 +1058,6 @@ export const clearAllUserData = async () => {
     await db.runAsync('DELETE FROM products');
     await db.runAsync('DELETE FROM tables');
     await db.runAsync('DELETE FROM orders');
-    await db.runAsync('DELETE FROM offline_status_changes');
     await db.runAsync('DELETE FROM cached_assignments');
   });
 };

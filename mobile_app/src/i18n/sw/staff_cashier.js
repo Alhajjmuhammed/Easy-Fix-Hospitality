@@ -155,4 +155,38 @@ export default {
   'No table': 'Hakuna meza',
   'Add booking': 'Ongeza uhifadhi',
   'People': 'Watu',
+
+  // Offline queue / sync notices
+  'You have {count} unsent items (orders, payments, requests). They stay on this phone, but only you can send them — log in again on this phone to send them.':
+    'Una vitu {count} ambavyo havijatumwa (oda, malipo, maombi). Vinabaki kwenye simu hii, lakini ni wewe tu unayeweza kuvituma — ingia tena kwenye simu hii ili uvitume.',
+  'Order {number}: offline payment of {amount} could not be recorded because the order was already fully paid. Settle or refund with the customer.':
+    'Oda {number}: malipo ya nje ya mtandao ya {amount} hayakuweza kurekodiwa kwa sababu oda ilikuwa imeshalipwa yote. Malizana au mrudishie mteja.',
+  '{count} unsent items from other accounts on this phone. Only those users can send them, by logging in on this phone.':
+    'Vitu {count} ambavyo havijatumwa vya akaunti nyingine viko kwenye simu hii. Ni watumiaji hao tu wanaoweza kuvituma, kwa kuingia kwenye simu hii.',
+  'Sync notices': 'Taarifa za usawazishaji',
+  'Dismiss all': 'Ondoa zote',
+  'Order {number}: {count} item(s) were unavailable and removed at sync.':
+    'Oda {number}: bidhaa {count} hazikupatikana na ziliondolewa wakati wa kutuma.',
+  'Order {number}: the total changed at sync from {old} to {total}. Check with the customer.':
+    'Oda {number}: jumla ilibadilika wakati wa kutuma kutoka {old} hadi {total}. Hakikisha na mteja.',
+  'Order {number}: {count} item price(s) changed at sync.':
+    'Oda {number}: bei za bidhaa {count} zilibadilika wakati wa kutuma.',
+  'Order {number} changed at sync. Check it before taking payment.':
+    'Oda {number} ilibadilika wakati wa kutuma. Ikague kabla ya kupokea malipo.',
+  'Order {number}: offline payment of {amount} was recorded as {recorded} because the order total changed. {difference} difference — settle with the customer.':
+    'Oda {number}: malipo ya nje ya mtandao ya {amount} yamerekodiwa kama {recorded} kwa sababu jumla ya oda ilibadilika. Tofauti ya {difference} — malizana na mteja.',
+  'Order {number}: the status change to "{status}" made offline was refused: {error}':
+    'Oda {number}: mabadiliko ya hali kuwa "{status}" yaliyofanywa bila mtandao yamekataliwa: {error}',
+  'The server refused {count} queued item(s): {error}. They stay on this phone and are shown as sync errors. Contact support if this continues.':
+    'Seva imekataa vitu {count} vilivyokuwa vikisubiri: {error}. Vinabaki kwenye simu hii na vinaonyeshwa kama makosa ya kutuma. Wasiliana na msaada tatizo likiendelea.',
+  'Waiting to sync': 'Inasubiri kutumwa',
+  'Waiting to sync – the status can be changed once the order is sent':
+    'Inasubiri kutumwa – hali inaweza kubadilishwa oda ikishatumwa',
+  'Connection lost – items saved on this phone and will be added when online':
+    'Mtandao umekatika – bidhaa zimehifadhiwa kwenye simu hii na zitaongezwa mtandao ukirudi',
+  'Connection lost – order saved on this phone and will sync automatically':
+    'Mtandao umekatika – oda imehifadhiwa kwenye simu hii na itatumwa yenyewe',
+  'Connection lost – payment saved on this phone and will sync automatically':
+    'Mtandao umekatika – malipo yamehifadhiwa kwenye simu hii na yatatumwa yenyewe',
+  'Sync in progress – try again in a moment': 'Inatuma sasa – jaribu tena baada ya muda mfupi',
 };

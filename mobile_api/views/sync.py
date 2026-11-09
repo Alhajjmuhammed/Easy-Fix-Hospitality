@@ -263,6 +263,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
     )
 
     dropped_items = []
+    price_changes = []  # server price always wins; the app is told what changed
     for i in items:
         try:
             qty = int(i.get('quantity', 1))
@@ -283,6 +284,7 @@ def _sync_order_atomic(user, owner, data, offline_id):
         else:
             fn = getattr(product, 'get_current_price', None)
             server_price = float(fn()) if fn else float(product.price)
+            _note_price_change(price_changes, product, i, server_price)
             _line = OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -326,11 +328,35 @@ def _sync_order_atomic(user, owner, data, offline_id):
         order.save(update_fields=['status', 'reason_if_cancelled'])
         order.release_table()  # the table was occupied above; a cancelled order frees it
 
-    result = {'status': 'created', 'order_id': order.id, 'order_number': order.order_number}
-    if dropped_items:
-        result['warning'] = f'{len(dropped_items)} item(s) were unavailable and removed from the order.'
-        result['dropped_item_ids'] = dropped_items
+    result = {'status': 'created', 'order_id': order.id, 'order_number': order.order_number,
+              'total_amount': str(order.total_amount)}
+    _add_change_warnings(result, dropped_items, price_changes)
     return result
+
+
+def _note_price_change(price_changes, product, item, server_price):
+    """Record a line whose offline (client) price differs from the server price used."""
+    raw = item.get('unit_price') or item.get('price')
+    try:
+        client_price = float(raw) if raw not in (None, '') else None
+    except (TypeError, ValueError):
+        client_price = None
+    if client_price is not None and abs(client_price - server_price) > 0.005:
+        price_changes.append({'product_id': product.id, 'name': product.name,
+                              'client_price': client_price, 'server_price': server_price})
+
+
+def _add_change_warnings(result, dropped_items, price_changes):
+    """Tell the app what differs from what the cashier saw offline (old apps ignore it)."""
+    parts = []
+    if dropped_items:
+        parts.append(f'{len(dropped_items)} item(s) were unavailable and removed from the order.')
+        result['dropped_item_ids'] = dropped_items
+    if price_changes:
+        parts.append(f'{len(price_changes)} item price(s) changed since the order was taken offline.')
+        result['price_changes'] = price_changes
+    if parts:
+        result['warning'] = ' '.join(parts)
 
 
 def _sync_order_append(user, owner, data, offline_id, existing_order_id):
@@ -358,6 +384,10 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
     ).first()
     if not order or (user.is_customer() and order.ordered_by_id != user.id):
         return {'status': 'error', 'error': f'Order #{existing_order_id} not found.'}
+    # Re-check under the row lock: an online add-items with the same client_id may have
+    # held the lock and stamped the tag after the unlocked check above.
+    if dedup_tag in (order.special_instructions or ''):
+        return {'status': 'duplicate', 'order_id': order.id, 'order_number': order.order_number}
     TERMINAL_STATUSES = {'cancelled', 'delivered', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted', 'out_for_delivery'}
     if order.status in TERMINAL_STATUSES:
         return {'status': 'error', 'error': f'Cannot add items to an order with status {order.status}.'}
@@ -369,6 +399,8 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
         return {'status': 'error', 'error': 'No items provided.'}
 
     new_items = []
+    dropped_items = []
+    price_changes = []
     for i in items:
         try:
             qty = max(1, min(int(i.get('quantity', 1)), 100))
@@ -381,9 +413,12 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
             id=i.get('product_id'),
             is_available=True,
         ).first()
+        if not product:
+            dropped_items.append(i.get('product_id'))
         if product:
             fn = getattr(product, 'get_current_price', None)
             unit_price = float(fn()) if fn else float(product.price)
+            _note_price_change(price_changes, product, i, unit_price)
             oi = OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -423,7 +458,17 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
         except Exception:
             pass
 
-    return {'status': 'created', 'order_id': order.id, 'order_number': order.order_number}
+    result = {'status': 'created', 'order_id': order.id, 'order_number': order.order_number,
+              'total_amount': str(order.total_amount)}
+    _add_change_warnings(result, dropped_items, price_changes)
+    return result
+
+
+def _capped_message(capped):
+    # Worded so nobody refunds before checking: the difference may be items still syncing.
+    return (f'Offline payment {capped["amount_requested"]} recorded as {capped["amount_recorded"]} — '
+            f'order total changed at sync. Check the order before settling the '
+            f'{capped["difference"]} difference with the customer.')
 
 
 def _sync_payment(user, owner, data):
@@ -508,8 +553,30 @@ def _sync_payment(user, owner, data):
             return {'status': 'error', 'error': f'Cannot process payment for a {order.status} order.'}
         already_paid = order.payments.filter(is_voided=False).aggregate(t=_Sum2('amount'))['t'] or Decimal('0.00')
         remaining = order.total_amount - already_paid
+        capped = None
         if amount > remaining:
-            return {'status': 'error', 'error': f'Payment amount ({amount}) exceeds remaining balance ({remaining}).'}
+            # Money taken offline against the total the phone showed. If the order total
+            # changed at sync (price change, item unavailable, edit on the web) it no longer
+            # fits: refusing would retry forever and the cash would never be recorded.
+            # Record what is still owed and flag the difference for the cashier to settle.
+            # Only for real offline payments (offline_id); nothing is owed → still refused.
+            if offline_id and remaining <= 0 and data.get('accepts_not_recorded'):
+                # Money taken offline for an order that is already fully paid (e.g. a second
+                # offline payment after the first was capped, or paid online meanwhile).
+                # Nothing can be recorded; tell the app once so it stops retrying.
+                # Builds that do not send accepts_not_recorded keep the old 'error' shape:
+                # they would treat an unknown status as an error anyway.
+                return {
+                    'status': 'not_recorded', 'order_id': order.id, 'order_number': order.order_number,
+                    'amount_requested': str(amount),
+                    'warning': (f'Offline payment {amount} could not be recorded: the order was already '
+                                f'fully paid — settle/refund with the customer.'),
+                }
+            if not offline_id or remaining <= 0:
+                return {'status': 'error', 'error': f'Payment amount ({amount}) exceeds remaining balance ({remaining}).'}
+            capped = {'amount_requested': amount, 'amount_recorded': remaining, 'difference': amount - remaining}
+            notes = (f'{notes} {_capped_message(capped)}').strip()
+            amount = remaining
 
         payment = Payment.objects.create(
             order=order,
@@ -535,7 +602,19 @@ def _sync_payment(user, owner, data):
     except Exception as e:
         logger.warning('WS notify failed for synced payment: %s', e)
 
-    return {'status': 'created', 'payment_id': payment.id}
+    result = {'status': 'created', 'payment_id': payment.id}
+    if capped:
+        logger.warning('Offline payment %s capped at sync: order %s requested %s recorded %s',
+                       offline_id, order.order_number, capped['amount_requested'], capped['amount_recorded'])
+        result.update({
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'amount_requested': str(capped['amount_requested']),
+            'amount_recorded': str(capped['amount_recorded']),
+            'difference': str(capped['difference']),
+            'warning': _capped_message(capped),
+        })
+    return result
 
 
 def _sync_bill_request(user, owner, data):
