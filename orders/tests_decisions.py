@@ -196,3 +196,50 @@ class ReviewFixTests(Base):
         give_back_order(s)                                                    # served: food is gone
         self.pk_.refresh_from_db()
         self.assertEqual(self.pk_.available_in_stock, 52)
+
+
+class SecondReviewTests(Base):
+    """Follow-up review of the decisions deploy."""
+
+    def test_no_stock_warning_for_dishes_whose_stock_is_not_counted(self):
+        Product.objects.filter(pk=self.pk_.pk).update(available_in_stock=0)   # never counted
+        r = api(self.cashier).post('/api/v1/orders/', {'table_id': self.t1.id, 'order_type': 'dine-in',
+                                                     'items': [{'product_id': self.pk_.id, 'quantity': 3,
+                                                                'price': float(self.pk_.price)}]}, format='json')
+        self.assertIn(r.status_code, (200, 201), r.content)
+        line = OrderItem.objects.get(order__ordered_by=self.cashier, product=self.pk_)
+        self.assertEqual((line.stock_taken, line.stock_short), (0, 0))
+        self.client.force_login(self.kitchen)
+        self.assertNotIn('in stock', self.client.get('/orders/kitchen/').content.decode())
+
+    def test_order_with_mobile_money_record_is_not_half_deleted(self):
+        from cashier.models_mobile_money import MobileMoneyAccount, MobileMoneyCharge
+        o = self.order([(self.pk_, 2)], status='preparing')
+        acc = MobileMoneyAccount.objects.create(owner=self.main, provider='mpesa_daraja')
+        MobileMoneyCharge.objects.create(account=acc, order=o, amount=1, currency='KES', phone='254712345678',
+                                         reference='R-DEL-1', status='failed')
+        self.pay(o, '100')
+        self.client.force_login(self.main)
+        r = self.client.post(f'/admin-panel/orders/delete/{o.id}/').json()
+        self.assertFalse(r['success'])
+        self.assertIn('mobile money', r['message'])                         # refused for that reason
+        self.assertTrue(Order.objects.filter(pk=o.pk).exists())
+        self.assertEqual(Payment.objects.filter(order=o).count(), 1)          # payment kept
+        self.pk_.refresh_from_db()
+        self.assertEqual(self.pk_.available_in_stock, 50)                     # stock untouched
+
+    def test_system_admin_status_cancel_follows_cancel_rules(self):
+        admin = User.objects.create_user('sysadm', password='pw12345!x', role=role('administrator'))
+        o = self.order([(self.pk_, 2)], status='preparing')
+        self.client.force_login(admin)
+        r = self.client.post(f'/system-admin/update-order-status/{o.id}/', json.dumps({'status': 'cancelled', 'reason': 'x'}),
+                             content_type='application/json').json()
+        self.assertTrue(r['success'], r)
+        self.pk_.refresh_from_db()
+        self.assertEqual(self.pk_.available_in_stock, 52)
+        paid = self.order([(self.pk_, 1)], status='preparing')
+        self.pay(paid, paid.total_amount)
+        self.client.force_login(admin)
+        r = self.client.post(f'/system-admin/update-order-status/{paid.id}/', json.dumps({'status': 'cancelled'}),
+                             content_type='application/json').json()
+        self.assertFalse(r['success'])

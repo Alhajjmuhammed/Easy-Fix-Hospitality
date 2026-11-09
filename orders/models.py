@@ -245,8 +245,11 @@ class OrderItem(models.Model):
 
     @property
     def stock_short(self):
-        """How many of this line were ordered beyond the stock that was left (0 = all in stock)."""
-        if self.stock_taken is None:
+        """How many of this line were ordered beyond the stock that was left (0 = no warning).
+
+        Only when the dish HAD some stock but not enough. A dish at 0 can't be told apart from a
+        dish whose stock the restaurant doesn't count (every dish starts at 0), so it never warns."""
+        if not self.stock_taken:               # None (older line) or 0 (not counted / already out)
             return 0
         return max(0, self.quantity - self.stock_taken)
     

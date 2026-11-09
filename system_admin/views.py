@@ -2587,6 +2587,7 @@ def order_details(request, order_id):
     return render(request, 'system_admin/order_details.html', context)
 
 @login_required
+@transaction.atomic                       # row lock + cancel side effects together
 def update_order_status(request, order_id):
     """Update order status"""
     if not _can_access(request.user, 'orders', 'edit'):
@@ -2606,9 +2607,19 @@ def update_order_status(request, order_id):
             if new_status not in valid_statuses:
                 return JsonResponse({'success': False, 'message': 'Invalid status'})
             
-            order = get_object_or_404(Order, id=order_id)
+            get_object_or_404(Order, id=order_id)
+            order = Order.objects.select_for_update(of=('self',)).get(pk=order_id)
             old_status = order.status
-            
+
+            # Cancelling here follows the same rules as the Cancel button: money must be voided
+            # at the cashier first, kitchen stock comes back, the table is freed
+            if new_status == 'cancelled' and old_status != 'cancelled':
+                if order.payments.filter(is_voided=False).exists():
+                    return JsonResponse({'success': False, 'message': 'This order has a payment. Void the payment at the cashier first, then cancel.'})
+                from orders.stock import give_back_order
+                give_back_order(order)
+                order.release_table()
+
             # Update status
             order.status = new_status
             

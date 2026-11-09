@@ -4127,10 +4127,13 @@ def delete_order(request, order_id):
                     return JsonResponse({'success': False, 'message': 'No restaurant context found.'})
 
         order_number = order.order_number
+        if order.mobile_money_charges.exists():
+            return JsonResponse({'success': False, 'message': 'This order has a mobile money payment record, which must be kept. Cancel the order instead of deleting it.'})
         _cleanup_order_dependencies([order.id])
         from orders.stock import give_back_order
         give_back_order(order)                    # an order deleted while still in the kitchen
-        order.release_table()
+        if order.is_table_occupying():
+            order.release_table()                 # only an order that was holding the table
         order.delete()
 
         return JsonResponse({
@@ -4139,6 +4142,8 @@ def delete_order(request, order_id):
         })
 
     except Exception as e:
+        # Undo everything done before the error (payments, stock, table) — the order still exists
+        transaction.set_rollback(True)
         logger.error(f'Error deleting order: {str(e)}')
         return JsonResponse({'success': False, 'message': 'Error deleting order. Please try again.'})
 
@@ -4222,6 +4227,10 @@ def bulk_delete_orders(request):
         order_numbers = list(orders_to_delete.values_list('order_number', flat=True))
         order_ids = list(orders_to_delete.values_list('id', flat=True))
 
+        from cashier.models_mobile_money import MobileMoneyCharge
+        if MobileMoneyCharge.objects.filter(order_id__in=order_ids).exists():
+            return JsonResponse({'success': False, 'error': 'Some of these orders have a mobile money payment record, which must be kept. Cancel those orders instead of deleting it.'})
+
         # Clean up all PROTECT FK chains before bulk deletion
         _cleanup_order_dependencies(order_ids)
 
@@ -4229,7 +4238,8 @@ def bulk_delete_orders(request):
         from orders.stock import give_back_order
         for _o in orders_to_delete.prefetch_related('order_items'):
             give_back_order(_o)                   # orders deleted while still in the kitchen
-            _o.release_table()
+            if _o.is_table_occupying():
+                _o.release_table()                # only orders that were holding a table
         deleted_count, deleted_details = orders_to_delete.delete()
         
         # Log the deletion
@@ -4249,6 +4259,7 @@ def bulk_delete_orders(request):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON data.'})
     except Exception as e:
+        transaction.set_rollback(True)            # nothing half-deleted
         logger.error(f"Error in bulk delete orders: {str(e)}")
         return JsonResponse({'success': False, 'error': 'An error occurred while deleting orders.'})
 
