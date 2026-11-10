@@ -11,8 +11,8 @@ export default function OrderConfirmationScreen({ route, navigation }) {
   const theme = useTheme();
   const t = useT();
   const { format } = useCurrency();
-  const { setRestaurant } = useAuthStore();
-  const { clearCart } = useCartStore();
+  const { setRestaurant, restaurantId } = useAuthStore();
+  const { clearCart, setRemoteOrder } = useCartStore();
   const { order } = route.params || {};
 
   const isRemote = order?.order_type === 'delivery' || order?.order_type === 'pickup';
@@ -29,12 +29,28 @@ export default function OrderConfirmationScreen({ route, navigation }) {
   };
 
   const handleOrderAgain = async () => {
-    // For remote orders: clear the saved restaurant so RestaurantSelector
-    // doesn't skip straight to TableSelection, then go pick a restaurant again.
     if (isRemote) {
-      try { await setRestaurant(null); } catch { /* ignore */ }
+      // Same rule as "Order Again" in My Orders: order again at the restaurant this
+      // order belongs to, with the same order type. Unknown restaurant (older server):
+      // let the customer choose it again.
+      const rid = order?.restaurant_id ?? restaurantId;
       clearCart();
-      navigation.reset({ index: 0, routes: [{ name: 'RestaurantSelector' }] });
+      if (rid === undefined || rid === null) {
+        navigation.reset({ index: 0, routes: [{ name: 'RestaurantSelector' }] });
+        return;
+      }
+      try { await setRestaurant(rid); } catch { /* ignore */ }
+      setRemoteOrder(rid, order.order_type);
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'RestaurantSelector' },
+          order.order_type === 'delivery'
+            // Delivery always asks for a fresh address
+            ? { name: 'DeliveryInfo', params: { restaurant: { id: rid }, orderType: 'delivery' } }
+            : { name: 'Menu' },
+        ],
+      });
     } else {
       // Dine-in: go back to table selection to pick a table
       clearCart();

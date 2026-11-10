@@ -5,6 +5,7 @@ RolePermissionSets and CustomRoles without logging in as that restaurant.
 """
 import datetime
 import json
+from accounts.security_utils import sanitize_name, sanitize_plain_text
 import logging
 
 from django.contrib.auth.decorators import login_required
@@ -66,7 +67,8 @@ def restaurant_permissions(request, restaurant_id):
             rps.features.set([feature_cache[s] for s in defaults if s in feature_cache])
         role_sets_json_data[role_name] = list(rps.features.values_list('slug', flat=True))
 
-    role_sets_json = json.dumps(role_sets_json_data)
+    # Python objects: the template emits them with |json_script (escapes < > &).
+    role_sets_json = role_sets_json_data
 
     custom_roles = CustomRole.objects.filter(owner=owner).prefetch_related('features')
 
@@ -81,7 +83,7 @@ def restaurant_permissions(request, restaurant_id):
         }
         for cr in custom_roles
     ]
-    custom_roles_json = json.dumps(custom_roles_data)
+    custom_roles_json = custom_roles_data
 
     staff = (
         User.objects.filter(owner=owner)
@@ -182,8 +184,9 @@ def admin_create_custom_role(request, restaurant_id):
 
     try:
         data = json.loads(request.body)
-        name = (data.get('name') or '').strip()
-        description = (data.get('description') or '').strip()
+        # Plain text only: role names/descriptions are shown in owner and system-admin pages.
+        name = sanitize_name(data.get('name') or '', max_length=100)
+        description = sanitize_plain_text(data.get('description') or '', max_length=255)
         slugs = data.get('feature_slugs', [])
         role_id = data.get('role_id')
 

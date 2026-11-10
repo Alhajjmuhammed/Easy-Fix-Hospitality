@@ -823,7 +823,8 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
             <div class="kds-bar-right">
                 <div class="kds-refresh-pill" id="refreshTimer">
                     <i class="fas fa-sync-alt" id="refreshIcon"></i>
-                    {% translate "Refresh in" %} <span class="kds-refresh-num" id="countdown">15</span>{% translate "s" context "seconds" %}
+                    <span id="refreshCountdown">{% translate "Refresh in" %} <span class="kds-refresh-num" id="countdown">15</span>{% translate "s" context "seconds" %}</span>
+                    <span id="refreshLive" style="display:none">{% translate "Instant updates on" %}</span>
                 </div>
                 <a href="{% url 'orders:kitchen_reports' %}" class="kds-report-btn">
                     <i class="fas fa-chart-bar"></i> {% translate "Reports" %}
@@ -838,25 +839,48 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
 
 {% block extra_js %}
 <script>
-// ── Always-on 15-second auto-refresh countdown ───────────────────────────────
+// ── Refresh: the WebSocket pushes changes; the 15-second reload runs only while it is
+//    NOT connected (no socket for this page, or reconnecting), so a connected kitchen
+//    screen no longer reloads the whole dashboard every 15 s.
 (function() {
     var countdownEl = document.getElementById('countdown');
     var timerEl     = document.getElementById('refreshTimer');
     var iconEl      = document.getElementById('refreshIcon');
+    var cdWrapEl    = document.getElementById('refreshCountdown');
+    var liveEl      = document.getElementById('refreshLive');
     var INTERVAL    = 15;
+    var MIN_GAP_MS  = 5000;          // never reload more often than this from WS events
+    var loadedAt    = Date.now();
     var val         = INTERVAL;
     var wsConnected = false;
+    var everConnected = false;
+    var reloadTimer = null;
+
+    function showLive(on) {
+        if (cdWrapEl) cdWrapEl.style.display = on ? 'none' : '';
+        if (liveEl)   liveEl.style.display   = on ? '' : 'none';
+    }
 
     function tick() {
+        // Keep polling even while the WebSocket is connected: some changes (web cancel,
+        // item cancel, admin edit/delete) send no event, and a kitchen must never keep
+        // cooking a cancelled order. WS events only make updates faster.
         val--;
         if (countdownEl) countdownEl.textContent = val;
         if (val <= 0) { location.reload(); }
     }
     setInterval(tick, 1000);
 
-    // ── WebSocket for instant new-order notifications ─────────────────────
+    // Coalesce bursts of events into one reload, at most one per MIN_GAP_MS since load
+    function scheduleReload(delayMs) {
+        if (reloadTimer) return;
+        var wait = Math.max(delayMs, MIN_GAP_MS - (Date.now() - loadedAt));
+        reloadTimer = setTimeout(function() { location.reload(); }, wait);
+    }
+
+    // ── WebSocket for instant order notifications ─────────────────────────
     var ownerId = '{{ ws_owner_id }}';
-    if (!ownerId || ownerId === 'None') return;
+    if (!ownerId || ownerId === 'None') return;   // no socket: keep polling
 
     var wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     var wsUrl = wsScheme + '://' + window.location.host + '/ws/restaurant/' + ownerId + '/';
@@ -868,21 +892,30 @@ body { padding-top:0 !important; margin-top:0 !important; overflow-x:hidden; }
         ws.onopen = function() {
             wsConnected = true;
             reconnectDelay = 3000;
+            showLive(true);
             // Pill goes blue (normal) when connected
             if (timerEl)  { timerEl.classList.remove('reconnecting'); }
             if (iconEl)   { iconEl.style.animation = ''; }
+            // Back after a drop: events may have been missed meanwhile, so resync once
+            if (everConnected) { scheduleReload(1000); }
+            everConnected = true;
         };
 
         ws.onmessage = function(e) {
             try {
                 var data = JSON.parse(e.data);
                 if (data.type === 'new_order') { location.reload(); }
+                else if (data.type === 'order_status_update' || data.type === 'order_cancelled' ||
+                         data.type === 'order_updated') { scheduleReload(1500); }
             } catch (_) {}
         };
 
         ws.onclose = function(e) {
             wsConnected = false;
-            if (e.code === 4001 || e.code === 4003) return;
+            showLive(false);
+            val = INTERVAL;
+            if (countdownEl) countdownEl.textContent = val;
+            if (e.code === 4001 || e.code === 4003) return;   // refused: polling continues
             // Pill goes orange while reconnecting
             if (timerEl)  { timerEl.classList.add('reconnecting'); }
             if (iconEl)   { iconEl.style.animation = 'spin .85s linear infinite'; }

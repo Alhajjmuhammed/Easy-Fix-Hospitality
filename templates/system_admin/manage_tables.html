@@ -180,7 +180,7 @@
                                             </button>
                                             {% endif %}
                                             {% if can_delete %}
-                                            <button class="btn btn-sm btn-danger" onclick="deleteTable({{ table.id }}, '{{ table.tbl_no }}', '{{ table.display_restaurant_name }}')">
+                                            <button class="btn btn-sm btn-danger" onclick="deleteTable({{ table.id }}, '{{ table.tbl_no|escapejs }}', '{{ table.display_restaurant_name|escapejs }}')">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                             {% endif %}
@@ -599,7 +599,7 @@ function showAlert(type, message) {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
     alertDiv.innerHTML = `
-        ${message}
+        ${escapeHtml(message)}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     

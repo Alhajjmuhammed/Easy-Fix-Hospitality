@@ -183,8 +183,19 @@ class ProductSerializer(serializers.ModelSerializer):
             'image_url', 'updated_at', 'station',
         ]
 
+    @staticmethod
+    def _cache_promotion(obj):
+        # current_price and has_promotion both need the active promotion: look it up once
+        # per product (Product reads _active_promotion_cache; the result is the same).
+        if not hasattr(obj, '_active_promotion_cache') and hasattr(obj, 'get_active_promotion'):
+            try:
+                obj._active_promotion_cache = obj.get_active_promotion()
+            except Exception:
+                pass
+
     def get_current_price(self, obj):
         try:
+            self._cache_promotion(obj)
             fn = getattr(obj, 'get_current_price', None)
             return float(fn()) if fn else float(obj.price)
         except Exception:
@@ -195,6 +206,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_has_promotion(self, obj):
         try:
+            self._cache_promotion(obj)
             fn = getattr(obj, 'get_active_promotion', None)
             return fn() is not None if fn else False
         except Exception:
@@ -334,14 +346,37 @@ class OrderSerializer(serializers.ModelSerializer):
     delivery_lat = serializers.SerializerMethodField()
     delivery_lng = serializers.SerializerMethodField()
     delivery_fee = serializers.SerializerMethodField()
+    restaurant_id = serializers.SerializerMethodField()
 
     def get_delivery_fee(self, obj):
         return float(obj.delivery_fee or 0)
 
+    def get_restaurant_id(self, obj):
+        """Restaurant row this order belongs to: the table's restaurant; for a delivery/pickup
+        order (or a legacy owner-only table) the restaurant its owner account operates
+        (Restaurant.for_owner — restaurant_owner, else the ordering staff's owner, as in
+        restaurant_orders_q). None when it can't be told. Uses only FK ids already on the row;
+        for_owner is looked up once per owner per response (no N+1 in lists)."""
+        table = obj.table_info if obj.table_info_id else None
+        if table is not None:
+            if table.restaurant_id:
+                return table.restaurant_id
+            owner_id = table.owner_id
+        else:
+            owner_id = obj.restaurant_owner_id or (obj.ordered_by.owner_id if obj.ordered_by_id and obj.ordered_by else None)
+        if not owner_id:
+            return None
+        cache = self.context.setdefault('_restaurant_id_by_owner', {}) if isinstance(self.context, dict) else {}
+        if owner_id not in cache:
+            from restaurant.models_restaurant import Restaurant
+            r = Restaurant.for_owner(owner_id)      # filters by owner, so the id is enough
+            cache[owner_id] = r.id if r else None
+        return cache[owner_id]
+
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'table_info', 'table_number',
+            'id', 'order_number', 'restaurant_id', 'table_info', 'table_number',
             'ordered_by_name', 'ordered_by_id', 'ordered_by_role', 'confirmed_by_name', 'entered_by_name', 'status', 'payment_status',
             'order_type', 'delivery_address', 'delivery_phone', 'delivery_lat', 'delivery_lng',
             'delivery_fee',
@@ -490,9 +525,13 @@ class OrderSerializer(serializers.ModelSerializer):
         return data
 
 
+# Most lines one order may carry (online place-order and offline sync push alike).
+MAX_ORDER_ITEMS = 50
+
+
 class PlaceOrderSerializer(serializers.Serializer):
     table_id = serializers.IntegerField(required=False, allow_null=True)
-    items = serializers.ListField(child=serializers.DictField(), min_length=1)
+    items = serializers.ListField(child=serializers.DictField(), min_length=1, max_length=MAX_ORDER_ITEMS)
     special_instructions = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='', max_length=1000)
     offline_id = serializers.CharField(allow_blank=True, allow_null=True, required=False, default='', max_length=64)
     restaurant_id = serializers.IntegerField(required=False, allow_null=True)
@@ -586,7 +625,7 @@ class ProcessPaymentSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)
     payment_method = serializers.ChoiceField(choices=['cash', 'card', 'digital', 'voucher', 'loyalty'])
     loyalty_code = serializers.CharField(allow_blank=True, required=False, default='', max_length=12)
-    reference_number = serializers.CharField(allow_blank=True, required=False, default='', max_length=100)
+    reference_number = serializers.CharField(allow_blank=True, required=False, default='', max_length=50)  # Payment.reference_number is 50
     notes = serializers.CharField(allow_blank=True, required=False, default='', max_length=500)
     offline_id = serializers.CharField(allow_blank=True, required=False, default='', max_length=64)
 

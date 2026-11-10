@@ -1,0 +1,23 @@
+# Kiswahili: period filters, pagination and export limits (performance review 2026-11).
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Yesterday"
+msgstr "Jana"
+
+msgid "Last 90 days"
+msgstr "Siku 90 zilizopita"
+
+msgid "No orders in this period. Choose a longer period above."
+msgstr "Hakuna oda katika kipindi hiki. Chagua kipindi kirefu zaidi hapo juu."
+
+msgid "Instant updates on"
+msgstr "Masasisho ya papo hapo yamewashwa"
+
+msgid ""
+"This PDF lists the latest %(shown)s of %(total)s orders. The summary above covers all "
+"%(total)s orders. For every order use the CSV export, or choose a shorter period."
+msgstr ""
+"PDF hii inaonyesha oda %(shown)s za karibuni kati ya %(total)s. Muhtasari ulio juu unahusu "
+"oda zote %(total)s. Kwa kila oda tumia CSV, au chagua kipindi kifupi zaidi."

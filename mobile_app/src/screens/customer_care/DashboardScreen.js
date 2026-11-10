@@ -26,7 +26,7 @@ import SyncWarningsBanner from '../../components/SyncWarningsBanner';
 import { useCurrency } from '../../hooks/useCurrency';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceipt } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
 import { useT } from '../../i18n';
 
@@ -133,7 +133,7 @@ const bannerStyles = StyleSheet.create({
 export default function CCDashboardScreen({ navigation }) {
   const t = useT();
   const theme = useTheme();
-  const { format } = useCurrency();
+  const { format, decimals } = useCurrency();
   const { pendingCount, lastSyncTime } = useSyncStore();
   const { user } = useAuthStore();
 
@@ -250,7 +250,7 @@ export default function CCDashboardScreen({ navigation }) {
       setBillRequests((prev) => prev.filter((r) => r.id !== id));
       setSnack(t('Bill request marked as complete'));
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Could not complete request'));
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || t('Could not complete request'));
     } finally {
       if (mountedRef.current) setCompleting(null);
     }
@@ -267,7 +267,9 @@ export default function CCDashboardScreen({ navigation }) {
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
+      if (isPrinterUnreachable(ok)) { if (mountedRef.current) setSnack(t('Printer not reachable')); return; }
       if (ok && mountedRef.current) setSnack(t('Bill sent to printer'));
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('Unknown error') }));
@@ -301,7 +303,7 @@ export default function CCDashboardScreen({ navigation }) {
       setSnack(t('Order cancelled'));
       fetchAll(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Cancel failed'));
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || t('Cancel failed'));
     } finally {
       if (mountedRef.current) setCancelling(false);
     }
@@ -338,7 +340,7 @@ export default function CCDashboardScreen({ navigation }) {
       setSnack(t('Table transferred'));
       fetchAll(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Transfer failed'));
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || t('Transfer failed'));
     } finally {
       if (mountedRef.current) setTransferring(false);
     }
@@ -486,9 +488,14 @@ export default function CCDashboardScreen({ navigation }) {
                       }
                     >
                       <Menu.Item leadingIcon="printer" title={t('Print Bill')} disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
-                      <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled'} />
-                      <Divider />
-                      <Menu.Item leadingIcon="close-circle-outline" title={t('Cancel Order')} titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpenId(null); openCancel(order); }} disabled={order.status === 'cancelled' || isPaid} />
+                      <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled' || order.order_type === 'delivery' || order.order_type === 'pickup'} />
+                      {/* Customer care may cancel only pending orders (server rule) */}
+                      {order.status === 'pending' && !isPaid && (
+                        <>
+                          <Divider />
+                          <Menu.Item leadingIcon="close-circle-outline" title={t('Cancel Order')} titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpenId(null); openCancel(order); }} />
+                        </>
+                      )}
                     </Menu>
                   </View>
                 </View>

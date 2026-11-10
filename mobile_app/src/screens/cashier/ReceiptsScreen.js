@@ -8,17 +8,18 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { apiPayments, apiReprintReceipt, apiPaymentReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
-import { printReceipt } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getAllOfflinePayments, getOrderById } from '../../database/operations';
 import { useT } from '../../i18n';
+import { localIsoDate } from '../../utils/orderFilters';
 
 const METHOD_LABELS = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
 
 export default function CashierReceiptsScreen() {
   const theme = useTheme();
   const t = useT();
-  const { format } = useCurrency();
+  const { format, decimals } = useCurrency();
   const user = useAuthStore((s) => s.user);
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
@@ -47,7 +48,8 @@ export default function CashierReceiptsScreen() {
         return;
       }
       setIsOffline(false);
-      const today = new Date().toISOString().slice(0, 10);
+      // Local date: toISOString() is UTC and gives yesterday/tomorrow around midnight
+      const today = localIsoDate();
       const data = await apiPayments({ date_from: today, date_to: today });
       if (!mountedRef.current) return;
       setPayments(Array.isArray(data) ? data : []);
@@ -87,15 +89,17 @@ export default function CashierReceiptsScreen() {
       const staffName = receiptData.payment?.processed_by_name
         || [user?.first_name, user?.last_name].filter(Boolean).join(' ')
         || user?.username || '';
-      await printReceipt({
+      const ok = await printReceipt({
         orderId:        receiptData.order?.id,
         order:          receiptData.order,
         payment:        receiptData.payment,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
       if (!mountedRef.current) return;
+      if (isPrinterUnreachable(ok)) { setSnack(t('Printer not reachable')); return; }
       setSnack('Receipt sent to printer');
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err?.message || t('Unknown error') }));
@@ -126,14 +130,16 @@ export default function CashierReceiptsScreen() {
       };
       const staffName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
         || user?.username || '';
-      await printReceipt({
+      const ok = await printReceipt({
         order,
         payment,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
       if (!mountedRef.current) return;
+      if (isPrinterUnreachable(ok)) { setSnack(t('Printer not reachable')); return; }
       setSnack('Receipt sent to printer');
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err?.message || t('Unknown error') }));

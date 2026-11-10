@@ -364,17 +364,17 @@
                             </td>
                             <td>
                                 <div class="order-items">
-                                    {% for item in order.orderitem_set.all|slice:":2" %}
+                                    {% for item in order.order_items.all|slice:":2" %}
                                         <div>{{ item.quantity }}x {{ item.product.name }}</div>
                                     {% endfor %}
-                                    {% if order.orderitem_set.all|length > 2 %}
-                                        <small class="text-muted">{% blocktranslate with n=order.orderitem_set.all|length|add:"-2" %}+{{ n }} more...{% endblocktranslate %}</small>
+                                    {% if order.order_items.all|length > 2 %}
+                                        <small class="text-muted">{% blocktranslate with n=order.order_items.all|length|add:"-2" %}+{{ n }} more...{% endblocktranslate %}</small>
                                     {% endif %}
                                 </div>
                             </td>
                             <td>
                                 <div class="order-value text-success">
-                                    {% currency_symbol %}{{ order.total|floatformat:2 }}
+                                    {% currency_symbol %}{{ order.total_amount|floatformat:2 }}
                                 </div>
                                 {% if order.payment_method %}
                                     <small class="text-muted">{% translate order.payment_method|title %}</small>

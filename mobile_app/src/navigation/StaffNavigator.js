@@ -40,6 +40,12 @@ const AttendanceStack       = createNativeStackNavigator();
 
 const STATION_ROLES = ['kitchen', 'bar', 'buffet', 'service'];
 
+// Owners and managers may not use /reports/cashier/ (cashier role only): they get the
+// restaurant-wide revenue report (/reports/revenue/) in the same screen.
+function OwnerReportsScreen(props) {
+  return <CashierReportsScreen {...props} mode="owner" />;
+}
+
 function CashierDashboardStackNavigator() {
   const t = useT();
   return (
@@ -307,7 +313,7 @@ export default function StaffNavigator() {
           />
           <Tab.Screen
             name="Reports"
-            component={CashierReportsScreen}
+            component={isManager ? OwnerReportsScreen : CashierReportsScreen}
             options={{ title: t('Reports'), headerShown: true, header: () => <RestaurantHeader /> }}
           />
           <Tab.Screen

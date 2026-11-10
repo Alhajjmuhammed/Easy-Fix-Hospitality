@@ -62,3 +62,37 @@ class TokenAuthMiddleware(BaseMiddleware):
                 scope = dict(scope)  # make a mutable copy
                 scope['user'] = await _get_user_from_token(token_key)
         return await super().__call__(scope, receive, send)
+
+
+# ---------------------------------------------------------------------------
+# Origin check (Cross-Site WebSocket Hijacking protection)
+# ---------------------------------------------------------------------------
+from channels.security.websocket import OriginValidator  # noqa: E402
+
+
+class _HostsOriginValidator(OriginValidator):
+    """
+    Channels' AllowedHostsOriginValidator, except a handshake WITHOUT an Origin header
+    is let through.
+
+    Browsers always send Origin on a WebSocket handshake, so a page on another site
+    (the cross-site hijacking attack, which would ride on the victim's session cookie)
+    is still rejected. Native clients (the React Native app, scripts) may omit Origin;
+    they authenticate with ?token=, not cookies, so the Origin check adds nothing for
+    them. Stock channels 4.1 rejects a missing Origin unless ALLOWED_HOSTS has '*'.
+    A literal "Origin: null" (sandboxed iframes, file:// pages) is still rejected.
+    """
+
+    def valid_origin(self, parsed_origin):
+        if parsed_origin is None:
+            return True
+        return super().valid_origin(parsed_origin)
+
+
+def AllowedHostsOriginValidator(application):
+    """Only accept WebSocket handshakes whose Origin host is in settings.ALLOWED_HOSTS."""
+    from django.conf import settings
+    allowed_hosts = settings.ALLOWED_HOSTS
+    if settings.DEBUG and not allowed_hosts:
+        allowed_hosts = ['localhost', '127.0.0.1', '[::1]']
+    return _HostsOriginValidator(application, allowed_hosts)

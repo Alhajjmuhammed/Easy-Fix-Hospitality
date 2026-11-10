@@ -37,7 +37,27 @@ const METHOD_LABELS = {
   loyalty: 'Loyalty points', mobile: 'Mobile money',
 };
 
-export default function CashierReportsScreen() {
+// Table label for a report row. Report rows may not carry order_type (older server):
+// a delivery/pickup order then has no table ('N/A'), so the table is left out.
+function orderPlaceLabel(o, t) {
+  if (o.order_type === 'delivery') return `🚴 ${t('Delivery')}`;
+  if (o.order_type === 'pickup') return `🛍 ${t('Pickup')}`;
+  const n = o.table_number;
+  if (n === undefined || n === null || n === '' || n === 'N/A') return '';
+  return t('Table {n}', { n });
+}
+
+const joinParts = (parts) => parts.filter(Boolean).join(' · ');
+
+/**
+ * mode 'cashier' (default): /reports/cashier/ (cashier role only).
+ * mode 'owner': /reports/revenue/ for owners and managers (restaurant-wide revenue
+ * with a per-staff collection breakdown instead of "My Collections").
+ */
+export default function CashierReportsScreen({ mode = 'cashier' }) {
+  const isOwnerMode = mode === 'owner';
+  const endpoint    = isOwnerMode ? '/reports/revenue/' : '/reports/cashier/';
+  const cacheKey    = isOwnerMode ? 'owner_report_cache' : 'cashier_report_cache';
   const { format }                      = useCurrency();
   const t = useT();
   const [loading,           setLoading]           = useState(true);
@@ -52,6 +72,8 @@ export default function CashierReportsScreen() {
   const [tempPids,          setTempPids]          = useState([]);
   const [showPicker,        setShowPicker]        = useState(false);
   const [products,          setProducts]          = useState([]);
+  // Server refused the report (403): message shown instead of the report
+  const [denied,            setDenied]            = useState('');
   // Ref so fetchReport can always read the latest pids without being a closure dep.
   // Updated synchronously alongside state to prevent stale-ref races.
   const selectedPidsRef = useRef([]);
@@ -70,9 +92,9 @@ export default function CashierReportsScreen() {
       if (!net.isConnected) {
         // Load last-cached report so staff see real data offline
         const [cached, cachedTs, cachedPeriod, pending] = await Promise.all([
-          getSyncMeta('cashier_report_cache'),
-          getSyncMeta('cashier_report_cache_ts'),
-          getSyncMeta('cashier_report_cache_period'),
+          getSyncMeta(cacheKey),
+          getSyncMeta(`${cacheKey}_ts`),
+          getSyncMeta(`${cacheKey}_period`),
           getOfflinePendingOrders(),
         ]);
         if (!mountedRef.current) return;
@@ -86,7 +108,7 @@ export default function CashierReportsScreen() {
             }
           } catch (_) {
             // Corrupted cache — fall back to local computation and drop the bad entry
-            await setSyncMeta('cashier_report_cache', '').catch(() => {});
+            await setSyncMeta(cacheKey, '').catch(() => {});
             const localStats = await getLocalReportStats();
             if (!mountedRef.current) return;
             setData(localStats);
@@ -106,8 +128,9 @@ export default function CashierReportsScreen() {
       } else {
         const params = { period };
         if (effectivePids.length > 0) params.product_ids = effectivePids.join(',');
-        const res = await client.get('/reports/cashier/', { params });
+        const res = await client.get(endpoint, { params });
         if (!mountedRef.current) return;
+        setDenied('');
         setData(res.data);
         setIsOffline(false);
         setCacheTimestamp(null);
@@ -116,17 +139,28 @@ export default function CashierReportsScreen() {
         setOfflineOrders(pending);
         // Cache for offline use
         await Promise.all([
-          setSyncMeta('cashier_report_cache', JSON.stringify(res.data)),
-          setSyncMeta('cashier_report_cache_ts', new Date().toISOString()),
-          setSyncMeta('cashier_report_cache_period', period),
+          setSyncMeta(cacheKey, JSON.stringify(res.data)),
+          setSyncMeta(`${cacheKey}_ts`, new Date().toISOString()),
+          setSyncMeta(`${cacheKey}_period`, period),
         ]);
       }
-    } catch {
-      // Network error — try cached data, then fall back to local computation
+    } catch (err) {
+      if (!mountedRef.current) return;
+      if (err?.response?.status === 403) {
+        // Not allowed to see this report: say so (the server was reached)
+        setData(null);
+        setOfflineOrders([]);
+        setIsOffline(false);
+        setDenied(err.response?.data?.error || err.response?.data?.detail || 'You do not have permission to view these reports.');
+        return;
+      }
+      // The server answered with an error: not a connection problem
+      const serverError = !!err?.response;
+      // Network / server error — try cached data, then fall back to local computation
       try {
         const [cached, cachedTs, pending] = await Promise.all([
-          getSyncMeta('cashier_report_cache'),
-          getSyncMeta('cashier_report_cache_ts'),
+          getSyncMeta(cacheKey),
+          getSyncMeta(`${cacheKey}_ts`),
           getOfflinePendingOrders(),
         ]);
         if (!mountedRef.current) return;
@@ -134,9 +168,9 @@ export default function CashierReportsScreen() {
           try {
             setData(JSON.parse(cached));
             setCacheTimestamp(cachedTs || null);
-            setSnack('Using cached data – could not reach server');
+            setSnack(serverError ? 'Server error – showing cached data' : 'Using cached data – could not reach server');
           } catch (_) {
-            await setSyncMeta('cashier_report_cache', '').catch(() => {});
+            await setSyncMeta(cacheKey, '').catch(() => {});
             const localStats = await getLocalReportStats();
             setData(localStats);
             setCacheTimestamp(null);
@@ -146,17 +180,17 @@ export default function CashierReportsScreen() {
           const localStats = await getLocalReportStats();
           setData(localStats);
           setCacheTimestamp(null);
-          setSnack('Offline – showing locally computed data');
+          setSnack(serverError ? 'Server error – showing locally computed data' : 'Offline – showing locally computed data');
         }
         setOfflineOrders(pending);
       } catch {
         if (mountedRef.current) { setOfflineOrders([]); setData(null); setSnack('Could not load report'); }
       }
-      if (mountedRef.current) setIsOffline(true);
+      if (mountedRef.current) setIsOffline(!serverError);
     } finally {
       if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
-  }, [period]); // selectedPids intentionally omitted — accessed via ref to avoid double-fetch
+  }, [period, endpoint, cacheKey]); // selectedPids intentionally omitted — accessed via ref to avoid double-fetch
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
@@ -164,10 +198,25 @@ export default function CashierReportsScreen() {
     return <View style={styles.center}><ActivityIndicator size="large" /></View>;
   }
 
+  if (denied) {
+    return (
+      <ScrollView
+        contentContainerStyle={[styles.container, styles.center, { flexGrow: 1 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchReport(true); }} />}
+      >
+        <MaterialCommunityIcons name="lock-outline" size={48} color="#C62828" />
+        <Text variant="bodyLarge" style={{ marginTop: 12, textAlign: 'center', fontFamily: 'Poppins_600SemiBold' }}>
+          {t(denied)}
+        </Text>
+      </ScrollView>
+    );
+  }
+
   const stats       = data?.stats                || {};
   const orders      = data?.orders               || [];
   const myMethods   = data?.my_payment_methods   || [];
   const topProducts = data?.top_products         || [];
+  const staffTotals = data?.cashier_totals       || [];
 
   const pendingOrders  = offlineOrders.filter((o) => !o._is_sync_error);
   const errorOrders    = offlineOrders.filter((o) => o._is_sync_error);
@@ -214,9 +263,11 @@ export default function CashierReportsScreen() {
                   </Text>
                 </View>
                 <Text variant="bodySmall" style={styles.meta}>
-                  {o.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: o.table_number ?? '' })}
-                  {' · '}{o.items_count !== 1 ? t('{n} items', { n: o.items_count ?? '' }) : t('{n} item', { n: o.items_count })}
-                  {' · '}{new Date(o.created_at).toLocaleTimeString()}
+                  {joinParts([
+                    orderPlaceLabel(o, t),
+                    o.items_count !== 1 ? t('{n} items', { n: o.items_count ?? '' }) : t('{n} item', { n: o.items_count }),
+                    new Date(o.created_at).toLocaleTimeString(),
+                  ])}
                 </Text>
                 {!!o.error_message && (
                   <Text variant="bodySmall" style={{ color: '#C62828', fontSize: 10, marginTop: 2 }}>
@@ -267,9 +318,11 @@ export default function CashierReportsScreen() {
                   </Text>
                 </View>
                 <Text variant="bodySmall" style={styles.meta}>
-                  {o.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: o.table_number ?? '' })}
-                  {' · '}{o.items_count !== 1 ? t('{n} items', { n: o.items_count ?? '' }) : t('{n} item', { n: o.items_count })}
-                  {' · '}{new Date(o.created_at).toLocaleTimeString()}
+                  {joinParts([
+                    orderPlaceLabel(o, t),
+                    o.items_count !== 1 ? t('{n} items', { n: o.items_count ?? '' }) : t('{n} item', { n: o.items_count }),
+                    new Date(o.created_at).toLocaleTimeString(),
+                  ])}
                 </Text>
               </Card.Content>
             </Card>
@@ -383,41 +436,66 @@ export default function CashierReportsScreen() {
         </Card.Content>
       </Card>
 
-      {/* My Collections */}
-      <Text variant="labelLarge" style={styles.sectionTitle}>{t('My Collections')}</Text>
-      <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#1565C0' }]}>
-        <Card.Content>
-          <View style={styles.row}>
-            <View style={styles.myCollectStat}>
-              <MaterialCommunityIcons name="cash-register" size={28} color="#1565C0" />
-              <Text style={styles.bigValue}>{format(stats.my_total_collected ?? 0)}</Text>
-              <Text style={styles.bigLabel}>{t('Total Collected')}</Text>
-            </View>
-            <View style={styles.myCollectStat}>
-              <MaterialCommunityIcons name="receipt" size={28} color="#6A1B9A" />
-              <Text style={[styles.bigValue, { color: '#6A1B9A' }]}>{stats.my_payment_count ?? 0}</Text>
-              <Text style={styles.bigLabel}>{t('Payments Processed')}</Text>
-            </View>
-          </View>
-
-          {myMethods.length > 0 && (
-            <>
-              <Divider style={{ marginVertical: 10 }} />
-              <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold', marginBottom: 6 }}>{t('By Method')}</Text>
-              {myMethods.map((m) => (
-                <View key={m.method} style={styles.methodRow}>
-                  <Text variant="bodySmall" style={{ textTransform: 'capitalize', fontFamily: 'Poppins_400Regular' }}>
-                    {METHOD_LABELS[m.method] ? t(METHOD_LABELS[m.method]) : m.method}
-                  </Text>
-                  <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
-                    {format(m.total)} ({m.count})
-                  </Text>
+      {isOwnerMode ? (
+        <>
+          {/* Collected per staff member (owner / manager report) */}
+          <Text variant="labelLarge" style={styles.sectionTitle}>{t('Collected by Staff')}</Text>
+          <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#1565C0' }]}>
+            <Card.Content>
+              {staffTotals.length === 0 ? (
+                <Text variant="bodySmall" style={{ opacity: 0.6 }}>{t('No payments for this period')}</Text>
+              ) : staffTotals.map((c, i) => {
+                const name = [c.processed_by__first_name, c.processed_by__last_name].filter(Boolean).join(' ')
+                  || c.processed_by__username || '—';
+                return (
+                  <View key={`${c.processed_by__username || ''}-${i}`} style={styles.methodRow}>
+                    <Text variant="bodySmall" style={{ fontFamily: 'Poppins_400Regular', flex: 1 }} numberOfLines={1}>{name}</Text>
+                    <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>{format(c.collected ?? 0)}</Text>
+                  </View>
+                );
+              })}
+            </Card.Content>
+          </Card>
+        </>
+      ) : (
+        <>
+          {/* My Collections */}
+          <Text variant="labelLarge" style={styles.sectionTitle}>{t('My Collections')}</Text>
+          <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#1565C0' }]}>
+            <Card.Content>
+              <View style={styles.row}>
+                <View style={styles.myCollectStat}>
+                  <MaterialCommunityIcons name="cash-register" size={28} color="#1565C0" />
+                  <Text style={styles.bigValue}>{format(stats.my_total_collected ?? 0)}</Text>
+                  <Text style={styles.bigLabel}>{t('Total Collected')}</Text>
                 </View>
-              ))}
-            </>
-          )}
-        </Card.Content>
-      </Card>
+                <View style={styles.myCollectStat}>
+                  <MaterialCommunityIcons name="receipt" size={28} color="#6A1B9A" />
+                  <Text style={[styles.bigValue, { color: '#6A1B9A' }]}>{stats.my_payment_count ?? 0}</Text>
+                  <Text style={styles.bigLabel}>{t('Payments Processed')}</Text>
+                </View>
+              </View>
+
+              {myMethods.length > 0 && (
+                <>
+                  <Divider style={{ marginVertical: 10 }} />
+                  <Text variant="bodySmall" style={{ fontFamily: 'Poppins_600SemiBold', marginBottom: 6 }}>{t('By Method')}</Text>
+                  {myMethods.map((m) => (
+                    <View key={m.method} style={styles.methodRow}>
+                      <Text variant="bodySmall" style={{ textTransform: 'capitalize', fontFamily: 'Poppins_400Regular' }}>
+                        {METHOD_LABELS[m.method] ? t(METHOD_LABELS[m.method]) : m.method}
+                      </Text>
+                      <Text variant="bodySmall" style={{ fontFamily: 'Poppins_700Bold' }}>
+                        {format(m.total)} ({m.count})
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              )}
+            </Card.Content>
+          </Card>
+        </>
+      )}
 
       {/* Top products */}
       {topProducts.length > 0 && (
@@ -475,7 +553,11 @@ export default function CashierReportsScreen() {
                   </View>
                 </View>
                 <Text variant="bodySmall" style={styles.meta}>
-                  {order.order_type === 'delivery' ? `🚴 ${t('Delivery')}` : t('Table {n}', { n: order.table_number ?? '?' })} · {t('{n} items', { n: order.items_count ?? '' })} · {t('by {name}', { name: order.ordered_by ?? '—' })}
+                  {joinParts([
+                    orderPlaceLabel(order, t),
+                    t('{n} items', { n: order.items_count ?? '' }),
+                    t('by {name}', { name: order.ordered_by ?? '—' }),
+                  ])}
                 </Text>
                 <Text variant="bodySmall" style={styles.meta}>
                   {new Date(order.created_at).toLocaleTimeString()}

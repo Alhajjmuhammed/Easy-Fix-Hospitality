@@ -10,6 +10,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { apiRestaurants, apiRestaurantByQR } from '../../api/restaurants';
 import { API_BASE_URL } from '../../config';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useCartStore } from '../../store/useCartStore';
 import { useT } from '../../i18n';
 
 export default function RestaurantSelectorScreen({ navigation }) {
@@ -45,12 +46,28 @@ export default function RestaurantSelectorScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    // If a restaurant was already chosen (persisted), skip straight to ordering
-    if (restaurantId) {
-      navigation.replace('TableSelection');
-      return;
+    // A restaurant chosen for dine-in (QR / table flow) is still selected: go straight
+    // back to its tables. A restaurant chosen for delivery / pickup shows this list,
+    // so remote customers never land on a dine-in table list.
+    const decide = () => {
+      if (!mountedRef.current) return;
+      if (restaurantId && useCartStore.getState().lastOrderMode === 'dine-in') {
+        navigation.replace('TableSelection');
+        return;
+      }
+      load();
+    };
+    // The cart (which remembers the last order type) is restored from storage asynchronously
+    if (useCartStore.persist?.hasHydrated?.() === false) {
+      // If the saved cart cannot be read (corrupt storage), zustand never fires the finish
+      // listener: fall back after 3 s so the customer is never stuck on a spinner.
+      let done = false;
+      const once = () => { if (done) return; done = true; clearTimeout(timer); unsub(); decide(); };
+      const unsub = useCartStore.persist.onFinishHydration(once);
+      const timer = setTimeout(once, 3000);
+      return () => { done = true; clearTimeout(timer); unsub(); };
     }
-    load();
+    decide();
   }, []);  // only run once on mount
 
   const handleSelect = (restaurant) => {
@@ -98,7 +115,9 @@ export default function RestaurantSelectorScreen({ navigation }) {
       const restaurant = await apiRestaurantByQR(code);
       if (!mountedRef.current) return;
       setScannerOpen(false);
+      // setRestaurant empties a cart that holds another restaurant's products
       await setRestaurant(restaurant.id);
+      useCartStore.getState().setLastOrderMode('dine-in');
       navigation.replace('TableSelection');
     } catch (err) {
       if (!mountedRef.current) return;
@@ -206,10 +225,12 @@ export default function RestaurantSelectorScreen({ navigation }) {
                     {item.description}
                   </Text>
                 ) : null}
-                <View style={styles.badgeRow}>
-                  <View style={styles.badge}><Text style={styles.badgeText}>{t('Delivery')}</Text></View>
-                  <View style={styles.badge}><Text style={styles.badgeText}>{t('Pickup')}</Text></View>
-                </View>
+                {item.allow_remote_orders ? (
+                  <View style={styles.badgeRow}>
+                    <View style={styles.badge}><Text style={styles.badgeText}>{t('Delivery')}</Text></View>
+                    <View style={styles.badge}><Text style={styles.badgeText}>{t('Pickup')}</Text></View>
+                  </View>
+                ) : null}
               </View>
 
               <MaterialCommunityIcons name="chevron-right" size={24} color="#2c3e50" />

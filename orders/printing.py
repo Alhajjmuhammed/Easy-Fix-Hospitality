@@ -2647,6 +2647,13 @@ def _generate_receipt_content(payment):
             spacing = width - len(pay_label) - len(pay_value)
             lines.append(pay_label + (" " * spacing) + pay_value)
 
+    # Partial payment: what is still owed (as on the web receipt's "Balance due")
+    balance_due = total - sum((m.amount for m in all_payments), Decimal('0'))
+    if balance_due > 0:
+        bal_label = "BALANCE DUE:"
+        bal_value = f"{currency_symbol}{float(balance_due):.2f}"
+        lines.append(bal_label + (" " * max(1, width - len(bal_label) - len(bal_value))) + bal_value)
+
     # Dotted separator - EXACTLY like HTML
     lines.append("-" * width)
     # NO blank line here

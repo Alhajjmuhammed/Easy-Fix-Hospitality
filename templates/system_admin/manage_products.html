@@ -374,7 +374,7 @@
                                             {% endif %}
                                             {% if can_delete %}
                                             <button class="btn btn-outline-danger"
-                                                    onclick="deleteProduct({{ product.id }}, '{{ product.name }}', '{{ product.main_category.display_restaurant_name }}')"
+                                                    onclick="deleteProduct({{ product.id }}, '{{ product.name|escapejs }}', '{{ product.main_category.display_restaurant_name|escapejs }}')"
                                                     title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -1022,7 +1022,7 @@ function showAlert(type, message) {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
     alertDiv.innerHTML = `
-        ${message}
+        ${escapeHtml(message)}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     

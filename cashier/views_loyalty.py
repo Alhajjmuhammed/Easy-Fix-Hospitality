@@ -20,6 +20,7 @@ from mobile_api.permissions import IsSubscriptionActive
 from orders.models import Order
 from .models_loyalty import LoyaltyProgram, LoyaltyTransaction
 from . import loyalty as svc
+from restaurant_system.db_utils import managed_owner_ids
 
 
 def _staff_order_q(owner):
@@ -28,8 +29,8 @@ def _staff_order_q(owner):
             | Q(table_info__restaurant__branch_owner=owner)
             | Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner)
             | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)
-            | Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner)
-            | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+            | Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner))
+            | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
 
 
 def _is_payment_staff(user):

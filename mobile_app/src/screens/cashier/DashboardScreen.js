@@ -17,8 +17,9 @@ import { useSyncStore } from '../../store/useSyncStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceipt } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
+import { IN_PROGRESS_STATUSES, FINISHED_STATUSES, isActiveOrder, isLocalToday, mergeOrders } from '../../utils/orderFilters';
 import { useT } from '../../i18n';
 import LoyaltyPayBox from '../../components/LoyaltyPayBox';
 import MobileMoneyBox from '../../components/MobileMoneyBox';
@@ -31,6 +32,12 @@ const PAYMENT_METHODS = [
   { value: 'voucher', label: 'Voucher' },
 ];
 
+// Names for every payment method the server may return (void picker)
+const METHOD_LABELS = {
+  cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher',
+  loyalty: 'Loyalty points', mobile: 'Mobile money',
+};
+
 const STATUS_NEXT = {
   pending:   'confirmed',
   confirmed: 'preparing',
@@ -41,7 +48,7 @@ const STATUS_NEXT = {
 export default function CashierDashboardScreen({ navigation }) {
   const theme = useTheme();
   const t = useT();
-  const { format } = useCurrency();
+  const { format, decimals } = useCurrency();
   const { pendingCount, lastSyncTime } = useSyncStore();
   const { user } = useAuthStore();
 
@@ -99,45 +106,65 @@ export default function CashierDashboardScreen({ navigation }) {
   // Per-card action menus
   const [menuOpenId, setMenuOpenId] = useState(null);
 
+  // Same rules as the online filters, applied to the cached orders
+  const filterCached = useCallback((cached) => (
+    filter === 'active'
+      ? cached.filter(isActiveOrder)
+      : cached.filter((o) => isLocalToday(o.created_at))
+  ), [filter]);
+
+  const fetchSeq = useRef(0);
   const fetchOrders = useCallback(async (silent = false) => {
+    // A slower, older request (e.g. the two-request "Active" load) must not overwrite the
+    // list of a newer one (the user switched filter meanwhile).
+    const seq = ++fetchSeq.current;
+    const stale = () => !mountedRef.current || seq !== fetchSeq.current;
     if (!silent && mountedRef.current) setLoading(true);
     try {
       const net = await NetInfo.fetch();
-      if (!mountedRef.current) return;
+      if (stale()) return;
       const offlinePending = await getOfflinePendingOrders();
-      if (!mountedRef.current) return;
+      if (stale()) return;
 
       if (isOnlineState(net)) {
-        const params = filter === 'active'
-          ? { status: 'pending,confirmed,preparing,ready,out_for_delivery' }
-          : {};
-        const data = await apiOrders(params);
-        if (!mountedRef.current) return;
-        const fetched = Array.isArray(data) ? data : data.results || [];
+        // The server ANDs its filters, so "Active" takes two requests: orders in progress,
+        // plus served/delivered orders that are not fully paid yet.
+        // "All Today" = every order created today.
+        const listOf = (data) => (Array.isArray(data) ? data : data?.results || []);
+        let fetched;
+        if (filter === 'active') {
+          const [inProgress, openBills] = await Promise.all([
+            apiOrders({ status: IN_PROGRESS_STATUSES.join(',') }),
+            apiOrders({ status: FINISHED_STATUSES.join(','), payment_status: 'unpaid,partial' }),
+          ]);
+          fetched = mergeOrders(listOf(inProgress), listOf(openBills));
+        } else {
+          fetched = listOf(await apiOrders({ period: 'today' }));
+        }
+        if (stale()) return;
         setOrders([...offlinePending, ...fetched]);
         setIsOffline(false);
         try { await cacheOrders(fetched); } catch { /* best-effort */ }
       } else {
-        const activeStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'];
-        const cached = await getOrders(filter === 'active' ? activeStatuses : null);
-        if (!mountedRef.current) return;
-        setOrders([...offlinePending, ...cached]);
+        const cached = await getOrders(null);
+        if (stale()) return;
+        setOrders([...offlinePending, ...filterCached(cached)]);
         setIsOffline(true);
       }
     } catch {
       try {
         const offlinePending = await getOfflinePendingOrders();
-        const cached = await getOrders(['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery']);
-        if (!mountedRef.current) return;
-        setOrders([...offlinePending, ...cached]);
+        const cached = await getOrders(null);
+        if (stale()) return;
+        setOrders([...offlinePending, ...filterCached(cached)]);
       } catch {
-        if (mountedRef.current) setOrders([]);
+        if (!stale()) setOrders([]);
       }
-      if (mountedRef.current) setIsOffline(true);
+      if (!stale()) setIsOffline(true);
     } finally {
-      if (mountedRef.current) { setLoading(false); setRefreshing(false); }
+      if (!stale()) { setLoading(false); setRefreshing(false); }
     }
-  }, [filter]);
+  }, [filter, filterCached]);
 
   useEffect(() => {
     fetchOrders();
@@ -230,7 +257,7 @@ export default function CashierDashboardScreen({ navigation }) {
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
         return;
       }
@@ -266,7 +293,7 @@ export default function CashierDashboardScreen({ navigation }) {
         setPayDialog(null);
         setSnack(doneMessage);
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
       };
       if (!online) {
@@ -294,7 +321,7 @@ export default function CashierDashboardScreen({ navigation }) {
       setPayDialog(null);
       setSnack('Payment recorded');
       if (usePrinterStore.getState().autoPrintAfterPayment) {
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
       }
       fetchOrders(true);
     } catch (err) {
@@ -319,6 +346,8 @@ export default function CashierDashboardScreen({ navigation }) {
 
   const handleVoid = async () => {
     if (!voidDialog) return;
+    // The server refuses a void without a reason
+    if (!voidReason.trim()) { setSnack('Enter a reason for the void'); return; }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
     if (!isOnlineState(net)) { setSnack('No internet — connect to void a payment'); setVoidDialog(null); return; }
@@ -423,7 +452,9 @@ export default function CashierDashboardScreen({ navigation }) {
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
+      if (isPrinterUnreachable(ok)) { if (mountedRef.current) setSnack(t('Printer not reachable')); return; }
       if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('unknown error') }));
@@ -587,7 +618,8 @@ export default function CashierDashboardScreen({ navigation }) {
                         leadingIcon="swap-horizontal"
                         title={t('Transfer Table')}
                         onPress={() => { setMenuOpenId(null); openTransfer(order); }}
-                        disabled={isPaid || order.status === 'cancelled' || order._is_offline_pending}
+                        disabled={isPaid || order.status === 'cancelled' || order._is_offline_pending
+                          || order.order_type === 'delivery' || order.order_type === 'pickup'}
                       />
                       {hasPayment && !order._is_offline_pending && (
                         <Menu.Item leadingIcon="cancel" title={t('Void Payment')} onPress={() => { setMenuOpenId(null); openVoid(order); }} />
@@ -773,7 +805,7 @@ export default function CashierDashboardScreen({ navigation }) {
             {paymentPickerOrder?.payments?.map(p => (
               <List.Item
                 key={p.id}
-                title={`${p.payment_method} — ${p.amount}`}
+                title={`${METHOD_LABELS[p.payment_method] ? t(METHOD_LABELS[p.payment_method]) : (p.payment_method || '')} — ${format(p.amount)}`}
                 onPress={() => {
                   setPaymentPickerVisible(false);
                   setVoidReason('');
@@ -794,12 +826,12 @@ export default function CashierDashboardScreen({ navigation }) {
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
               {t('Order #{number}', { number: voidDialog?.order?.order_number || voidDialog?.order?.id || '' })}
             </Text>
-            <TextInput label={t('Void Reason (optional)')} value={voidReason}
+            <TextInput label={t('Void Reason (required)')} value={voidReason}
               onChangeText={setVoidReason} mode="outlined" multiline numberOfLines={2} autoFocus />
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setVoidDialog(null)}>{t('Cancel')}</Button>
-            <Button mode="contained" buttonColor="#E53935" loading={voiding} disabled={voiding} onPress={handleVoid}>{t('Void')}</Button>
+            <Button mode="contained" buttonColor="#E53935" loading={voiding} disabled={voiding || !voidReason.trim()} onPress={handleVoid}>{t('Void')}</Button>
           </Dialog.Actions>
         </Dialog>
 

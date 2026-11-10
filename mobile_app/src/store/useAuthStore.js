@@ -182,6 +182,7 @@ export const useAuthStore = create((set, get) => ({
     // on this device seeing previous user's cart (data breach fix)
     const { useCartStore } = require('./useCartStore');
     useCartStore.getState().clearCart();
+    useCartStore.getState().setLastOrderMode(null);
     // Reset printer settings to defaults — Bluetooth device paired by one staff
     // member should not carry over to the next user session.
     const { usePrinterStore } = require('./usePrinterStore');
@@ -209,6 +210,9 @@ export const useAuthStore = create((set, get) => ({
       setClientAuth(get().token, restaurantId);
       setQueueOwner(get().user?.id, restaurantId);
       set({ restaurantId });
+      // A cart holding another restaurant's products is emptied: they would be refused
+      // there ("Product not found").
+      try { require('./useCartStore').useCartStore.getState().ensureRestaurant(restaurantId); } catch (_) {}
       // Currency and tax rate in the profile are resolved per restaurant
       // (X-Restaurant-ID); refresh in the background so menu/cart show the
       // selected restaurant's values instead of the login-time defaults.

@@ -355,7 +355,7 @@
                                         {% endif %}
                                         {% if can_edit and order.status != 'cancelled' and order.status != 'served' %}
                                         <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item text-danger" href="#" onclick="cancelOrder({{ order.id }}, '{{ order.order_number }}')">
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="cancelOrder({{ order.id }}, '{{ order.order_number|escapejs }}')">
                                             <i class="fas fa-times-circle"></i> Cancel Order
                                         </a></li>
                                         {% endif %}
@@ -491,7 +491,7 @@
                                     {% endif %}
                                     {% if can_delete %}
                                     {% if order.status != 'cancelled' and order.status != 'served' %}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="cancelOrder({{ order.id }}, '{{ order.order_number }}')" title="Cancel">
+                                    <button class="btn btn-sm btn-outline-danger" onclick="cancelOrder({{ order.id }}, '{{ order.order_number|escapejs }}')" title="Cancel">
                                         <i class="fas fa-times-circle"></i>
                                     </button>
                                     {% endif %}
@@ -896,8 +896,8 @@ function showAlert(type, message) {
     const alertId = 'alert-' + Date.now();
     
     const alertHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert" id="${alertId}">
-            ${message}
+        <div class="alert alert-${escapeHtml(type)} alert-dismissible fade show" role="alert" id="${escapeHtml(alertId)}">
+            ${escapeHtml(message)}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;

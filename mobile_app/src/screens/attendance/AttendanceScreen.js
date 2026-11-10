@@ -5,6 +5,7 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
 import { apiAttendanceScan, apiAttendanceConfirm } from '../../api/attendance';
 import { useT } from '../../i18n';
 
@@ -80,6 +81,7 @@ export default function AttendanceScreen({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
 
   // Dialog state
+  const isFocused = useIsFocused();
   const [scanResult, setScanResult]   = useState(null);  // API response from /scan/
   const [scannedToken, setScannedToken] = useState(null);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -193,11 +195,17 @@ export default function AttendanceScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       {/* Camera */}
-      <CameraView
-        style={StyleSheet.absoluteFillObject}
-        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onBarcodeScanned={dialogVisible || alreadyDoneVisible ? undefined : handleScan}
-      />
+      {/* Camera runs only while this screen is visible and no dialog is open:
+          the CameraView unmounts on blur, which releases the camera. */}
+      {isFocused && !dialogVisible && !alreadyDoneVisible ? (
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={handleScan}
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#000' }]} />
+      )}
 
       {/* Dark overlay — top */}
       <View style={styles.overlayTop} />

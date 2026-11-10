@@ -512,7 +512,7 @@
                                             <select class="form-select" id="productMainCategory" name="main_category" required>
                                                 <option value="">{% translate "Select Restaurant First" %}</option>
                                                 {% for category in all_main_categories %}
-                                                <option value="{{ category.id }}" data-restaurant-id="{{ category.restaurant.id|default:'' }}">{{ category.name }}</option>
+                                                <option value="{{ category.id }}" data-restaurant-id="{{ category.restaurant_id|default:'' }}">{{ category.name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -680,7 +680,7 @@ function showAlert(message, type = 'success') {
     alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed alert-custom`;
     alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1055; min-width: 300px;';
     alertDiv.innerHTML = `
-        ${message}
+        ${escapeHtml(message)}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{% translate "Close" %}"></button>
     `;
     
@@ -1506,7 +1506,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0" role="alert">
                 <div class="d-flex">
                     <div class="toast-body">
-                        <strong>${title}:</strong> ${message}
+                        <strong>${escapeHtml(title)}:</strong> ${escapeHtml(message)}
                     </div>
                     <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
                 </div>

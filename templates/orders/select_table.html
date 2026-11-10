@@ -136,7 +136,7 @@
                         {% for table in available_tables %}
                             <div class="col-3 col-md-4 col-lg-3 col-xl-2">
                                 <div class="table-card {% if table.is_truly_available %}available{% else %}occupied{% endif %}" 
-                                     onclick="selectTable({{ table.id }}, '{{ table.tbl_no }}', {{ table.is_truly_available|yesno:'true,false' }})">
+                                     onclick="selectTable({{ table.id }}, '{{ table.tbl_no|escapejs }}', {{ table.is_truly_available|yesno:'true,false'|escapejs }})">
                                     <div class="text-center">
                                         <div class="table-icon">
                                             <i class="bi bi-table"></i>

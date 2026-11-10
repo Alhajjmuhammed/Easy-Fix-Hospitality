@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useCurrency } from '../../hooks/useCurrency';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View, Alert } from 'react-native';
 import {
   Text,
   Card,
@@ -28,7 +28,7 @@ export default function TableSelectionScreen({ navigation }) {
   const t = useT();
   const { format } = useCurrency();
   const { setTable, clearCart, setExistingOrder } = useCartStore();
-  const { setRestaurant, user } = useAuthStore();
+  const { setRestaurant, user, restaurantId } = useAuthStore();
   const isStaff = user?.role_name && user.role_name !== 'customer';
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,14 +42,24 @@ export default function TableSelectionScreen({ navigation }) {
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
+  // Reloads when the selected restaurant changes (e.g. "Order Again" on another restaurant's
+  // order while this screen is still in the stack) so its tables are never shown for the new one.
+  // loadSeq drops a slower, older response that lands after a newer one.
+  const loadSeq = useRef(0);
   const loadTables = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    if (restaurantId === null || restaurantId === undefined) {
+      // Restaurant being changed (Change Restaurant clears it) — nothing to load.
+      if (mountedRef.current) setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const net = await NetInfo.fetch();
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== loadSeq.current) return;
       if (net.isConnected) {
         const data = await apiTables();
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || seq !== loadSeq.current) return;
         await saveTables(data);
         setTables(data);
       } else {
@@ -60,13 +70,13 @@ export default function TableSelectionScreen({ navigation }) {
       }
     } catch {
       const local = await getTables();
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== loadSeq.current) return;
       setTables(local);
       setSnack('Could not refresh – showing cached data');
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && seq === loadSeq.current) setLoading(false);
     }
-  }, []);
+  }, [restaurantId]);
 
   useEffect(() => {
     loadTables();
@@ -74,7 +84,7 @@ export default function TableSelectionScreen({ navigation }) {
 
   const goToMenu = (table) => {
     const tNum = table.table_number ?? table.tbl_no ?? '?';
-    setTable(table.id, `Table ${tNum}`, null);
+    setTable(table.id, `Table ${tNum}`, restaurantId);
     navigation.navigate('Menu', { tableId: table.id, tableName: `Table ${tNum}` });
   };
 
@@ -123,7 +133,7 @@ export default function TableSelectionScreen({ navigation }) {
     // Clear stale cart items before entering add-to-existing flow
     const tableName = `Table ${occupiedTable.table_number ?? occupiedTable.tbl_no}`;
     clearCart();
-    setTable(occupiedTable.id, tableName, null);
+    setTable(occupiedTable.id, tableName, restaurantId);
     setExistingOrder(order.id);
     navigation.navigate('Menu', { tableId: occupiedTable.id, tableName });
   };
@@ -145,12 +155,28 @@ export default function TableSelectionScreen({ navigation }) {
           icon="swap-horizontal"
           mode="text"
           compact
-          onPress={async () => {
-            try {
-              await setRestaurant(null);
-              navigation.replace('RestaurantSelector');
-            } catch {
-              setSnack(t('Could not change restaurant. Please try again.'));
+          onPress={() => {
+            // The cart holds this restaurant's products: they cannot be ordered elsewhere.
+            const doChange = async () => {
+              try {
+                clearCart();
+                await setRestaurant(null);
+                navigation.replace('RestaurantSelector');
+              } catch {
+                setSnack(t('Could not change restaurant. Please try again.'));
+              }
+            };
+            if (useCartStore.getState().items.length > 0) {
+              Alert.alert(
+                t('Change Restaurant'),
+                t('Your cart will be emptied. Items from this restaurant cannot be ordered at another one.'),
+                [
+                  { text: t('Cancel'), style: 'cancel' },
+                  { text: t('Empty cart'), style: 'destructive', onPress: doChange },
+                ],
+              );
+            } else {
+              doChange();
             }
           }}
           style={styles.changeRestaurantBtn}

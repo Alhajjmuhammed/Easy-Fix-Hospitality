@@ -581,7 +581,7 @@
                     <div class="wifi-item">
                         <span class="wifi-key">{% translate "Network:" %}</span>
                         <span class="wifi-value" id="wifi-ssid">{{ restaurant_obj.wifi_ssid }}</span>
-                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_ssid }}', this)" title="{% translate 'Copy network name' %}">
+                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_ssid|escapejs }}', this)" title="{% translate 'Copy network name' %}">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
@@ -589,7 +589,7 @@
                     <div class="wifi-item">
                         <span class="wifi-key">{% translate "Password:" %}</span>
                         <span class="wifi-value" id="wifi-password">{{ restaurant_obj.wifi_password }}</span>
-                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_password }}', this)" title="{% translate 'Copy password' %}">
+                        <button class="copy-btn" onclick="copyToClipboard('{{ restaurant_obj.wifi_password|escapejs }}', this)" title="{% translate 'Copy password' %}">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>

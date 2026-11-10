@@ -149,9 +149,31 @@ class Daraja:
         self.creds = account.credentials
         self.host = self.HOSTS[account.environment]
 
-    def _token(self, timeout=TIMEOUT):
-        key = f'daraja-token:{self.account.pk}:{self.account.updated_at.timestamp()}'
-        token = cache.get(key)
+    TOKEN_SAFETY_MARGIN = 60          # seconds before Daraja's expiry that we stop reusing a token
+    TOKEN_DEFAULT_LIFETIME = 3599     # Daraja's usual expires_in, if the answer has none
+
+    def _token_cache_key(self):
+        """Per account AND per credentials: new keys (or sandbox -> live) never reuse a token
+        issued for the old ones. Only a digest of the secret goes into the key."""
+        import hashlib
+        digest = hashlib.sha256('|'.join((
+            self.account.environment, str(self.creds.get('consumer_key', '')),
+            str(self.creds.get('consumer_secret', '')))).encode()).hexdigest()[:24]
+        return f'daraja-token:{self.account.pk}:{digest}'
+
+    def _forget_token(self):
+        try:
+            cache.delete(self._token_cache_key())
+        except Exception:
+            pass
+
+    def _token(self, timeout=TIMEOUT, fresh=False):
+        # fresh=True ("Test connection") always asks Safaricom, never trusts a cached token.
+        # Cached in Django's cache for (expires_in - 60 s): one OAuth round trip per hour per
+        # account instead of one per STK push / status check. With the cache down (Redis
+        # outage, IGNORE_EXCEPTIONS) get() just misses and we fetch a fresh token.
+        key = self._token_cache_key()
+        token = None if fresh else cache.get(key)
         if token:
             return token
         basic = base64.b64encode(f"{self.creds['consumer_key']}:{self.creds['consumer_secret']}".encode()).decode()
@@ -160,7 +182,13 @@ class Daraja:
         token = data.get('access_token')
         if status != 200 or not token:
             raise ProviderError('M-Pesa rejected the account keys. Check the Consumer Key and Secret.')
-        cache.set(key, token, 50 * 60)
+        try:
+            lifetime = int(float(data.get('expires_in') or self.TOKEN_DEFAULT_LIFETIME))
+        except (TypeError, ValueError):
+            lifetime = self.TOKEN_DEFAULT_LIFETIME
+        ttl = lifetime - self.TOKEN_SAFETY_MARGIN
+        if ttl > 0:
+            cache.set(key, token, ttl)
         return token
 
     def _password(self):
@@ -194,6 +222,8 @@ class Daraja:
             raise ProviderError(str(e) if not e.uncertain else 'Could not reach M-Pesa. Please try again.')
         status, data = _http('POST', f'{self.host}/mpesa/stkpush/v1/processrequest',
                              headers={'Authorization': f'Bearer {token}'}, body=body)
+        if status == 401:
+            self._forget_token()       # revoked / expired early: the next try logs in again
         if status == 200 and str(data.get('ResponseCode')) == '0' and data.get('CheckoutRequestID'):
             charge.provider_ref = data['CheckoutRequestID']
             return {}
@@ -217,6 +247,8 @@ class Daraja:
                              body={'BusinessShortCode': self.creds['shortcode'], 'Password': password,
                                    'Timestamp': ts, 'CheckoutRequestID': charge.provider_ref},
                              timeout=CHECK_TIMEOUT)
+        if status == 401:
+            self._forget_token()
         code = str(data.get('ResultCode', '')).strip()
         if code == '0':
             return 'successful', '', ''
@@ -332,7 +364,7 @@ def test_connection(account):
     if any(not account.credentials.get(k) for k in provider_for(account).REQUIRED):
         raise ProviderError('Fill in all the account details first.')
     if account.provider == 'mpesa_daraja':
-        Daraja(account)._token()
+        Daraja(account)._token(fresh=True)
         return True
     status, data = _http('GET', f'{Flutterwave.BASE}/balances', headers=Flutterwave(account)._headers())
     if status == 200 and data.get('status') == 'success':

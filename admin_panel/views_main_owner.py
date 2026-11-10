@@ -16,7 +16,9 @@ from accounts.models import User
 from restaurant.models_restaurant import Restaurant
 from restaurant.models import Product, MainCategory, SubCategory, TableInfo
 from orders.models import Order, OrderItem
-from .restaurant_utils import get_restaurant_context, restaurant_orders_q, NON_REVENUE_STATUSES
+from .restaurant_utils import (get_restaurant_context, restaurant_orders_q, restaurant_tables_products_q,
+                               NON_REVENUE_STATUSES)
+from restaurant_system.db_utils import managed_owner_ids
 
 
 @login_required
@@ -163,39 +165,18 @@ def branch_reports(request):
     date_to = request.GET.get('date_to')
     selected_restaurant = request.GET.get('restaurant')
     
-    # Build query
-    query = Q()
+    # Build query: each restaurant's own orders (restaurant_orders_q), so a branch the main
+    # owner runs himself, or owner-only legacy tables, are never counted under two restaurants.
     restaurant_filter = restaurants
-    
     if selected_restaurant and selected_restaurant != 'all':
         try:
-            selected_rest = restaurants.get(id=selected_restaurant)
-            query = Q(table_info__restaurant=selected_rest)
-            if selected_rest.branch_owner:
-                query |= Q(table_info__owner=selected_rest.branch_owner)
-                query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_rest.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=selected_rest.branch_owner))
-                query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_rest.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=selected_rest.branch_owner))
-            elif selected_rest.main_owner:
-                query |= Q(table_info__owner=selected_rest.main_owner)
-                query |= Q(order_type__in=['delivery', 'pickup'], ordered_by=selected_rest.main_owner)
+            restaurants.get(id=selected_restaurant)
             restaurant_filter = restaurants.filter(id=selected_restaurant)
-        except Restaurant.DoesNotExist:
+        except (Restaurant.DoesNotExist, ValueError, ValidationError):
             pass
-    else:
-        # All restaurants
-        for restaurant in restaurants:
-            restaurant_query = Q(table_info__restaurant=restaurant)
-            if restaurant.branch_owner:
-                restaurant_query |= Q(table_info__owner=restaurant.branch_owner)
-                restaurant_query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.branch_owner))
-                restaurant_query |= (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.branch_owner))
-            elif restaurant.main_owner:
-                restaurant_query |= Q(table_info__owner=restaurant.main_owner)
-                restaurant_query |= Q(order_type__in=['delivery', 'pickup'], ordered_by=restaurant.main_owner)
-            if query:
-                query |= restaurant_query
-            else:
-                query = restaurant_query
+    query = Q()
+    for restaurant in restaurant_filter:
+        query |= restaurant_orders_q(restaurant)
 
     if not query:
         orders = Order.objects.none()
@@ -215,33 +196,28 @@ def branch_reports(request):
         except (ValueError, TypeError, ValidationError):
             pass
     
-    # Calculate metrics
-    total_orders = orders.count()
-    total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    # Calculate metrics — sales only (cancelled / not-sold orders are not revenue)
+    sold = orders.exclude(status__in=NON_REVENUE_STATUSES)
+    total_orders = sold.count()
+    total_revenue = sold.aggregate(total=Sum('total_amount'))['total'] or 0
     average_order = total_revenue / total_orders if total_orders > 0 else 0
-    
-    # Orders by status
+
+    # Orders by status (every status, cancelled included, so the owner sees them)
     status_breakdown = orders.order_by().values('status').annotate(count=Count('id'))  # no default ordering in GROUP BY
-    
-    # Revenue by restaurant
-    # Correlated subquery annotations — 1 SQL statement instead of N round-trips
-    _rev_sq = Subquery(
-        orders.filter(
-            Q(table_info__restaurant=OuterRef('pk')) |
-            Q(table_info__owner=OuterRef('branch_owner'))
-        ).order_by().annotate(_g=Value(1)).values('_g').annotate(s=Sum('total_amount')).values('s')[:1]
-    )
-    _cnt_sq = Subquery(
-        orders.filter(
-            Q(table_info__restaurant=OuterRef('pk')) |
-            Q(table_info__owner=OuterRef('branch_owner'))
-        ).order_by().annotate(_g=Value(1)).values('_g').annotate(s=Count('id')).values('s')[:1]
-    )
+
+    # Revenue by restaurant — one aggregate with a filtered Sum/Count per restaurant
+    _rests = list(restaurant_filter)
+    _agg = {}
+    for restaurant in _rests:
+        _rq = restaurant_orders_q(restaurant)
+        _agg[f'rev_{restaurant.pk}'] = Sum('total_amount', filter=_rq)
+        _agg[f'cnt_{restaurant.pk}'] = Count('id', filter=_rq)
+    _per = sold.aggregate(**_agg) if _agg else {}
 
     restaurant_revenue = []
-    for restaurant in restaurant_filter.annotate(_rest_rev=_rev_sq, _rest_cnt=_cnt_sq):
-        rest_revenue = restaurant._rest_rev or 0
-        rest_count = restaurant._rest_cnt or 0
+    for restaurant in _rests:
+        rest_revenue = _per.get(f'rev_{restaurant.pk}') or 0
+        rest_count = _per.get(f'cnt_{restaurant.pk}') or 0
         restaurant_revenue.append({
             'restaurant': restaurant,
             'revenue': rest_revenue,
@@ -289,7 +265,7 @@ def view_all_orders(request):
             Q(table_info__restaurant=restaurant) |
             Q(table_info__owner=restaurant.branch_owner) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.branch_owner)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.branch_owner))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(restaurant.branch_owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(restaurant.branch_owner)))
         )
         if query:
             query |= restaurant_query
@@ -299,7 +275,14 @@ def view_all_orders(request):
     if not query:
         orders = Order.objects.none()
     else:
-        orders = Order.objects.filter(query).select_related('table_info', 'ordered_by').prefetch_related('order_items').order_by('-created_at')
+        # Rows show the location (table_info.restaurant / owner) and the first items' names
+        from django.db.models import Prefetch as _Prefetch
+        from orders.models import OrderItem as _OrderItem
+        orders = Order.objects.filter(query).select_related(
+            'table_info__restaurant', 'table_info__owner', 'ordered_by',
+        ).prefetch_related(
+            _Prefetch('order_items', queryset=_OrderItem.objects.select_related('product')),
+        ).order_by('-created_at')
     
     # Filters
     status_filter = request.GET.get('status')
@@ -315,7 +298,7 @@ def view_all_orders(request):
                 Q(table_info__restaurant=selected_restaurant) |
                 Q(table_info__owner=selected_restaurant.branch_owner) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=selected_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=selected_restaurant.branch_owner)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=selected_restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=selected_restaurant.branch_owner))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(selected_restaurant.branch_owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(selected_restaurant.branch_owner)))
             )
         except Restaurant.DoesNotExist:
             pass
@@ -354,28 +337,24 @@ def branch_detail(request, restaurant_id):
     
     restaurant = get_object_or_404(Restaurant, id=restaurant_id, main_owner=request.user)
     
-    # Branch statistics
-    orders = Order.objects.filter(
-        Q(table_info__restaurant=restaurant) |
-        Q(table_info__owner=restaurant.branch_owner) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=restaurant.branch_owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=restaurant.branch_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=restaurant.branch_owner))
-    )
-    
-    total_orders = orders.count()
-    total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or 0
+    # Branch statistics — this restaurant's own orders; revenue counts sales only
+    orders = Order.objects.filter(restaurant_orders_q(restaurant))
+    sold = orders.exclude(status__in=NON_REVENUE_STATUSES)
+
+    total_orders = sold.count()
+    total_revenue = sold.aggregate(total=Sum('total_amount'))['total'] or 0
     
     # Today's stats
     from django.utils.timezone import localtime
     today = localtime(timezone.now()).date()
-    today_orders = orders.filter(created_at__date=today)
+    today_orders = sold.filter(created_at__date=today)
     _today = today_orders.aggregate(total=Sum('total_amount'), count=Count('id'))
     today_revenue = _today['total'] or 0
     today_order_count = _today['count'] or 0
     
     # This week's stats
     week_start = timezone.now() - timedelta(days=7)
-    _week = orders.filter(created_at__gte=week_start).aggregate(total=Sum('total_amount'), count=Count('id'))
+    _week = sold.filter(created_at__gte=week_start).aggregate(total=Sum('total_amount'), count=Count('id'))
     week_orders = _week['count'] or 0
     week_revenue = _week['total'] or 0
     
@@ -383,15 +362,11 @@ def branch_detail(request, restaurant_id):
     staff = User.objects.filter(owner=restaurant.branch_owner)
     
     # Tables
-    tables = TableInfo.objects.filter(
-        Q(restaurant=restaurant) | Q(owner=restaurant.branch_owner)
-    )
+    _tables_q, _products_q = restaurant_tables_products_q(restaurant)
+    tables = TableInfo.objects.filter(_tables_q)
     
     # Products
-    products = Product.objects.filter(
-        Q(main_category__restaurant=restaurant) |
-        Q(main_category__owner=restaurant.branch_owner)
-    )
+    products = Product.objects.filter(_products_q)
     
     # Recent orders
     recent_orders = orders.prefetch_related('order_items').order_by('-created_at')[:10]

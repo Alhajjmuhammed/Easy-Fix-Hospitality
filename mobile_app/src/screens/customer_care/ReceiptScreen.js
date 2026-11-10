@@ -15,7 +15,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiPaymentReceipt, apiReprintReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
 import { buildReceiptText, shareOnWhatsApp } from '../../utils/shareReceipt';
-import { printReceipt }     from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { useAuthStore }     from '../../store/useAuthStore';
 import { useT } from '../../i18n';
 const METHOD_LABEL = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
@@ -24,7 +24,7 @@ export default function ReceiptScreen({ route }) {
   const t = useT();
   const { paymentId } = route.params;
   const theme = useTheme();
-  const { format } = useCurrency();
+  const { format, decimals } = useCurrency();
   const user = useAuthStore((s) => s.user);
   const [loading, setLoading] = useState(true);
   const [reprinting, setReprinting] = useState(false);
@@ -76,15 +76,17 @@ export default function ReceiptScreen({ route }) {
       const staffName = data.payment?.processed_by_name
         || [user?.first_name, user?.last_name].filter(Boolean).join(' ')
         || user?.username || '';
-      await printReceipt({
+      const ok = await printReceipt({
         orderId:        data.payment?.order_id ?? data.order?.id,
         order:          data.order,
         payment:        data.payment,
         restaurantName: user?.restaurant_name || '',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
-      if (mountedRef.current) setSnack('Receipt sent to printer');
+      if (!mountedRef.current) return;
+      setSnack(isPrinterUnreachable(ok) ? t('Printer not reachable') : 'Receipt sent to printer');
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err?.message || t('Unknown error') }));
     } finally {

@@ -424,7 +424,11 @@ export default function CCReportsScreen() {
 
                   <View style={styles.row}>
                     <Text variant="bodySmall" style={{ opacity: 0.65 }}>
-                      {t('Table {n}', { n: order.table_number })} · {order.items_count !== 1
+                      {order.order_type === 'delivery' ? `🚴 ${t('Delivery')} · `
+                        : order.order_type === 'pickup' ? `🛍 ${t('Pickup')} · `
+                        // No order_type (older server): a remote order has no table ('N/A'), leave it out
+                        : (order.table_number && order.table_number !== 'N/A') ? `${t('Table {n}', { n: order.table_number })} · ` : ''}
+                      {order.items_count !== 1
                         ? t('{n} items', { n: order.items_count })
                         : t('{n} item', { n: order.items_count })}
                     </Text>

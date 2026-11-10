@@ -556,7 +556,7 @@ $('#confirmDeleteBtn').click(function() {
                 
                 // Show success message and redirect
                 $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-                    data.message + ' ' + "{{ t_redirecting|escapejs }}" +
+                    escapeHtml(data.message) + ' ' + escapeHtml("{{ t_redirecting|escapejs }}") +
                     '<button type="button" class="close" data-dismiss="alert">' +
                     '<span>&times;</span></button></div>')
                     .prependTo('.container-fluid');

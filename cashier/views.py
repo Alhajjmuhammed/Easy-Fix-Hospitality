@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from restaurant_system.db_utils import managed_owner_ids
 
 
 def _safe_csv(value):
@@ -75,7 +76,7 @@ def cashier_dashboard(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     if period == 'today':
         orders = Order.objects.filter(
@@ -142,12 +143,12 @@ def cashier_dashboard(request):
         role__name='cashier', owner=owner
     ).order_by('first_name', 'username')
     
-    # Get products for waste recording modal
+    # Get products for waste recording modal (the dropdown shows category names: join them)
     waste_products = Product.objects.filter(
         Q(main_category__owner=owner) |
         Q(main_category__restaurant__main_owner=owner) |
         Q(main_category__restaurant__branch_owner=owner)
-    ).distinct().order_by('name')
+    ).select_related('main_category', 'sub_category').distinct().order_by('name')
     
     # Calculate payment summaries using already-prefetched payments (avoids N+1)
     # Note: .filter().aggregate() would bypass the prefetch cache, so iterate in Python instead.
@@ -174,6 +175,34 @@ def cashier_dashboard(request):
     return render(request, 'cashier/dashboard.html', context)
 
 
+from django.utils.translation import gettext_lazy as _lazy
+
+MY_ORDERS_PERIODS = (
+    ('today', _lazy('Today')),
+    ('yesterday', _lazy('Yesterday')),
+    ('7d', _lazy('Last 7 days')),
+    ('30d', _lazy('Last 30 days')),
+    ('all', _lazy('All time')),
+)
+MY_ORDERS_PER_PAGE = 50
+
+
+def _my_orders_range(period):
+    """(start, end) aware datetimes for a my-orders period; None = open-ended.
+    Local midnight, the same way the cashier dashboard computes "today"."""
+    from datetime import timedelta
+    today_start = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == 'today':
+        return today_start, today_start + timedelta(days=1)
+    if period == 'yesterday':
+        return today_start - timedelta(days=1), today_start
+    if period == '7d':
+        return today_start - timedelta(days=6), None
+    if period == '30d':
+        return today_start - timedelta(days=29), None
+    return None, None
+
+
 @login_required
 def my_orders(request):
     """Cashier's own orders - orders they created"""
@@ -192,16 +221,39 @@ def my_orders(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
-    orders = Order.objects.filter(
+    # Period filter (default: today, in local time) + pagination: without them a busy
+    # cashier's page loaded every order they ever took.
+    period = request.GET.get('period', 'today')
+    if period not in dict(MY_ORDERS_PERIODS):
+        period = 'today'
+    period_start, period_end = _my_orders_range(period)
+    date_q = Q()
+    if period_start is not None:
+        date_q &= Q(created_at__gte=period_start)
+    if period_end is not None:
+        date_q &= Q(created_at__lt=period_end)
+    if period == 'today':
+        # "Today" also keeps older orders that still owe money (e.g. taken at 23:30 and
+        # not paid before midnight), so an open bill never drops out of the default view.
+        from reports.forecast import NOT_SOLD
+        date_q |= Q(payment_status__in=['unpaid', 'partial']) & ~Q(status__in=NOT_SOLD)
+
+    orders_qs = Order.objects.filter(
         _oq_mo,
-        Q(ordered_by=request.user) | Q(entered_by=request.user)
+        Q(ordered_by=request.user) | Q(entered_by=request.user),
+        date_q,
     ).select_related('table_info', 'ordered_by').prefetch_related(
         Prefetch('order_items', queryset=OrderItem.objects.select_related('product')),
         'payments'
     ).order_by('-created_at')
-    
+
+    from django.core.paginator import Paginator
+    paginator = Paginator(orders_qs, MY_ORDERS_PER_PAGE)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    orders = list(page_obj.object_list)
+
     # Calculate payment summaries using already-prefetched payments (avoids N+1)
     for order in orders:
         total_paid = sum(p.amount for p in order.payments.all() if not p.is_voided) or Decimal('0.00')
@@ -213,10 +265,14 @@ def my_orders(request):
         Q(main_category__owner=owner) |
         Q(main_category__restaurant__main_owner=owner) |
         Q(main_category__restaurant__branch_owner=owner)
-    ).distinct().order_by('name')
+    ).select_related('main_category', 'sub_category').distinct().order_by('name')
 
     context = {
         'orders': orders,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'period': period,
+        'period_choices': MY_ORDERS_PERIODS,
         'payment_status_choices': Order.PAYMENT_STATUS_CHOICES,
         'waste_products': waste_products,
     }
@@ -241,7 +297,7 @@ def process_payment(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     # Use select_for_update() on POST to prevent concurrent payment race conditions.
     # GET uses a plain queryset (no lock needed for read-only data).
@@ -316,8 +372,9 @@ def process_payment(request, order_id):
         
         payment_method = data.get('payment_method', 'cash')
         selected_items = data.get('selected_items', [])
-        reference_number = data.get('reference_number', '')
-        notes = data.get('notes', '')
+        from accounts.security_utils import sanitize_notes  # Payment.reference_number is max_length=50
+        reference_number = (sanitize_notes(str(data.get('reference_number') or '')) or '')[:50]
+        notes = sanitize_notes(str(data.get('notes') or '')) or ''
         
         # Validate amount
         if amount <= 0:
@@ -351,6 +408,7 @@ def process_payment(request, order_id):
                 loyalty_redeem = loyalty_svc.prepare_redeem(order, amount, data.get('loyalty_code'))
             except _VE as e:
                 return JsonResponse({'error': ' '.join(e.messages)}, status=400)
+            amount = loyalty_redeem[3]     # exactly what the points taken are worth (rest stays due)
 
         # Create payment record (and take the points in the same step: both happen or neither)
         with transaction.atomic():
@@ -363,7 +421,7 @@ def process_payment(request, order_id):
                 notes=notes
             )
             if loyalty_redeem:
-                program, customer, points = loyalty_redeem
+                program, customer, points, _credited = loyalty_redeem
                 loyalty_svc.record_redeem(program, customer, payment, points, request.user)
         
         # If specific items selected, create item payment records
@@ -510,7 +568,7 @@ def void_payment(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     # select_for_update prevents concurrent void of the same payment
     payment = locked_get(Payment.objects.filter(_pq_vp), id=payment_id)
@@ -614,7 +672,7 @@ def transfer_table(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = locked_get(Order.objects.filter(_oq_tt), id=order_id)
 
@@ -693,7 +751,7 @@ def cancel_order(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = locked_get(Order.objects.filter(_oq_co), id=order_id)
 
@@ -710,15 +768,13 @@ def cancel_order(request, order_id):
         data = json.loads(request.body)
         cancel_reason = data.get('reason', '')
         
+        # Put back what the lines took — only while the food is still in the kitchen. Served /
+        # out for delivery / delivered food is gone (same rule as the app and kitchen cancel).
+        from orders.stock import give_back_order
+        give_back_order(order)                 # call before the status changes
         order.status = 'cancelled'
         order.payment_status = 'unpaid'
         order.reason_if_cancelled = cancel_reason
-        # Restore stock for each item — atomic per-product update
-        from restaurant.models import Product as _Product
-        from django.db.models import F as _F
-        from orders.stock import give_back
-        for item in order.order_items.select_related('product').all():
-            give_back(item)                    # exactly what this line took (stock never below 0)
         # Release the table when order is cancelled
         order.release_table()
         order.save(update_fields=['status', 'payment_status', 'reason_if_cancelled'])
@@ -747,7 +803,7 @@ def payment_history(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = get_object_or_404(Order.objects.filter(_oq_ph), id=order_id)
     
@@ -797,7 +853,7 @@ def generate_receipt(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     payment = get_object_or_404(
         Payment.objects.select_related('order')
@@ -842,7 +898,7 @@ def reprint_receipt(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     payment = get_object_or_404(
         Payment.objects.select_related('order')
@@ -903,7 +959,7 @@ def receipt_management(request):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     payments = Payment.objects.filter(
         _pq_rm,
@@ -928,12 +984,12 @@ def receipt_management(request):
     # Limit results for performance
     payments = payments[:50]
     
-    # Get products for waste recording modal
+    # Get products for waste recording modal (the dropdown shows category names: join them)
     waste_products = Product.objects.filter(
         Q(main_category__owner=owner) |
         Q(main_category__restaurant__main_owner=owner) |
         Q(main_category__restaurant__branch_owner=owner)
-    ).distinct().order_by('name')
+    ).select_related('main_category', 'sub_category').distinct().order_by('name')
     
     context = {
         'payments': payments,
@@ -961,7 +1017,7 @@ def print_bill(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = get_object_or_404(
         Order.objects.prefetch_related('order_items__product').filter(_oq_pb),
@@ -1038,7 +1094,7 @@ def cashier_reports(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     orders = Order.objects.filter(_oq_cr)
     
@@ -1129,7 +1185,8 @@ def cashier_reports(request):
         ).values('payment_method').annotate(count=Count('id'), total=Sum('amount')).order_by('-total')
     ]
 
-    total_items = OrderItem.objects.filter(order_id__in=order_ids).count()
+    # Dishes sold: quantities (not lines) of the orders counted in the revenue (no cancelled ones)
+    total_items = OrderItem.objects.filter(order__in=revenue_qs).aggregate(t=Sum('quantity'))['t'] or 0
     
     # Handle CSV export
     if export_format == 'csv':
@@ -1342,7 +1399,7 @@ def cashier_reports(request):
         Q(main_category__owner=owner) |
         Q(main_category__restaurant__main_owner=owner) |
         Q(main_category__restaurant__branch_owner=owner)
-    ).distinct().order_by('name')
+    ).select_related('main_category', 'sub_category').distinct().order_by('name')
 
     context = {
         'orders': orders,

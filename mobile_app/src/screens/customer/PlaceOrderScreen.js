@@ -206,11 +206,11 @@ export default function PlaceOrderScreen({ navigation }) {
             if (price_changes?.length) {
               setConflictDialog(price_changes);
             } else if (!unavailable_items?.length) {
-              setSnack(err.response.data?.detail || t('Order failed. Please try again.'));
+              setSnack(err.response.data?.error || err.response.data?.detail || t('Order failed. Please try again.'));
             }
           } else {
-            const friendlyMsg = err.response?.data?.detail
-              || err.response?.data?.error
+            const friendlyMsg = err.response?.data?.error
+              || err.response?.data?.detail
               || err.response?.data?.message
               || t('Please check your order and try again.');
             setSnack(friendlyMsg);

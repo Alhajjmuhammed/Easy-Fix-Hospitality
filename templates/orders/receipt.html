@@ -225,7 +225,7 @@
                         </div>
                     {% endif %}
                     <div class="total-row">
-                        <span>{% blocktranslate with rate=order.tax_rate %}Tax ({{ rate }}%):{% endblocktranslate %}</span>
+                        <span>{% blocktranslate with rate=order.charged_tax_percentage|floatformat:1 %}Tax ({{ rate }}%):{% endblocktranslate %}</span>
                         <span>{% currency_symbol %}{{ tax_amount|floatformat:2 }}</span>
                     </div>
                     {% if order.delivery_fee > 0 %}

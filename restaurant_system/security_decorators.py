@@ -101,6 +101,27 @@ def rate_limit_registration(func):
     return wrapper
 
 
+def rate_limit_mobile_registration(func):
+    """
+    Rate limiter for the mobile app's customer self-registration (/api/v1/auth/register/).
+    - 30 sign-ups per hour per IP (customers on one restaurant Wi-Fi / carrier NAT share an IP; same 'ip' key as the web login: RATELIMIT_IP_META_KEY,
+      i.e. nginx's X-Real-IP in production)
+    Answers with JSON 429 and an 'error' key, which is what the mobile app shows.
+    Put it ABOVE @api_view so it sees the plain Django request.
+    """
+    @wraps(func)
+    @ratelimit(key='ip', rate='30/h', block=False, method='POST')
+    def wrapper(request, *args, **kwargs):
+        if getattr(request, 'limited', False):
+            from django.utils.translation import gettext as _
+            return JsonResponse({
+                'error': _('Too many sign-up attempts from this network. Please try again later.'),
+                'rate_limited': True,
+            }, status=429)
+        return func(request, *args, **kwargs)
+    return wrapper
+
+
 def rate_limit_password_reset(func):
     """
     Rate limiter for password reset requests

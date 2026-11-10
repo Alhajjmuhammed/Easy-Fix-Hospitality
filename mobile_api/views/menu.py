@@ -59,9 +59,16 @@ def menu(request):
             queryset=SubCategory.objects.filter(is_active=True).prefetch_related(
                 Prefetch(
                     'products',
-                    queryset=Product.objects.filter(is_available=True).select_related('sub_category'),
+                    queryset=Product.objects.filter(is_available=True).select_related(
+                        'main_category__restaurant__main_owner', 'main_category__restaurant__branch_owner',
+                        'main_category__owner', 'sub_category',
+                    ),
+                    to_attr='_available_products',
                 )
             ),
+            # to_attr: CategorySerializer/SubCategorySerializer read these lists (as sync
+            # pull does); without it they call .filter() and hit the DB once per category.
+            to_attr='_active_subs',
         )
     )
 

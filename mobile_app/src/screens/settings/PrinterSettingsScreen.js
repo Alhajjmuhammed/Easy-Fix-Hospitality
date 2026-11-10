@@ -32,6 +32,7 @@ import { usePrinterStore }      from '../../store/usePrinterStore';
 import { useAuthStore }         from '../../store/useAuthStore';
 import { useLockStore }         from '../../store/useLockStore';
 import { useT }                 from '../../i18n';
+import { useCurrency }          from '../../hooks/useCurrency';
 import LanguageSwitch           from '../../components/LanguageSwitch';
 
 // ─── Shared banner helpers (same as DashboardScreen) ─────────────────────────
@@ -108,6 +109,7 @@ import {
   scanBluetoothDevices,
   connectBluetoothPrinter,
   printReceipt,
+  isPrinterUnreachable,
 }                               from '../../utils/printer';
 
 // ─── Mode definitions ─────────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ export default function PrinterSettingsScreen() {
   const user = useAuthStore((s) => s.user);
   const restaurantName = user?.restaurant_name || '';
   const currencySymbol = user?.currency_symbol || '';
+  const { decimals } = useCurrency();
 
   const { hasPin, setPin, removePin } = useLockStore();
   const [scanning, setScanning]       = useState(false);
@@ -262,18 +265,20 @@ export default function PrinterSettingsScreen() {
           { product_name: 'Soft Drink',      quantity: 2, total_price: '3.00' },
         ],
       };
-      await printReceipt({
+      const ok = await printReceipt({
         order:          demoOrder,
         payment:        { payment_method: 'cash', amount: '11.50', created_at: new Date().toISOString(), id: 999999 },
         restaurantName: restaurantName || 'My Restaurant',
         currencySymbol: currencySymbol || '$',
+        decimals,
       });
+      if (isPrinterUnreachable(ok)) Alert.alert(t('Test Print Failed'), t('Printer not reachable'));
     } catch (err) {
       Alert.alert(t('Test Print Failed'), err?.message || t('Could not print.'));
     } finally {
       setTestPrinting(false);
     }
-  }, [restaurantName, currencySymbol, t]);
+  }, [restaurantName, currencySymbol, decimals, t]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 

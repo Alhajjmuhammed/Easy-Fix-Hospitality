@@ -64,10 +64,10 @@ document.getElementById('editRoleForm').addEventListener('submit', function(e) {
     .then(r => r.json())
     .then(res => {
         if (res.success) {
-            alertBox.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>' + res.message + '</div>';
+            alertBox.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>' + escapeHtml(res.message) + '</div>';
             setTimeout(() => { window.location.href = '{% url "admin_panel:manage_users" %}'; }, 1500);
         } else {
-            alertBox.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + res.message + '</div>';
+            alertBox.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + escapeHtml(res.message) + '</div>';
         }
     })
     .catch(() => {

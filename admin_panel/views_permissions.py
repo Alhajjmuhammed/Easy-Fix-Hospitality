@@ -1,4 +1,5 @@
 import json
+from accounts.security_utils import sanitize_name, sanitize_plain_text
 import logging
 
 from django.contrib.auth.decorators import login_required
@@ -140,8 +141,9 @@ def create_custom_role(request):
 
     try:
         data = json.loads(request.body)
-        name = data.get('name', '').strip()
-        description = data.get('description', '').strip()
+        # Plain text only: role names/descriptions are shown in owner and system-admin pages.
+        name = sanitize_name(data.get('name') or '', max_length=100)
+        description = sanitize_plain_text(data.get('description') or '', max_length=255)
         feature_slugs = data.get('feature_slugs', [])
         role_id = data.get('role_id')
 

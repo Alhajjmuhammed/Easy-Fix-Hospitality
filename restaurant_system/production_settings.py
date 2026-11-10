@@ -186,7 +186,12 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': [{'address': REDIS_URL, 'protocol': 2}],
+            # channels_redis 4.x passes the extra keys to redis.asyncio ConnectionPool.from_url:
+            # give up after 1 s when Redis is unreachable instead of hanging the request.
+            # NO socket_timeout: consumers wait for messages with a blocking BZPOPMIN (5 s), and
+            # a read timeout below that kills every idle WebSocket (verified with channels_redis 4.2).
+            'hosts': [{'address': REDIS_URL, 'protocol': 2,
+                       'socket_connect_timeout': 1}],
             'capacity': 1500,
             'expiry': 10,
         },
@@ -415,9 +420,16 @@ AXES_IP_WHITELIST = []  # Can add trusted IPs (e.g., admin office, staff network
 # Rate Limiting Configuration
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = 'default'
+# When the cache (Redis) is unreachable the counters can't be read: let requests through
+# instead of answering 429 to every login and payment. (Axes still guards logins in the DB.)
+RATELIMIT_FAIL_OPEN = True
 RATELIMIT_VIEW = 'restaurant_system.security_decorators.rate_limited_view'  # Custom rate limit exceeded view (429 page)
 # Use X-Real-IP header which nginx sets, fallback to X-Forwarded-For
 RATELIMIT_IP_META_KEY = 'HTTP_X_REAL_IP'
+
+# Key for the encrypted payment-provider credentials (cashier/secure_fields.py reads it
+# with getattr). Empty = the previous behaviour.
+CREDENTIALS_ENCRYPTION_KEY = config('CREDENTIALS_ENCRYPTION_KEY', default='')
 
 # Redis Cache for Production (Required)
 # IMPORTANT: REDIS_PASSWORD should be set in environment for security
@@ -441,9 +453,10 @@ CACHES = {
         'LOCATION': REDIS_URL,
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'SOCKET_CONNECT_TIMEOUT': 5,
-            'SOCKET_TIMEOUT': 5,
-            'RETRY_ON_TIMEOUT': True,
+            # Fail fast when Redis is down (IGNORE_EXCEPTIONS turns errors into misses):
+            # 1 s, no retry — a sync worker has a 30 s budget for the whole request.
+            'SOCKET_CONNECT_TIMEOUT': 1,
+            'SOCKET_TIMEOUT': 1,
             'MAX_CONNECTIONS': 50,
             'CONNECTION_POOL_KWARGS': {'max_connections': 50},
             'IGNORE_EXCEPTIONS': True,  # Graceful degradation if Redis down
@@ -453,8 +466,11 @@ CACHES = {
     }
 }
 
-# Use Redis for session storage in production
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+# Sessions: database-backed with Redis as a read-through cache. With the pure cache
+# backend a Redis outage logged everyone out and made login impossible ("Unable to
+# create a new session key"); cached_db keeps working from PostgreSQL meanwhile.
+# (django.contrib.sessions is installed; its table comes from sessions.0001_initial.)
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 SESSION_CACHE_ALIAS = 'default'
 
 # CORS Configuration for Production
@@ -543,6 +559,10 @@ REST_FRAMEWORK = {
         'anon': '100/minute',   # Anonymous users: 100 requests/minute
         'user': '1000/minute',  # Authenticated users: 1000 requests/minute (PrintClient uses ~12/min)
     },
+    # One reverse proxy (nginx) appends the real client address to X-Forwarded-For.
+    # With NUM_PROXIES=1 DRF throttles on the RIGHTMOST entry (the one nginx added),
+    # so a client cannot dodge the throttle by sending its own fake X-Forwarded-For.
+    'NUM_PROXIES': 1,
 }
 
 # ============================================================================

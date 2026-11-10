@@ -197,14 +197,21 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{# Chart data via json_script (escapes < > &): restaurant names cannot break out of the script. #}
+{{ json_daily_orders|json_script:"stats-daily-orders" }}
+{{ json_daily_users|json_script:"stats-daily-users" }}
+{{ json_order_status|json_script:"stats-order-status" }}
+{{ json_role_counts|json_script:"stats-role-counts" }}
+{{ json_top_restaurants|json_script:"stats-top-restaurants" }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   try {
-  const dailyOrders = {{ json_daily_orders|safe }};
-  const dailyUsers  = {{ json_daily_users|safe }};
-  const statusData  = {{ json_order_status|safe }};
-  const roleData    = {{ json_role_counts|safe }};
-  const topRest     = {{ json_top_restaurants|safe }};
+  const readJson = (id) => JSON.parse(document.getElementById(id).textContent);
+  const dailyOrders = readJson('stats-daily-orders');
+  const dailyUsers  = readJson('stats-daily-users');
+  const statusData  = readJson('stats-order-status');
+  const roleData    = readJson('stats-role-counts');
+  const topRest     = readJson('stats-top-restaurants');
 
   Chart.defaults.font.family = "'Segoe UI', Arial, sans-serif";
   Chart.defaults.color = '#6c757d';

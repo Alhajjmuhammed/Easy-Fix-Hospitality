@@ -373,10 +373,12 @@ function showToast(message, type) {
     const toast = document.createElement('div');
     toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
     toast.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    // message may contain names typed by users: show it as text, never as HTML
     toast.innerHTML = `
-        ${message}
+        <span class="toast-message"></span>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
+    toast.querySelector('.toast-message').textContent = message == null ? '' : String(message);
     
     document.body.appendChild(toast);
     

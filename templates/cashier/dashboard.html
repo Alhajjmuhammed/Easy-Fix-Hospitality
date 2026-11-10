@@ -88,6 +88,18 @@
 <script>
     // Currency symbol for JavaScript
     const CURRENCY_SYMBOL = '{% currency_symbol %}';
+    /* HTML escaper for every server value put into innerHTML / template strings.
+       cashier_base.html does not load base.html's escapeHtml, so it is defined here. */
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/`/g, '&#96;');
+    }
     {% with feats=request.user.visible_features %}
     const CAN_VOID = {% if 'void_payments' in feats %}true{% else %}false{% endif %};
     const CAN_PRINT_RECEIPT = {% if 'view_receipts' in feats %}true{% else %}false{% endif %};
@@ -156,10 +168,10 @@ $(document).ready(function() {
             success: function(data) {
                 $('#wasteSuccessDetails').html(`
                     <div class="alert alert-light border text-start">
-                        <strong>${data.waste_log.product_name}</strong><br>
-                        {{ t_quantity_colon|escapejs }} ${data.waste_log.quantity_wasted}<br>
-                        {{ t_total_cost_colon|escapejs }} ${CURRENCY_SYMBOL}${data.waste_log.total_cost.toFixed(2)}<br>
-                        {{ t_reason_colon|escapejs }} ${data.waste_log.waste_reason}
+                        <strong>${escapeHtml(data.waste_log.product_name)}</strong><br>
+                        {{ t_quantity_colon|escapejs }} ${escapeHtml(data.waste_log.quantity_wasted)}<br>
+                        {{ t_total_cost_colon|escapejs }} ${CURRENCY_SYMBOL}${escapeHtml(Number(data.waste_log.total_cost).toFixed(2))}<br>
+                        {{ t_reason_colon|escapejs }} ${escapeHtml(data.waste_log.waste_reason)}
                     </div>
                 `);
                 $('#wasteRecordModal').modal('hide');
@@ -205,7 +217,9 @@ $(document).ready(function() {
                 var msg = JSON.parse(e.data);
                 if (msg.type === 'new_order') {
                     showOrderNotification(msg.order_number, msg.table_number);
-                } else if (msg.type === 'order_status_update' || msg.type === 'order_update') {
+                } else if (msg.type === 'order_status_update' || msg.type === 'order_update' ||
+                           msg.type === 'order_updated' || msg.type === 'bill_request' ||
+                           msg.type === 'order_cancelled') {
                     // Payment or status change — schedule a quiet refresh
                     scheduleReload();
                 }
@@ -428,7 +442,7 @@ $(document).ready(function() {
                                                         </button>
                                                         {% endif %}
                                                         {% if 'view_receipts' in feats %}
-                                                        <button type="button" class="btn btn-secondary btn-sm" onclick="printBill({{ order.id }}, '{{ order.order_number }}')">
+                                                        <button type="button" class="btn btn-secondary btn-sm" onclick="printBill({{ order.id }}, '{{ order.order_number|escapejs }}')">
                                                             🧾 {% translate "Print Bill" %}
                                                         </button>
                                                         {% endif %}
@@ -690,12 +704,12 @@ function processPayment(orderId) {
                     <h6>{{ t_order_details|escapejs }}</h6>
                     <div class="row">
                         <div class="col-sm-6">
-                            <strong>{{ t_order_colon|escapejs }}</strong> ${data.order_number}<br>
-                            <strong>{{ t_table_colon|escapejs }}</strong> ${data.table_number}
+                            <strong>{{ t_order_colon|escapejs }}</strong> ${escapeHtml(data.order_number)}<br>
+                            <strong>{{ t_table_colon|escapejs }}</strong> ${escapeHtml(data.table_number)}
                         </div>
                         <div class="col-sm-6 text-end">
-                            <strong>{{ t_total_colon|escapejs }}</strong> ${CURRENCY_SYMBOL}${data.total_amount}<br>
-                            <strong>{{ t_balance_due_colon|escapejs }}</strong> <span class="text-danger">${CURRENCY_SYMBOL}${data.balance_due}</span>
+                            <strong>{{ t_total_colon|escapejs }}</strong> ${CURRENCY_SYMBOL}${escapeHtml(data.total_amount)}<br>
+                            <strong>{{ t_balance_due_colon|escapejs }}</strong> <span class="text-danger">${CURRENCY_SYMBOL}${escapeHtml(data.balance_due)}</span>
                         </div>
                     </div>
                 </div>
@@ -705,8 +719,8 @@ function processPayment(orderId) {
                         <div class="col-md-6">
                             <label for="paymentAmount" class="form-label">{{ t_payment_amount|escapejs }}</label>
                             <input type="number" class="form-control" id="paymentAmount" 
-                                   step="0.01" min="0.01" max="${data.balance_due}" 
-                                   value="${data.balance_due}" required>
+                                   step="0.01" min="0.01" max="${escapeHtml(data.balance_due)}" 
+                                   value="${escapeHtml(data.balance_due)}" required>
                         </div>
                         <div class="col-md-6">
                             <label for="paymentMethod" class="form-label">{{ t_payment_method|escapejs }}</label>
@@ -758,13 +772,13 @@ function processPayment(orderId) {
                                 <tbody id="itemsTable">
                                     ${data.items.map(item => `
                                         <tr>
-                                            <td>${item.product_name}</td>
-                                            <td>${CURRENCY_SYMBOL}${item.unit_price}</td>
-                                            <td>${item.remaining_quantity}</td>
+                                            <td>${escapeHtml(item.product_name)}</td>
+                                            <td>${CURRENCY_SYMBOL}${escapeHtml(item.unit_price)}</td>
+                                            <td>${escapeHtml(item.remaining_quantity)}</td>
                                             <td>
                                                 <input type="number" class="form-control form-control-sm item-quantity" 
-                                                       data-item-id="${item.id}" data-unit-price="${item.unit_price}"
-                                                       min="0" max="${item.remaining_quantity}" value="0"
+                                                       data-item-id="${escapeHtml(item.id)}" data-unit-price="${escapeHtml(item.unit_price)}"
+                                                       min="0" max="${escapeHtml(item.remaining_quantity)}" value="0"
                                                        onchange="updateItemTotal()">
                                             </td>
                                             <td class="item-total">${CURRENCY_SYMBOL}0.00</td>
@@ -819,8 +833,9 @@ function loadLoyalty(orderId, balanceDue, info) {
             line.textContent = `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}: ` + "{{ t_points_worth|escapejs }}".replace('{points}', () => c.points).replace('{amount}', () => `${CURRENCY_SYMBOL}${c.worth}`);
             box.appendChild(line);
             const value = parseFloat(d.point_value);
-            const usable = Math.min(balanceDue, parseFloat(c.worth));
-            const needed = Math.ceil(usable / value - 1e-9);
+            // Whole points only, rounded down; the server credits exactly points x value.
+            const needed = Math.floor(Math.min(balanceDue, parseFloat(c.worth)) / value + 1e-9);
+            const usable = Math.round(needed * value * 100) / 100;
             if (c.points >= d.min_redeem_points && needed >= d.min_redeem_points && usable > 0) {
                 if (!opt) {
                     opt = document.createElement('option');
@@ -1002,7 +1017,7 @@ function viewPaymentHistory(orderId) {
             }
             
             document.getElementById('historyModalContent').innerHTML = `
-                <h6>{{ t_order_colon|escapejs }} ${data.order_number}</h6>
+                <h6>{{ t_order_colon|escapejs }} ${escapeHtml(data.order_number)}</h6>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
@@ -1018,10 +1033,10 @@ function viewPaymentHistory(orderId) {
                         <tbody>
                             ${data.payments.map(payment => `
                                 <tr class="${payment.is_voided ? 'table-secondary' : ''}">
-                                    <td>${payment.created_at}</td>
-                                    <td>${CURRENCY_SYMBOL}${payment.amount}</td>
-                                    <td>${payment.payment_method}</td>
-                                    <td>${payment.processed_by}</td>
+                                    <td>${escapeHtml(payment.created_at)}</td>
+                                    <td>${CURRENCY_SYMBOL}${escapeHtml(payment.amount)}</td>
+                                    <td>${escapeHtml(payment.payment_method)}</td>
+                                    <td>${escapeHtml(payment.processed_by)}</td>
                                     <td>
                                         ${payment.is_voided ? 
                                             '<span class="badge bg-secondary">' + "{{ t_voided|escapejs }}" + '</span>' : 
@@ -1031,10 +1046,10 @@ function viewPaymentHistory(orderId) {
                                     <td>
                                         ${!payment.is_voided ?
                                             `<div class="btn-group btn-group-sm">
-                                                ${CAN_VOID ? `<button class="btn btn-danger" onclick="voidPayment(${payment.id}, ${payment.payment_method === 'loyalty'})">{{ t_void|escapejs }}</button>` : ''}
-                                                ${CAN_PRINT_RECEIPT ? `<button class="btn btn-info" onclick="generateReceipt(${payment.id})">{{ t_receipt|escapejs }}</button>` : ''}
+                                                ${CAN_VOID ? `<button class="btn btn-danger" onclick="voidPayment(${Number(payment.id)}, ${payment.payment_method === 'loyalty'})">{{ t_void|escapejs }}</button>` : ''}
+                                                ${CAN_PRINT_RECEIPT ? `<button class="btn btn-info" onclick="generateReceipt(${Number(payment.id)})">{{ t_receipt|escapejs }}</button>` : ''}
                                             </div>` :
-                                            `${CAN_PRINT_RECEIPT ? `<button class="btn btn-sm btn-secondary" onclick="generateReceipt(${payment.id})">{{ t_view_receipt|escapejs }}</button>` : ''}`
+                                            `${CAN_PRINT_RECEIPT ? `<button class="btn btn-sm btn-secondary" onclick="generateReceipt(${Number(payment.id)})">{{ t_view_receipt|escapejs }}</button>` : ''}`
                                         }
                                     </td>
                                 </tr>

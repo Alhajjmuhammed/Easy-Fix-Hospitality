@@ -443,7 +443,7 @@
             <div class="roles-sidebar">
                 <div class="roles-sidebar-title">Select a role to edit</div>
                 {% for role_name, role_display in built_in_roles %}
-                <button class="role-item" data-role="{{ role_name }}" onclick="selectRole('{{ role_name }}', '{{ role_display }}')">
+                <button class="role-item" data-role="{{ role_name }}" onclick="selectRole('{{ role_name|escapejs }}', '{{ role_display|escapejs }}')">
                     <span class="role-icon ri-{{ role_name }}">
                         {% if role_name == 'manager' %}<i class="fas fa-user-tie"></i>
                         {% elif role_name == 'customer_care' %}<i class="fas fa-headset"></i>
@@ -752,14 +752,16 @@
     </div>
 </div>
 
+{{ role_sets_json|json_script:"perm-role-sets" }}
+{{ custom_roles_json|json_script:"perm-custom-roles" }}
 <script>
 (function() {
     const RID  = {{ restaurant_id }};
     const BASE = '/system-admin/restaurant-permissions/' + RID;
     const CSRF = '{{ csrf_token }}';
 
-    const roleSets      = {{ role_sets_json|safe }};
-    const customRolesArr = {{ custom_roles_json|safe }};
+    const roleSets      = JSON.parse(document.getElementById('perm-role-sets').textContent);
+    const customRolesArr = JSON.parse(document.getElementById('perm-custom-roles').textContent);
     const customRolesMap = {};
     customRolesArr.forEach(function(cr) { customRolesMap[cr.id] = cr; });
 
@@ -856,7 +858,7 @@
     function toast(msg, type) {
         var el = document.createElement('div');
         el.className = 'perm-toast ' + type;
-        el.innerHTML = '<i class="fas ' + (type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle') + '"></i> ' + msg;
+        el.innerHTML = '<i class="fas ' + (type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle') + '"></i> ' + escapeHtml(msg);
         document.body.appendChild(el);
         setTimeout(function() { el.remove(); }, 3500);
     }
@@ -1002,7 +1004,7 @@
                     if (label) {
                         if (customRoleId) {
                             var cr = customRolesMap[parseInt(customRoleId)];
-                            label.innerHTML = '<span class="custom-role-chip">' + (cr ? cr.name : 'Custom Role') + '</span>';
+                            label.innerHTML = '<span class="custom-role-chip">' + escapeHtml(cr ? cr.name : 'Custom Role') + '</span>';
                         } else {
                             label.innerHTML = '<span style="color:var(--perm-muted);font-size:.82rem;">Using built-in</span>';
                         }

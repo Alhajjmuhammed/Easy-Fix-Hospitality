@@ -332,11 +332,7 @@ class Product(models.Model):
             owner=self.owner,
             is_active=True,
             days_of_week__contains=current_day
-        ).filter(
-            models.Q(products=self) |
-            models.Q(main_categories=self.main_category) |
-            models.Q(sub_categories=self.sub_category)
-        ).order_by('-discount_percentage')  # Get highest discount first
+        ).filter(self._promotion_match_q()).order_by('-discount_percentage')  # Get highest discount first
         
         # Check each promotion for time-based activation (handles cross-midnight)
         active_promotions = []
@@ -358,6 +354,17 @@ class Product(models.Model):
         
         return self.price
     
+    def _promotion_match_q(self):
+        """Promotions that name this product, its category or its sub-category.
+        Only what the product really has: Q(sub_categories=None) would mean "promotions with
+        NO sub-category" and put every such promotion on every dish without a sub-category."""
+        q = models.Q(products=self)
+        if self.main_category_id:
+            q |= models.Q(main_categories=self.main_category_id)
+        if self.sub_category_id:
+            q |= models.Q(sub_categories=self.sub_category_id)
+        return q
+
     def get_active_promotion(self):
         """Get the currently active promotion for this product"""
         # Use pre-computed cache set by the menu view (avoids N+1)
@@ -376,11 +383,7 @@ class Product(models.Model):
             owner=self.owner,
             is_active=True,
             days_of_week__contains=current_day
-        ).filter(
-            models.Q(products=self) |
-            models.Q(main_categories=self.main_category) |
-            models.Q(sub_categories=self.sub_category)
-        ).order_by('-discount_percentage')  # Get highest discount first
+        ).filter(self._promotion_match_q()).order_by('-discount_percentage')  # Get highest discount first
         
         # Check each promotion for time-based activation (handles cross-midnight)
         for promotion in potential_promotions:

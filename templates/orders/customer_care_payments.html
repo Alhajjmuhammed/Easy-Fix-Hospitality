@@ -207,13 +207,13 @@
                                                 {% if order.payment_status != 'paid' %}
                                                 {% if 'process_payments' in feats %}
                                                 <button class="btn btn-success btn-sm mb-1"
-                                                        onclick="processPayment('{{ order.id }}', '{{ order.order_number }}', {{ order.balance|default:order.total_amount }})">
+                                                        onclick="processPayment('{{ order.id }}', '{{ order.order_number|escapejs }}', {{ order.balance|default:order.total_amount|escapejs }})">
                                                     <i class="bi bi-cash"></i> {% translate "Pay" %}
                                                 </button>
                                                 {% endif %}
                                                 {% if 'view_receipts' in feats %}
                                                 <button class="btn btn-secondary btn-sm mb-1"
-                                                        onclick="printBill('{{ order.id }}', '{{ order.order_number }}')">
+                                                        onclick="printBill('{{ order.id }}', '{{ order.order_number|escapejs }}')">
                                                     <i class="bi bi-receipt"></i> {% translate "Print Bill" %}
                                                 </button>
                                                 {% endif %}

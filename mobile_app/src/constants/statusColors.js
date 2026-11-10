@@ -8,6 +8,10 @@ export const STATUS_COLORS = {
   out_for_delivery: '#1565C0',
   delivered:        '#2E7D32',
   cancelled:        '#B71C1C',
+  customer_refused: '#B71C1C',
+  kitchen_error:    '#B71C1C',
+  quality_issue:    '#B71C1C',
+  wasted:           '#B71C1C',
 };
 
 export const PAYMENT_STATUS_COLORS = {

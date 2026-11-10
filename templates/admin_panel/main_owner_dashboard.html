@@ -223,7 +223,7 @@
                                         <button type="button" 
                                                 class="btn btn-outline-{% if stat.is_active %}secondary{% else %}success{% endif %}" 
                                                 title="{% if stat.is_active %}{% translate 'Deactivate Branch' %}{% else %}{% translate 'Activate Branch' %}{% endif %}"
-                                                onclick="toggleRestaurantStatus('{{ stat.restaurant.id }}', '{{ stat.restaurant.name|escapejs }}', {{ stat.is_active|yesno:'true,false' }})">
+                                                onclick="toggleRestaurantStatus('{{ stat.restaurant.id }}', '{{ stat.restaurant.name|escapejs }}', {{ stat.is_active|yesno:'true,false'|escapejs }})">
                                             <i class="fas fa-{% if stat.is_active %}pause{% else %}play{% endif %}"></i>
                                         </button>
                                         <button type="button" 
@@ -302,7 +302,7 @@ let branchToDelete = null;
 function confirmDeleteBranch(branchId, branchName) {
     branchToDelete = branchId;
     document.getElementById('branchDeleteMessage').innerHTML = 
-        "{{ t_branch_delete_msg|escapejs }}".replace('{name}', `<strong>${branchName}</strong>`);
+        "{{ t_branch_delete_msg|escapejs }}".replace('{name}', () => `<strong>${escapeHtml(branchName)}</strong>`);
     
     const modal = new bootstrap.Modal(document.getElementById('deleteBranchModal'));
     modal.show();
@@ -382,9 +382,9 @@ function toggleRestaurantStatus(restaurantId, restaurantName, isActive) {
 
 function showAlert(type, message) {
     const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert" 
+        <div class="alert alert-${escapeHtml(type)} alert-dismissible fade show" role="alert" 
              style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
-            ${message}
+            ${escapeHtml(message)}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;

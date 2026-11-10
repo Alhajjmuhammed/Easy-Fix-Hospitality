@@ -351,7 +351,7 @@
                                             </button>
                                             {% endif %}
                                             {% if can_delete %}
-                                            <button class="btn btn-outline-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')"
+                                            <button class="btn btn-outline-danger" onclick="deleteUser({{ user.id }}, '{{ user.username|escapejs }}')"
                                                     title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -833,18 +833,18 @@ function viewUser(userId) {
             document.getElementById('userDetailsContent').innerHTML = `
                 <div class="row">
                     <div class="col-md-6">
-                        <p><strong>ID:</strong> ${user.id}</p>
-                        <p><strong>Username:</strong> ${user.username}</p>
-                        <p><strong>Email:</strong> ${user.email}</p>
-                        <p><strong>First Name:</strong> ${user.first_name || 'N/A'}</p>
-                        <p><strong>Last Name:</strong> ${user.last_name || 'N/A'}</p>
+                        <p><strong>ID:</strong> ${escapeHtml(user.id)}</p>
+                        <p><strong>Username:</strong> ${escapeHtml(user.username)}</p>
+                        <p><strong>Email:</strong> ${escapeHtml(user.email)}</p>
+                        <p><strong>First Name:</strong> ${escapeHtml(user.first_name || 'N/A')}</p>
+                        <p><strong>Last Name:</strong> ${escapeHtml(user.last_name || 'N/A')}</p>
                     </div>
                     <div class="col-md-6">
-                        <p><strong>Role:</strong> ${user.role_name}</p>
-                        <p><strong>Restaurant:</strong> ${user.restaurant_name || 'N/A'}</p>
-                        <p><strong>Status:</strong> ${user.is_active ? 'Active' : 'Inactive'}</p>
-                        <p><strong>Date Joined:</strong> ${new Date(user.date_joined).toLocaleDateString()}</p>
-                        <p><strong>Last Login:</strong> ${user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}</p>
+                        <p><strong>Role:</strong> ${escapeHtml(user.role_name)}</p>
+                        <p><strong>Restaurant:</strong> ${escapeHtml(user.restaurant_name || 'N/A')}</p>
+                        <p><strong>Status:</strong> ${escapeHtml(user.is_active ? 'Active' : 'Inactive')}</p>
+                        <p><strong>Date Joined:</strong> ${escapeHtml(new Date(user.date_joined).toLocaleDateString())}</p>
+                        <p><strong>Last Login:</strong> ${escapeHtml(user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never')}</p>
                     </div>
                 </div>
             `;

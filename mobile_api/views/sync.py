@@ -21,10 +21,14 @@ from restaurant.models import TableInfo, Product, MainCategory, SubCategory
 from cashier.models import Payment
 from ..serializers import (
     CategorySerializer, TableSerializer, OrderSerializer,
-    BillRequestSerializer, SyncPushSerializer,
+    BillRequestSerializer, SyncPushSerializer, MAX_ORDER_ITEMS,
 )
 from .helpers import get_restaurant_owner, client_supports_delivery_fee
-from .orders import _notify_ws
+from .orders import (
+    _notify_ws, customer_order_throttle_wait, ORDER_THROTTLED_MESSAGE, safe_client_id,
+)
+from accounts.security_utils import sanitize_special_instructions, sanitize_notes
+from restaurant_system.db_utils import managed_owner_ids
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +118,7 @@ def _request_restaurant_id(request):
 def _sync_order(user, owner, data):
     if not user.is_customer() and not user.has_feature('place_orders'):
         return {'status': 'error', 'error': 'Access denied.'}
-    offline_id = data.get('offline_id', '').strip()
+    offline_id = safe_client_id(data.get('offline_id', ''))
 
     # All DB writes are in the atomic block; _notify_ws (async_to_sync) is called after.
     # Dedup check is also inside the transaction so two concurrent pushes with the same
@@ -164,6 +168,17 @@ def _sync_order_atomic(user, owner, data, offline_id):
         if existing:
             return {'status': 'duplicate', 'order_id': existing.id, 'order_number': existing.order_number}
 
+    items = data.get('items', [])
+    if not items or not isinstance(items, list):
+        return {'status': 'error', 'error': 'No items provided.'}
+    if len(items) > MAX_ORDER_ITEMS:
+        return {'status': 'error', 'error': f'Too many items in one order (maximum {MAX_ORDER_ITEMS}).'}
+
+    # Same per-customer order-flood guard as the online POST /orders/ (staff never throttled).
+    # After the dedup check, so re-pushing an order that already synced never counts.
+    if user.is_customer() and customer_order_throttle_wait(user) is not None:
+        return {'status': 'error', 'error': ORDER_THROTTLED_MESSAGE}
+
     order_type = data.get('order_type', 'dine-in')
     is_remote = order_type in ('delivery', 'pickup')
 
@@ -204,11 +219,8 @@ def _sync_order_atomic(user, owner, data, offline_id):
     if table is not None:
         table = TableInfo.objects.select_for_update(of=('self',)).get(pk=table.pk)
 
-    items = data.get('items', [])
-    if not items:
-        return {'status': 'error', 'error': 'No items provided.'}
-
-    special = data.get('special_instructions', '')
+    # Same sanitising and 500-character cap as the online _place_order.
+    special = sanitize_special_instructions(data.get('special_instructions', '') or '')
     if offline_id:
         special = f'[offline:{offline_id}] {special}'.strip()
 
@@ -366,13 +378,13 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
     """
     dedup_tag = f'[offline-append:{offline_id}]'
 
-    # Dedup: if this append was already applied, the tag will be in the order's notes.
-    already = Order.objects.filter(
-        id=existing_order_id,
-        special_instructions__contains=dedup_tag,
-    ).first()
-    if already:
-        return {'status': 'duplicate', 'order_id': already.id, 'order_number': already.order_number}
+    # Who may append: exactly the online add_items_to_order rule (orders.py).
+    # The place_orders feature is already checked by _sync_order for non-customers.
+    is_staff = (user.is_customer_care() or user.is_cashier() or
+                user.is_owner() or user.is_main_owner() or
+                user.is_branch_owner() or user.is_manager())
+    if not (is_staff or user.is_customer()):
+        return {'status': 'error', 'error': 'Access denied.'}
 
     # Find the target order — must belong to this restaurant.
     # Q(ordered_by__owner=owner) covers delivery/pickup orders where table_info is None.
@@ -384,8 +396,11 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
     ).first()
     if not order or (user.is_customer() and order.ordered_by_id != user.id):
         return {'status': 'error', 'error': f'Order #{existing_order_id} not found.'}
-    # Re-check under the row lock: an online add-items with the same client_id may have
-    # held the lock and stamped the tag after the unlocked check above.
+    # CC staff can only add to their own orders (same rule and message as online add-items).
+    if user.is_customer_care() and order.ordered_by_id != user.id:
+        return {'status': 'error', 'error': 'Access denied.'}
+    # Dedup (checked under the row lock): if this append was already applied, the tag is
+    # in the order's notes — also covers an online add-items with the same client_id.
     if dedup_tag in (order.special_instructions or ''):
         return {'status': 'duplicate', 'order_id': order.id, 'order_number': order.order_number}
     TERMINAL_STATUSES = {'cancelled', 'delivered', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted', 'out_for_delivery'}
@@ -395,8 +410,29 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
         return {'status': 'error', 'error': 'Cannot add items to a fully paid order.'}
 
     items = data.get('items', [])
-    if not items:
+    if not items or not isinstance(items, list):
         return {'status': 'error', 'error': 'No items provided.'}
+    if len(items) > MAX_ORDER_ITEMS:
+        return {'status': 'error', 'error': f'Too many items in one order (maximum {MAX_ORDER_ITEMS}).'}
+
+    # Product scope, same as online add-items: the restaurant's menu; for a customer only
+    # the restaurant they selected, and a customer's delivery/pickup order (no table) only
+    # takes more of the products already in it.
+    _append_pq = (
+        Q(main_category__owner=owner) |
+        Q(main_category__restaurant__main_owner=owner) |
+        Q(main_category__restaurant__branch_owner=owner)
+    )
+    if user.is_customer():
+        if order.table_info_id is None:
+            _append_pq &= Q(id__in=list(order.order_items.values_list('product_id', flat=True)))
+        else:
+            _cust_rid = data.get('_customer_rid')
+            if _cust_rid:
+                _append_pq &= (
+                    Q(main_category__restaurant_id=_cust_rid) |
+                    Q(main_category__restaurant__isnull=True, main_category__owner=owner)
+                )
 
     new_items = []
     dropped_items = []
@@ -407,9 +443,7 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
         except (TypeError, ValueError):
             qty = 1
         product = Product.objects.select_for_update(of=('self',)).filter(
-            Q(main_category__owner=owner) |
-            Q(main_category__restaurant__main_owner=owner) |
-            Q(main_category__restaurant__branch_owner=owner),
+            _append_pq,
             id=i.get('product_id'),
             is_available=True,
         ).first()
@@ -432,19 +466,19 @@ def _sync_order_append(user, owner, data, offline_id, existing_order_id):
     if not new_items:
         return {'status': 'error', 'error': 'No valid products found — items could not be added.'}
 
-    # Recalculate total — use table tax rate when available, otherwise reverse-calculate
-    # the effective rate from the existing total/subtotal so delivery/pickup orders
-    # don't lose their tax when items are appended offline.
+    # Recalculate total at the rate this order was CHARGED (every order type, same rule as the
+    # online add-items): today's restaurant rate may have changed since the order was placed.
     all_items = list(order.order_items.all())
     actual_subtotal = sum(oi.get_subtotal() for oi in all_items)
-    if order.table_info:
-        tax_rate = order.table_info.get_tax_rate()
-    else:
-        orig_subtotal = sum(
-            oi.get_subtotal() for oi in all_items if oi not in new_items
-        )
-        tax_rate = order.charged_tax_rate(orig_subtotal)  # excludes the delivery fee
+    orig_subtotal = sum(
+        oi.get_subtotal() for oi in all_items if oi not in new_items
+    )
+    tax_rate = order.charged_tax_rate(orig_subtotal)  # excludes the delivery fee
     order.total_amount = order.total_for_subtotal(actual_subtotal, tax_rate)
+    # Extra notes sent with the append: sanitised and capped like online add-items.
+    extra_notes = sanitize_special_instructions((data.get('special_instructions', '') or '').strip())
+    if extra_notes:
+        order.special_instructions = ((order.special_instructions or '') + '\n' + extra_notes).strip()
     # Stamp the dedup tag so a retry push doesn't double-add the same items.
     order.special_instructions = ((order.special_instructions or '').rstrip() + f' {dedup_tag}').strip()
     order.save(update_fields=['total_amount', 'special_instructions'])
@@ -483,7 +517,7 @@ def _sync_payment(user, owner, data):
     if not is_privileged and not user.is_customer_care():
         return {'status': 'error', 'error': 'Only staff can process payments.'}
 
-    offline_id = data.get('offline_id', '').strip()
+    offline_id = safe_client_id(data.get('offline_id', ''))
 
     order_id = data.get('order_id')
     order_number = data.get('order_number', '')
@@ -495,7 +529,7 @@ def _sync_payment(user, owner, data):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     if not is_privileged:
         restaurant_q = restaurant_q & Q(ordered_by=user)
@@ -510,7 +544,7 @@ def _sync_payment(user, owner, data):
         except (Order.DoesNotExist, Order.MultipleObjectsReturned):
             # Third fallback: order was created in the same sync push so the client
             # only knows its offline_id — look up by the dedup tag in special_instructions.
-            order_offline_id = data.get('order_offline_id', '').strip()
+            order_offline_id = safe_client_id(data.get('order_offline_id', ''))
             if order_offline_id:
                 _tag = f'[offline:{order_offline_id}]'
                 try:
@@ -526,7 +560,7 @@ def _sync_payment(user, owner, data):
     if user.is_customer_care() and order.ordered_by != user:
         return {'status': 'error', 'error': 'Access denied.'}
 
-    notes = data.get('notes', '')
+    notes = sanitize_notes(data.get('notes', '') or '')
     if offline_id:
         notes = f'[offline:{offline_id}] {notes}'.strip()
 
@@ -583,7 +617,9 @@ def _sync_payment(user, owner, data):
             amount=amount,
             payment_method=payment_method,
             processed_by=user,
-            reference_number=data.get('reference_number', ''),
+            # Payment.reference_number is 50 chars: longer would fail on PostgreSQL and the
+            # sale would be retried forever.
+            reference_number=(sanitize_notes(str(data.get('reference_number') or '')) or '')[:50],
             notes=notes,
             is_voided=False,
         )
@@ -732,7 +768,10 @@ def sync_pull(request):
         Prefetch(
             'subcategories',
             queryset=SubCategory.objects.filter(is_active=True).prefetch_related(
-                Prefetch('products', queryset=Product.objects.filter(is_available=True), to_attr='_available_products')
+                Prefetch('products', queryset=Product.objects.filter(is_available=True).select_related(
+                        'main_category__restaurant__main_owner', 'main_category__restaurant__branch_owner',
+                        'main_category__owner', 'sub_category',
+                    ), to_attr='_available_products')
             ),
             to_attr='_active_subs',
         ),
@@ -759,7 +798,7 @@ def sync_pull(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner)) |
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner))) |
         # Self-registered customers (owner=None) — their delivery/pickup orders have no owner FK
         Q(order_type__in=['delivery', 'pickup'], ordered_by=user, ordered_by__owner__isnull=True)
     )
@@ -767,7 +806,9 @@ def sync_pull(request):
         order_table_q,
         status__in=['pending', 'confirmed', 'preparing', 'ready', 'served', 'out_for_delivery', 'delivered'],
         payment_status__in=['unpaid', 'partial'],
-    ).distinct().select_related('table_info', 'ordered_by').prefetch_related('order_items__product', 'payments')
+    ).distinct().select_related('table_info', 'ordered_by').prefetch_related(
+        'order_items__product', 'payments', 'table_info__bill_requests',
+    )
 
     if user.is_customer() or user.is_customer_care():
         orders_qs = orders_qs.filter(ordered_by=user)

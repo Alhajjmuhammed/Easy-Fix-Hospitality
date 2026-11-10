@@ -1,3 +1,4 @@
+import re
 import uuid
 import logging
 from datetime import timedelta
@@ -7,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.throttling import SimpleRateThrottle
 from django.db import transaction
 from django.db.models import F, Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -20,8 +22,56 @@ from cashier.models import Payment
 from ..serializers import OrderSerializer, PlaceOrderSerializer
 from .helpers import get_restaurant_owner, customer_restaurant_q, client_supports_delivery_fee
 from accounts.security_utils import sanitize_special_instructions
+from restaurant_system.db_utils import managed_owner_ids
 
 logger = logging.getLogger(__name__)
+
+
+class CustomerOrderThrottle(SimpleRateThrottle):
+    """
+    Per-customer limit on placing NEW orders (online POST /orders/ and offline sync push).
+    Staff are never throttled here: a cashier legitimately takes hundreds of orders a day.
+    The rate lives on the class so no settings change is needed.
+    """
+    scope = 'customer_orders'
+    rate = '20/hour'
+
+    def get_cache_key(self, request, view):
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated or not user.is_customer():
+            return None  # None = not throttled
+        # pk + join time: a recycled pk (deleted account, test DB rollback) never inherits
+        # another account's history.
+        joined = getattr(user, 'date_joined', None)
+        ident = f'{user.pk}-{int(joined.timestamp() * 1000000)}' if joined else str(user.pk)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+ORDER_THROTTLED_MESSAGE = 'Too many orders placed. Please wait a while before placing another order.'
+
+
+def customer_order_throttle_wait(user):
+    """
+    Record one new-order attempt for a customer. Returns None when allowed, else the
+    number of seconds to wait. Works without a DRF request (sync push passes only the user).
+    """
+    from types import SimpleNamespace
+    t = CustomerOrderThrottle()
+    if t.allow_request(SimpleNamespace(user=user), None):
+        return None
+    return int(t.wait() or 0) or 1
+
+
+_CLIENT_ID_UNSAFE = re.compile(r'[^A-Za-z0-9._:-]')
+
+
+def safe_client_id(value):
+    """
+    Offline/client ids are stored inside special_instructions as "[offline:<id>]" tags.
+    Keep only id characters (the app sends "<ms>-<base36>") so a crafted id can't close
+    the tag early and smuggle markup into the notes. Identity for every id the app makes.
+    """
+    return _CLIENT_ID_UNSAFE.sub('', str(value or '').strip())[:64]
 
 
 def _notify_ws(order, updated_by_user, event_type='order_status_update'):
@@ -187,7 +237,7 @@ def _list_orders(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     qs = Order.objects.filter(_tq).distinct().select_related(
         'table_info', 'ordered_by', 'confirmed_by', 'entered_by'
@@ -272,7 +322,7 @@ def _place_order(request):
 
     data = s.validated_data
     user = request.user
-    offline_id = data.get('offline_id', '').strip()
+    offline_id = safe_client_id(data.get('offline_id', ''))
 
     if not offline_id:
         logger.warning(
@@ -292,6 +342,15 @@ def _place_order(request):
                 'order': OrderSerializer(existing, context={'request': request}).data,
                 'already_synced': True,
             })
+
+    # Order-flood guard for customers (after the dedup check, so a retry of an order that
+    # already went through never counts). Staff are not throttled.
+    if user.is_customer():
+        _wait = customer_order_throttle_wait(user)
+        if _wait is not None:
+            return Response({'error': ORDER_THROTTLED_MESSAGE, 'retry_after': _wait},
+                            status=status.HTTP_429_TOO_MANY_REQUESTS,
+                            headers={'Retry-After': str(_wait)})
 
     owner = get_restaurant_owner(request)
     if owner is None:
@@ -579,7 +638,7 @@ def order_detail(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = get_object_or_404(
         Order.objects.filter(_tq).distinct().select_related(
@@ -617,7 +676,7 @@ def update_order_status(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = get_object_or_404(
         Order.objects.filter(_tq).distinct().prefetch_related(
@@ -783,7 +842,7 @@ def print_bill(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = get_object_or_404(
         Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
@@ -856,7 +915,7 @@ def print_station_ticket(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = get_object_or_404(
         Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
@@ -899,7 +958,7 @@ def transfer_table(request, order_id):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     order = get_object_or_404(Order.objects.filter(_tq).distinct(), id=order_id)
 
@@ -999,7 +1058,7 @@ def cancel_order(request, order_id):
             Q(table_info__restaurant__main_owner=owner) |
             Q(table_info__restaurant__branch_owner=owner) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
         )
         order = get_object_or_404(
             Order.objects.filter(_tq).distinct().prefetch_related('order_items__product'),
@@ -1148,7 +1207,7 @@ def add_items_to_order(request, order_id):
             Q(table_info__restaurant__main_owner=owner) |
             Q(table_info__restaurant__branch_owner=owner) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
         )
         order = get_object_or_404(
             Order.objects.filter(_tq).distinct().prefetch_related(
@@ -1166,7 +1225,7 @@ def add_items_to_order(request, order_id):
     # is the one _sync_order_append in sync.py stamps, so a repeat on either path is a no-op.
     # Checked before the paid/cancelled guards: a replay must return the earlier result.
     # Older app builds send no client_id and keep the old behaviour.
-    client_id = str(request.data.get('client_id') or '').strip()[:64]
+    client_id = safe_client_id(request.data.get('client_id'))
     append_tag = _append_tag(client_id)
     if append_tag and append_tag in (order.special_instructions or ''):
         return _add_items_response(request, order, already_applied=True)
@@ -1237,9 +1296,6 @@ def add_items_to_order(request, order_id):
         return Response({'error': 'No valid items to add.'}, status=400)
 
     from decimal import Decimal as _Dec
-    # Capture effective tax rate BEFORE the transaction mutates order_items.
-    # For delivery/pickup (table_info=None) reverse-calculate from the stored total.
-    _add_tax_rate = order.charged_tax_rate()  # the rate this order was charged; excludes the fee
 
     class _StockConflict(Exception):
         def __init__(self, msg): self.msg = msg
@@ -1257,6 +1313,9 @@ def add_items_to_order(request, order_id):
             raise _AlreadyApplied()
         order.total_amount = _locked.total_amount
         order.special_instructions = _locked.special_instructions or ''
+        # Rate this order was charged (from the locked total, before items change; excludes the fee)
+        _sub_before = _locked.get_subtotal()
+        _add_tax_rate = _locked.charged_tax_rate(_sub_before)
         for item in validated:
             # Re-fetch product under SELECT FOR UPDATE so concurrent add-item
             # requests cannot both pass the stock check and together oversell.
@@ -1273,7 +1332,8 @@ def add_items_to_order(request, order_id):
             from orders.stock import take_for_item
             take_for_item(oi)                  # stock never below 0; the line records what it took
         added = sum(_Dec(str(i['unit_price'])) * _Dec(str(i['quantity'])) for i in validated)
-        order.total_amount = _Dec(str(order.total_amount)) + added * (_Dec('1') + _add_tax_rate)
+        # Same formula and rounding as when the order was placed, for the new food subtotal
+        order.total_amount = _locked.total_for_subtotal(_sub_before + added, _add_tax_rate)
         extra_notes = sanitize_special_instructions(
             (request.data.get('special_instructions', '') or '').strip()
         )
@@ -1426,7 +1486,7 @@ def cancel_order_item(request, item_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     item = get_object_or_404(
         OrderItem.objects.filter(_itq).distinct().select_related('order', 'product'),

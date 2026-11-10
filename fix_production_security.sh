@@ -67,7 +67,7 @@ ALLOWED_HOSTS=72.62.51.225,localhost,127.0.0.1
 # Database Configuration (PostgreSQL)
 DB_NAME=restaurant_db
 DB_USER=restaurant_user
-DB_PASSWORD=RestaurantPass123
+DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD before running this script}
 DB_HOST=localhost
 DB_PORT=5432
 
@@ -405,7 +405,7 @@ User=root
 WorkingDirectory=/var/www/restaurant
 Environment="PATH=/var/www/restaurant/venv/bin"
 Environment="DJANGO_SETTINGS_MODULE=restaurant_system.production_settings"
-ExecStart=/var/www/restaurant/venv/bin/daphne -b 0.0.0.0 -p 8001 restaurant_system.asgi:application
+ExecStart=/var/www/restaurant/venv/bin/daphne -b 127.0.0.1 -p 8001 restaurant_system.asgi:application
 
 [Install]
 WantedBy=multi-user.target

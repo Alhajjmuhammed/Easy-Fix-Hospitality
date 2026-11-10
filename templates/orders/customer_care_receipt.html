@@ -307,7 +307,7 @@
                     <div>{% currency_symbol %}{{ order.get_subtotal|floatformat:2 }}</div>
                 </div>
                 <div class="total-row">
-                    <div>{% blocktranslate with rate=order.tax_rate|floatformat:1 %}Tax ({{ rate }}%):{% endblocktranslate %}</div>
+                    <div>{% blocktranslate with rate=order.charged_tax_percentage|floatformat:1 %}Tax ({{ rate }}%):{% endblocktranslate %}</div>
                     <div>{% currency_symbol %}{{ order.get_tax_amount|floatformat:2 }}</div>
                 </div>
                 {% if order.delivery_fee > 0 %}

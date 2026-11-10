@@ -45,8 +45,12 @@ export default function LoyaltyPayBox({ order, balanceDue, format, onUsePoints, 
   };
 
   const c = info.customer;
-  const usable = c ? Math.min(Number(balanceDue) || 0, Number(c.worth) || 0) : 0;
-  const needed = Math.ceil(usable / (Number(info.point_value) || 1) - 1e-9);
+  // The server takes whole points only (rounded down) and credits exactly points × value,
+  // so offer that amount; any remainder stays due and is paid another way.
+  const pointValue = Number(info.point_value) || 1;
+  const maxAmount = c ? Math.min(Number(balanceDue) || 0, Number(c.worth) || 0) : 0;
+  const needed = Math.floor(maxAmount / pointValue + 1e-9);
+  const usable = Math.round(needed * pointValue * 100) / 100;
   const canUse = c && c.points >= info.min_redeem_points && needed >= info.min_redeem_points && usable > 0;
 
   return (

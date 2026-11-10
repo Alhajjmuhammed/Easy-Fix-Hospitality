@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import {
   Text,
   Card,
@@ -14,7 +14,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiOrderDetail } from '../../api/orders';
 import { getOrderById } from '../../database/operations';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceipt } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { useCurrency } from '../../hooks/useCurrency';
 import { buildReceiptText, shareOnWhatsApp } from '../../utils/shareReceipt';
 import { useT } from '../../i18n';
@@ -102,7 +102,7 @@ export default function ReceiptScreen({ route }) {
         ...allPayments[allPayments.length - 1],
         amount: allPayments.reduce((s, p) => s + parseFloat(p.amount || 0), 0),
       } : null;
-      await printReceipt({
+      const ok = await printReceipt({
         orderId:        order?.id,
         order,
         payment:        aggregatedPayment,
@@ -111,6 +111,7 @@ export default function ReceiptScreen({ route }) {
         staffName,
         decimals,
       });
+      if (isPrinterUnreachable(ok)) Alert.alert(t('Printer not reachable'));
     } catch {
       // user cancelled or printer error — silently ignore
     } finally {

@@ -1,5 +1,6 @@
 {% extends 'system_admin/base.html' %}
 {% load static %}
+{% load i18n %}
 
 {% block title %}View Orders - System Admin{% endblock %}
 
@@ -34,7 +35,15 @@
         <div class="card-header"><h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filter Orders</h6></div>
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label">{% translate "Period" %}</label>
+                    <select class="form-select" name="period" onchange="this.form.submit()">
+                        {% for value, label in period_choices %}
+                        <option value="{{ value }}" {% if period == value %}selected{% endif %}>{% translate label %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label">Status</label>
                     <select class="form-select" name="status" onchange="this.form.submit()">
                         <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
@@ -43,7 +52,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Restaurant</label>
                     <select class="form-select" name="restaurant" onchange="this.form.submit()">
                         <option value="all" {% if restaurant_filter == 'all' %}selected{% endif %}>All Restaurants</option>
@@ -54,7 +63,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-3 d-flex align-items-end">
                     <a href="{% url 'system_admin:view_orders' %}" class="btn btn-outline-secondary">
                         <i class="fas fa-times me-1"></i> Clear Filters
                     </a>
@@ -66,7 +75,8 @@
     <!-- Orders Table -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="fas fa-receipt me-2"></i>Orders ({{ orders|length }})</h6>
+            <h6 class="mb-0"><i class="fas fa-receipt me-2"></i>Orders ({{ paginator.count }})</h6>
+            {% if paginator.num_pages > 1 %}<small class="text-muted">{% blocktranslate with n=page_obj.number total=paginator.num_pages %}Page {{ n }} of {{ total }}{% endblocktranslate %}</small>{% endif %}
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -110,7 +120,7 @@
                                     <span class="text-muted">Walk-in</span>
                                 {% endif %}
                             </td>
-                            <td>{{ order.orderitem_set.all|length }} item{{ order.orderitem_set.all|length|pluralize }}</td>
+                            <td>{{ order.order_items.all|length }} item{{ order.order_items.all|length|pluralize }}</td>
                             <td><strong>{{ order.total_amount }}</strong></td>
                             <td>
                                 <span class="badge order-status-{{ order.status }}">
@@ -141,6 +151,23 @@
                 </table>
             </div>
         </div>
+        {% if paginator.num_pages > 1 %}
+        <div class="card-footer">
+            <nav aria-label="Orders pagination">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&amp;page=1">&laquo;</a></li>
+                    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&amp;page={{ page_obj.previous_page_number }}">&lsaquo;</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&amp;page={{ page_obj.next_page_number }}">&rsaquo;</a></li>
+                    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&amp;page={{ paginator.num_pages }}">&raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

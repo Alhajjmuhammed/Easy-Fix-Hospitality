@@ -230,7 +230,7 @@
                             </span>
                         </td>
                         <td>
-                            {% with restaurant_info=user.get_user_restaurant_info %}
+                            {% with restaurant_info=user.restaurant_info %}
                                 {% if restaurant_info %}
                                     <div>
                                         <span title="{{ restaurant_info.name }}">{{ restaurant_info.name }}</span>
@@ -1272,7 +1272,7 @@ function showAlert(message, type) {
     alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
     alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1055; min-width: 300px;';
     alertDiv.innerHTML = `
-        ${message}
+        ${escapeHtml(message)}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     

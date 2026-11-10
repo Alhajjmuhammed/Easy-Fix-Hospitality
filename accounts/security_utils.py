@@ -240,14 +240,42 @@ def sanitize_text(text, max_length=None, strip_html=True):
     return text.strip()
 
 
+def sanitize_plain_text(text, max_length=None, single_line=False):
+    """
+    Plain text for storage (names, role names, short descriptions): no HTML at all,
+    but nothing readable is mangled.
+    Strips HTML tags like sanitize_text, then undoes bleach's entity-escaping
+    ("Tom & Jerry" stays as typed, not "Tom &amp; Jerry") and drops any leftover
+    '<' / '>'. Apostrophes, quotes, hyphens and accented letters ("O'Brien", "José",
+    "Ñúñez") are kept. single_line=True also folds tabs/newlines into single spaces.
+    Templates still auto-escape the result when it is shown.
+    """
+    import html as _html
+    text = sanitize_text(text, strip_html=True)
+    text = _html.unescape(text).replace('<', '').replace('>', '')
+    if single_line:
+        text = ' '.join(text.split())
+    else:
+        text = text.strip()
+    if max_length and len(text) > max_length:
+        text = text[:max_length].rstrip()
+    return text
+
+
+def sanitize_name(text, max_length=150):
+    """Sanitize a person's (or role's) name: sanitize_plain_text on a single line."""
+    return sanitize_plain_text(text, max_length=max_length, single_line=True)
+
+
 def sanitize_special_instructions(text):
-    """Sanitize order special instructions"""
-    return sanitize_text(text, max_length=500, strip_html=True)
+    """Sanitize order special instructions: no HTML, but "&" stays "&" (it is printed on the
+    kitchen ticket and shown in the app, which do not decode "&amp;")."""
+    return sanitize_plain_text(text, max_length=500)
 
 
 def sanitize_notes(text):
-    """Sanitize general notes fields"""
-    return sanitize_text(text, max_length=1000, strip_html=True)
+    """Sanitize general notes fields (payment notes / reference numbers): same rule."""
+    return sanitize_plain_text(text, max_length=1000)
 
 
 # ============================================================================

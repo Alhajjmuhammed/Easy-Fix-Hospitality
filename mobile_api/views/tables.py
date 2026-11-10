@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from ..permissions import IsSubscriptionActive
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 
 from restaurant.models import TableInfo
 from orders.models import Order
@@ -25,7 +25,19 @@ def tables(request):
     if owner is None:
         return Response({'error': 'Restaurant not found.'}, status=404)
 
-    qs = TableInfo.objects.filter(_table_scope(request, owner)).distinct().order_by('tbl_no')
+    # Same active-order prefetch as sync pull: TableSerializer.get_is_available then reads it
+    # instead of running is_truly_available() (one query) per table. Same statuses as
+    # TableInfo.get_active_orders(), so the result is identical.
+    qs = TableInfo.objects.filter(_table_scope(request, owner)).distinct().order_by('tbl_no').prefetch_related(
+        Prefetch(
+            'orders',
+            queryset=Order.objects.filter(
+                status__in=['pending', 'confirmed', 'preparing', 'ready', 'served'],
+                payment_status__in=['unpaid', 'partial'],
+            ),
+            to_attr='_active_orders_prefetch',
+        )
+    )
     return Response({'tables': TableSerializer(qs, many=True).data})
 
 

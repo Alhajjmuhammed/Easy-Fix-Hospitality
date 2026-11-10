@@ -38,7 +38,7 @@ export default {
   'Reference / Approval Code': 'Namba ya kumbukumbu / idhini',
   'Select Payment to Void': 'Chagua malipo ya kubatilisha',
   'Order #{number} has multiple payments. Choose one to void.': 'Oda #{number} ina malipo zaidi ya moja. Chagua moja la kubatilisha.',
-  'Void Reason (optional)': 'Sababu ya kubatilisha (si lazima)',
+  'Void Reason (required)': 'Sababu ya kubatilisha (lazima)',
   'Void': 'Batilisha',
   'Reason': 'Sababu',
   'Reason (required)': 'Sababu (lazima)',
@@ -189,4 +189,12 @@ export default {
   'Connection lost – payment saved on this phone and will sync automatically':
     'Mtandao umekatika – malipo yamehifadhiwa kwenye simu hii na yatatumwa yenyewe',
   'Sync in progress – try again in a moment': 'Inatuma sasa – jaribu tena baada ya muda mfupi',
+  // 1.2.0 fixes: void reason, printer, more order statuses
+  'Enter a reason for the void': 'Andika sababu ya kubatilisha',
+  'Printer not reachable': 'Printa haipatikani',
+  'customer_refused': 'mteja amekataa',
+  'kitchen_error': 'kosa la jikoni',
+  'quality_issue': 'tatizo la ubora',
+  'wasted': 'imepotea',
+  'unknown': 'haijulikani',
 };

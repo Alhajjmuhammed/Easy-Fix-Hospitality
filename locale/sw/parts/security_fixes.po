@@ -1,0 +1,7 @@
+# Kiswahili: security fixes (mobile sign-up rate limit).
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Too many sign-up attempts from this network. Please try again later."
+msgstr "Majaribio mengi mno ya kujisajili kutoka mtandao huu. Tafadhali jaribu tena baadaye."

@@ -15,17 +15,22 @@ django_asgi_app = get_asgi_application()
 
 # Import routing after Django is set up
 import orders.routing
-from restaurant_system.token_auth_middleware import TokenAuthMiddleware
+from restaurant_system.token_auth_middleware import TokenAuthMiddleware, AllowedHostsOriginValidator
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     # TokenAuthMiddleware first: reads ?token=<drf-token> from the WS URL
     # so mobile clients can authenticate without session cookies.
     # AuthMiddlewareStack handles session-based auth (web browsers) as fallback.
-    "websocket": TokenAuthMiddleware(
-        AuthMiddlewareStack(
-            URLRouter(
-                orders.routing.websocket_urlpatterns
+    # AllowedHostsOriginValidator (outermost): a browser page on another site cannot
+    # open a socket that rides on the victim's session cookie. A handshake with no
+    # Origin header (native mobile app) is allowed; it authenticates with ?token=.
+    "websocket": AllowedHostsOriginValidator(
+        TokenAuthMiddleware(
+            AuthMiddlewareStack(
+                URLRouter(
+                    orders.routing.websocket_urlpatterns
+                )
             )
         )
     ),

@@ -288,7 +288,7 @@
                                             {% endif %}
                                             {% if can_delete %}
                                             <button class="btn btn-outline-danger"
-                                                    onclick="deleteCategory({{ category.id }}, '{{ category.name }}', '{{ category.display_restaurant_name }}')"
+                                                    onclick="deleteCategory({{ category.id }}, '{{ category.name|escapejs }}', '{{ category.display_restaurant_name|escapejs }}')"
                                                     title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -834,8 +834,8 @@ function showAlert(type, message) {
     const alertId = 'alert-' + Date.now();
     
     const alertHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert" id="${alertId}">
-            ${message}
+        <div class="alert alert-${escapeHtml(type)} alert-dismissible fade show" role="alert" id="${escapeHtml(alertId)}">
+            ${escapeHtml(message)}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;

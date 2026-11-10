@@ -142,7 +142,15 @@ class Order(models.Model):
         fee = self.delivery_fee or Decimal('0')
         base = subtotal + (fee if self.delivery_fee_taxed else Decimal('0'))
         if base > 0 and self.total_amount:
-            return max(Decimal('0'), (self.total_amount - subtotal - fee) / base)
+            rate = max(Decimal('0'), (self.total_amount - subtotal - fee) / base)
+            # The stored total is rounded to the cent, so the ratio is a hair off the rate the
+            # restaurant set (e.g. 0.16000032). Prefer the 4-decimal rate (Restaurant.tax_rate's
+            # precision) when it gives back exactly the stored total — then a later total for a new
+            # subtotal is what compute_total gives at that rate, and labels read 16.0%.
+            snapped = rate.quantize(Decimal('0.0001'))
+            if self.compute_total(subtotal, snapped, fee, self.delivery_fee_taxed) == self.total_amount:
+                return snapped
+            return rate
         return self._get_tax_rate_decimal()
 
     def total_for_subtotal(self, food_subtotal, tax_rate):
@@ -169,6 +177,15 @@ class Order(models.Model):
     def tax_rate(self):
         """Tax rate as percentage for display"""
         return float(self._get_tax_rate_decimal() * 100)
+
+    @property
+    def charged_tax_percentage(self):
+        """Tax % this order was CHARGED (receipt labels), from the stored total — today's rate
+        may have changed since. Same rule as orders.printing._charged_amounts."""
+        subtotal = self.get_subtotal()
+        if self.total_amount and self.total_amount >= subtotal:
+            return float(self.charged_tax_rate(subtotal) * 100)
+        return self.tax_rate
 
     def get_total(self):
         """Get final total including tax and delivery fee"""

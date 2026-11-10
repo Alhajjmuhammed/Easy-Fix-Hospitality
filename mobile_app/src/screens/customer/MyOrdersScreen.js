@@ -41,7 +41,7 @@ export default function MyOrdersScreen() {
   const theme = useTheme();
   const navigation = useNavigation();
   const { format } = useCurrency();
-  const { restaurantId } = useAuthStore();
+  const { setRestaurant } = useAuthStore();
   const { setTable, setRemoteOrder, clearCart, addItem } = useCartStore();
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
@@ -103,13 +103,39 @@ export default function MyOrdersScreen() {
     setCancelTarget(order);
   }, []);
 
-  const handleOrderAgain = useCallback((order) => {
+  const handleOrderAgain = useCallback(async (order) => {
     if (!order.items?.length) {
       setSnack(t('No items found in this order'));
       return;
     }
+    // Reorder at the restaurant the order was placed at, not the one selected now:
+    // its products do not exist anywhere else ("Product not found").
+    const rid = order.restaurant_id;
+    if (rid === undefined || rid === null || rid === '') {
+      setSnack(t('Cannot order this again: the restaurant of this order is unknown. Please choose the restaurant and order from its menu.'));
+      return;
+    }
     setReorderingId(order.id);
+    try {
+      await setRestaurant(rid);
+    } catch {
+      if (mountedRef.current) {
+        setReorderingId(null);
+        setSnack(t('Could not save restaurant. Please try again.'));
+      }
+      return;
+    }
     clearCart();
+    // Set the cart's restaurant / order type first, then add the items
+    if (order.order_type === 'delivery' || order.order_type === 'pickup') {
+      // Delivery reorders must collect a fresh address — never pre-fill a stale one.
+      setRemoteOrder(rid, order.order_type);
+    } else if (order.table_info) {
+      setTable(order.table_info, `Table ${order.table_number}`, rid);
+    } else {
+      useCartStore.getState().ensureRestaurant(rid);
+      useCartStore.getState().setLastOrderMode('dine-in');
+    }
     order.items.forEach((item) => {
       addItem(
         {
@@ -121,23 +147,14 @@ export default function MyOrdersScreen() {
         item.quantity,
       );
     });
+    setTimeout(() => { if (mountedRef.current) setReorderingId(null); }, 400);
     if (order.order_type === 'delivery') {
-      // Delivery reorders must collect a fresh address — never pre-fill a stale one.
-      setRemoteOrder(restaurantId, 'delivery');
-      setTimeout(() => setReorderingId(null), 400);
-      navigation.navigate('Order', { screen: 'DeliveryInfo', params: { restaurant: { id: restaurantId }, orderType: 'delivery' } });
-    } else if (order.order_type === 'pickup') {
-      setRemoteOrder(restaurantId, 'pickup');
-      setSnack(t('Items added to cart!'));
-      setTimeout(() => setReorderingId(null), 400);
-      navigation.navigate('Order', { screen: 'Cart' });
+      navigation.navigate('Order', { screen: 'DeliveryInfo', params: { restaurant: { id: rid }, orderType: 'delivery' } });
     } else {
-      if (order.table_info) setTable(order.table_info, `Table ${order.table_number}`, restaurantId);
       setSnack(t('Items added to cart!'));
-      setTimeout(() => setReorderingId(null), 400);
       navigation.navigate('Order', { screen: 'Cart' });
     }
-  }, [clearCart, setTable, setRemoteOrder, addItem, navigation, restaurantId, t]);
+  }, [clearCart, setTable, setRemoteOrder, addItem, navigation, setRestaurant, t]);
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
@@ -164,7 +181,7 @@ export default function MyOrdersScreen() {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'pending') return o.status === 'pending';
     if (activeFilter === 'active') return ['confirmed', 'preparing', 'ready', 'served', 'out_for_delivery'].includes(o.status) || (o.status === 'delivered' && o.payment_status !== 'paid');
-    if (activeFilter === 'done') return o.status === 'cancelled' || ((o.status === 'served' || o.status === 'delivered') && o.payment_status === 'paid');
+    if (activeFilter === 'done') return ['cancelled', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted'].includes(o.status) || ((o.status === 'served' || o.status === 'delivered') && o.payment_status === 'paid');
     return true;
   });
 
@@ -267,7 +284,7 @@ export default function MyOrdersScreen() {
                     style={[styles.chip, { backgroundColor: color + '22' }]}
                     textStyle={{ color, fontSize: 11, fontFamily: 'Poppins_600SemiBold' }}
                   >
-                    {(order.status || 'unknown').toUpperCase()}
+                    {t(order.status || 'unknown').toUpperCase()}
                   </Chip>
                 </View>
 
@@ -329,7 +346,7 @@ export default function MyOrdersScreen() {
                   </Button>
                 )}
 
-                {['served', 'cancelled'].includes(order.status) && (
+                {['served', 'delivered', 'cancelled'].includes(order.status) && (
                   <Button
                     compact
                     mode="outlined"

@@ -14,6 +14,7 @@ from django.db import transaction
 from orders.models import Order, DeliveryRider, DeliveryAssignment
 from accounts.models import User
 from .helpers import get_restaurant_owner
+from restaurant_system.db_utils import managed_owner_ids
 
 logger = logging.getLogger(__name__)
 
@@ -226,9 +227,9 @@ def assign_rider(request):
             _Q(table_info__restaurant__main_owner=owner) |
             _Q(table_info__restaurant__branch_owner=owner) |
             _Q(ordered_by__owner=owner) |
-            _Q(ordered_by__owner__managed_restaurant__main_owner=owner) |
+            _Q(ordered_by__owner__in=managed_owner_ids(owner)) |
             _Q(restaurant_owner=owner) |
-            _Q(restaurant_owner__managed_restaurant__main_owner=owner)
+            _Q(restaurant_owner__in=managed_owner_ids(owner))
         )
         order = get_object_or_404(Order.objects.filter(order_scope).distinct(), id=order_id, order_type='delivery')
     else:
@@ -304,9 +305,9 @@ def auto_assign_rider(request):
             _Q(table_info__restaurant__main_owner=owner) |
             _Q(table_info__restaurant__branch_owner=owner) |
             _Q(ordered_by__owner=owner) |
-            _Q(ordered_by__owner__managed_restaurant__main_owner=owner) |
+            _Q(ordered_by__owner__in=managed_owner_ids(owner)) |
             _Q(restaurant_owner=owner) |
-            _Q(restaurant_owner__managed_restaurant__main_owner=owner)
+            _Q(restaurant_owner__in=managed_owner_ids(owner))
         )
         order = get_object_or_404(Order.objects.filter(order_scope).distinct(), id=order_id, order_type='delivery')
     else:
@@ -495,7 +496,7 @@ def track_order(request, order_id):
                 _Q(table_info__restaurant__main_owner=owner) |
                 _Q(table_info__restaurant__branch_owner=owner) |
                 (_Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | _Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-                (_Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | _Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+                (_Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | _Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
             )
             can_view = Order.objects.filter(_stq, id=order.id).exists()
 

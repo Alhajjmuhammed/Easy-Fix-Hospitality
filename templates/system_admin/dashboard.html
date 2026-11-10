@@ -189,7 +189,7 @@
                                 </a>
                                 <!-- Copy download link -->
                                 <button class="btn btn-outline-secondary"
-                                        onclick="copyDownloadLink('{{ request.scheme }}://{{ request.get_host }}{{ app_release.apk_file.url }}')"
+                                        onclick="copyDownloadLink('{{ request.scheme|escapejs }}://{{ request.get_host|escapejs }}{{ app_release.apk_file.url|escapejs }}')"
                                         title="Copy link to share with clients">
                                     <i class="fas fa-link me-1"></i> Copy Link
                                 </button>

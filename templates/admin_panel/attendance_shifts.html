@@ -103,7 +103,7 @@
                             </td>
                             <td class="text-end pe-4">
                                 <button class="btn btn-sm btn-outline-primary me-1"
-                                        onclick="openEditModal({{ shift.id }}, '{{ shift.name|escapejs }}', '{{ shift.shift_type }}', '{{ shift.start_time|time:"H:i" }}', '{{ shift.end_time|time:"H:i" }}', {{ shift.grace_minutes }}, {{ shift.is_active|yesno:'true,false' }})">
+                                        onclick="openEditModal({{ shift.id }}, '{{ shift.name|escapejs }}', '{{ shift.shift_type|escapejs }}', '{{ shift.start_time|time:"H:i" }}', '{{ shift.end_time|time:"H:i" }}', {{ shift.grace_minutes }}, {{ shift.is_active|yesno:'true,false' }})">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form method="post" class="d-inline"

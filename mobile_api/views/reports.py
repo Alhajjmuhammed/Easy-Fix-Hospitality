@@ -10,6 +10,8 @@ from django.utils import timezone
 
 from orders.models import Order, OrderItem
 from .helpers import get_restaurant_owner
+from reports.forecast import NOT_SOLD
+from restaurant_system.db_utils import managed_owner_ids
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +79,7 @@ def cc_reports(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     _start_dt = timezone.make_aware(datetime.combine(date_from, datetime.min.time()))
     _end_dt   = timezone.make_aware(datetime.combine(date_to + timedelta(days=1), datetime.min.time()))
@@ -86,7 +88,7 @@ def cc_reports(request):
         ordered_by=request.user,
         created_at__gte=_start_dt,
         created_at__lt=_end_dt,
-    ).distinct()
+    ).exclude(status__in=NOT_SOLD).distinct()   # cancelled / not-sold orders are not sales (as on the web)
 
     # --- Payment-status filter ---
     payment_status = request.GET.get('payment_status', 'all')
@@ -97,7 +99,7 @@ def cc_reports(request):
     _raw_pids = request.GET.get('product_ids', '').strip()
     product_ids = [int(x) for x in _raw_pids.split(',') if x.strip().isdigit()] if _raw_pids else []
     if product_ids:
-        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
+        orders = orders.filter(id__in=OrderItem.objects.filter(product_id__in=product_ids).values('order_id'))
 
     orders = orders.select_related('table_info').prefetch_related(
         'order_items__product__main_category',
@@ -114,7 +116,7 @@ def cc_reports(request):
     )
     total_orders  = agg['total_orders']  or 0
     total_revenue = float(agg['total_revenue'] or 0)
-    total_items   = orders.aggregate(t=Sum('order_items__quantity'))['t'] or 0
+    total_items   = OrderItem.objects.filter(order__in=orders.order_by().values('id')).aggregate(t=Sum('quantity'))['t'] or 0
     avg_order     = round(total_revenue / total_orders, 2) if total_orders else 0
 
     stats = {
@@ -145,7 +147,8 @@ def cc_reports(request):
         orders_list.append({
             'id':             order.id,
             'order_number':   order.order_number,
-            'table_number':   order.table_info.tbl_no if order.table_info else 'N/A',
+            'table_number':   order.table_info.tbl_no if order.table_info else 'N/A',  # old app builds print it as is
+            'order_type':     order.order_type,
             'status':         order.status,
             'payment_status': order.payment_status,
             'total_amount':   float(order.total_amount),
@@ -230,7 +233,7 @@ def owner_reports(request):
         Q(table_info__restaurant__in=owned_restaurants) |
         Q(table_info__owner=owner, table_info__restaurant__isnull=True) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
 
     _start_dt = timezone.make_aware(_dt.combine(date_from, _dt.min.time()))
@@ -239,7 +242,7 @@ def owner_reports(request):
         table_q,
         created_at__gte=_start_dt,
         created_at__lt=_end_dt,
-    ).distinct().select_related('table_info', 'ordered_by').prefetch_related('order_items', 'payments')
+    ).exclude(status__in=NOT_SOLD).distinct().select_related('table_info', 'ordered_by').prefetch_related('order_items', 'payments')
 
     payment_status = request.GET.get('payment_status', 'all')
     if payment_status in ('paid', 'unpaid', 'partial'):
@@ -249,7 +252,7 @@ def owner_reports(request):
     _raw_pids = request.GET.get('product_ids', '').strip()
     product_ids = [int(x) for x in _raw_pids.split(',') if x.strip().isdigit()] if _raw_pids else []
     if product_ids:
-        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
+        orders = orders.filter(id__in=OrderItem.objects.filter(product_id__in=product_ids).values('order_id'))
 
     orders = orders.order_by('-created_at')
 
@@ -262,7 +265,7 @@ def owner_reports(request):
     )
     total_orders  = agg['total_orders']  or 0
     total_revenue = float(agg['total_revenue'] or 0)
-    total_items   = orders.aggregate(t=Sum('order_items__quantity'))['t'] or 0
+    total_items   = OrderItem.objects.filter(order__in=orders.order_by().values('id')).aggregate(t=Sum('quantity'))['t'] or 0
     avg_order     = round(total_revenue / total_orders, 2) if total_orders else 0
 
     # Per-staff cashier breakdown
@@ -272,7 +275,7 @@ def owner_reports(request):
         Q(order__table_info__restaurant__in=owned_restaurants) |
         Q(order__table_info__owner=owner, order__table_info__restaurant__isnull=True) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     cashier_totals = (
         Payment.objects.filter(
@@ -303,7 +306,8 @@ def owner_reports(request):
         orders_list.append({
             'id':             order.id,
             'order_number':   order.order_number,
-            'table_number':   order.table_info.tbl_no if order.table_info else 'N/A',
+            'table_number':   order.table_info.tbl_no if order.table_info else 'N/A',  # old app builds print it as is
+            'order_type':     order.order_type,
             'ordered_by':     order.ordered_by.get_full_name() or order.ordered_by.username if order.ordered_by else 'Unknown',
             'status':         order.status,
             'payment_status': order.payment_status,
@@ -393,7 +397,7 @@ def cashier_reports(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     _start_dt = timezone.make_aware(_dt.combine(date_from, _dt.min.time()))
     _end_dt   = timezone.make_aware(_dt.combine(date_to + timedelta(days=1), _dt.min.time()))
@@ -401,7 +405,7 @@ def cashier_reports(request):
         _tq,
         created_at__gte=_start_dt,
         created_at__lt=_end_dt,
-    ).distinct()
+    ).exclude(status__in=NOT_SOLD).distinct()   # cancelled / not-sold orders are not sales (as on the web)
 
     payment_status_filter = request.GET.get('payment_status', 'all')
     if payment_status_filter in ('paid', 'unpaid', 'partial'):
@@ -411,7 +415,7 @@ def cashier_reports(request):
     _raw_pids = request.GET.get('product_ids', '').strip()
     product_ids = [int(x) for x in _raw_pids.split(',') if x.strip().isdigit()] if _raw_pids else []
     if product_ids:
-        orders = orders.filter(order_items__product_id__in=product_ids).distinct()
+        orders = orders.filter(id__in=OrderItem.objects.filter(product_id__in=product_ids).values('order_id'))
 
     orders = orders.select_related('table_info', 'ordered_by').prefetch_related(
         'order_items__product', 'payments'
@@ -426,7 +430,7 @@ def cashier_reports(request):
     )
     total_orders  = agg['total_orders']  or 0
     total_revenue = float(agg['total_revenue'] or 0)
-    total_items   = orders.aggregate(t=Sum('order_items__quantity'))['t'] or 0
+    total_items   = OrderItem.objects.filter(order__in=orders.order_by().values('id')).aggregate(t=Sum('quantity'))['t'] or 0
     avg_order     = round(total_revenue / total_orders, 2) if total_orders else 0
 
     # --- Cashier's personal payment collections ---
@@ -437,7 +441,7 @@ def cashier_reports(request):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     # id__in: the OR'd joins above can repeat a payment row, which would inflate the sums
     my_payments = Payment.objects.filter(
@@ -489,7 +493,8 @@ def cashier_reports(request):
         orders_list.append({
             'id':             order.id,
             'order_number':   order.order_number,
-            'table_number':   order.table_info.tbl_no if order.table_info else 'N/A',
+            'table_number':   order.table_info.tbl_no if order.table_info else 'N/A',  # old app builds print it as is
+            'order_type':     order.order_type,
             'ordered_by':     order.ordered_by.get_full_name() or order.ordered_by.username if order.ordered_by else 'Unknown',
             'status':         order.status,
             'payment_status': order.payment_status,

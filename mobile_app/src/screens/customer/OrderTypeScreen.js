@@ -37,7 +37,7 @@ const BOOK_TABLE = {
 export default function OrderTypeScreen({ route, navigation }) {
   const t = useT();
   const { restaurant } = route.params;   // { id, name, address, ... }
-  const { setRemoteOrder } = useCartStore();
+  const { setRemoteOrder, setLastOrderMode } = useCartStore();
   const { setRestaurant } = useAuthStore();
   const [snack, setSnack] = useState('');
 
@@ -54,11 +54,14 @@ export default function OrderTypeScreen({ route, navigation }) {
       return;
     }
     try {
+      // Empties a cart that holds another restaurant's products
       await setRestaurant(restaurant.id);
     } catch {
       setSnack(t('Could not save restaurant. Please try again.'));
       return;
     }
+    // Chosen for delivery / pickup: RestaurantSelector must not skip to the table list
+    setLastOrderMode('remote');
     if (type === 'delivery') {
       navigation.navigate('DeliveryInfo', { restaurant, orderType: type });
     } else {

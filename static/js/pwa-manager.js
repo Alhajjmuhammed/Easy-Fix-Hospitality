@@ -497,13 +497,16 @@ class PWAManager {
         toast.innerHTML = `
             <div class="d-flex">
                 <div class="toast-body">
-                    <strong>${title}</strong><br>
-                    ${message}
+                    <strong class="pwa-toast-title"></strong><br>
+                    <span class="pwa-toast-message"></span>
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" 
                         data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         `;
+        // title/message are set as text, never parsed as HTML
+        toast.querySelector('.pwa-toast-title').textContent = title == null ? '' : String(title);
+        toast.querySelector('.pwa-toast-message').textContent = message == null ? '' : String(message);
         
         toastContainer.appendChild(toast);
         

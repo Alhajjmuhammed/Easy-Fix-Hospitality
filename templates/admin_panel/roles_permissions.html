@@ -218,7 +218,7 @@
         <div class="rp-sidebar">
             <div class="rp-sidebar-title">{% translate "Select a role to edit" %}</div>
             {% for role_name, role_display in built_in_roles %}
-            <button class="rp-role-btn" data-role="{{ role_name }}" onclick="rpSelectRole('{{ role_name }}','{{ role_display }}')">
+            <button class="rp-role-btn" data-role="{{ role_name }}" onclick="rpSelectRole('{{ role_name|escapejs }}','{{ role_display|escapejs }}')">
                 <span class="rp-role-icon ri-{{ role_name }}">
                     {% if role_name == 'manager' %}<i class="fas fa-user-tie"></i>
                     {% elif role_name == 'customer_care' %}<i class="fas fa-headset"></i>
@@ -503,13 +503,15 @@
     function toast(msg, type){
         var el=document.createElement('div');
         el.className='rp-toast '+type;
-        el.innerHTML='<i class="fas '+(type==='success'?'fa-check-circle':'fa-exclamation-circle')+'"></i> '+msg;
+        el.innerHTML='<i class="fas '+(type==='success'?'fa-check-circle':'fa-exclamation-circle')+'"></i> '+escapeHtml(msg);
         document.body.appendChild(el);
         setTimeout(function(){el.remove();},3500);
     }
 
-    const roleSets = {{ role_sets_json|safe }};
-    const customRolesData = {{ custom_roles_json|safe }};
+    // The view passes json.dumps() strings: escapejs keeps them inert inside this script block
+    // (a closing script tag inside a role name can no longer end this block), JSON.parse rebuilds the same objects.
+    const roleSets = JSON.parse('{{ role_sets_json|escapejs }}');
+    const customRolesData = JSON.parse('{{ custom_roles_json|escapejs }}');
     const customRolesMap = {};
     customRolesData.forEach(function(cr){customRolesMap[cr.id]=cr;});
 
@@ -665,7 +667,7 @@
                 if(res.success){
                     var label=document.getElementById('asr-label-'+userId);
                     if(label){
-                        if(roleId){var cr=customRolesMap[parseInt(roleId)];label.innerHTML='<span class="custom-chip">'+(cr?cr.name:"{{ t_custom_role|escapejs }}")+'</span>';}
+                        if(roleId){var cr=customRolesMap[parseInt(roleId)];label.innerHTML='<span class="custom-chip">'+escapeHtml(cr?cr.name:"{{ t_custom_role|escapejs }}")+'</span>';}
                         else label.innerHTML='<span style="color:var(--rp-muted);font-size:.81rem;">'+"{{ t_using_builtin|escapejs }}"+'</span>';
                     }
                     toast("{{ t_assign_updated|escapejs }}",'success');

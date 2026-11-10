@@ -24,6 +24,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiMenu } from '../../api/menu';
 import { getCategories, saveCategories, getSyncMeta } from '../../database/operations';
 import { useCartStore } from '../../store/useCartStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { MENU_STALE_THRESHOLD_MS } from '../../config';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useT } from '../../i18n';
@@ -45,14 +46,20 @@ export default function MenuScreen({ navigation }) {
   const mountedRef = useRef(true);
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
+  // Reloads when the selected restaurant changes (e.g. "Order Again" on another restaurant's
+  // order while this Menu is still in the stack): the old restaurant's dishes must never be
+  // offered for the new restaurant's cart. loadSeq drops an older response landing late.
+  const selectedRestaurantId = useAuthStore((s) => s.restaurantId);
+  const loadSeq = useRef(0);
   const loadMenu = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const net = await NetInfo.fetch();
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== loadSeq.current) return;
       if (net.isConnected) {
         const data = await apiMenu();
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || seq !== loadSeq.current) return;
         await saveCategories(data);
         setCategories(data);
       } else {
@@ -70,17 +77,25 @@ export default function MenuScreen({ navigation }) {
       }
     } catch {
       const local = await getCategories();
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== loadSeq.current) return;
       setCategories(local);
       setSnack('Could not refresh menu');
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && seq === loadSeq.current) setLoading(false);
     }
-  }, []);
+  }, [selectedRestaurantId]);
 
   useEffect(() => {
     loadMenu();
   }, [loadMenu]);
+
+  // Safety net: a saved cart from another restaurant is emptied before items are added
+  // here (its products would be refused with "Product not found").
+  useEffect(() => {
+    if (useCartStore.getState().ensureRestaurant(selectedRestaurantId) && mountedRef.current) {
+      setSnack('Your cart was emptied because you changed restaurant');
+    }
+  }, [selectedRestaurantId]);
 
   // Categories that have at least one available product (used to filter chip bar)
   const catsWithProducts = useMemo(() => {

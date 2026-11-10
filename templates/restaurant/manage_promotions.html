@@ -454,7 +454,9 @@ function showNotification(message, type) {
     const notification = document.createElement('div');
     notification.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger') + ' alert-dismissible fade show position-fixed';
     notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    notification.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    // message may contain names typed by users: show it as text, never as HTML
+    notification.appendChild(document.createTextNode(message == null ? '' : String(message)));
+    notification.insertAdjacentHTML('beforeend', '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>');
     
     document.body.appendChild(notification);
     

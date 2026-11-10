@@ -196,4 +196,13 @@ export default {
   '⚠ Only {n} in stock': '⚠ Zilikuwepo {n} tu',
   // Cashier report: payment method names
   'Mobile money': 'Pesa kwa simu',
+  // Owner / manager reports, rider tracking (1.2.0 fixes)
+  'Collected by Staff': 'Kilichokusanywa na wafanyakazi',
+  'No payments for this period': 'Hakuna malipo katika kipindi hiki',
+  'You do not have permission to view these reports.': 'Huna ruhusa ya kuona ripoti hizi.',
+  'Server error – showing cached data': 'Hitilafu ya seva – taarifa zilizohifadhiwa zinaonyeshwa',
+  'Server error – showing locally computed data': 'Hitilafu ya seva – taarifa zilizohesabiwa kwenye kifaa zinaonyeshwa',
+  'Location is turned off. Turn on location to share your position with the customer.':
+    'Huduma ya mahali imezimwa. Iwashe ili mteja aone ulipo.',
+  'Live tracking is not available for this delivery': 'Ufuatiliaji wa moja kwa moja haupatikani kwa usafirishaji huu',
 };

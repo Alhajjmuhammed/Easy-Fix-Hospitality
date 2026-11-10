@@ -396,6 +396,15 @@ export async function printReceipt({
   return printReceiptLocal({ order, payment, restaurantName, currencySymbol, staffName });
 }
 
+/**
+ * True when a printReceipt() result means the printer could not be reached: strict
+ * Bluetooth mode resolves false instead of opening the system dialog. In the other
+ * modes false only means the user closed the system print dialog (nothing to report).
+ */
+export function isPrinterUnreachable(result) {
+  return result === false && usePrinterStore.getState().mode === 'bluetooth';
+}
+
 // ─── BT Classic ticket (KOT/BOT — no prices, no cash drawer) ────────────────
 
 async function _printTicketBtClassic({ order, restaurantName, stationFilter = null, orderedBy = '' }) {

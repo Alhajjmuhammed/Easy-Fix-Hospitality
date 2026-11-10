@@ -197,6 +197,20 @@
     </style>
     
     {% block extra_css %}{% endblock %}
+    <script>
+    /* Shared HTML escaper: use it for EVERY value put into innerHTML / insertAdjacentHTML /
+       template strings (text and attribute values). null/undefined become ''. */
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/`/g, '&#96;');
+    }
+    </script>
 </head>
 <body>
     <!-- Navigation -->

@@ -35,6 +35,10 @@ const STATUS_COLORS = {
   out_for_delivery: '#1565C0',
   delivered:        '#2E7D32',
   cancelled:        '#B71C1C',
+  customer_refused: '#B71C1C',
+  kitchen_error:    '#B71C1C',
+  quality_issue:    '#B71C1C',
+  wasted:           '#B71C1C',
 };
 
 const PAYMENT_INFO = {
@@ -42,6 +46,9 @@ const PAYMENT_INFO = {
   partial: { color: '#1565C0', bg: '#E3F2FD', label: 'Partial Payment',  icon: '💳' },
   paid:    { color: '#2E7D32', bg: '#E8F5E9', label: 'Paid',             icon: '✅' },
 };
+
+// Final statuses where the order was not completed: shown like a cancelled order
+const STOPPED_STATUSES = ['cancelled', 'customer_refused', 'kitchen_error', 'quality_issue', 'wasted'];
 
 // Order progress steps — delivery orders use a different final step
 const DINE_IN_STEPS = [
@@ -176,7 +183,7 @@ export default function OrderTrackingScreen({ route }) {
         setSnack(t('Bill request saved – will sync when online'));
       }
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Could not request bill'));
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || t('Could not request bill'));
     } finally {
       if (mountedRef.current) setBillRequesting(false);
     }
@@ -234,7 +241,8 @@ export default function OrderTrackingScreen({ route }) {
 
   // Progress tracking
   const currentStepIdx = STEP_ORDER.indexOf(order.status);
-  const isCancelled = order.status === 'cancelled';
+  // Orders stopped by the restaurant end like a cancelled order (no progress timeline)
+  const isCancelled = STOPPED_STATUSES.includes(order.status);
   const isOutForDelivery = order.status === 'out_for_delivery';
   const isDelivered      = order.status === 'delivered';
   const fmt = formatCurrency;
@@ -261,7 +269,7 @@ export default function OrderTrackingScreen({ route }) {
               style={[styles.statusChip, { backgroundColor: statusColor + '22' }]}
               textStyle={{ color: statusColor, fontFamily: P600 }}
             >
-              {order.status?.toUpperCase() ?? ''}
+              {order.status ? t(order.status).toUpperCase() : ''}
             </Chip>
             <View style={[styles.payBadge, { backgroundColor: payInfo.bg }]}>
               <Text style={{ color: payInfo.color, fontSize: 12, fontFamily: P600 }}>
@@ -282,7 +290,7 @@ export default function OrderTrackingScreen({ route }) {
         <Card style={[styles.card, { backgroundColor: '#FFEBEE' }]}>
           <Card.Content>
             <Text variant="titleSmall" style={{ fontFamily: P700, color: '#B71C1C', marginBottom: 4 }}>
-              ✗  {t('Order Cancelled')}
+              ✗  {t('Order Cancelled')}{order.status !== 'cancelled' ? ` · ${t(order.status)}` : ''}
             </Text>
             {order.reason_if_cancelled ? (
               <Text variant="bodySmall" style={{ fontFamily: P400, color: '#B71C1C' }}>

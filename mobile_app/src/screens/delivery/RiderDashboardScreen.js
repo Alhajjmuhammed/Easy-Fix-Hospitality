@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import {
   Text, Card, Chip, Button, ActivityIndicator,
@@ -41,34 +41,36 @@ export default function RiderDashboardScreen() {
   const [togglingAvail, setTogglingAvail] = useState(false);
   const [snack, setSnack]             = useState('');
   const [isOffline, setIsOffline]     = useState(false);
+  // No state updates after the screen is gone (logout / navigation during a request)
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent && mountedRef.current) setLoading(true);
     try {
       const net = await NetInfo.fetch();
+      if (!mountedRef.current) return;
       if (!net.isConnected) {
         setIsOffline(true);
         try {
           const cached = await getCachedAssignments();
-          setAssignments(cached);
+          if (mountedRef.current) setAssignments(cached);
         } catch {
           // best-effort: leave current state
         }
-        setLoading(false);
-        setRefreshing(false);
         return;
       }
       setIsOffline(false);
       const data = await apiMyAssignments();
+      if (!mountedRef.current) return;
       const fetched = data.assignments || [];
       setAssignments(fetched);
       setAvailable(data.is_available ?? true);
       try { await cacheAssignments(fetched); } catch { /* best-effort */ }
     } catch {
-      setSnack('Could not load assignments');
+      if (mountedRef.current) setSnack('Could not load assignments');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
@@ -81,15 +83,17 @@ export default function RiderDashboardScreen() {
   const handleToggleAvail = async () => {
     const net = await NetInfo.fetch();
     if (!net.isConnected) { setSnack('No internet — connect to update availability'); return; }
+    if (!mountedRef.current) return;
     setTogglingAvail(true);
     try {
       const res = await apiToggleAvailability();
+      if (!mountedRef.current) return;
       setAvailable(res.is_available);
       setSnack(res.is_available ? 'You are now available' : 'You are now offline');
     } catch {
-      setSnack('Could not update availability');
+      if (mountedRef.current) setSnack('Could not update availability');
     } finally {
-      setTogglingAvail(false);
+      if (mountedRef.current) setTogglingAvail(false);
     }
   };
 

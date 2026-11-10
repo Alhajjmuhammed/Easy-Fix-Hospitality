@@ -110,7 +110,7 @@
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline-danger btn-action"
-                                        onclick="deleteEntry('category', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use }})" title="{% translate "Delete" %}">
+                                        onclick="deleteEntry('category', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use|escapejs }})" title="{% translate "Delete" %}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -163,7 +163,7 @@
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline-danger btn-action"
-                                        onclick="deleteEntry('unit', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use }})" title="{% translate "Delete" %}">
+                                        onclick="deleteEntry('unit', {{ row.obj.id }}, '{{ row.obj.name|escapejs }}', {{ row.in_use|escapejs }})" title="{% translate "Delete" %}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>

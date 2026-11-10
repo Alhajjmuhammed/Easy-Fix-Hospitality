@@ -640,8 +640,8 @@ $(document).ready(function() {
     // Show alert function
     function showAlert(type, message) {
         const alertHtml = `
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
+            <div class="alert alert-${escapeHtml(type)} alert-dismissible fade show" role="alert">
+                ${escapeHtml(message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{% translate "Close" %}"></button>
             </div>
         `;

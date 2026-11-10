@@ -13,6 +13,10 @@ import {
   apiMarkDelivered,
 } from '../../api/delivery';
 import { useT } from '../../i18n';
+import { shouldReconnect, reconnectDelay } from '../../utils/wsReconnect';
+
+// GPS is shared only while the rider is on the way: before pick-up and before delivery
+const TRACKED_STATUSES = ['assigned', 'picked_up'];
 
 // Build the Leaflet HTML — shows rider position + destination pin
 function buildMapHtml({ riderLat, riderLng, destLat, destLng, destAddress }) {
@@ -123,7 +127,13 @@ export default function RiderActiveDeliveryScreen({ route }) {
   const wsRef       = useRef(null);
   const locSubRef   = useRef(null);
   const mountedRef  = useRef(true);
-  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+  const navTimerRef = useRef(null);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    clearTimeout(navTimerRef.current);
+  }, []);
+  // Set once "Delivered" succeeded: tracking stops right away, before the reload
+  const [finished, setFinished] = useState(false);
 
   // ── Load assignment data ─────────────────────────────────────────────────
   const loadAssignment = useCallback(async () => {
@@ -168,15 +178,28 @@ export default function RiderActiveDeliveryScreen({ route }) {
   }), [initMapData]);
 
   // ── Location tracking ────────────────────────────────────────────────────
+  // Only while the assignment is assigned / picked up: stops after delivery (or cancel).
+  const assignmentStatus = assignment?.assignment?.status;
+  const tracking = !finished && TRACKED_STATUSES.includes(assignmentStatus);
+
   useEffect(() => {
+    if (!tracking) return undefined;
     let active = true;
     let reconnectTimeout = null;
+    let attempts = 0;
+    let refusedInARow = 0;
 
     async function startTracking() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (!active) return; // guard: unmount during permission dialog
       if (status !== 'granted') {
         setSnack('Location permission denied — tracking disabled');
+        return;
+      }
+      const servicesOn = await Location.hasServicesEnabledAsync().catch(() => true);
+      if (!active) return;
+      if (!servicesOn) {
+        setSnack('Location is turned off. Turn on location to share your position with the customer.');
         return;
       }
 
@@ -191,14 +214,45 @@ export default function RiderActiveDeliveryScreen({ route }) {
         const ws = new WebSocket(`${wsUrl}/ws/delivery/${assignmentOrderId}/?token=${encodeURIComponent(token)}`);
         wsRef.current = ws;
 
+        let opened = false;
+        ws.onopen = () => { opened = true; attempts = 0; refusedInARow = 0; };
         ws.onerror = () => {
           if (!active) return;
           setSnack('Live tracking connection issue — reconnecting...');
         };
         ws.onclose = (e) => {
-          if (!active || e.code === 1000) return;
-          setSnack('Live tracking reconnecting...');
-          reconnectTimeout = setTimeout(connectWS, 3000);
+          if (!active) return;
+          if (!shouldReconnect(e?.code)) {
+            // Refused by the server (not allowed / not found): reconnecting cannot help
+            if (e?.code !== 1000) setSnack('Live tracking is not available for this delivery');
+            return;
+          }
+          // The server refuses before accepting, which React Native reports as 1006, not as
+          // its 4001/4003 code. Several closes in a row without ever opening while the phone
+          // IS online therefore mean "refused": stop instead of retrying forever. Offline,
+          // keep retrying (with backoff) so tracking resumes when the network returns.
+          const retry = () => {
+            if (!active) return;
+            setSnack('Live tracking reconnecting...');
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(connectWS, reconnectDelay(attempts));
+            attempts += 1;
+          };
+          if (!opened) {
+            refusedInARow += 1;
+            if (refusedInARow >= 5) {
+              NetInfo.fetch().then((net) => {
+                if (!active) return;
+                if (net?.isConnected && net?.isInternetReachable !== false) {
+                  setSnack('Live tracking is not available for this delivery');
+                } else {
+                  retry();
+                }
+              }).catch(retry);
+              return;
+            }
+          }
+          retry();
         };
         ws.onmessage = (e) => {
           if (!active) return;
@@ -235,15 +289,19 @@ export default function RiderActiveDeliveryScreen({ route }) {
       locSubRef.current = sub;
     }
 
-    startTracking();
+    startTracking().catch(() => {
+      // watchPositionAsync throws when location services are off or unavailable
+      if (active) setSnack('Location is turned off. Turn on location to share your position with the customer.');
+    });
 
     return () => {
       active = false;
       clearTimeout(reconnectTimeout);
       locSubRef.current?.remove();
-      if (wsRef.current) wsRef.current.close(1000);
+      locSubRef.current = null;
+      if (wsRef.current) { wsRef.current.close(1000); wsRef.current = null; }
     };
-  }, [assignmentOrderId, token]);
+  }, [assignmentOrderId, token, tracking]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const handlePickedUp = async () => {
@@ -252,12 +310,13 @@ export default function RiderActiveDeliveryScreen({ route }) {
     setActioning(true);
     try {
       await apiMarkPickedUp(assignmentOrderId);
+      if (!mountedRef.current) return;
       setSnack('Marked as picked up!');
       await loadAssignment();
     } catch (e) {
-      setSnack(e.response?.data?.error || 'Could not update status');
+      if (mountedRef.current) setSnack(e.response?.data?.error || e.response?.data?.detail || 'Could not update status');
     } finally {
-      setActioning(false);
+      if (mountedRef.current) setActioning(false);
     }
   };
 
@@ -276,13 +335,17 @@ export default function RiderActiveDeliveryScreen({ route }) {
             setActioning(true);
             try {
               await apiMarkDelivered(assignmentOrderId);
+              if (!mountedRef.current) return;
+              setFinished(true); // stops GPS and the live socket now
               setSnack('Delivery complete!');
-              setTimeout(() => navigation.goBack(), 1500);
+              clearTimeout(navTimerRef.current);
+              navTimerRef.current = setTimeout(() => { if (mountedRef.current) navigation.goBack(); }, 1500);
               // Don't clear actioning on success — component navigates away in 1.5s
               // and clearing it briefly re-enables the button before unmount.
               return;
             } catch (e) {
-              setSnack(e.response?.data?.error || 'Could not complete delivery');
+              if (!mountedRef.current) return;
+              setSnack(e.response?.data?.error || e.response?.data?.detail || 'Could not complete delivery');
             }
             setActioning(false);
           },

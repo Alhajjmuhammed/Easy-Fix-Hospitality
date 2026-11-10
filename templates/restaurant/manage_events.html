@@ -278,7 +278,7 @@
                                     </button>
                                     {% endif %}
                                     {% if event.payment_status != 'fully_paid' and event.status != 'cancelled' %}
-                                    <button class="btn btn-success" title="{% translate "Record Payment" %}" onclick="openPaymentModal({{ event.id }}, '{{ event.title|escapejs }}', {{ event.total_amount }}, {{ event.amount_paid }}, {{ event.balance_due }}, '{{ currency_symbol }}')">
+                                    <button class="btn btn-success" title="{% translate "Record Payment" %}" onclick="openPaymentModal({{ event.id }}, '{{ event.title|escapejs }}', {{ event.total_amount|escapejs }}, {{ event.amount_paid|escapejs }}, {{ event.balance_due|escapejs }}, '{{ currency_symbol|escapejs }}')">
                                         <i class="fas fa-money-bill-wave"></i>
                                     </button>
                                     {% endif %}

@@ -643,7 +643,7 @@ $(document).ready(function() {
         tableSelect.append('<option value="">' + "{{ t_select_table|escapejs }}" + '</option>');
         tables.forEach(function(t) {
             const label = "{{ t_table_n|escapejs }}".replace('{n}', () => t.tbl_no) + (t.is_available ? '' : ' ' + "{{ t_occupied|escapejs }}");
-            tableSelect.append('<option value="' + t.id + '">' + label + '</option>');
+            tableSelect.append('<option value="' + escapeHtml(t.id) + '">' + escapeHtml(label) + '</option>');
         });
         if (tables.length === 0) {
             tableSelect.append('<option value="" disabled>' + "{{ t_no_tables|escapejs }}" + '</option>');
@@ -655,7 +655,7 @@ $(document).ready(function() {
         customerSelect.empty();
         customerSelect.append('<option value="">' + "{{ t_select_customer|escapejs }}" + '</option>');
         customers.forEach(function(c) {
-            customerSelect.append('<option value="' + c.id + '">' + c.name + '</option>');
+            customerSelect.append('<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>');
         });
         if (customers.length === 0) {
             customerSelect.append('<option value="" disabled>' + "{{ t_no_customers|escapejs }}" + '</option>');
@@ -671,7 +671,7 @@ $(document).ready(function() {
     function showAlert(type, message) {
         const alertHtml = `
             <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
+                ${escapeHtml(message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ t_close|escapejs }}"></button>
             </div>
         `;

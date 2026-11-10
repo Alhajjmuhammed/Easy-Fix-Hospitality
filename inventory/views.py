@@ -607,6 +607,15 @@ def _get_item_for_user(item_id, owner, user):
         return None
 
 
+def _safe_csv(value):
+    """Prevent CSV formula injection: prefix dangerous leading characters.
+    (Same helper as restaurant/views.py, waste_management/views.py.)"""
+    s = str(value) if value is not None else ''
+    if s and s[0] in ('=', '+', '-', '@', '|', '%'):
+        return '	' + s
+    return s
+
+
 def _export_csv(records_qs, currency_symbol='$', total_spent=0, total_refunds=0, net_cost=0):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="inventory_history_{timezone.now():%Y%m%d}.csv"'
@@ -630,13 +639,13 @@ def _export_csv(records_qs, currency_symbol='$', total_spent=0, total_refunds=0,
             cost_str = ''
         writer.writerow([
             r.recorded_at.strftime('%Y-%m-%d %H:%M'),
-            r.item.name,
-            r.get_record_type_display(),
+            _safe_csv(r.item.name),
+            _safe_csv(r.get_record_type_display()),
             r.quantity_change,
-            r.item.unit,
+            _safe_csv(r.item.unit),
             cost_str,
-            r.notes,
-            r.recorded_by.username if r.recorded_by else '',
+            _safe_csv(r.notes),
+            _safe_csv(r.recorded_by.username if r.recorded_by else ''),
         ])
     return response
 

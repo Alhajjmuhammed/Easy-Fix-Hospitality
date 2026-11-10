@@ -6,6 +6,7 @@ from django.contrib.auth.models import AnonymousUser
 from orders.models import Order, DeliveryAssignment, DeliveryRider
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from restaurant_system.db_utils import managed_owner_ids
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,34 @@ class RestaurantConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error sending cancellation notification: {str(e)}")
 
+    async def bill_request(self, event):
+        """A table asked for the bill (app / synced). Same reason as order_updated: without a
+        handler Channels drops every connected staff socket of this restaurant."""
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'bill_request',
+                'table_number': event.get('table_number'),
+                'bill_request_id': event.get('bill_request_id'),
+                'message': event.get('message'),
+                'timestamp': event.get('timestamp'),
+            }))
+        except Exception as e:
+            logger.error(f"Error sending bill_request to restaurant group: {e}")
+
+    async def order_updated(self, event):
+        """Items were added to an order (web add-to-order). Without this handler Channels
+        raises "No handler for message type" and drops every connected staff socket."""
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'order_updated',
+                'order_id': event.get('order_id'),
+                'order_number': event.get('order_number'),
+                'message': event.get('message'),
+                'timestamp': event.get('timestamp'),
+            }))
+        except Exception as e:
+            logger.error(f"Error sending order_updated to restaurant group: {e}")
+
     async def order_status_update(self, event):
         try:
             await self.send(text_data=json.dumps({
@@ -560,9 +589,9 @@ class DeliveryConsumer(AsyncWebsocketConsumer):
                         _Q(table_info__restaurant__branch_owner=_owner_user) |
                         (_Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=_owner_user) | _Q(order_type__in=['delivery', 'pickup'], restaurant_owner=_owner_user)) |
                         _Q(order_type__in=['delivery', 'pickup'],
-                           ordered_by__owner__managed_restaurant__main_owner=_owner_user) |
+                           ordered_by__owner__in=managed_owner_ids(_owner_user)) |
                         _Q(order_type__in=['delivery', 'pickup'],
-                           restaurant_owner__managed_restaurant__main_owner=_owner_user)
+                           restaurant_owner__in=managed_owner_ids(_owner_user))
                     )
                     if Order.objects.filter(_stq, id=order_id).exists():
                         return True

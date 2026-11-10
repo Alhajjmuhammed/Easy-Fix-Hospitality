@@ -194,7 +194,7 @@ document.getElementById('editOrderForm').addEventListener('submit', function(e) 
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-success alert-dismissible fade show';
             alertDiv.innerHTML = `
-                <i class="fas fa-check-circle"></i> ${data.message}
+                <i class="fas fa-check-circle"></i> ${escapeHtml(data.message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             
@@ -213,7 +213,7 @@ document.getElementById('editOrderForm').addEventListener('submit', function(e) 
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-danger alert-dismissible fade show';
             alertDiv.innerHTML = `
-                <i class="fas fa-exclamation-circle"></i> {{ t_error|escapejs }}: ${data.message}
+                <i class="fas fa-exclamation-circle"></i> {{ t_error|escapejs }}: ${escapeHtml(data.message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             

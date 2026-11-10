@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models, transaction
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
+from django.utils.functional import cached_property
 from decimal import Decimal
 from datetime import date, timedelta
 
@@ -202,9 +203,14 @@ class User(AbstractUser):
             return set(p.section for p in self.admin_section_permissions.filter(can_view=True))
         return set()
 
-    @property
+    @cached_property
     def visible_features(self):
-        """Returns the set of feature slugs this user can access — for sidebar/template use."""
+        """Returns the set of feature slugs this user can access — for sidebar/template use.
+
+        Cached on the instance (one computation per request.user): templates read it
+        inside loops, and as a plain property it ran 3 queries per call.  Nothing in
+        a request changes the *requesting* user's own permissions and then re-reads
+        them; if that is ever needed, `self.__dict__.pop('visible_features', None)`."""
         if (self.is_administrator() or self.is_owner() or
                 self.is_main_owner() or self.is_branch_owner()):
             try:

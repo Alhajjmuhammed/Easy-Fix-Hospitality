@@ -19,7 +19,7 @@ import { apiProcessPayment, apiVoidPayment } from '../../api/payments';
 import { apiTables } from '../../api/tables';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceipt } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
 import { useT } from '../../i18n';
 import LoyaltyPayBox from '../../components/LoyaltyPayBox';
@@ -32,6 +32,12 @@ const PAYMENT_METHODS = [
   { value: 'voucher', label: 'Voucher' },
 ];
 
+// Names for every payment method the server may return (void picker)
+const METHOD_LABELS = {
+  cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher',
+  loyalty: 'Loyalty points', mobile: 'Mobile money',
+};
+
 const STATUS_NEXT = {
   pending:   'confirmed',
   confirmed: 'preparing',
@@ -42,7 +48,7 @@ const STATUS_NEXT = {
 export default function CashierMyOrdersScreen({ navigation }) {
   const theme = useTheme();
   const t = useT();
-  const { format } = useCurrency();
+  const { format, decimals } = useCurrency();
   const { pendingCount, lastSyncTime } = useSyncStore();
   const { user } = useAuthStore();
 
@@ -242,7 +248,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
         setPayDialog(null);
         setSnack('Payment queued – will sync when online');
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
         return;
       }
@@ -277,7 +283,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
         setPayDialog(null);
         setSnack(doneMessage);
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
       };
       if (!online) {
@@ -305,11 +311,11 @@ export default function CashierMyOrdersScreen({ navigation }) {
       setPayDialog(null);
       setSnack('Payment recorded');
       if (usePrinterStore.getState().autoPrintAfterPayment) {
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch((err) => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
       }
       fetchOrders(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || err.response?.data?.error || 'Payment failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || 'Payment failed');
     } finally {
       if (mountedRef.current) setPaying(false);
     }
@@ -329,6 +335,8 @@ export default function CashierMyOrdersScreen({ navigation }) {
 
   const handleVoid = async () => {
     if (!voidDialog) return;
+    // The server refuses a void without a reason
+    if (!voidReason.trim()) { setSnack('Enter a reason for the void'); return; }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
     if (!isOnlineState(net)) { setSnack('No internet — connect to void a payment'); setVoidDialog(null); return; }
@@ -340,7 +348,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
       setSnack('Payment voided');
       fetchOrders(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Void failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || 'Void failed');
     } finally {
       if (mountedRef.current) setVoiding(false);
     }
@@ -363,7 +371,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
       setSnack('Order cancelled');
       fetchOrders(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Cancel failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || 'Cancel failed');
     } finally {
       if (mountedRef.current) setCancelling(false);
     }
@@ -410,7 +418,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
       setSnack('Table transferred');
       fetchOrders(true);
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || 'Transfer failed');
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || 'Transfer failed');
     } finally {
       if (mountedRef.current) setTransferring(false);
     }
@@ -427,7 +435,9 @@ export default function CashierMyOrdersScreen({ navigation }) {
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
+      if (isPrinterUnreachable(ok)) { if (mountedRef.current) setSnack(t('Printer not reachable')); return; }
       if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('unknown error') }));
@@ -574,7 +584,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                       />
                       <Divider />
                       <Menu.Item leadingIcon="printer" title={t('Print Bill')} disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
-                      <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled' || order._is_offline_pending} />
+                      <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} disabled={isPaid || order.status === 'cancelled' || order._is_offline_pending || order.order_type === 'delivery' || order.order_type === 'pickup'} />
                       {hasPayment && !order._is_offline_pending && (
                         <Menu.Item leadingIcon="cancel" title={t('Void Payment')} onPress={() => { setMenuOpenId(null); openVoid(order); }} />
                       )}
@@ -778,7 +788,7 @@ export default function CashierMyOrdersScreen({ navigation }) {
                     setVoidReason('');
                   }}
                 >
-                  {p.payment_method || p.method} — {p.amount}
+                  {(() => { const m = p.payment_method || p.method; return METHOD_LABELS[m] ? t(METHOD_LABELS[m]) : (m || ''); })()} — {format(p.amount)}
                 </Button>
               )}
             />
@@ -795,12 +805,12 @@ export default function CashierMyOrdersScreen({ navigation }) {
             <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
               {t('Order #{number}', { number: voidDialog?.order?.order_number || voidDialog?.order?.id || '' })}
             </Text>
-            <TextInput label={t('Void Reason (optional)')} value={voidReason}
+            <TextInput label={t('Void Reason (required)')} value={voidReason}
               onChangeText={setVoidReason} mode="outlined" multiline numberOfLines={2} />
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setVoidDialog(null)}>{t('Cancel')}</Button>
-            <Button mode="contained" buttonColor="#E53935" loading={voiding} disabled={voiding} onPress={handleVoid}>{t('Void')}</Button>
+            <Button mode="contained" buttonColor="#E53935" loading={voiding} disabled={voiding || !voidReason.trim()} onPress={handleVoid}>{t('Void')}</Button>
           </Dialog.Actions>
         </Dialog>
 

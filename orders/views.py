@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from restaurant_system.db_utils import managed_owner_ids
 
 
 def _safe_csv(value):
@@ -47,6 +48,26 @@ logger = logging.getLogger(__name__)
 
 # Initialize channel layer for WebSocket communication
 channel_layer = get_channel_layer()
+
+
+def _ws_send_on_commit(group, message):
+    """Send a WebSocket group message once the current transaction commits.
+
+    With ATOMIC_REQUESTS every view runs in a transaction, often holding row locks
+    (select_for_update); a group_send there makes everyone wait on Redis, and if the
+    transaction rolls back the screens were told about an order that doesn't exist.
+    Same rule as mobile_api's _notify_ws. Runs immediately when no transaction is open.
+    The message is built by the caller now (a plain data snapshot); failures are logged
+    and never reach the request.
+    """
+    def _send():
+        try:
+            layer = get_channel_layer()
+            if layer is not None:
+                async_to_sync(layer.group_send)(group, message)
+        except Exception as e:
+            logger.warning('WebSocket notification failed (non-critical): %s', e)
+    transaction.on_commit(_send)
 
 
 def _customer_product_q(session, owner):
@@ -852,7 +873,7 @@ def place_order(request):
                 # Send real-time notifications (non-blocking - failures won't break order)
                 try:
                     restaurant_id = current_restaurant.id
-                    async_to_sync(channel_layer.group_send)(
+                    _ws_send_on_commit(
                         f'restaurant_{restaurant_id}',
                         {
                             'type': 'new_order',
@@ -867,7 +888,7 @@ def place_order(request):
                         }
                     )
 
-                    async_to_sync(channel_layer.group_send)(
+                    _ws_send_on_commit(
                         f'order_{order.id}',
                         {
                             'type': 'order_status_update',
@@ -1089,7 +1110,7 @@ def my_orders(request):
                     Q(table_info__restaurant__main_owner=owner_filter) |
                     Q(table_info__restaurant__branch_owner=owner_filter) |
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
                 )
             # If no restaurant assignment, show all their orders
         except PermissionDenied:
@@ -1134,7 +1155,7 @@ def order_detail(request, order_id):
             Q(table_info__restaurant__main_owner=owner) |
             Q(table_info__restaurant__branch_owner=owner) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
         )
         order = get_object_or_404(_order_qs.filter(_oq_ord), id=order_id)
     else:
@@ -1261,7 +1282,7 @@ def order_list(request):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             ).distinct()
         else:
             # Only system admin (no owner) can see all orders
@@ -1282,6 +1303,18 @@ def create_order(request):
     """Placeholder for create order - redirect to table selection"""
     return redirect('orders:select_table')
 
+def _local_day_range(day=None):
+    """[start, end) aware datetimes of a local calendar day (default: today in the current
+    time zone, settings.TIME_ZONE). Exactly the rows `created_at__date=day` matches with
+    USE_TZ=True, but as a range the created_at index can serve."""
+    from datetime import datetime as _dt, time as _time, timedelta as _td
+    if day is None:
+        day = timezone.localtime(timezone.now()).date()
+    start = timezone.make_aware(_dt.combine(day, _time.min))
+    end = timezone.make_aware(_dt.combine(day + _td(days=1), _time.min))
+    return start, end
+
+
 @login_required
 def kitchen_dashboard(request):
     """Kitchen staff dashboard to manage orders"""
@@ -1295,7 +1328,7 @@ def kitchen_dashboard(request):
     # Base queryset filtered by owner
     try:
         owner_filter = get_owner_filter(request.user)
-        base_queryset = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items__product')
+        base_queryset = Order.objects.select_related('table_info', 'ordered_by__role', 'confirmed_by').prefetch_related('order_items__product')
         
         if owner_filter:
             # Filter orders where the customer belongs to the same owner as kitchen staff
@@ -1304,7 +1337,7 @@ def kitchen_dashboard(request):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
         # If administrator or no owner filter, show all orders
 
@@ -1315,10 +1348,10 @@ def kitchen_dashboard(request):
     # Only include orders that have at least one kitchen item (DB-level filter, no N+1)
     base_queryset = base_queryset.filter(order_items__product__station='kitchen').distinct()
 
-    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
-    from django.utils.timezone import localtime
-    today = localtime(timezone.now()).date()
-    base_queryset = base_queryset.filter(created_at__date=today)
+    # Filter to today's orders only — local (EAT) midnight to midnight, so midnight-to-3am
+    # orders aren't lost; a plain range on created_at can use its index (__date cannot).
+    _day_start, _day_end = _local_day_range()
+    base_queryset = base_queryset.filter(created_at__gte=_day_start, created_at__lt=_day_end)
 
     # Get orders by status
     pending_orders = base_queryset.filter(status='pending').order_by('-created_at')
@@ -1363,14 +1396,14 @@ def bar_dashboard(request):
 
     try:
         owner_filter = get_owner_filter(request.user)
-        base_queryset = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items__product')
+        base_queryset = Order.objects.select_related('table_info', 'ordered_by__role', 'confirmed_by').prefetch_related('order_items__product')
         if owner_filter:
             base_queryset = base_queryset.filter(
                 Q(table_info__owner=owner_filter) |
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
     except PermissionDenied:
         messages.error(request, 'You are not associated with any restaurant.')
@@ -1379,10 +1412,10 @@ def bar_dashboard(request):
     # Only include orders that have at least one bar item (DB-level filter, no N+1)
     base_queryset = base_queryset.filter(order_items__product__station='bar').distinct()
 
-    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
-    from django.utils.timezone import localtime
-    today = localtime(timezone.now()).date()
-    base_queryset = base_queryset.filter(created_at__date=today)
+    # Filter to today's orders only — local (EAT) midnight to midnight, so midnight-to-3am
+    # orders aren't lost; a plain range on created_at can use its index (__date cannot).
+    _day_start, _day_end = _local_day_range()
+    base_queryset = base_queryset.filter(created_at__gte=_day_start, created_at__lt=_day_end)
 
     # Get orders by status
     pending_orders = base_queryset.filter(status='pending').order_by('-created_at')
@@ -1422,7 +1455,7 @@ def buffet_dashboard(request):
 
     try:
         owner_filter = get_owner_filter(request.user)
-        base_queryset = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items__product')
+        base_queryset = Order.objects.select_related('table_info', 'ordered_by__role', 'confirmed_by').prefetch_related('order_items__product')
         
         # Filter by owner
         if owner_filter:
@@ -1431,7 +1464,7 @@ def buffet_dashboard(request):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
 
         # Filter to only include orders with buffet items (database-level)
@@ -1440,10 +1473,10 @@ def buffet_dashboard(request):
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
-    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
-    from django.utils.timezone import localtime
-    today = localtime(timezone.now()).date()
-    base_queryset = base_queryset.filter(created_at__date=today)
+    # Filter to today's orders only — local (EAT) midnight to midnight, so midnight-to-3am
+    # orders aren't lost; a plain range on created_at can use its index (__date cannot).
+    _day_start, _day_end = _local_day_range()
+    base_queryset = base_queryset.filter(created_at__gte=_day_start, created_at__lt=_day_end)
 
     # Get orders by status
     pending_orders = base_queryset.filter(status='pending').order_by('-created_at')
@@ -1483,7 +1516,7 @@ def service_dashboard(request):
 
     try:
         owner_filter = get_owner_filter(request.user)
-        base_queryset = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items__product')
+        base_queryset = Order.objects.select_related('table_info', 'ordered_by__role', 'confirmed_by').prefetch_related('order_items__product')
         
         # Filter by owner
         if owner_filter:
@@ -1492,7 +1525,7 @@ def service_dashboard(request):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
 
         # Filter to only include orders with service items (database-level)
@@ -1501,10 +1534,10 @@ def service_dashboard(request):
         messages.error(request, 'You are not associated with any restaurant.')
         return redirect('restaurant:home')
 
-    # Filter to today's orders only — use local EAT date so midnight-to-3am orders aren't lost
-    from django.utils.timezone import localtime
-    today = localtime(timezone.now()).date()
-    base_queryset = base_queryset.filter(created_at__date=today)
+    # Filter to today's orders only — local (EAT) midnight to midnight, so midnight-to-3am
+    # orders aren't lost; a plain range on created_at can use its index (__date cannot).
+    _day_start, _day_end = _local_day_range()
+    base_queryset = base_queryset.filter(created_at__gte=_day_start, created_at__lt=_day_end)
 
     # Get orders by status
     pending_orders = base_queryset.filter(status='pending').order_by('-created_at')
@@ -1584,7 +1617,7 @@ def kitchen_reports(request):
             Q(table_info__restaurant__main_owner=owner_filter) |
             Q(table_info__restaurant__branch_owner=owner_filter) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
         )
 
     orders_with_kitchen_items = list(base_queryset)
@@ -1701,7 +1734,7 @@ def bar_reports(request):
             Q(table_info__restaurant__main_owner=owner_filter) |
             Q(table_info__restaurant__branch_owner=owner_filter) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
         )
 
     orders_with_bar_items = list(base_queryset)
@@ -1817,7 +1850,7 @@ def buffet_reports(request):
             Q(table_info__restaurant__main_owner=owner_filter) |
             Q(table_info__restaurant__branch_owner=owner_filter) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
         )
 
     orders_with_buffet_items = list(base_queryset)
@@ -1930,7 +1963,7 @@ def service_reports(request):
             Q(table_info__restaurant__main_owner=owner_filter) |
             Q(table_info__restaurant__branch_owner=owner_filter) |
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+            (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
         )
 
     orders_with_service_items = list(base_queryset)
@@ -2011,7 +2044,7 @@ def confirm_order(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = get_object_or_404(kitchen_orders.filter(_oq_ko).select_for_update(of=('self',)), id=order_id, status='pending')
         else:
@@ -2039,7 +2072,7 @@ def confirm_order(request, order_id):
         if not _owner_id:
             _owner_id = order.restaurant_owner_id
         try:
-            async_to_sync(channel_layer.group_send)(
+            _ws_send_on_commit(
                 f'order_{order.id}',
                 {
                     'type': 'order_status_update',
@@ -2056,7 +2089,7 @@ def confirm_order(request, order_id):
             logger.warning(f"WS order notify failed in confirm_order: {_ws_err}")
         if _owner_id:
             try:
-                async_to_sync(channel_layer.group_send)(
+                _ws_send_on_commit(
                     f'restaurant_{_owner_id}',
                     {
                         'type': 'order_status_update',
@@ -2111,7 +2144,7 @@ def update_order_status(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = locked_get(Order.objects.filter(_oq_uos3), id=order_id)
         else:
@@ -2212,7 +2245,7 @@ def update_order_status(request, order_id):
 
         # Send real-time notifications (non-critical — Redis failure must not roll back order.save())
         try:
-            async_to_sync(channel_layer.group_send)(
+            _ws_send_on_commit(
                 f'order_{order.id}',
                 {
                     'type': 'order_status_update',
@@ -2242,7 +2275,7 @@ def update_order_status(request, order_id):
             owner_id = None
         if owner_id:
             try:
-                async_to_sync(channel_layer.group_send)(
+                _ws_send_on_commit(
                     f'restaurant_{owner_id}',
                     {
                         'type': 'order_status_update',
@@ -2264,7 +2297,7 @@ def update_order_status(request, order_id):
                 _da = DeliveryAssignment.objects.select_related('rider__user').filter(
                     order=order, status__in=['assigned', 'picked_up', 'delivered']
                 ).order_by('-assigned_at').first()
-                async_to_sync(channel_layer.group_send)(
+                _ws_send_on_commit(
                     f'delivery_{order.id}',
                     {
                         'type': 'delivery_status_update',
@@ -2332,7 +2365,7 @@ def cancel_order(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = get_object_or_404(
                 Order.objects.prefetch_related('order_items__product').filter(_oq_cobk),
@@ -2472,7 +2505,7 @@ def customer_cancel_order(request, order_id):
                     Q(table_info__restaurant__main_owner=owner_filter) |
                     Q(table_info__restaurant__branch_owner=owner_filter) |
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
                 )
                 _cco_qs = _order_qs.filter(_oq_cco)
                 if request.user.is_customer_care():
@@ -2610,7 +2643,7 @@ def kitchen_order_detail(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = get_object_or_404(
                 Order.objects.prefetch_related('order_items__product').filter(_oq_kod),
@@ -2654,7 +2687,7 @@ def customer_care_dashboard(request):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter)),
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter))),
                 ordered_by=request.user,
             ).distinct()
         else:
@@ -2704,7 +2737,7 @@ def customer_care_dashboard(request):
         Q(main_category__owner=owner_filter) |
         Q(main_category__restaurant__main_owner=owner_filter) |
         Q(main_category__restaurant__branch_owner=owner_filter)
-    ).distinct().order_by('name') if owner_filter else Product.objects.none()
+    ).select_related('main_category', 'sub_category').distinct().order_by('name') if owner_filter else Product.objects.none()
 
     context = {
         'stats': stats,
@@ -2747,7 +2780,7 @@ def customer_care_payments(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
     if period_filter == 'weekly':
         # Start of week (Monday)
@@ -2810,7 +2843,7 @@ def customer_care_payments(request):
     )
     products = Product.objects.filter(
         _pq_dash, is_available=True,
-    ).distinct().select_related('main_category')
+    ).distinct().select_related('main_category', 'sub_category')
 
     context = {
         'orders': orders_list,
@@ -2847,7 +2880,7 @@ def customer_care_receipt(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     _receipts = Payment.objects.filter(_pq_ccr)
     if request.user.is_customer_care():
@@ -2895,7 +2928,7 @@ def customer_care_reprint_receipt(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     _receipts = Payment.objects.filter(_pq_ccrr)
     if request.user.is_customer_care():
@@ -2955,7 +2988,7 @@ def customer_care_receipt_management(request):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     payments = Payment.objects.filter(
         _pq_ccpm,
@@ -2987,7 +3020,7 @@ def customer_care_receipt_management(request):
         Q(main_category__owner=owner) |
         Q(main_category__restaurant__main_owner=owner) |
         Q(main_category__restaurant__branch_owner=owner)
-    ).distinct().order_by('name')
+    ).select_related('main_category', 'sub_category').distinct().order_by('name')
 
     context = {
         'payments': payments,
@@ -3016,7 +3049,7 @@ def view_receipt(request, order_id):
                     Q(table_info__restaurant__main_owner=owner_filter) |
                     Q(table_info__restaurant__branch_owner=owner_filter) |
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
                 )
                 _ccod_qs = _order_qs.filter(_oq_ccod)
                 if request.user.is_customer_care():
@@ -3181,7 +3214,7 @@ def reprint_kot(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = get_object_or_404(_order_qs.filter(_oq_rk), id=order_id)
         else:
@@ -3315,7 +3348,7 @@ def reprint_bot(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = get_object_or_404(_order_qs.filter(_oq_rb), id=order_id)
         else:
@@ -3449,7 +3482,7 @@ def reprint_buffet(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = get_object_or_404(_order_qs.filter(_oq_rbuf), id=order_id)
         else:
@@ -3583,7 +3616,7 @@ def reprint_service(request, order_id):
                 Q(table_info__restaurant__main_owner=owner_filter) |
                 Q(table_info__restaurant__branch_owner=owner_filter) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner_filter)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner_filter))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner_filter)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner_filter)))
             )
             order = get_object_or_404(_order_qs.filter(_oq_rsvc), id=order_id)
         else:
@@ -3991,8 +4024,10 @@ def handle_add_to_existing_order(request, order_id, cart):
             # Update order total — total_amount is tax-inclusive, so gross the added subtotal
             # Keep the rate the order was charged at, for every order type — today's rate may have
             # changed since (items already include the new ones). Same rule as the app.
-            tax_rate = order.charged_tax_rate(order.get_subtotal() - total_added)
-            order.total_amount += total_added * (1 + tax_rate)
+            _sub_before = order.get_subtotal() - total_added
+            tax_rate = order.charged_tax_rate(_sub_before)
+            # Same formula and rounding as when the order was placed, for the new food subtotal
+            order.total_amount = order.total_for_subtotal(_sub_before + total_added, tax_rate)
             order.save(update_fields=['total_amount'])
 
             # Log the action
@@ -4012,7 +4047,7 @@ def handle_add_to_existing_order(request, order_id, cart):
             # Send real-time notifications (non-critical, wrapped in try-except)
             try:
                 restaurant_id = (restaurant or owner_filter).id
-                async_to_sync(channel_layer.group_send)(
+                _ws_send_on_commit(
                     f'restaurant_{restaurant_id}',
                     {
                         'type': 'order_updated',
@@ -4076,6 +4111,7 @@ def handle_add_to_existing_order(request, order_id, cart):
 @login_required
 def customer_care_reports(request):
     """Customer Care Reports - showing only their own orders and sales"""
+    from reports.forecast import NOT_SOLD
     if not (request.user.is_customer_care() or request.user.is_owner() or
             request.user.is_main_owner() or request.user.is_branch_owner() or request.user.is_manager()):
         messages.error(request, "Access denied. Customer Care or management role required.")
@@ -4105,9 +4141,9 @@ def customer_care_reports(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner)),
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner))),
         ordered_by=request.user,
-    ).distinct()
+    ).exclude(status__in=NOT_SOLD).distinct()   # cancelled / not-sold orders are not sales (as in the web reports)
     
     # Apply period filter — use local EAT date so midnight-to-3am orders aren't lost
     from django.utils.timezone import localtime
@@ -4191,7 +4227,7 @@ def customer_care_reports(request):
     )
     total_revenue = _agg['total_revenue'] or 0
     total_orders = _agg['total_orders'] or 0
-    total_items = orders.aggregate(total=Sum('order_items__quantity'))['total'] or 0
+    total_items = OrderItem.objects.filter(order_id__in=order_ids).aggregate(total=Sum('quantity'))['total'] or 0
     avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
     
     # Get currency symbol from owner's profile (customer care inherits from owner)
@@ -4378,7 +4414,7 @@ def customer_care_reports(request):
             Q(main_category__owner=owner) |
             Q(main_category__restaurant__main_owner=owner) |
             Q(main_category__restaurant__branch_owner=owner)
-        ).distinct().order_by('name') if owner else Product.objects.none(),
+        ).select_related('main_category', 'sub_category').distinct().order_by('name') if owner else Product.objects.none(),
     }
     
     return render(request, 'orders/customer_care_reports.html', context)
@@ -4410,7 +4446,7 @@ def cancel_order_item(request, item_id):
             Q(order__table_info__restaurant__main_owner=owner) |
             Q(order__table_info__restaurant__branch_owner=owner) |
             (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-            (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+            (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
         )
         item = OrderItem.objects.filter(_oiq, id=item_id).first()
         if item is None:

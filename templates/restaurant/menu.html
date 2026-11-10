@@ -1354,10 +1354,34 @@ const T = {
 function fmt(text, values) {
     return text.replace(/\{(\w+)\}/g, (match, key) => (key in values ? String(values[key]) : match));
 }
+// HTML escaper for values put into innerHTML (also defined in base.html; repeated here
+// because staff open this page through cashier_base.html).
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
 // Currency symbol from server-side context
 const CURRENCY_SYMBOL = '{% currency_symbol %}';
 
 document.addEventListener('DOMContentLoaded', function() {
+
+    // Add-to-cart buttons in the category modal: the product id/name come from data-
+    // attributes (never put data inside an inline onclick, where HTML entities decode
+    // back into JavaScript).
+    const subcategoryContent = document.getElementById('subcategoryTabContent');
+    if (subcategoryContent) {
+        subcategoryContent.addEventListener('click', function(e) {
+            const btn = e.target.closest('.js-add-to-cart');
+            if (!btn || !subcategoryContent.contains(btn)) return;
+            addToCartDemo(btn.dataset.productName, parseInt(btn.dataset.productId, 10) || null);
+        });
+    }
 
     // Handle category card clicks
     document.querySelectorAll('.category-card').forEach(card => {
@@ -1396,7 +1420,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     {
                         'id': {{ product.id }},
                         'name': '{{ product.name|escapejs }}',
-                        'description': '{{ product.description|escapejs|truncatechars:100 }}',
+                        'description': '{{ product.description|truncatechars:100|escapejs }}',
                         'price': '{{ product.get_current_price }}',
                         'original_price': '{{ product.price }}',
                         'stock': {{ product.available_in_stock }},
@@ -1418,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     {
                         'id': {{ product.id }},
                         'name': '{{ product.name|escapejs }}',
-                        'description': '{{ product.description|escapejs|truncatechars:100 }}',
+                        'description': '{{ product.description|truncatechars:100|escapejs }}',
                         'price': '{{ product.get_current_price }}',
                         'original_price': '{{ product.price }}',
                         'stock': {{ product.available_in_stock }},
@@ -1456,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         tabsHtml += `
                             <li class="nav-item">
                                 <button class="nav-link ${isActive}" data-bs-toggle="tab" data-bs-target="#${tabId}" type="button">
-                                    <i class="bi bi-list-ul me-1"></i>${subName}
+                                    <i class="bi bi-list-ul me-1"></i>${escapeHtml(subName)}
                                 </button>
                             </li>
                         `;
@@ -1479,8 +1503,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <div class="col-12 col-sm-6 mb-3">
                                             <div class="card product-search-card" data-product-id="${product.id}">
                                                 <div class="card-body">
-                                                    <h6 class="card-title">${product.name}</h6>
-                                                    <p class="card-text">${product.description}</p>
+                                                    <h6 class="card-title">${escapeHtml(product.name)}</h6>
+                                                    <p class="card-text">${escapeHtml(product.description)}</p>
                                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                                         <div>
                                                             ${priceDisplay}
@@ -1499,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                 <i class="bi bi-plus"></i>
                                                             </button>
                                                         </div>
-                                                        <button class="btn btn-primary btn-sm w-100" style="white-space:nowrap;" onclick="addToCartDemo('${product.name}', ${product.id})">
+                                                        <button type="button" class="btn btn-primary btn-sm w-100 js-add-to-cart" style="white-space:nowrap;" data-product-id="${Number(product.id)}" data-product-name="${escapeHtml(product.name)}">
                                                             <i class="bi bi-cart-plus me-1"></i>${T.addToCart}
                                                         </button>
                                                     </div>
@@ -1516,7 +1540,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         contentHtml += `
                             <div class="tab-pane fade ${showActive}" id="${tabId}">
                                 <div class="p-4">
-                                    <h5>${subName}</h5>
+                                    <h5>${escapeHtml(subName)}</h5>
                                     <div class="row">
                                         ${productsHtml}
                                     </div>
@@ -1627,14 +1651,14 @@ function updateCartCount(count) {
     // Method 2: Fallback - update the entire button if span not found
     const viewCartBtn = document.getElementById('viewCartBtn');
     if (viewCartBtn && !cartCountSpan) {
-        viewCartBtn.innerHTML = `<i class="bi bi-cart3"></i> ${T.viewCart} (<span id="cartCount">${count}</span>)`;
+        viewCartBtn.innerHTML = `<i class="bi bi-cart3"></i> ${T.viewCart} (<span id="cartCount">${escapeHtml(count)}</span>)`;
     }
     
     // Method 3: Final fallback - search by href
     if (!cartCountSpan && !viewCartBtn) {
         const btnByHref = document.querySelector('a[href*="view_cart"]');
         if (btnByHref) {
-            btnByHref.innerHTML = `<i class="bi bi-cart3"></i> ${T.viewCart} (${count})`;
+            btnByHref.innerHTML = `<i class="bi bi-cart3"></i> ${T.viewCart} (${escapeHtml(count)})`;
         }
     }
 }
@@ -1718,7 +1742,7 @@ function useHardcodedFallback(categoryName, tabsContainer, contentContainer) {
         // Simple fallback for other categories
         contentContainer.innerHTML = `
             <div class="p-4">
-                <h5>${fmt(T.itemsOf, { name: categoryName })}</h5>
+                <h5>${escapeHtml(fmt(T.itemsOf, { name: categoryName }))}</h5>
                 <p class="text-muted">${T.noItemsNow}</p>
             </div>
         `;
@@ -1732,7 +1756,7 @@ function showAlert(message, type) {
     alertDiv.innerHTML = `
         <div class="d-flex align-items-center">
             <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
-            <span>${message}</span>
+            <span>${escapeHtml(message)}</span>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;

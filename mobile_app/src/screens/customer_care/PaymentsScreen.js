@@ -36,7 +36,7 @@ import { useSyncStore } from '../../store/useSyncStore';
 import SyncWarningsBanner from '../../components/SyncWarningsBanner';
 import { usePrinterStore } from '../../store/usePrinterStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceipt } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { useT } from '../../i18n';
 
 const PAYMENT_METHODS = [
@@ -71,7 +71,7 @@ const ORDER_STATUS_COLOR = {
 export default function CCPaymentsScreen({ navigation }) {
   const t = useT();
   const theme = useTheme();
-  const { format } = useCurrency();
+  const { format, decimals } = useCurrency();
   const { user } = useAuthStore();
   const { pendingCount, lastSyncTime } = useSyncStore();
   const mountedRef = useRef(true);
@@ -237,7 +237,7 @@ export default function CCPaymentsScreen({ navigation }) {
         setPayDialog(null);
         setSnack(t('Payment queued – will sync when online'));
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
         return;
       }
@@ -276,7 +276,7 @@ export default function CCPaymentsScreen({ navigation }) {
         setPayDialog(null);
         setSnack(doneMessage);
         if (usePrinterStore.getState().autoPrintAfterPayment) {
-          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+          printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
         }
       };
       if (!online) {
@@ -309,7 +309,7 @@ export default function CCPaymentsScreen({ navigation }) {
       setPayDialog(null);
       setSnack(t('Payment recorded successfully'));
       if (usePrinterStore.getState().autoPrintAfterPayment) {
-        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
+        printReceipt({ order: paidOrder, payment: payForPrint, restaurantName: user?.restaurant_name || 'Restaurant', currencySymbol: user?.currency_symbol || '', staffName, decimals }).then((ok) => { if (isPrinterUnreachable(ok) && mountedRef.current) setSnack(t('Printer not reachable')); }).catch(() => { if (mountedRef.current) setSnack('Auto-print failed — check printer settings'); });
       }
       fetchOrders(true);
     } catch (err) {
@@ -335,7 +335,9 @@ export default function CCPaymentsScreen({ navigation }) {
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
+      if (isPrinterUnreachable(ok)) { if (mountedRef.current) setSnack(t('Printer not reachable')); return; }
       if (ok && mountedRef.current) setSnack('Bill sent to printer');
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('Unknown error') }));
@@ -546,7 +548,8 @@ export default function CCPaymentsScreen({ navigation }) {
                       <Menu.Item leadingIcon="cash" title={t('Pay')} onPress={() => { setMenuOpenId(null); openPayment(order); }} />
                     )}
                     <Menu.Item leadingIcon="printer" title={t('Print Bill')} disabled={printBillId === order.id} onPress={() => { setMenuOpenId(null); handlePrintBill(order); }} />
-                    {!isCancelled && !isPaid && !order._is_offline_pending && (
+                    {!isCancelled && !isPaid && !order._is_offline_pending
+                      && order.order_type !== 'delivery' && order.order_type !== 'pickup' && (
                       <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpenId(null); openTransfer(order); }} />
                     )}
                     {order._is_offline_pending && (

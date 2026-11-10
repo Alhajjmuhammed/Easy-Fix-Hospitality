@@ -117,4 +117,11 @@ export default {
   'Auto-filled from pin — tap to edit if needed': 'Imejazwa kutoka kwenye alama — gusa kubadilisha ukihitaji',
   'Phone Number *': 'Namba ya Simu *',
   'Browse Menu': 'Tazama Menyu',
+  // Cart belongs to one restaurant (1.2.0 fixes)
+  'Your cart will be emptied. Items from this restaurant cannot be ordered at another one.':
+    'Kikapu chako kitaondolewa. Bidhaa za mgahawa huu haziwezi kuagizwa kwenye mgahawa mwingine.',
+  'Empty cart': 'Ondoa kikapu',
+  'Your cart was emptied because you changed restaurant': 'Kikapu chako kimeondolewa kwa sababu umebadilisha mgahawa',
+  'Cannot order this again: the restaurant of this order is unknown. Please choose the restaurant and order from its menu.':
+    'Haiwezekani kuagiza hii tena: mgahawa wa oda hii haujulikani. Tafadhali chagua mgahawa na uagize kutoka kwenye menyu yake.',
 };

@@ -14,11 +14,26 @@
         </div>
     </div>
 
+    <form method="get" class="row g-2 mb-3 align-items-end">
+        <div class="col-auto">
+            <label class="form-label mb-1" for="my-orders-period">{% translate "Period" %}</label>
+            <select class="form-select form-select-sm" id="my-orders-period" name="period" onchange="this.form.submit()">
+                {% for value, label in period_choices %}
+                <option value="{{ value }}" {% if period == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <small class="text-muted">{% blocktranslate count counter=paginator.count %}{{ counter }} order{% plural %}{{ counter }} orders{% endblocktranslate %}</small>
+        </div>
+    </form>
+
     <div class="row">
         <div class="col-md-12">
             <div class="card" style="border-radius: 0;">
                 <div class="card-body">
                     {% if orders %}
+                        {% with feats=request.user.visible_features %}
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
@@ -37,7 +52,7 @@
                                 <tbody>
                                     {% for order in orders %}
                                         <tr {% if order.status == 'cancelled' %}class="table-secondary"{% elif order.is_fully_paid %}class="table-success"{% endif %}>
-                                            <td>{{ forloop.counter }}</td>
+                                            <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
                                             <td>
                                                 <strong>{{ order.order_number }}</strong><br>
                                                 <small class="text-muted">{{ order.created_at|date:"M d, H:i" }}</small>
@@ -55,13 +70,11 @@
                                                             <li>
                                                                 {{ item.quantity }}x {{ item.product.name }} 
                                                                 <span class="text-muted">({% currency_symbol %}{{ item.get_subtotal }})</span>
-                                                                {% with feats=request.user.visible_features %}
                                                                 {% if request.user.is_cashier and 'cancel_orders' in feats and order.status != 'cancelled' and order.payment_status != 'paid' and order.order_items.all|length > 1 %}
-                                                                    <button class="btn btn-xs btn-danger btn-sm ms-2" onclick="cancelItem({{ item.id }}, '{{ item.product.name }}', {{ item.quantity }})">
+                                                                    <button class="btn btn-xs btn-danger btn-sm ms-2" onclick="cancelItem({{ item.id }}, '{{ item.product.name|escapejs }}', {{ item.quantity|escapejs }})">
                                                                         <i class="fas fa-times"></i> {% translate "Cancel" %}
                                                                     </button>
                                                                 {% endif %}
-                                                                {% endwith %}
                                                             </li>
                                                         {% endfor %}
                                                     </ul>
@@ -109,12 +122,26 @@
                                 </tbody>
                             </table>
                         </div>
+                        {% endwith %}
+                        {% if paginator.num_pages > 1 %}
+                        <nav aria-label="{% translate 'Orders pagination' %}">
+                            <ul class="pagination pagination-sm justify-content-center mb-0">
+                                {% if page_obj.has_previous %}
+                                <li class="page-item"><a class="page-link" href="?period={{ period|urlencode }}&page={{ page_obj.previous_page_number }}">&lsaquo; {% translate "Previous" %}</a></li>
+                                {% endif %}
+                                <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ paginator.num_pages }}</span></li>
+                                {% if page_obj.has_next %}
+                                <li class="page-item"><a class="page-link" href="?period={{ period|urlencode }}&page={{ page_obj.next_page_number }}">{% translate "Next" %} &rsaquo;</a></li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
                     {% else %}
                         <div class="text-center py-5">
                             <div class="text-muted">
                                 <i class="fas fa-receipt fa-3x mb-3"></i>
                                 <h5>{% translate "No orders found" %}</h5>
-                                <p>{% translate "You haven't created any orders yet." %}</p>
+                                <p>{% if period == 'all' %}{% translate "You haven't created any orders yet." %}{% else %}{% translate "No orders in this period. Choose a longer period above." %}{% endif %}</p>
                             </div>
                         </div>
                     {% endif %}

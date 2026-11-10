@@ -158,7 +158,7 @@
                 <div class="status-actions">
                     {% for value, label in event.EVENT_STATUS_CHOICES %}
                     <button class="btn btn-sm {% if event.status == value %}btn-primary{% else %}btn-outline-secondary{% endif %} status-btn"
-                            onclick="updateStatus('{{ value }}')"
+                            onclick="updateStatus('{{ value|escapejs }}')"
                             {% if event.status == value %}disabled{% endif %}>
                         {{ label }}
                     </button>

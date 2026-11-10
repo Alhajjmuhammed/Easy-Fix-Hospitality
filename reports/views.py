@@ -1,5 +1,6 @@
 ﻿from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from restaurant_system.db_utils import managed_owner_ids
 
 
 def _safe_csv(value):
@@ -8,7 +9,7 @@ def _safe_csv(value):
     if s and s[0] in ('=', '+', '-', '@', '|', '%'):
         return '\t' + s
     return s
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.core.paginator import Paginator
 from reports.forecast import NOT_SOLD
 from orders.models import Order, OrderItem
@@ -21,20 +22,39 @@ from django.utils import timezone
 import csv
 
 def _restaurant_order_q(restaurant):
-    """Orders that belong to one location: its tables, legacy tables of its owner, and its own
-    delivery/pickup orders. A branch only claims delivery/pickup orders of its branch owner, so
-    the main restaurant's remote orders do not show up in every branch."""
-    from django.db.models import Q
-    if restaurant.is_main_restaurant:
-        remote_owners = [o for o in [restaurant.main_owner, restaurant.branch_owner] if o]
-        legacy_owner = restaurant.main_owner
-    else:
-        remote_owners = [o for o in [restaurant.branch_owner] if o]
-        legacy_owner = restaurant.branch_owner
-    return (Q(table_info__restaurant=restaurant) |
-            Q(table_info__owner=legacy_owner, table_info__restaurant__isnull=True) |
-            Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=remote_owners) |
-            Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=remote_owners))
+    """Orders that belong to exactly one location — the same rule as the admin dashboard
+    (admin_panel.restaurant_utils.restaurant_orders_q): its tables, legacy owner-only tables of
+    its operator, and delivery/pickup orders placed with its operator. A branch the main owner
+    runs himself gets only its own tables: its remote orders carry the main owner, so they
+    belong to (and are counted once under) the main restaurant."""
+    from admin_panel.restaurant_utils import restaurant_orders_q
+    return restaurant_orders_q(restaurant)
+
+
+def _items_charged_tax(items):
+    """Tax charged on these order lines: each line times the rate ITS order was charged (from
+    the stored total, as Order.charged_tax_rate), not today's rate of whichever order is first."""
+    from decimal import Decimal as _Dec
+    items = list(items.select_related('order'))
+    order_ids = {i.order_id for i in items}
+    subtotals = dict(OrderItem.objects.filter(order_id__in=order_ids).order_by().values('order_id')
+                     .annotate(s=Sum(ExpressionWrapper(F('unit_price') * F('quantity'),
+                                                       output_field=DecimalField(max_digits=14, decimal_places=2))))
+                     .values_list('order_id', 's'))
+    rates, tax = {}, _Dec('0')
+    for i in items:
+        if i.order_id not in rates:
+            o, sub = i.order, subtotals.get(i.order_id) or _Dec('0')
+            fee = o.delivery_fee or _Dec('0')
+            base = sub + (fee if o.delivery_fee_taxed else _Dec('0'))
+            if base > 0 and o.total_amount and o.total_amount >= sub:
+                # each line's share of the tax actually stored on its order (so a filter that
+                # covers every line gives exactly the unfiltered tax)
+                rates[i.order_id] = max(_Dec('0'), (o.total_amount - sub - fee) / base)
+            else:
+                rates[i.order_id] = o.charged_tax_rate(sub)
+        tax += i.quantity * i.unit_price * rates[i.order_id]
+    return tax.quantize(_Dec('0.01'))
 
 
 def _location_breakdown(orders, restaurants, stats_items=None):
@@ -55,6 +75,105 @@ def _location_breakdown(orders, restaurants, stats_items=None):
                            for o in Order.objects.filter(id__in=ids).prefetch_related('order_items')), _Dec('0'))
         result[restaurant.id] = (ids, len(ids), revenue)
     return result
+
+
+STATIONS = ('kitchen', 'bar', 'buffet', 'service')
+
+
+def _station_order_counts(orders):
+    """{'kitchen': n, 'bar': n, 'buffet': n, 'service': n, 'mixed': n} for `orders`, in one
+    query: an order counts for a station when any of its items' product is on that station."""
+    from django.db.models import Exists, OuterRef, Q as _Q, Case, When, IntegerField, Value
+    flags = {st: Exists(OrderItem.objects.filter(order_id=OuterRef('pk'), product__station=st))
+             for st in STATIONS}
+    qs = orders.order_by().annotate(**{f'_has_{st}': flags[st] for st in STATIONS})
+    n_stations = sum((Case(When(**{f'_has_{st}': True}, then=Value(1)), default=Value(0),
+                           output_field=IntegerField()) for st in STATIONS[1:]),
+                     Case(When(**{f'_has_{STATIONS[0]}': True}, then=Value(1)), default=Value(0),
+                          output_field=IntegerField()))
+    qs = qs.annotate(_n_stations=n_stations)
+    aggs = {st: Count('pk', filter=_Q(**{f'_has_{st}': True})) for st in STATIONS}
+    aggs['mixed'] = Count('pk', filter=_Q(_n_stations__gt=1))
+    result = qs.aggregate(**aggs)
+    return {k: result.get(k) or 0 for k in (*STATIONS, 'mixed')}
+
+
+# ---------------------------------------------------------------------------
+# Export helpers (CSV / PDF)
+# ---------------------------------------------------------------------------
+PDF_MAX_ORDER_ROWS = 2000   # detail rows in the PDF; the summary always covers every order
+CSV_CHUNK_SIZE = 500        # orders fetched (and prefetched) per round trip while streaming
+
+
+def _with_export_relations(qs):
+    """Everything an export detail row reads, in a constant number of queries per chunk:
+    restaurant name (table_info.restaurant), 'Order By' role, and 'Paid By' + role."""
+    from django.db.models import Prefetch
+    return qs.select_related('table_info__restaurant', 'ordered_by__role').prefetch_related(
+        'order_items__product__main_category', 'order_items__product__sub_category',
+        Prefetch('payments', queryset=Payment.objects.select_related('processed_by__role')),
+    )
+
+
+def _order_taxes(orders):
+    """[(tax, payment_status)] for each order in `orders`: exactly Order.get_tax_amount()
+    (max(0, total - sum(qty * unit_price) - delivery fee)), from two light queries instead
+    of loading every order with all its prefetches once per payment status."""
+    from decimal import Decimal as _Dec
+    subtotals = {}
+    for order_id, qty, price in OrderItem.objects.filter(order__in=orders).values_list(
+            'order_id', 'quantity', 'unit_price'):
+        subtotals[order_id] = subtotals.get(order_id, 0) + qty * price
+    return [(max(_Dec('0.00'), total - subtotals.get(oid, 0) - (fee or _Dec('0'))), status)
+            for oid, total, fee, status in orders.values_list(
+                'id', 'total_amount', 'delivery_fee', 'payment_status')]
+
+
+def _csv_detail_orders(orders):
+    """The export's orders, newest first, streamed CSV_CHUNK_SIZE at a time with the same
+    related data as _with_export_relations: a constant number of queries per chunk.
+
+    A long period has tens of thousands of orders, so the cost is building model objects:
+    the (few) products with their categories are loaded once for the whole export instead
+    of again for every chunk, and the item rows carry only the columns the CSV uses."""
+    from django.db.models import Prefetch
+    from restaurant.models import Product
+    products = {p.pk: p for p in Product.objects.filter(
+        pk__in=OrderItem.objects.filter(order__in=orders).values('product_id')
+    ).select_related('main_category', 'sub_category')}
+    rows = orders.prefetch_related(None).prefetch_related(
+        Prefetch('order_items', queryset=OrderItem.objects.only(
+            'id', 'order_id', 'product_id', 'quantity', 'unit_price')),
+        Prefetch('payments', queryset=Payment.objects.select_related('processed_by__role')),
+    ).order_by('-created_at')
+    # chunk_size is required for prefetch_related to apply to .iterator() (Django 4.2)
+    for order in rows.iterator(chunk_size=CSV_CHUNK_SIZE):
+        for item in order.order_items.all():
+            item._state.fields_cache['product'] = products.get(item.product_id)
+        yield order
+
+
+def _safe_csv_cell(value):
+    """_safe_csv for a free-text cell, leaving the bare '-' / '' placeholders as they were."""
+    if value in ('-', ''):
+        return value
+    return _safe_csv(value)
+
+
+class _CSVEcho:
+    """csv.writer target that hands each formatted row back instead of buffering it."""
+    def write(self, value):
+        return value
+
+
+class _StreamingCSVResponse(StreamingHttpResponse):
+    """Streamed CSV that can still be read whole through `.content` (tests, middleware):
+    reading it materialises the stream once and keeps it replayable."""
+    @property
+    def content(self):
+        data = b''.join(self.streaming_content)
+        self.streaming_content = [data]
+        return data
 
 
 # PDF export libraries
@@ -128,25 +247,11 @@ def dashboard(request):
     
     # Base queryset - filter by restaurant with performance optimization
     if target_restaurant:
-        # Filter orders by specific selected restaurant
-        if target_restaurant.is_main_restaurant:
-            # Main restaurant: show orders from tables assigned to it OR owned by main owner with no restaurant
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
-                .filter(
-                    Q(table_info__restaurant=target_restaurant) |
-                    Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
-                )
-        else:
-            # Branch restaurant: only show orders from tables specifically assigned to this branch
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
-                .filter(
-                    Q(table_info__restaurant=target_restaurant) |
-                    Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.branch_owner] if o]))
-                )
+        # Exactly this location's orders (a branch the main owner runs himself does not get
+        # the main restaurant's delivery/pickup orders or owner-only tables)
+        orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
+            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category')\
+            .filter(_restaurant_order_q(target_restaurant))
     elif request.user.is_administrator():
         # Administrator sees all orders
         orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
@@ -317,13 +422,12 @@ def dashboard(request):
         tax_rate_percentage = float(target_restaurant.tax_rate * 100)
     elif request.user.tax_rate:
         tax_rate_percentage = float(request.user.tax_rate * 100)
-    _tax_rate_decimal = Decimal(str(tax_rate_percentage)) / Decimal('100')
 
     # Calculate tax on the correct revenue base.
     # When a filter is active, tax must be on filtered items revenue only —
     # calling order.get_tax_amount() would use the full order subtotal and give wrong figures.
     if _item_filter_active:
-        total_tax = (Decimal(str(total_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+        total_tax = _items_charged_tax(_stats_items)
     else:
         # Compute tax in DB: tax = total_amount - sum(unit_price * quantity) per order.
         # Replaces N Python-level iterations with 1 DB aggregation.
@@ -350,7 +454,7 @@ def dashboard(request):
     else:
         paid_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     if _item_filter_active:
-        paid_tax = (Decimal(str(paid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+        paid_tax = _items_charged_tax(_stats_items.filter(order__payment_status='paid'))
     else:
         _paid_items_subtotal = OrderItem.objects.filter(order__in=paid_orders).aggregate(
             t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
@@ -368,7 +472,7 @@ def dashboard(request):
     else:
         unpaid_revenue = unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     if _item_filter_active:
-        unpaid_tax = (Decimal(str(unpaid_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+        unpaid_tax = _items_charged_tax(_stats_items.filter(order__payment_status='unpaid'))
     else:
         _unpaid_items_subtotal = OrderItem.objects.filter(order__in=unpaid_orders).aggregate(
             t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
@@ -386,7 +490,7 @@ def dashboard(request):
     else:
         partial_revenue = partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     if _item_filter_active:
-        partial_tax = (Decimal(str(partial_revenue)) * _tax_rate_decimal).quantize(Decimal('0.01'))
+        partial_tax = _items_charged_tax(_stats_items.filter(order__payment_status='partial'))
     else:
         _partial_items_subtotal = OrderItem.objects.filter(order__in=partial_orders).aggregate(
             t=Sum(ExpressionWrapper(F('unit_price') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)))
@@ -397,12 +501,23 @@ def dashboard(request):
         partial_revenue = _partial_rev_with_tax - partial_tax
     partial_revenue_with_tax = Decimal(str(partial_revenue)) + partial_tax
     
-    # Calculate station-specific metrics
-    kitchen_orders_count = len([o for o in orders if has_kitchen_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'kitchen' else 0)
-    bar_orders_count = len([o for o in orders if has_bar_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'bar' else 0)
-    buffet_orders_count = len([o for o in orders if has_buffet_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'buffet' else 0)
-    service_orders_count = len([o for o in orders if has_service_items(o)]) if station_filter == 'all' else (total_orders if station_filter == 'service' else 0)
-    mixed_orders_count = len([o for o in orders if sum([has_kitchen_items(o), has_bar_items(o), has_buffet_items(o), has_service_items(o)]) > 1]) if station_filter == 'all' else 0
+    # Calculate station-specific metrics -- counted in the database (one query) instead of
+    # loading every order of the period with its items. Same rules as has_*_items above:
+    # an order counts for a station when at least one of its items' product is on that
+    # station (items whose product is gone count for none); "mixed" = more than one station.
+    if station_filter == 'all':
+        _station_counts = _station_order_counts(orders)
+        kitchen_orders_count = _station_counts['kitchen']
+        bar_orders_count = _station_counts['bar']
+        buffet_orders_count = _station_counts['buffet']
+        service_orders_count = _station_counts['service']
+        mixed_orders_count = _station_counts['mixed']
+    else:
+        kitchen_orders_count = total_orders if station_filter == 'kitchen' else 0
+        bar_orders_count = total_orders if station_filter == 'bar' else 0
+        buffet_orders_count = total_orders if station_filter == 'buffet' else 0
+        service_orders_count = total_orders if station_filter == 'service' else 0
+        mixed_orders_count = 0
     
     # Top selling products analysis (moved after categories are defined — see below)
     
@@ -416,19 +531,19 @@ def dashboard(request):
                 Q(id=target_restaurant.main_owner_id)
             ).filter(
                 role__name__in=['customer_care', 'cashier']
-            ).distinct().order_by('first_name', 'last_name')
+            ).select_related('role').distinct().order_by('first_name', 'last_name')
         else:
             staff_users = User.objects.filter(
                 Q(owner=target_restaurant.branch_owner) |
                 Q(id=target_restaurant.branch_owner_id)
             ).filter(
                 role__name__in=['customer_care', 'cashier']
-            ).distinct().order_by('first_name', 'last_name')
+            ).select_related('role').distinct().order_by('first_name', 'last_name')
     elif request.user.is_administrator():
         # Admin sees all staff
         staff_users = User.objects.filter(
             role__name__in=['customer_care', 'cashier']
-        ).order_by('first_name', 'last_name')
+        ).select_related('role').order_by('first_name', 'last_name')
     else:
         # Get staff from accessible restaurants
         accessible_restaurants = restaurant_context['accessible_restaurants']
@@ -440,10 +555,14 @@ def dashboard(request):
                 staff_query |= Q(owner=restaurant.branch_owner) | Q(id=restaurant.branch_owner_id)
         staff_users = User.objects.filter(staff_query).filter(
             role__name__in=['customer_care', 'cashier']
-        ).distinct().order_by('first_name', 'last_name')
+        ).select_related('role').distinct().order_by('first_name', 'last_name')
     
     # Get orders for table with pagination
-    orders_list = orders.prefetch_related('payments__processed_by').order_by('-created_at')
+    # The rows show the creator's role, the location and who took each payment (with role)
+    from django.db.models import Prefetch as _Prefetch
+    orders_list = orders.select_related('ordered_by__role', 'table_info__restaurant').prefetch_related(
+        _Prefetch('payments', queryset=Payment.objects.select_related('processed_by__role'))
+    ).order_by('-created_at')
     
     # Pagination
     page_number = request.GET.get('page', 1)
@@ -508,7 +627,7 @@ def dashboard(request):
 
     # Build tables dropdown scoped to current restaurant context
     if target_restaurant:
-        tables_qs = TableInfoModel.objects.filter(restaurant=target_restaurant).order_by('tbl_no')
+        tables_qs = TableInfoModel.objects.filter(restaurant=target_restaurant).select_related('restaurant').order_by('tbl_no')
     elif request.user.is_administrator():
         tables_qs = TableInfoModel.objects.all().select_related('restaurant').order_by('tbl_no')
     else:
@@ -583,6 +702,17 @@ def dashboard(request):
     digital_total = payment_method_stats.get('digital', {}).get('total', 0) or 0
     voucher_count = payment_method_stats.get('voucher', {}).get('count', 0)
     voucher_total = payment_method_stats.get('voucher', {}).get('total', 0) or 0
+    loyalty_count = payment_method_stats.get('loyalty', {}).get('count', 0)
+    loyalty_total = payment_method_stats.get('loyalty', {}).get('total', 0) or 0
+    mobile_count  = payment_method_stats.get('mobile',  {}).get('count', 0)   # older Customer Care payments
+    mobile_total  = payment_method_stats.get('mobile',  {}).get('total', 0) or 0
+    # Every method present, so the breakdown always adds up to the money collected
+    _method_names = dict(PaymentModel.PAYMENT_METHOD_CHOICES)
+    _method_names.setdefault('mobile', 'Mobile money')
+    payment_method_breakdown = [
+        {'method': m, 'label': _method_names.get(m, m), 'count': r['count'], 'total': r['total'] or 0}
+        for m, r in payment_method_stats.items()
+    ]
 
     # Today's date for template defaults
     today_str = today.strftime('%Y-%m-%d')
@@ -604,6 +734,9 @@ def dashboard(request):
         'card_count': card_count, 'card_total': card_total,
         'digital_count': digital_count, 'digital_total': digital_total,
         'voucher_count': voucher_count, 'voucher_total': voucher_total,
+        'loyalty_count': loyalty_count, 'loyalty_total': loyalty_total,
+        'mobile_count': mobile_count, 'mobile_total': mobile_total,
+        'payment_method_breakdown': payment_method_breakdown,
         'period': period,
         'categories': categories,
         'subcategories': subcategories,
@@ -707,28 +840,12 @@ def export_csv(request):
     
     # Base queryset - filter by restaurant with optimization
     if target_restaurant:
-        if target_restaurant.is_main_restaurant:
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                                  'payments__processed_by')\
-                .filter(
-                    Q(table_info__restaurant=target_restaurant) |
-                    Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
-                )
-        else:
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                                  'payments__processed_by')\
-                .filter(
-                    Q(table_info__restaurant=target_restaurant) |
-                    Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.branch_owner] if o]))
-                )
+        # Exactly this location's orders (a branch the main owner runs himself does not get
+        # the main restaurant's delivery/pickup orders or owner-only tables)
+        orders = _with_export_relations(Order.objects)\
+            .filter(_restaurant_order_q(target_restaurant))
     elif request.user.is_administrator():
-        orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                              'payments__processed_by').all()
+        orders = _with_export_relations(Order.objects).all()
     else:
         accessible_restaurants = restaurant_context['accessible_restaurants']
         if accessible_restaurants.exists():
@@ -740,9 +857,7 @@ def export_csv(request):
                     Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]))
                 )
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                                  'payments__processed_by')\
+            orders = _with_export_relations(Order.objects)\
                 .filter(order_query)
         else:
             orders = Order.objects.none()
@@ -865,7 +980,8 @@ def export_csv(request):
     # Separate tax from revenue so CSV matches dashboard (total_amount is tax-inclusive)
     from decimal import Decimal as _D
     if not _item_filter_active:
-        _csv_total_tax = sum(_o.get_tax_amount() for _o in orders)
+        _order_tax = _order_taxes(orders)
+        _csv_total_tax = sum(_t for _t, _s in _order_tax)
         total_revenue = _D(str(orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_csv_total_tax))
     else:
         _csv_total_tax = _D('0.00')
@@ -876,7 +992,7 @@ def export_csv(request):
     if _item_filter_active:
         paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
     else:
-        _pr_tax = sum(_o.get_tax_amount() for _o in paid_orders)
+        _pr_tax = sum(_t for _t, _s in _order_tax if _s == 'paid')
         paid_revenue = _D(str(paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pr_tax))
 
     unpaid_orders = orders.filter(payment_status='unpaid')
@@ -884,7 +1000,7 @@ def export_csv(request):
     if _item_filter_active:
         unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
     else:
-        _ur_tax = sum(_o.get_tax_amount() for _o in unpaid_orders)
+        _ur_tax = sum(_t for _t, _s in _order_tax if _s == 'unpaid')
         unpaid_revenue = _D(str(unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_ur_tax))
 
     partial_orders = orders.filter(payment_status='partial')
@@ -892,7 +1008,7 @@ def export_csv(request):
     if _item_filter_active:
         partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
     else:
-        _par_tax = sum(_o.get_tax_amount() for _o in partial_orders)
+        _par_tax = sum(_t for _t, _s in _order_tax if _s == 'partial')
         partial_revenue = _D(str(partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_par_tax))
     
     # Get currency symbol from user settings
@@ -932,11 +1048,11 @@ def export_csv(request):
         except (User.DoesNotExist, ValueError):
             pass
     
-    # Create CSV response
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="sales_report_{payment_status}_{period}_{datetime.now().strftime("%Y%m%d")}.csv"'
-    
-    writer = csv.writer(response)
+    # The summary is small: build it first (all its queries run inside the request), then
+    # stream the detail rows chunk by chunk so a long period never sits in memory at once.
+    import io as _io
+    _summary_buf = _io.StringIO()
+    writer = csv.writer(_summary_buf)
     
     # Write summary header
     writer.writerow(['SALES REPORT SUMMARY'])
@@ -1015,10 +1131,13 @@ def export_csv(request):
     _csv_method_map = {r['payment_method']: r for r in _csv_method_qs}
     writer.writerow(['PAYMENT METHOD BREAKDOWN'])
     writer.writerow(['Method', 'Transactions', 'Total Amount'])
-    for _method in ['cash', 'card', 'digital', 'voucher', 'loyalty']:
+    # Every method present (older 'mobile' payments too), so the rows add up to the money collected
+    _csv_labels = {'loyalty': 'Loyalty points', 'mobile': 'Mobile money'}
+    _csv_order = ['cash', 'card', 'digital', 'voucher', 'loyalty', 'mobile']
+    for _method in _csv_order + sorted(m for m in _csv_method_map if m not in _csv_order):
         _row = _csv_method_map.get(_method, {})
         if _row:
-            writer.writerow(['Loyalty points' if _method == 'loyalty' else _method.title(),
+            writer.writerow([_csv_labels.get(_method, str(_method).title()),
                              f"{_row['count']:,}", f"{currency_symbol}{_row['total']:,.2f}"])
     writer.writerow([])  # Empty row
     
@@ -1122,7 +1241,7 @@ def export_csv(request):
         ).values('name').first()
         selected_subcategory_name = _subcat['name'] if _subcat else None
     
-    for order in orders.order_by('-created_at'):
+    def _detail_row(order):
         all_items = list(order.order_items.all())
         
         # Filter items for Items column based on active filter.
@@ -1196,24 +1315,32 @@ def export_csv(request):
         if order.table_info and order.table_info.restaurant and not order.table_info.restaurant.is_main_restaurant:
             order_restaurant += ' (Branch)'
         
-        writer.writerow([
+        return [
             order.order_number,
-            customer_name,
+            _safe_csv_cell(customer_name),
             order.created_at.strftime('%Y-%m-%d %H:%M'),
-            table_number,
-            order_restaurant,
-            items_list,
-            categories_list,
-            subcategories_list,
+            _safe_csv_cell(table_number),
+            _safe_csv_cell(order_restaurant),
+            _safe_csv_cell(items_list),
+            _safe_csv_cell(categories_list),
+            _safe_csv_cell(subcategories_list),
             stations_list,
             f"{currency_symbol}{(sum(item.quantity * item.unit_price for item in filtered_items) if _item_filter_active else order.total_amount):.2f}",
             order.payment_status,
             ', '.join(sorted(set(p.payment_method.title() for p in order.payments.all() if not p.is_voided))) or '-',
             order.status,
-            order_by_name,
-            paid_by_name
-        ])
+            _safe_csv_cell(order_by_name),
+            _safe_csv_cell(paid_by_name)
+        ]
     
+    def _stream():
+        yield _summary_buf.getvalue()
+        _row_writer = csv.writer(_CSVEcho())
+        for _order in _csv_detail_orders(orders):
+            yield _row_writer.writerow(_detail_row(_order))
+
+    response = _StreamingCSVResponse(_stream(), content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="sales_report_{payment_status}_{period}_{datetime.now().strftime("%Y%m%d")}.csv"'
     return response
 
 @login_required
@@ -1277,28 +1404,12 @@ def export_pdf(request):
     
     # Base queryset - filter by restaurant with optimization
     if target_restaurant:
-        if target_restaurant.is_main_restaurant:
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                                  'payments__processed_by')\
-                .filter(
-                    Q(table_info__restaurant=target_restaurant) |
-                    Q(table_info__owner=target_restaurant.main_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.main_owner, target_restaurant.branch_owner] if o]))
-                )
-        else:
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                                  'payments__processed_by')\
-                .filter(
-                    Q(table_info__restaurant=target_restaurant) |
-                    Q(table_info__owner=target_restaurant.branch_owner, table_info__restaurant__isnull=True) |
-                    (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [target_restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [target_restaurant.branch_owner] if o]))
-                )
+        # Exactly this location's orders (a branch the main owner runs himself does not get
+        # the main restaurant's delivery/pickup orders or owner-only tables)
+        orders = _with_export_relations(Order.objects)\
+            .filter(_restaurant_order_q(target_restaurant))
     elif request.user.is_administrator():
-        orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-            .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                              'payments__processed_by').all()
+        orders = _with_export_relations(Order.objects).all()
     else:
         accessible_restaurants = restaurant_context['accessible_restaurants']
         if accessible_restaurants.exists():
@@ -1310,9 +1421,7 @@ def export_pdf(request):
                     Q(table_info__owner=restaurant.branch_owner, table_info__restaurant__isnull=True) |
                     (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=[o for o in [restaurant.main_owner, restaurant.branch_owner] if o]))
                 )
-            orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by')\
-                .prefetch_related('order_items__product__main_category', 'order_items__product__sub_category',
-                                  'payments__processed_by')\
+            orders = _with_export_relations(Order.objects)\
                 .filter(order_query)
         else:
             orders = Order.objects.none()
@@ -1435,7 +1544,8 @@ def export_pdf(request):
     # Separate tax from revenue so PDF matches dashboard (total_amount is tax-inclusive)
     from decimal import Decimal as _D
     if not _item_filter_active:
-        _pdf_total_tax = sum(_o.get_tax_amount() for _o in orders)
+        _order_tax = _order_taxes(orders)
+        _pdf_total_tax = sum(_t for _t, _s in _order_tax)
         total_revenue = _D(str(orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_total_tax))
     else:
         _pdf_total_tax = _D('0.00')
@@ -1446,7 +1556,7 @@ def export_pdf(request):
     if _item_filter_active:
         paid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='paid')) or 0
     else:
-        _pdf_pr_tax = sum(_o.get_tax_amount() for _o in paid_orders)
+        _pdf_pr_tax = sum(_t for _t, _s in _order_tax if _s == 'paid')
         paid_revenue = _D(str(paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_pr_tax))
 
     unpaid_orders = orders.filter(payment_status='unpaid')
@@ -1454,7 +1564,7 @@ def export_pdf(request):
     if _item_filter_active:
         unpaid_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='unpaid')) or 0
     else:
-        _pdf_ur_tax = sum(_o.get_tax_amount() for _o in unpaid_orders)
+        _pdf_ur_tax = sum(_t for _t, _s in _order_tax if _s == 'unpaid')
         unpaid_revenue = _D(str(unpaid_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_ur_tax))
 
     partial_orders = orders.filter(payment_status='partial')
@@ -1462,7 +1572,7 @@ def export_pdf(request):
     if _item_filter_active:
         partial_revenue = sum(item.quantity * item.unit_price for item in _stats_items.filter(order__payment_status='partial')) or 0
     else:
-        _pdf_par_tax = sum(_o.get_tax_amount() for _o in partial_orders)
+        _pdf_par_tax = sum(_t for _t, _s in _order_tax if _s == 'partial')
         partial_revenue = _D(str(partial_orders.aggregate(total=Sum('total_amount'))['total'] or 0)) - _D(str(_pdf_par_tax))
     
     # Get currency symbol from user settings
@@ -1782,8 +1892,16 @@ def export_pdf(request):
     headers = ['Order #', 'Date', 'Customer', 'Location', 'Items', 'Total', 'Pay Status', 'Method', 'Status', 'Order By', 'Paid By']
     data = [headers]
     
-    # Table data
-    for order in orders.order_by('-created_at'):
+    # Table data: at most PDF_MAX_ORDER_ROWS rows (the summary above covers every order)
+    if total_orders > PDF_MAX_ORDER_ROWS:
+        from django.utils.translation import gettext as _gt
+        elements.append(Paragraph(
+            _gt('This PDF lists the latest %(shown)s of %(total)s orders. The summary above covers '
+                'all %(total)s orders. For every order use the CSV export, or choose a shorter period.')
+            % {'shown': f'{PDF_MAX_ORDER_ROWS:,}', 'total': f'{total_orders:,}'},
+            styles['Normal']))
+        elements.append(Spacer(1, 8))
+    for order in orders.order_by('-created_at')[:PDF_MAX_ORDER_ROWS]:
         all_items = list(order.order_items.all())
         
         # Filter items for Items column based on active filter.
@@ -1944,7 +2062,7 @@ def money_flow(request):
             DQ(table_info__owner=owner) |
             DQ(table_info__restaurant__main_owner=owner) |
             (DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | DQ(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-            (DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | DQ(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+            (DQ(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | DQ(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
         )
     elif request.user.is_administrator():
         _scope_q = DQ()

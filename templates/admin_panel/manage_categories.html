@@ -739,7 +739,7 @@ function showAlert(message, type = 'success') {
     alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed alert-custom`;
     alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1055; min-width: 300px;';
     alertDiv.innerHTML = `
-        ${message}
+        ${escapeHtml(message)}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     

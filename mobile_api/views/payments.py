@@ -16,6 +16,7 @@ from cashier.models import Payment, VoidTransaction
 from ..serializers import PaymentSerializer, ProcessPaymentSerializer
 from .helpers import get_restaurant_owner
 from .orders import _notify_ws
+from restaurant_system.db_utils import managed_owner_ids
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def _list_payments(request):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     qs = Payment.objects.filter(
         _otq,
@@ -102,7 +103,9 @@ def _process_payment(request):
         return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
 
     data = s.validated_data
-    offline_id = data.get('offline_id', '').strip()
+    from mobile_api.views.orders import safe_client_id
+    from accounts.security_utils import sanitize_notes
+    offline_id = safe_client_id(data.get('offline_id', ''))
 
     owner = get_restaurant_owner(request)
     if owner is None:
@@ -113,7 +116,7 @@ def _process_payment(request):
         Q(table_info__restaurant__main_owner=owner) |
         Q(table_info__restaurant__branch_owner=owner) |
         (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=owner)) |
-        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(owner)))
     )
 
     # Quick access check before acquiring lock (avoids holding lock during CC IDOR check)
@@ -125,7 +128,7 @@ def _process_payment(request):
     if amount <= 0:
         return Response({'error': 'Payment amount must be positive.'}, status=400)
 
-    notes = data.get('notes', '')
+    notes = sanitize_notes(data.get('notes', '')) or ''
     if offline_id:
         notes = f'[offline:{offline_id}] {notes}'.strip()
 
@@ -173,18 +176,19 @@ def _process_payment(request):
                 loyalty_redeem = loyalty_svc.prepare_redeem(order, amount, data.get('loyalty_code'))
             except _VE as e:
                 return Response({'error': ' '.join(e.messages)}, status=400)
+            amount = loyalty_redeem[3]     # exactly what the points taken are worth (rest stays due)
 
         payment = Payment.objects.create(
             order=order,
             amount=amount,
             payment_method=data['payment_method'],
             processed_by=request.user,
-            reference_number=data.get('reference_number', ''),
+            reference_number=(sanitize_notes(data.get('reference_number', '')) or '')[:50],
             notes=notes,
             is_voided=False,
         )
         if loyalty_redeem:
-            program, customer, points = loyalty_redeem
+            program, customer, points, _credited = loyalty_redeem
             loyalty_svc.record_redeem(program, customer, payment, points, request.user)
 
         # Update order payment status
@@ -232,7 +236,7 @@ def void_payment(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
 
     reason = request.data.get('reason', '').strip()
@@ -320,7 +324,7 @@ def payment_receipt(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     payment = get_object_or_404(
         Payment.objects.filter(_otq).distinct().select_related('order', 'order__table_info', 'processed_by'),
@@ -368,7 +372,7 @@ def reprint_receipt(request, payment_id):
         Q(order__table_info__restaurant__main_owner=owner) |
         Q(order__table_info__restaurant__branch_owner=owner) |
         (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner=owner)) |
-        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__managed_restaurant__main_owner=owner) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__managed_restaurant__main_owner=owner))
+        (Q(order__order_type__in=['delivery', 'pickup'], order__ordered_by__owner__in=managed_owner_ids(owner)) | Q(order__order_type__in=['delivery', 'pickup'], order__restaurant_owner__in=managed_owner_ids(owner)))
     )
     payment = get_object_or_404(
         Payment.objects.filter(_otq2).distinct().select_related('order'),

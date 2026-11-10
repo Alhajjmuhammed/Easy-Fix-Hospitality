@@ -1889,30 +1889,30 @@ function viewRestaurantDetails(restaurantId) {
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <strong class="text-primary">${data.restaurant_name}</strong>
-                                    ${data.cuisine_type ? `<br><small class="text-success"><i class="fas fa-utensils me-1"></i>${data.cuisine_type}</small>` : ''}
+                                    <strong class="text-primary">${escapeHtml(data.restaurant_name)}</strong>
+                                    ${data.cuisine_type ? `<br><small class="text-success"><i class="fas fa-utensils me-1"></i>${escapeHtml(data.cuisine_type)}</small>` : ''}
                                 </div>
                                 ${data.restaurant_description ? `
                                     <div class="mb-3">
                                         <label class="fw-semibold text-muted small">DESCRIPTION</label>
-                                        <p class="small">${data.restaurant_description.split('\n')[0]}</p>
+                                        <p class="small">${escapeHtml(data.restaurant_description.split('\n')[0])}</p>
                                     </div>
                                 ` : ''}
                                 ${data.opening_hours ? `
                                     <div class="mb-3">
                                         <label class="fw-semibold text-muted small">OPENING HOURS</label>
-                                        <p class="small"><i class="fas fa-clock text-warning me-1"></i>${data.opening_hours}</p>
+                                        <p class="small"><i class="fas fa-clock text-warning me-1"></i>${escapeHtml(data.opening_hours)}</p>
                                     </div>
                                 ` : ''}
                                 <div class="mb-3">
                                     <label class="fw-semibold text-muted small">ADDRESS</label>
-                                    <p class="small"><i class="fas fa-map-marker-alt text-danger me-1"></i>${data.address || 'Not provided'}</p>
+                                    <p class="small"><i class="fas fa-map-marker-alt text-danger me-1"></i>${escapeHtml(data.address || 'Not provided')}</p>
                                 </div>
                                 <div class="mb-3">
                                     <label class="fw-semibold text-muted small">STATUS</label>
-                                    <br><span class="badge ${data.is_active ? 'bg-success' : 'bg-danger'}">
-                                        <i class="fas fa-${data.is_active ? 'check' : 'times'} me-1"></i>
-                                        ${data.is_active ? 'Active' : 'Inactive'}
+                                    <br><span class="badge ${escapeHtml(data.is_active ? 'bg-success' : 'bg-danger')}">
+                                        <i class="fas fa-${escapeHtml(data.is_active ? 'check' : 'times')} me-1"></i>
+                                        ${escapeHtml(data.is_active ? 'Active' : 'Inactive')}
                                     </span>
                                 </div>
                             </div>
@@ -1926,23 +1926,23 @@ function viewRestaurantDetails(restaurantId) {
                             <div class="card-body">
                                 <div class="mb-3">
                                     <label class="fw-semibold text-muted small">FULL NAME</label>
-                                    <p><strong>${data.first_name} ${data.last_name}</strong></p>
+                                    <p><strong>${escapeHtml(data.first_name)} ${escapeHtml(data.last_name)}</strong></p>
                                 </div>
                                 <div class="mb-3">
                                     <label class="fw-semibold text-muted small">USERNAME</label>
-                                    <p><i class="fas fa-user text-primary me-1"></i>@${data.username}</p>
+                                    <p><i class="fas fa-user text-primary me-1"></i>@${escapeHtml(data.username)}</p>
                                 </div>
                                 <div class="mb-3">
                                     <label class="fw-semibold text-muted small">EMAIL</label>
-                                    <p><i class="fas fa-envelope text-warning me-1"></i>${data.email}</p>
+                                    <p><i class="fas fa-envelope text-warning me-1"></i>${escapeHtml(data.email)}</p>
                                 </div>
                                 <div class="mb-3">
                                     <label class="fw-semibold text-muted small">PHONE</label>
-                                    <p><i class="fas fa-phone text-success me-1"></i>${data.phone_number || 'Not provided'}</p>
+                                    <p><i class="fas fa-phone text-success me-1"></i>${escapeHtml(data.phone_number || 'Not provided')}</p>
                                 </div>
                                 <div class="mb-3">
                                     <label class="fw-semibold text-muted small">JOINED</label>
-                                    <p><i class="fas fa-calendar text-info me-1"></i>${data.date_joined}</p>
+                                    <p><i class="fas fa-calendar text-info me-1"></i>${escapeHtml(data.date_joined)}</p>
                                 </div>
                             </div>
                         </div>
@@ -1957,23 +1957,23 @@ function viewRestaurantDetails(restaurantId) {
                             <div class="card-body">
                                 <div class="row text-center">
                                     <div class="col">
-                                        <h4 class="text-primary">${data.stats.categories}</h4>
+                                        <h4 class="text-primary">${escapeHtml(data.stats.categories)}</h4>
                                         <small class="text-muted">Categories</small>
                                     </div>
                                     <div class="col">
-                                        <h4 class="text-warning">${data.stats.products}</h4>
+                                        <h4 class="text-warning">${escapeHtml(data.stats.products)}</h4>
                                         <small class="text-muted">Products</small>
                                     </div>
                                     <div class="col">
-                                        <h4 class="text-info">${data.stats.tables}</h4>
+                                        <h4 class="text-info">${escapeHtml(data.stats.tables)}</h4>
                                         <small class="text-muted">Tables</small>
                                     </div>
                                     <div class="col">
-                                        <h4 class="text-success">${data.stats.orders}</h4>
+                                        <h4 class="text-success">${escapeHtml(data.stats.orders)}</h4>
                                         <small class="text-muted">Orders</small>
                                     </div>
                                     <div class="col">
-                                        <h4 class="text-danger">${data.stats.staff}</h4>
+                                        <h4 class="text-danger">${escapeHtml(data.stats.staff)}</h4>
                                         <small class="text-muted">Staff</small>
                                     </div>
                                 </div>
@@ -1993,7 +1993,7 @@ function viewRestaurantDetails(restaurantId) {
             detailsBody.innerHTML = `
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    Error loading restaurant details: ${error.message}
+                    Error loading restaurant details: ${escapeHtml(error.message)}
                 </div>
             `;
         });
@@ -2340,11 +2340,11 @@ function showMessage(message, type = 'info') {
     const toastContainer = document.getElementById('toastContainer') || createToastContainer();
     
     const toastHtml = `
-        <div class="toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast align-items-center text-white bg-${escapeHtml(type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info')} border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body">
-                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>
-                    ${message}
+                    <i class="fas fa-${escapeHtml(type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle')} me-2"></i>
+                    ${escapeHtml(message)}
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
@@ -2436,27 +2436,27 @@ function showBranchDeletionConfirmation(restaurantId, newPlan, data) {
                     <div class="modal-body">
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-circle me-2"></i>
-                            <strong>Warning:</strong> ${data.message}
+                            <strong>Warning:</strong> ${escapeHtml(data.message)}
                         </div>
                         
-                        <p><strong>Restaurant:</strong> ${data.restaurant_name}</p>
+                        <p><strong>Restaurant:</strong> ${escapeHtml(data.restaurant_name)}</p>
                         <p><strong>Current Plan:</strong> PRO (Multi-Branch)</p>
                         <p><strong>New Plan:</strong> Single (Basic)</p>
                         
                         <div class="mt-3">
                             <h6 class="text-danger">
                                 <i class="fas fa-trash me-1"></i>
-                                Branches to be deleted (${data.branches_count}):
+                                Branches to be deleted (${escapeHtml(data.branches_count)}):
                             </h6>
                             <div class="list-group">
                                 ${data.branches.map(branch => `
                                     <div class="list-group-item d-flex justify-content-between align-items-center">
                                         <div>
-                                            <strong>${branch.name}</strong>
-                                            <small class="text-muted d-block">Created: ${branch.created_date}</small>
+                                            <strong>${escapeHtml(branch.name)}</strong>
+                                            <small class="text-muted d-block">Created: ${escapeHtml(branch.created_date)}</small>
                                         </div>
-                                        <span class="badge ${branch.is_active ? 'bg-success' : 'bg-secondary'}">
-                                            ${branch.is_active ? 'Active' : 'Inactive'}
+                                        <span class="badge ${escapeHtml(branch.is_active ? 'bg-success' : 'bg-secondary')}">
+                                            ${escapeHtml(branch.is_active ? 'Active' : 'Inactive')}
                                         </span>
                                     </div>
                                 `).join('')}
@@ -2466,7 +2466,7 @@ function showBranchDeletionConfirmation(restaurantId, newPlan, data) {
                         <div class="mt-4 p-3 bg-light rounded">
                             <h6><i class="fas fa-info-circle text-info me-1"></i> What will happen:</h6>
                             <ul class="mb-0">
-                                <li>All ${data.branches_count} branch(es) will be <strong class="text-danger">permanently deleted</strong></li>
+                                <li>All ${escapeHtml(data.branches_count)} branch(es) will be <strong class="text-danger">permanently deleted</strong></li>
                                 <li>All branch data, settings, and configurations will be lost</li>
                                 <li>Staff accounts associated with branches will be removed</li>
                                 <li>This action <strong class="text-danger">cannot be undone</strong></li>

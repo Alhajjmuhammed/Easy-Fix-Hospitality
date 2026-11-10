@@ -499,7 +499,7 @@ function switchAndViewQR(restaurantId, restaurantName) {
                 
                 // Show success message
                 $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-                    '<i class="fas fa-check-circle me-2"></i>' + "{{ t_switched_qr|escapejs }}".replace('{name}', restaurantName) +
+                    '<i class="fas fa-check-circle me-2"></i>' + escapeHtml("{{ t_switched_qr|escapejs }}").replace('{name}', () => escapeHtml(restaurantName)) +
                     '<button type="button" class="close" data-dismiss="alert">' +
                     '<span>&times;</span></button></div>')
                     .prependTo('.container-fluid');
@@ -556,7 +556,7 @@ function upgradeToPro() {
                 if (data.success) {
                     // Show success message
                     $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-                        '<i class="fas fa-check-circle me-2"></i>' + data.message +
+                        '<i class="fas fa-check-circle me-2"></i>' + escapeHtml(data.message) +
                         '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>')
                         .prependTo('.container-fluid');
                     
@@ -587,7 +587,7 @@ function downgradeToSingle() {
                 if (data.success) {
                     // Show success message
                     $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-                        '<i class="fas fa-check-circle me-2"></i>' + data.message +
+                        '<i class="fas fa-check-circle me-2"></i>' + escapeHtml(data.message) +
                         '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>')
                         .prependTo('.container-fluid');
                     

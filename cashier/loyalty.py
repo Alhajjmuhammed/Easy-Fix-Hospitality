@@ -8,7 +8,6 @@ in the same transaction as the payment, and given back if that payment is voided
 """
 import hmac
 import logging
-import math
 import secrets
 from decimal import Decimal, InvalidOperation
 
@@ -143,7 +142,10 @@ def sync_order_points(order):
 # ---------------------------------------------------------------------------
 
 def prepare_redeem(order, amount, code):
-    """Check a loyalty payment of `amount` on `order`. Returns (program, customer, points).
+    """Check a loyalty payment of up to `amount` on `order`. Returns (program, customer, points,
+    credited): whole points only, and `credited` = points x point value exactly — never more
+    points' value taken than the amount credited, never more credited than the points cover.
+    Any part of `amount` a whole point can't cover stays due (paid another way).
     The customer's code proves they agree. Locks the programme row so two tills can't
     spend the same points at once."""
     if order.status in NOT_PAYABLE_STATUSES:
@@ -159,7 +161,10 @@ def prepare_redeem(order, amount, code):
         amount = Decimal(str(amount))
     except (InvalidOperation, ValueError, TypeError):
         raise ValidationError('Invalid amount.')
-    points = math.ceil(amount / program.point_value)
+    points = int(amount // program.point_value)     # whole points that fit in the amount
+    if points < 1:
+        raise ValidationError(f'One point is worth {money_value(program, 1)}: points can only pay '
+                              f'{money_value(program, 1)} or more.')
     if points < program.min_redeem_points:
         raise ValidationError(f'At least {program.min_redeem_points} points must be used at once '
                               f'({money_value(program, program.min_redeem_points)}).')
@@ -167,7 +172,8 @@ def prepare_redeem(order, amount, code):
     if points > available:
         raise ValidationError(f'Not enough points: this needs {points}, the customer has {available}.')
     _check_code(customer, code)
-    return program, customer, points
+    credited = (points * program.point_value).quantize(Decimal('0.01'))
+    return program, customer, points, credited
 
 
 def record_redeem(program, customer, payment, points, user):

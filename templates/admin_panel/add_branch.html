@@ -652,7 +652,7 @@
                                                     <label class="form-label fw-bold text-muted">{% translate "Login URL:" %}</label>
                                                     <div class="input-group">
                                                         <input type="text" class="form-control" value="http://{{ request.get_host }}/accounts/login/" readonly>
-                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('http://{{ request.get_host }}/accounts/login/', this)">
+                                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('http://{{ request.get_host|escapejs }}/accounts/login/', this)">
                                                             <i class="fas fa-copy"></i>
                                                         </button>
                                                     </div>
@@ -1138,12 +1138,13 @@ $(document).ready(function() {
 
 // Print credentials function
 function printCredentials() {
-    // Store credentials in JS variables (escapejs applied server-side)
-    var credFullName = "{{ branch_credentials.full_name|escapejs }}";
-    var credUsername = "{{ branch_credentials.username|escapejs }}";
-    var credEmail    = "{{ branch_credentials.email|escapejs }}";
-    var credPassword = "{{ branch_credentials.password|escapejs }}";
-    var credRole     = "{{ branch_credentials.role|escapejs }}";
+    // Store credentials in JS variables (escapejs for the JS string; escapeHtml because
+    // they are written into the print window's HTML below)
+    var credFullName = escapeHtml("{{ branch_credentials.full_name|escapejs }}");
+    var credUsername = escapeHtml("{{ branch_credentials.username|escapejs }}");
+    var credEmail    = escapeHtml("{{ branch_credentials.email|escapejs }}");
+    var credPassword = escapeHtml("{{ branch_credentials.password|escapejs }}");
+    var credRole     = escapeHtml("{{ branch_credentials.role|escapejs }}");
 
     const printWindow = window.open('', '_blank');
     printWindow.document.write(

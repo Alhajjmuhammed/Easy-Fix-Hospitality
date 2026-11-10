@@ -13,6 +13,9 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
+from accounts.security_utils import sanitize_name
+from restaurant_system.security_decorators import rate_limit_mobile_registration
+
 from ..serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
@@ -173,6 +176,7 @@ def save_language(request):
 _USERNAME_RE = re.compile(r'^[a-zA-Z0-9_]{3,150}$')
 
 
+@rate_limit_mobile_registration
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
@@ -190,9 +194,10 @@ def register(request):
 
     username = (data.get('username') or '').strip()
     email = (data.get('email') or '').strip().lower()
-    first_name = (data.get('first_name') or '').strip()
-    last_name = (data.get('last_name') or '').strip()
-    phone_number = (data.get('phone_number') or '').strip()
+    # Names end up in staff and system-admin pages: store them as plain text, no HTML.
+    first_name = sanitize_name(data.get('first_name') or '', max_length=None)
+    last_name = sanitize_name(data.get('last_name') or '', max_length=None)
+    phone_number = sanitize_name(data.get('phone_number') or '', max_length=None)
     password = data.get('password', '')
     confirm_password = data.get('confirm_password', '')
 
@@ -223,6 +228,9 @@ def register(request):
         return Response({'error': 'Last name is required.'}, status=status.HTTP_400_BAD_REQUEST)
     if len(last_name) > 150:
         return Response({'error': 'Last name must be 150 characters or fewer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if len(phone_number) > 15:
+        return Response({'error': 'Phone number must be 15 characters or fewer.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if not password:
         return Response({'error': 'Password is required.'}, status=status.HTTP_400_BAD_REQUEST)

@@ -15,6 +15,8 @@ from .models_printjob import PrintJob
 
 logger = logging.getLogger(__name__)
 
+PENDING_POLL_LIMIT = 50   # print jobs handed to a print client per poll
+
 
 class PrintClientRateThrottle(UserRateThrottle):
     """Custom rate throttle for print clients - allows more frequent polling"""
@@ -127,11 +129,18 @@ class PrintJobViewSet(viewsets.ReadOnlyModelViewSet):
             stale_jobs.update(status='pending', printed_by_client='')
             logger.info(f"Auto-reset {count} stale 'printing' job(s) to 'pending'")
 
-        pending_jobs = self.get_queryset().filter(status='pending').order_by('created_at')
-        serializer = self.get_serializer(pending_jobs, many=True)
+        # Oldest first, at most PENDING_POLL_LIMIT per poll: a client that was offline for a
+        # day must not pull (and the server serialise) the whole backlog in one response.
+        # Nothing is dropped: the rest comes on the next polls, still oldest first.
+        pending_jobs = self.get_queryset().filter(status='pending').order_by('created_at', 'id')
+        total_pending = pending_jobs.count()
+        batch = list(pending_jobs[:PENDING_POLL_LIMIT])
+        serializer = self.get_serializer(batch, many=True)
 
         return Response({
-            'count': pending_jobs.count(),
+            'count': total_pending,              # all pending jobs (unchanged meaning)
+            'returned': len(batch),
+            'has_more': total_pending > len(batch),
             'jobs': serializer.data
         })
     

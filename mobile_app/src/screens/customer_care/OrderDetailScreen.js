@@ -22,7 +22,7 @@ import { apiTables } from '../../api/tables';
 import { getOrderById } from '../../database/operations';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
-import { printReceipt } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
 import { STATUS_COLORS } from '../../constants/statusColors';
 import { useT } from '../../i18n';
 
@@ -62,8 +62,9 @@ export default function OrderDetailScreen({ route, navigation }) {
   const [tableMenuVisible, setTableMenuVisible]     = useState(false);
   const [transferring, setTransferring]             = useState(false);
 
-  const { format } = useCurrency();
+  const { format, decimals } = useCurrency();
   const { user } = useAuthStore();
+  const isCustomerCare = user?.role_name === 'customer_care';
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -150,7 +151,9 @@ export default function OrderDetailScreen({ route, navigation }) {
         restaurantName: user?.restaurant_name || 'Restaurant',
         currencySymbol: user?.currency_symbol || '',
         staffName,
+        decimals,
       });
+      if (isPrinterUnreachable(ok)) { if (mountedRef.current) setSnack(t('Printer not reachable')); return; }
       if (ok && mountedRef.current) setSnack(t('Bill sent to printer'));
     } catch (err) {
       if (mountedRef.current) setSnack(t('Print failed: {error}', { error: err.message || t('Unknown error') }));
@@ -189,7 +192,7 @@ export default function OrderDetailScreen({ route, navigation }) {
       setSnack(t('Table transferred'));
       fetchOrder();
     } catch (err) {
-      if (mountedRef.current) setSnack(err.response?.data?.detail || t('Transfer failed'));
+      if (mountedRef.current) setSnack(err.response?.data?.error || err.response?.data?.detail || t('Transfer failed'));
     } finally {
       if (mountedRef.current) setTransferring(false);
     }
@@ -234,9 +237,14 @@ export default function OrderDetailScreen({ route, navigation }) {
                 }
               >
                 <Menu.Item leadingIcon="printer" title={t('Print Bill')} disabled={printBillId !== null} onPress={() => { setMenuOpen(false); handlePrintBill(); }} />
-                <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpen(false); openTransfer(); }} disabled={order.payment_status === 'paid' || order.status === 'cancelled'} />
-                <Divider />
-                <Menu.Item leadingIcon="close-circle-outline" title={t('Cancel Order')} titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpen(false); setCancelDialog(true); }} disabled={order.status === 'cancelled' || order.payment_status === 'paid'} />
+                <Menu.Item leadingIcon="swap-horizontal" title={t('Transfer Table')} onPress={() => { setMenuOpen(false); openTransfer(); }} disabled={order.payment_status === 'paid' || order.status === 'cancelled' || order.order_type === 'delivery' || order.order_type === 'pickup'} />
+                {/* Customer care may cancel only pending orders (server rule) */}
+                {(!isCustomerCare || order.status === 'pending') && (
+                  <>
+                    <Divider />
+                    <Menu.Item leadingIcon="close-circle-outline" title={t('Cancel Order')} titleStyle={{ color: '#E53935' }} onPress={() => { setMenuOpen(false); setCancelDialog(true); }} disabled={order.status === 'cancelled' || order.payment_status === 'paid'} />
+                  </>
+                )}
               </Menu>
             </View>
           </View>

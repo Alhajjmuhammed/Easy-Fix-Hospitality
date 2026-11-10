@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Count, Q, Subquery, OuterRef, F
+from django.db.models import Count, Q, Subquery, OuterRef, F, Prefetch
+from urllib.parse import urlencode
 from django.db import transaction
 from django.utils import timezone
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
@@ -18,6 +19,7 @@ from datetime import date, timedelta, datetime
 from .models import MobileAppRelease
 import json
 import logging
+from restaurant_system.db_utils import managed_owner_ids
 
 logger = logging.getLogger(__name__)
 
@@ -298,21 +300,23 @@ def statistics(request):
         'order_status_counts': order_status_counts,
         'user_role_counts': user_role_counts,
         'top_restaurants': top_restaurants,
-        'json_order_status': json.dumps({
+        # Chart data as plain Python objects: the template emits them with |json_script
+        # (escapes < > & so a restaurant name like "</script>..." cannot break out).
+        'json_order_status': {
             'labels': [s.title() for s in order_status_counts.keys()],
             'data': list(order_status_counts.values()),
             'colors': [STATUS_COLORS.get(s, '#bdc3c7') for s in order_status_counts.keys()],
-        }),
-        'json_role_counts': json.dumps({
+        },
+        'json_role_counts': {
             'labels': [r.replace('_', ' ').title() for r in user_role_counts.keys()],
             'data': list(user_role_counts.values()),
-        }),
-        'json_top_restaurants': json.dumps({
+        },
+        'json_top_restaurants': {
             'labels': [r.restaurant_name for r in top_restaurants],
             'data': [r.order_count for r in top_restaurants],
-        }),
-        'json_daily_orders': json.dumps({'labels': _day_labels, 'data': _order_series}),
-        'json_daily_users': json.dumps({'labels': _day_labels, 'data': _user_series}),
+        },
+        'json_daily_orders': {'labels': _day_labels, 'data': _order_series},
+        'json_daily_users': {'labels': _day_labels, 'data': _user_series},
     }
 
     return render(request, 'system_admin/statistics.html', context)
@@ -581,9 +585,30 @@ def manage_all_users(request):
 
     return render(request, 'system_admin/manage_users.html', context)
 
+# "All orders" period filter: a full scan of every tenant's orders took 15-50 s,
+# so the page defaults to the last 7 days and is paginated.
+VIEW_ORDERS_PERIODS = (
+    ('today', 'Today'),
+    ('7d', 'Last 7 days'),
+    ('30d', 'Last 30 days'),
+    ('90d', 'Last 90 days'),
+    ('all', 'All time'),
+)
+VIEW_ORDERS_PER_PAGE = 50
+
+
+def _period_start(period):
+    """Start (aware, local midnight) of a period; None for 'all'."""
+    today_start = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+    days = {'today': 0, '7d': 6, '30d': 29, '90d': 89}.get(period)
+    if days is None:
+        return None
+    return today_start - timedelta(days=days)
+
+
 @login_required
 def view_all_orders(request):
-    """View all orders system-wide"""
+    """View all orders system-wide (paginated, period-limited)."""
     if not _can_access(request.user, 'orders', 'view'):
         messages.error(request, 'Access denied.')
         return redirect('system_admin:dashboard')
@@ -593,9 +618,23 @@ def view_all_orders(request):
     restaurant_filter = request.GET.get('restaurant', 'all')
     if restaurant_filter != 'all' and not str(restaurant_filter).isdigit():
         restaurant_filter = 'all'  # ignore a malformed filter instead of a 500
-    
-    orders = Order.objects.select_related('table_info', 'ordered_by', 'confirmed_by').prefetch_related('order_items').order_by('-created_at')
-    
+    period = request.GET.get('period', '7d')
+    if period not in dict(VIEW_ORDERS_PERIODS):
+        period = '7d'
+
+    # Everything the template reads per row comes from these joins (restaurant name via
+    # table_info.restaurant / table_info.owner, customer via ordered_by) plus one prefetch
+    # for the item count: a constant number of queries per page.
+    orders = Order.objects.select_related(
+        'table_info__restaurant', 'table_info__owner', 'ordered_by__owner', 'restaurant_owner',
+    ).prefetch_related(
+        Prefetch('order_items', queryset=OrderItem.objects.only('id', 'order_id')),
+    ).order_by('-created_at')
+
+    start = _period_start(period)
+    if start is not None:
+        orders = orders.filter(created_at__gte=start)
+
     if status_filter != 'all':
         orders = orders.filter(status=status_filter)
     
@@ -605,17 +644,28 @@ def view_all_orders(request):
             (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__id=restaurant_filter) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__id=restaurant_filter))
         )
 
+    paginator = Paginator(orders, VIEW_ORDERS_PER_PAGE)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     # Get filter options - Updated for new role system
     restaurant_owners = User.objects.filter(
         role__name__in=['owner', 'main_owner', 'branch_owner'], 
         restaurant_name__isnull=False
     ).exclude(restaurant_name='')
+
+    # Filters carried over to the pagination links
+    filter_query = urlencode({'status': status_filter, 'restaurant': restaurant_filter, 'period': period})
     
     context = {
-        'orders': orders,
+        'orders': page_obj.object_list,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'filter_query': filter_query,
         'restaurant_owners': restaurant_owners,
         'status_filter': status_filter,
         'restaurant_filter': restaurant_filter,
+        'period': period,
+        'period_choices': VIEW_ORDERS_PERIODS,
         'status_choices': Order.STATUS_CHOICES,
         'can_create': _can_access(request.user, 'orders', 'create'),
         'can_edit': _can_access(request.user, 'orders', 'edit'),
@@ -942,7 +992,7 @@ def get_restaurant_details(request, restaurant_id):
                 Q(table_info__restaurant__main_owner=main_owner) |
                 Q(table_info__restaurant__branch_owner=main_owner) |
                 (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner=main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner=main_owner)) |
-                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__managed_restaurant__main_owner=main_owner) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__managed_restaurant__main_owner=main_owner))
+                (Q(order_type__in=['delivery', 'pickup'], ordered_by__owner__in=managed_owner_ids(main_owner)) | Q(order_type__in=['delivery', 'pickup'], restaurant_owner__in=managed_owner_ids(main_owner)))
             ).distinct().count(),
             'staff': User.objects.filter(owner=main_owner).count(),
         }

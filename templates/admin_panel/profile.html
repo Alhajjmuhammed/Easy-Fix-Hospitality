@@ -719,9 +719,9 @@ function previewLogo(event) {
         reader.onload = function(e) {
             previewDiv.innerHTML = `
                 <div class="alert alert-info d-flex align-items-center gap-3">
-                    <img src="${e.target.result}" alt="{% translate 'Logo Preview' %}" style="max-height: 80px; max-width: 150px; border-radius: 8px;">
+                    <img src="${escapeHtml(e.target.result)}" alt="{% translate 'Logo Preview' %}" style="max-height: 80px; max-width: 150px; border-radius: 8px;">
                     <div>
-                        <small><i class="fas fa-check-circle text-success"></i> {{ t_logo_preview }} (${(file.size / 1024).toFixed(2)} KB)</small><br>
+                        <small><i class="fas fa-check-circle text-success"></i> {{ t_logo_preview|escapejs }} (${(file.size / 1024).toFixed(2)} KB)</small><br>
                         <small class="text-muted">{% translate "This will be shown on the menu QR code page" %}</small>
                     </div>
                 </div>
