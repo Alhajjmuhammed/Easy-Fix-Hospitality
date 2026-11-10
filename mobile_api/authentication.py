@@ -2,7 +2,10 @@
 Token authentication with expiry.
 
 - Every path: tokens expire TOKEN_EXPIRE_DAYS days after they were created.
-  Expired tokens are deleted so the app gets a clean 401 and prompts re-login.
+  Expired tokens get a clean 401 every time, so the app prompts re-login (login
+  replaces the user's tokens). They are not deleted here: production runs with
+  ATOMIC_REQUESTS, and DRF rolls the request's transaction back on a 401, so a
+  delete here would be undone anyway.
 - One exception: the print-jobs API used by the restaurant's local Print Client
   (/orders/api/print-jobs/, see print_client/print_client.py). The Print Client is a
   headless agent configured once with the owner's token from Printer Settings; it
@@ -42,7 +45,6 @@ class ExpiringTokenAuthentication(TokenAuthentication):
 
         expiry_time = token.created + timedelta(days=TOKEN_EXPIRE_DAYS)
         if timezone.now() > expiry_time:
-            token.delete()
             raise AuthenticationFailed('Token has expired. Please log in again.')
 
         return (user, token)

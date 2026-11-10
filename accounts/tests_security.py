@@ -266,7 +266,9 @@ class TokenExpiryTests(Base):
         key = self._aged_token(self.owner)
         r = self.client.get('/api/v1/auth/me/', HTTP_AUTHORIZATION=f'Token {key}')
         self.assertEqual(r.status_code, 401)
-        self.assertFalse(Token.objects.filter(key=key).exists())
+        # Refused again on every later use (no reliance on deleting it).
+        r = self.client.get('/api/v1/auth/me/', HTTP_AUTHORIZATION=f'Token {key}')
+        self.assertEqual(r.status_code, 401)
 
     def test_expired_token_rejected_outside_mobile_api(self):
         key = self._aged_token(self.owner)
