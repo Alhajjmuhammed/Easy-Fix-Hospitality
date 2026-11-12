@@ -38,6 +38,9 @@ export const usePrinterStore = create((set, get) => ({
    */
   localKotBot: false,
 
+  /** true when localKotBot was switched on by choosing a Bluetooth printer (not by hand) */
+  kotBotAuto: false,
+
   /** true once loadSettings() has resolved — guards against cold-start race */
   settingsLoaded: false,
 
@@ -52,6 +55,7 @@ export const usePrinterStore = create((set, get) => ({
           bluetoothDevice:       saved.bluetoothDevice       ?? null,
           autoPrintAfterPayment: saved.autoPrintAfterPayment ?? true,
           localKotBot:           saved.localKotBot           ?? false,
+          kotBotAuto:            saved.kotBotAuto            ?? false,
         });
       }
     } catch (_) {}
@@ -61,7 +65,7 @@ export const usePrinterStore = create((set, get) => ({
 
   /** Clear all printer settings on logout so the next user starts fresh. */
   resetSettings: async () => {
-    set({ mode: 'auto', bluetoothDevice: null, autoPrintAfterPayment: true, localKotBot: false });
+    set({ mode: 'auto', bluetoothDevice: null, autoPrintAfterPayment: true, localKotBot: false, kotBotAuto: false });
     try { await AsyncStorage.removeItem(STORAGE_KEY); } catch (_) {}
   },
 
@@ -82,6 +86,7 @@ export const usePrinterStore = create((set, get) => ({
           bluetoothDevice:       next.bluetoothDevice,
           autoPrintAfterPayment: next.autoPrintAfterPayment,
           localKotBot:           next.localKotBot,
+          kotBotAuto:            next.kotBotAuto,
         }),
       );
     } catch (_) {}

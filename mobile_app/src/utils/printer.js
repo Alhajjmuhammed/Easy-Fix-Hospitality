@@ -101,78 +101,157 @@ async function requestBluetoothPermissions() {
   }
 }
 
-/**
- * Ask the OS to turn Bluetooth on (Android only — shows a system dialog).
- * Resolves when BT is enabled or the user dismisses the dialog.
- */
-async function ensureBluetoothEnabled(BluetoothManager) {
-  if (Platform.OS !== 'android') return;
+// Messages thrown to the screens (translated there with t()).
+export const BT_MSG_OFF    = 'Bluetooth is off. Turn on Bluetooth and try again.';
+export const BT_MSG_NO_CONNECT = 'Could not connect to the printer. Make sure it is switched on, has paper and is close to the phone.';
+export const BT_MSG_DENIED = 'Bluetooth permission denied. Allow Nearby Devices in phone Settings → Apps → Easy Fix → Permissions.';
+
+// One Bluetooth job at a time: the library keeps a single pending connect, so two prints
+// at once (e.g. kitchen + bar tickets) could hang or interleave on the paper.
+let _btQueue = Promise.resolve();
+function runBtJob(fn) {
+  const run = _btQueue.then(fn, fn);
+  _btQueue = run.catch(() => {});
+  return run;
+}
+const BT_CONNECT_TIMEOUT_MS = 15000;
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+/** Connect to the printer; an already-open connection to it is fine. */
+async function connectOrThrow(BluetoothManager, address) {
   try {
-    await BluetoothManager.enableBluetooth();
+    await withTimeout(BluetoothManager.connect(address), BT_CONNECT_TIMEOUT_MS, '__bt_timeout__');
+  } catch (e) {
+    const msg = String(e?.message || e).toLowerCase();
+    if (msg.includes('already') || (msg.includes('connected') && !msg.includes('unable'))) return;
+    if (msg.includes('__bt_timeout__')) {
+      // Stop the half-open attempt now: otherwise its late failure would reject the NEXT
+      // print's connect (the library keeps only one pending connect).
+      try { await BluetoothManager.disconnect(address); } catch (_) {}
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    throw new Error(BT_MSG_NO_CONNECT);
+  }
+}
+
+/** Library results come as JSON strings or objects; return [{ address, name }]. */
+function normalizeDevices(list) {
+  const out = [];
+  (Array.isArray(list) ? list : []).forEach((d) => {
+    let o = d;
+    if (typeof d === 'string') { try { o = JSON.parse(d); } catch (_) { o = null; } }
+    if (o && o.address) out.push({ address: o.address, name: o.name || o.address });
+  });
+  return out;
+}
+
+/** Merge device lists, first occurrence wins, no duplicate addresses. */
+export function mergeDevices(...lists) {
+  const map = new Map();
+  lists.flat().forEach((d) => { if (d && d.address && !map.has(d.address)) map.set(d.address, d); });
+  return Array.from(map.values());
+}
+
+/**
+ * Printers already paired in the phone's Bluetooth settings.
+ * Needs no device search and no Location, so it works on every phone. A thermal
+ * printer is normally paired once in phone Settings → Bluetooth (PIN 0000 or 1234).
+ * Turns Bluetooth on first (Android asks the user).
+ */
+export async function getPairedPrinters() {
+  const mod = loadBtEscPos();
+  if (!mod) throw new Error('Bluetooth Classic not available on this build. Run: npx expo prebuild');
+  if (!(await requestBluetoothPermissions())) throw new Error(BT_MSG_DENIED);
+  let list;
+  try {
+    // Resolves with the paired devices once Bluetooth is on; rejects if the user keeps it off.
+    list = await mod.BluetoothManager.enableBluetooth();
   } catch (_) {
-    // User denied or BT already on — continue either way
+    throw new Error(BT_MSG_OFF);
+  }
+  return normalizeDevices(list);
+}
+
+/**
+ * Search for nearby printers that are not paired yet. Optional extra: Android only lets
+ * the search start when Location is on and allowed (otherwise the library reports
+ * "NOT_STARTED"). Never throws — returns { devices, started }.
+ */
+export async function discoverNearbyPrinters() {
+  const mod = loadBtEscPos();
+  if (!mod) return { devices: [], started: false };
+  if (Platform.OS === 'android') {
+    try {
+      const loc = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+      if (!(await PermissionsAndroid.check(loc))) await PermissionsAndroid.request(loc);
+    } catch (_) { /* optional */ }
+  }
+  try {
+    // Not in the print queue (a connect cancels the search itself). Android stops a search
+    // by itself after ~12 s; the timeout only guards against a lost callback.
+    const result = await withTimeout(mod.BluetoothManager.scanDevices(), 25000, 'scan timeout');
+    const parsed = typeof result === 'string' ? JSON.parse(result) : (result || {});
+    return { devices: mergeDevices(normalizeDevices(parsed.paired), normalizeDevices(parsed.found)), started: true };
+  } catch (_) {
+    return { devices: [], started: false };
   }
 }
 
 /**
- * Scan for paired + nearby Bluetooth devices.
- * Returns array of { address: string, name: string }.
+ * Paired printers plus any nearby ones. Only fails when Bluetooth itself is
+ * unavailable, off or not allowed — a failed nearby search just returns the paired list.
  */
 export async function scanBluetoothDevices() {
-  const mod = loadBtEscPos();
-  if (!mod) throw new Error('Bluetooth Classic not available on this build. Run: npx expo prebuild');
+  const paired = await getPairedPrinters();
+  const { devices } = await discoverNearbyPrinters();
+  return mergeDevices(paired, devices);
+}
 
-  // 1. Runtime permissions — required on Android 12+ before any BT operation
-  const granted = await requestBluetoothPermissions();
-  if (!granted) {
-    throw new Error(
-      'Bluetooth permission denied.\n\n' +
-      'Go to phone Settings → Apps → Easy Fix → Permissions and allow Nearby Devices (Bluetooth).',
-    );
-  }
-
-  const { BluetoothManager } = mod;
-
-  // 2. Make sure Bluetooth is switched on
-  await ensureBluetoothEnabled(BluetoothManager);
-
-  // 3. Scan — library returns either a JSON string or a plain object depending on version
-  const result = await BluetoothManager.scanDevices();
-  const parsed = typeof result === 'string' ? JSON.parse(result) : result;
-  const found  = Array.isArray(parsed.found)  ? parsed.found  : [];
-  const paired = Array.isArray(parsed.paired) ? parsed.paired : [];
-
-  // Merge found + paired, deduplicate by address
-  const map = new Map();
-  [...found, ...paired].forEach((d) => {
-    if (d && d.address) map.set(d.address, { address: d.address, name: d.name || d.address });
-  });
-  return Array.from(map.values());
+/**
+ * True when this phone itself should print (Bluetooth printer / system dialog) instead of
+ * sending the job to the server's Windows Print Client — used by the Reprint and station
+ * Print buttons, online or offline. Network and Auto keep the Print Client for these
+ * (Auto has the PC as its fallback when the Bluetooth printer is unreachable).
+ */
+export function prefersPhonePrinter() {
+  const { mode } = usePrinterStore.getState();
+  return mode === 'bluetooth' || mode === 'system';
 }
 
 /**
  * Connect to a BT Classic printer by MAC address.
  */
-export async function connectBluetoothPrinter(address) {
+export function connectBluetoothPrinter(address) {
+  return runBtJob(() => _connectBluetoothPrinterNow(address));
+}
+
+async function _connectBluetoothPrinterNow(address) {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('Bluetooth Classic not available on this build.');
 
   // Runtime permissions required before connecting on Android 12+
-  const granted = await requestBluetoothPermissions();
-  if (!granted) {
-    throw new Error(
-      'Bluetooth permission denied. Allow Nearby Devices in phone Settings → Apps → Permissions.',
-    );
+  if (!(await requestBluetoothPermissions())) throw new Error(BT_MSG_DENIED);
+  try {
+    await mod.BluetoothManager.enableBluetooth();
+  } catch (_) {
+    throw new Error(BT_MSG_OFF);
   }
-
-  await ensureBluetoothEnabled(mod.BluetoothManager);
-  await mod.BluetoothManager.connect(address);
+  await connectOrThrow(mod.BluetoothManager, address);
 }
 
 /**
  * Send a formatted receipt to a BT Classic ESC/POS printer silently.
  */
-async function printBtClassic({ order, payment, restaurantName, currencySymbol, staffName = '', decimals = 2 }) {
+function printBtClassic(opts) {
+  return runBtJob(() => _printBtClassicNow(opts));
+}
+
+async function _printBtClassicNow({ order, payment, restaurantName, currencySymbol, staffName = '', decimals = 2 }) {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('BT Classic module not loaded');
 
@@ -183,13 +262,8 @@ async function printBtClassic({ order, payment, restaurantName, currencySymbol, 
     throw new Error('No Bluetooth printer selected. Go to Settings → Printer Settings to choose a printer.');
   }
 
-  // Connect (ignores "already connected" errors)
-  try {
-    await BluetoothManager.connect(bluetoothDevice.address);
-  } catch (e) {
-    const msg = String(e).toLowerCase();
-    if (!msg.includes('already') && !msg.includes('connected')) throw e;
-  }
+  // Connect (an already-open connection is fine; gives up after 15 s)
+  await connectOrThrow(BluetoothManager, bluetoothDevice.address);
 
   const sym = currencySymbol || '';
   const fmt = (v) => { const n = parseFloat(v); return isNaN(n) ? (0).toFixed(decimals) : n.toFixed(decimals); };
@@ -407,7 +481,11 @@ export function isPrinterUnreachable(result) {
 
 // ─── BT Classic ticket (KOT/BOT — no prices, no cash drawer) ────────────────
 
-async function _printTicketBtClassic({ order, restaurantName, stationFilter = null, orderedBy = '' }) {
+function _printTicketBtClassic(opts) {
+  return runBtJob(() => _printTicketBtClassicNow(opts));
+}
+
+async function _printTicketBtClassicNow({ order, restaurantName, stationFilter = null, orderedBy = '' }) {
   const mod = loadBtEscPos();
   if (!mod) throw new Error('BT Classic module not loaded');
 
@@ -418,13 +496,8 @@ async function _printTicketBtClassic({ order, restaurantName, stationFilter = nu
     throw new Error('No Bluetooth printer selected. Go to Settings → Printer Settings.');
   }
 
-  // Connect (ignores "already connected" errors)
-  try {
-    await BluetoothManager.connect(bluetoothDevice.address);
-  } catch (e) {
-    const msg = String(e).toLowerCase();
-    if (!msg.includes('already') && !msg.includes('connected')) throw e;
-  }
+  // Connect (an already-open connection is fine; gives up after 15 s)
+  await connectOrThrow(BluetoothManager, bluetoothDevice.address);
 
   const BT_STATION_TITLES = {
     kitchen: 'KITCHEN ORDER TICKET (KOT)',

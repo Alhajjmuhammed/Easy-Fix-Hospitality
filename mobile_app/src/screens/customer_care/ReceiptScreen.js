@@ -15,7 +15,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { apiPaymentReceipt, apiReprintReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
 import { buildReceiptText, shareOnWhatsApp } from '../../utils/shareReceipt';
-import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable, prefersPhonePrinter } from '../../utils/printer';
 import { useAuthStore }     from '../../store/useAuthStore';
 import { useT } from '../../i18n';
 const METHOD_LABEL = { cash: 'Cash', card: 'Card', digital: 'Digital', voucher: 'Voucher' };
@@ -55,6 +55,8 @@ export default function ReceiptScreen({ route }) {
   useEffect(() => { fetchReceipt(); }, [fetchReceipt]);
 
   const handleReprint = async () => {
+    // Bluetooth / system-dialog phones print here themselves, online too.
+    if (prefersPhonePrinter()) { handleLocalPrint(); return; }
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to reprint'); return; }

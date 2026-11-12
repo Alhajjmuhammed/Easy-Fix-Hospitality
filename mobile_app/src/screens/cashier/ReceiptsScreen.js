@@ -8,7 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { apiPayments, apiReprintReceipt, apiPaymentReceipt } from '../../api/payments';
 import { useCurrency } from '../../hooks/useCurrency';
-import { printReceipt, isPrinterUnreachable } from '../../utils/printer';
+import { printReceipt, isPrinterUnreachable, prefersPhonePrinter } from '../../utils/printer';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getAllOfflinePayments, getOrderById } from '../../database/operations';
 import { useT } from '../../i18n';
@@ -62,7 +62,10 @@ export default function CashierReceiptsScreen() {
 
   useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
-  const handleReprint = async (paymentId) => {
+  const handleReprint = async (p) => {
+    // Bluetooth / system-dialog phones print here themselves, online too.
+    if (prefersPhonePrinter()) { handleLocalPrint(p); return; }
+    const paymentId = p.id;
     const net = await NetInfo.fetch();
     if (!mountedRef.current) return;
     if (!net.isConnected) { setSnack('No internet — connect to reprint'); return; }
@@ -259,7 +262,7 @@ export default function CashierReceiptsScreen() {
                   icon="printer"
                   loading={reprinting === p.id}
                   disabled={reprinting === p.id || localPrinting === p.id}
-                  onPress={() => handleReprint(p.id)}
+                  onPress={() => handleReprint(p)}
                 >
                   {t('Reprint')}
                 </Button>

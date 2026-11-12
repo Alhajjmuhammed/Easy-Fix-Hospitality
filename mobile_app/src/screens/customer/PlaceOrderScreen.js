@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import {
   Text,
   Button,
@@ -75,6 +75,17 @@ export default function PlaceOrderScreen({ navigation }) {
         .then((ok) => ok !== false)
         .catch(() => false)))
         .then((results) => results.length > 0 && results.every(Boolean));
+    };
+
+    // Online + phone prints tickets: the server skipped the Print Client, so a failed
+    // phone print must not go unnoticed (the order itself is saved and on the kitchen screen).
+    const warnTicketsNotPrinted = (printed) => {
+      if (!printed && localKotBot) {
+        Alert.alert(
+          t('Printer not reachable'),
+          t('Kitchen/bar tickets did not print. The order is saved and shows on the kitchen screen. Check the Bluetooth printer, then print the ticket again from the station screen.'),
+        );
+      }
     };
 
     if (!items.length) return;
@@ -178,14 +189,14 @@ export default function PlaceOrderScreen({ navigation }) {
               })),
             };
             clearCart();
-            fireTickets(newItemsOrder);
+            fireTickets(newItemsOrder).then(warnTicketsNotPrinted);
             navigation.replace('OrderConfirmation', { order: result.order });
           } else {
             const result = await apiPlaceOrder({ ...orderData, offline_id: clientId }, localKotBot);
             // Cache immediately so the order is available offline
             cacheOrders([result.order]).catch(() => {});
             clearCart();
-            fireTickets(result.order);
+            fireTickets(result.order).then(warnTicketsNotPrinted);
             navigation.replace('OrderConfirmation', { order: result.order });
           }
         } catch (err) {

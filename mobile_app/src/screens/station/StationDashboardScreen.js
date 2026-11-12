@@ -23,7 +23,7 @@ import SyncWarningsBanner from '../../components/SyncWarningsBanner';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePrinterStore } from '../../store/usePrinterStore';
-import { printOrderTicket } from '../../utils/printer';
+import { printOrderTicket, prefersPhonePrinter } from '../../utils/printer';
 import RestaurantHeader from '../../components/RestaurantHeader';
 import { STATUS_COLORS } from '../../constants/statusColors';
 import { useT } from '../../i18n';
@@ -369,14 +369,15 @@ export default function StationDashboardScreen() {
   const handlePrint = useCallback(async (order) => {
     if (mountedRef.current) setPrintingId(order.id);
     const isOfflineOrder = String(order.id).startsWith('offline_');
-    const useLocal = localKotBot || isOffline || isOfflineOrder;
+    // Phone prints itself when offline, when asked to, or when it has a Bluetooth printer.
+    const useLocal = localKotBot || isOffline || isOfflineOrder || prefersPhonePrinter();
     try {
       if (useLocal) {
         // Local BT print: offline orders, offline mode, or localKotBot flag
         const restaurantName = user?.restaurant_name || '';
         const orderedBy = user?.username || '';
-        await printOrderTicket(order, restaurantName, stationName, orderedBy);
-        if (mountedRef.current) setSnack('Ticket sent to printer');
+        const ok = await printOrderTicket(order, restaurantName, stationName, orderedBy);
+        if (mountedRef.current) setSnack(ok === false ? t('Printer not reachable') : 'Ticket sent to printer');
       } else {
         // Online: ask server to print via its configured printer
         await apiPrintStationTicket(order.id);
@@ -391,7 +392,7 @@ export default function StationDashboardScreen() {
     } finally {
       if (mountedRef.current) setPrintingId(null);
     }
-  }, [localKotBot, isOffline, stationName, user]);
+  }, [localKotBot, isOffline, stationName, user, t]);
 
   const renderOrderCard = useCallback(
     ({ item }) => (

@@ -11,7 +11,7 @@
  *  System     — native OS print dialog (works with any printer, always available)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -106,7 +106,9 @@ const bannerStyles = StyleSheet.create({
 });
 import {
   isBtClassicAvailable,
-  scanBluetoothDevices,
+  getPairedPrinters,
+  discoverNearbyPrinters,
+  mergeDevices,
   connectBluetoothPrinter,
   printReceipt,
   isPrinterUnreachable,
@@ -125,7 +127,7 @@ const MODES = [
     key:   'bluetooth',
     label: 'Bluetooth (Silent)',
     icon:  'bluetooth',
-    desc:  'Prints silently to a paired Bluetooth thermal printer. Requires custom build — will fall back to System dialog in Expo Go.',
+    desc:  'Prints silently on the Bluetooth thermal printer chosen below — online and offline.',
   },
   {
     key:   'network',
@@ -199,9 +201,41 @@ export default function PrinterSettingsScreen() {
     );
   }, [removePin, t]);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     setBtAvailable(isBtClassicAvailable());
+    return () => { mountedRef.current = false; };
   }, []);
+
+  // Bluetooth mode = this phone prints everything on its Bluetooth printer, online too.
+  // Kitchen/bar tickets move to the phone only once a printer is really selected (otherwise
+  // the server would skip the Print Client and the tickets would print nowhere), and move
+  // back when Bluetooth mode or the printer is left — only if the app switched them on.
+  const enableTicketsOnPhone = useCallback(async () => {
+    const s = usePrinterStore.getState();
+    if (s.mode !== 'bluetooth' || !s.bluetoothDevice?.address || s.localKotBot) return;
+    await saveSettings({ localKotBot: true, kotBotAuto: true });
+    Alert.alert(
+      t('Bluetooth (Silent)'),
+      t('Receipts, bills and kitchen/bar tickets will print on the Bluetooth printer of this phone, online and offline. You can turn off "Print KOT / BOT from phone" below.'),
+    );
+  }, [saveSettings, t]);
+
+  const releaseAutoTickets = () => {
+    const s = usePrinterStore.getState();
+    return s.kotBotAuto && s.localKotBot ? { localKotBot: false, kotBotAuto: false } : {};
+  };
+
+  const selectMode = useCallback(async (key) => {
+    if (key === 'bluetooth') {
+      if (mode === 'bluetooth') return;
+      await saveSettings({ mode: key });
+      await enableTicketsOnPhone();
+      return;
+    }
+    await saveSettings({ mode: key, ...(mode === 'bluetooth' ? releaseAutoTickets() : {}) });
+  }, [mode, saveSettings, enableTicketsOnPhone]);
 
   // ── BT scan ──────────────────────────────────────────────────────────────
 
@@ -217,18 +251,33 @@ export default function PrinterSettingsScreen() {
       );
       return;
     }
+    setScanning(true);
+    setBtDevices([]);
     try {
-      setScanning(true);
-      setBtDevices([]);
-      const devices = await scanBluetoothDevices();
-      setBtDevices(devices);
-      if (devices.length === 0) {
-        Alert.alert(t('No Devices Found'), t('Make sure your printer is on and paired in Android Bluetooth settings.'));
+      // 1. Printers already paired in phone settings — shown at once, no search needed.
+      let paired;
+      try {
+        paired = await getPairedPrinters();
+      } catch (err) {
+        if (mountedRef.current) Alert.alert(t('Bluetooth printer'), t(err?.message || 'Unknown error'));
+        return;
       }
-    } catch (err) {
-      Alert.alert(t('Scan Failed'), err?.message || t('Unknown error'));
+      if (!mountedRef.current) return;
+      setBtDevices(paired);
+      // 2. Optional search for nearby printers that are not paired yet.
+      const { devices: nearby, started } = await discoverNearbyPrinters();
+      if (!mountedRef.current) return;
+      const all = mergeDevices(paired, nearby);
+      setBtDevices(all);
+      if (all.length === 0) {
+        Alert.alert(
+          t('No Devices Found'),
+          t('Turn the printer on and pair it in phone Settings → Bluetooth (the PIN is usually 0000 or 1234), then tap Scan for Printers again.')
+            + (started ? '' : '\n\n' + t('To also find printers that are not paired yet, turn on Location.')),
+        );
+      }
     } finally {
-      setScanning(false);
+      if (mountedRef.current) setScanning(false);
     }
   }, [btAvailable, t]);
 
@@ -240,12 +289,13 @@ export default function PrinterSettingsScreen() {
       await connectBluetoothPrinter(device.address);
       await saveSettings({ bluetoothDevice: device });
       Alert.alert(t('Connected'), t('Printer "{name}" is ready.', { name: device.name }));
+      await enableTicketsOnPhone();
     } catch (err) {
-      Alert.alert(t('Connection Failed'), err?.message || t('Could not connect to printer.'));
+      Alert.alert(t('Connection Failed'), err?.message ? t(err.message) : t('Could not connect to printer.'));
     } finally {
       setConnecting(null);
     }
-  }, [saveSettings, t]);
+  }, [saveSettings, enableTicketsOnPhone, t]);
 
   // ── Test print ────────────────────────────────────────────────────────────
 
@@ -302,7 +352,7 @@ export default function PrinterSettingsScreen() {
             <TouchableOpacity
               key={m.key}
               style={[styles.modeCard, active && styles.modeCardActive]}
-              onPress={() => saveSettings({ mode: m.key })}
+              onPress={() => selectMode(m.key)}
               activeOpacity={0.7}
             >
               <View style={styles.modeRow}>
@@ -340,7 +390,7 @@ export default function PrinterSettingsScreen() {
                   <Text style={styles.deviceName}>{bluetoothDevice.name}</Text>
                   <Text style={styles.deviceAddress}>{bluetoothDevice.address}</Text>
                 </View>
-                <TouchableOpacity onPress={() => saveSettings({ bluetoothDevice: null })}>
+                <TouchableOpacity onPress={() => saveSettings({ bluetoothDevice: null, ...releaseAutoTickets() })}>
                   <Ionicons name="close-circle" size={22} color="#e53935" />
                 </TouchableOpacity>
               </View>
@@ -437,7 +487,7 @@ export default function PrinterSettingsScreen() {
         {/* ── Local KOT/BOT Toggle ── */}
         <TouchableOpacity
           style={styles.toggleRow}
-          onPress={() => saveSettings({ localKotBot: !localKotBot })}
+          onPress={() => saveSettings({ localKotBot: !localKotBot, kotBotAuto: false })}
           activeOpacity={0.7}
         >
           <View style={{ flex: 1 }}>

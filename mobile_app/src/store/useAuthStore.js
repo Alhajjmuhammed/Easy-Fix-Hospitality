@@ -183,10 +183,9 @@ export const useAuthStore = create((set, get) => ({
     const { useCartStore } = require('./useCartStore');
     useCartStore.getState().clearCart();
     useCartStore.getState().setLastOrderMode(null);
-    // Reset printer settings to defaults — Bluetooth device paired by one staff
-    // member should not carry over to the next user session.
-    const { usePrinterStore } = require('./usePrinterStore');
-    usePrinterStore.getState().resetSettings();
+    // Printer settings are KEPT: the Bluetooth printer belongs to this phone/counter, not to
+    // the person. Wiping them on every logout (including automatic ones when a login expires)
+    // silently sent receipts away from the Bluetooth printer until someone set it up again.
     // Clear the SQLite cache (menu, tables, cached orders) of the previous user's
     // restaurant. The offline queue is KEPT — this logout may be automatic (401/403) and
     // the unsent sales must survive it. Queued rows are tagged with their user and
